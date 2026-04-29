@@ -38,7 +38,7 @@
   >
 
   <!-- App design system – loaded synchronously so no flash of unstyled content -->
-  <link rel="stylesheet" href="/src/styles.css">
+  <link rel="stylesheet" href="./styles.css">
 
   <!--
     Inline critical CSS: hides #app until JS hydrates it,
@@ -97,15 +97,15 @@
       • Module-scoped variables (no global leaks)
   -->
   <script type="module">
-    import { loadState, getState, dispatch, subscribe, A } from '/src/state.js';
-    import { exportJSON, importJSON, exportCSV }           from '/src/backup.js';
-    import { mountApp }                                    from '/src/ui.js';
-    import { mountTimer }                                  from '/src/timer.js';
+    import { loadState, getState, dispatch, subscribe, A } from './state.js';
+    import { exportJSON, importJSON, exportCSV }           from './backup.js';
+    import { mountApp }                                    from './ui.js';
+    import { mountTimer }                                  from './timer.js';
     import {
       registerServiceWorker,
       onStorageError,
       onSwUpdateReady,
-    } from '/src/registerSW.js';
+    } from './registerSW.js';
 
     // ── 1. Hydrate state ────────────────────────────────────────────────────────
     //
