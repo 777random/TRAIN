@@ -96,6 +96,15 @@
       • Strict mode for free
       • Module-scoped variables (no global leaks)
   -->
+  <script>
+  window.onerror = function(msg, url, line) {
+    alert("FEHLER: " + msg + " (Zeile " + line + ")");
+  };
+  window.onunhandledrejection = function(e) {
+    alert("PROMISE-FEHLER: " + e.reason);
+  };
+  </script>
+  
   <script type="module">
     import { loadState, getState, dispatch, subscribe, A } from './state.js';
     import { exportJSON, importJSON, exportCSV }           from './backup.js';
@@ -128,7 +137,7 @@
     //
     // mountTimer attaches the session clock and pause-timer overlay to the DOM
     // and wires up the timer-start trigger from set completions and warmup clicks.
-    mountTimer();
+    // mountTimer();
 
     // ── 4. Show app, hide splash ────────────────────────────────────────────────
     appRoot.classList.add('is-ready');
