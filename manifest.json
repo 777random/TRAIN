@@ -1,0 +1,13 @@
+{
+  "name": "TRAIN – Workout Tracker",
+  "short_name": "TRAIN",
+  "description": "Funktionaler Workout-Tracker mit wöchentlichem Progressions-Tracking, Deload-Modus und CSV-Export.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0E0E10",
+  "theme_color": "#0E0E10",
+  "lang": "de",
+  "categories": ["fitness", "health", "sports"]
+}
