@@ -2,54 +2,27 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8">
-  <!--
-    viewport-fit=cover: lets content reach the iPhone notch/home-indicator area.
-    The body padding-bottom in CSS already accounts for the home indicator safe area.
-  --> 
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-
-  <!-- PWA / browser chrome -->
   <meta name="theme-color" content="#0E0E10">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="TRAIN">
-  <meta name="description"
-    content="Funktionaler Workout-Tracker mit wöchentlichem Progressions-Tracking, Pausentimer und CSV-Export.">
-
+  <meta name="description" content="Funktionaler Workout-Tracker mit wöchentlichem Progressions-Tracking, Pausentimer und CSV-Export.">
   <title>TRAIN</title>
 
-  <!-- PWA manifest -->
   <link rel="manifest" href="./manifest.json">
+  <link rel="apple-touch-icon" sizes="192x192" href="./icon-192.png">
+  <link rel="apple-touch-icon" sizes="512x512" href="./icon-512.png">
 
-  <!-- Apple touch icons -->
-  <link rel="apple-touch-icon" sizes="192x192" href="/icons/icon-192.png">
-  <link rel="apple-touch-icon" sizes="512x512" href="/icons/icon-512.png">
-
-  <!--
-    Fonts – two preconnects speed up the very first DNS lookup.
-    display=swap means body text renders immediately in the fallback font
-    while Bebas Neue / DM Sans load in the background.
-  -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link
-    href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap"
-    rel="stylesheet"
-  >
-
-  <!-- App design system – loaded synchronously so no flash of unstyled content -->
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./styles.css">
 
-  <!--
-    Inline critical CSS: hides #app until JS hydrates it,
-    preventing a brief flash of the empty div background.
-    Once mountApp() runs it removes this class.
-  -->
   <style>
     #app { opacity: 0; transition: opacity 200ms ease; }
     #app.is-ready { opacity: 1; }
 
-    /* Splash / loading indicator shown before JS hydrates */
     #splash {
       position: fixed; inset: 0; z-index: 9999;
       background: #0E0E10;
@@ -75,118 +48,62 @@
 </head>
 <body>
 
-  <!-- Splash – visible until mountApp() finishes first render -->
   <div id="splash" aria-hidden="true">
     <div id="splash__ring"></div>
     TRAIN
   </div>
 
-  <!--
-    Single mount point.
-    ui.js renders everything inside here via innerHTML / DOM APIs.
-    aria-live="polite" means screen readers announce dynamic content changes.
-  -->
   <div id="app" aria-live="polite"></div>
 
-  <!--
-    Boot script.
-    type="module" gives us:
-      • ES module imports / exports
-      • Deferred by default (equivalent to defer) – runs after DOM is parsed
-      • Strict mode for free
-      • Module-scoped variables (no global leaks)
-  -->
   <script>
-  window.onerror = function(msg, url, line) {
-    alert("FEHLER: " + msg + " (Zeile " + line + ")");
-  };
-  window.onunhandledrejection = function(e) {
-    alert("PROMISE-FEHLER: " + e.reason);
-  };
+    window.onerror = function(msg, url, line) {
+      alert("FEHLER: " + msg + " (Zeile " + line + ")");
+    };
+    window.onunhandledrejection = function(e) {
+      alert("PROMISE-FEHLER: " + e.reason);
+    };
+
+    // Dieser Detektor fängt jeden Tipp auf den Bildschirm ab!
+    document.addEventListener('click', function(e) {
+      alert("KLICK ERKANNT AUF -> Element: " + e.target.tagName + " | Klasse: " + e.target.className + " | ID: " + e.target.id);
+    }, true);
   </script>
   
   <script type="module">
     import { loadState, getState, dispatch, subscribe, A } from './state.js';
     import { exportJSON, importJSON, exportCSV }           from './backup.js';
     import { mountApp }                                    from './ui.js';
-    import { mountTimer }                                  from './timer.js';
-    import {
-      registerServiceWorker,
-      onStorageError,
-      onSwUpdateReady,
-    } from './registerSW.js';
+    // import { mountTimer }                               from './timer.js';
+    import { registerServiceWorker, onStorageError, onSwUpdateReady } from './registerSW.js';
 
-    // ── 1. Hydrate state ────────────────────────────────────────────────────────
-    //
-    // loadState() reads localStorage (primary) → localStorage shadow (fallback).
-    // Returns true if existing data was found, false if starting fresh.
     const restored = loadState();
     if (!restored) {
       console.info('[TRAIN] No saved state – starting with default week.');
     }
 
-    // ── 2. Mount UI ─────────────────────────────────────────────────────────────
-    //
-    // mountApp builds the full DOM scaffold, binds all event listeners,
-    // sets up the IntersectionObserver for sticky headers, and calls
-    // subscribe() so every dispatch() triggers a re-render.
     const appRoot = document.getElementById('app');
     mountApp(appRoot);
 
-    // ── 3. Mount Timer ──────────────────────────────────────────────────────────
-    //
-    // mountTimer attaches the session clock and pause-timer overlay to the DOM
-    // and wires up the timer-start trigger from set completions and warmup clicks.
+    // Timer bleibt zum Testen deaktiviert
     // mountTimer();
 
-    // ── 4. Show app, hide splash ────────────────────────────────────────────────
     appRoot.classList.add('is-ready');
     const splash = document.getElementById('splash');
     splash.classList.add('is-hidden');
-    // Remove from DOM after transition so it doesn't block interaction
     splash.addEventListener('transitionend', () => splash.remove(), { once: true });
 
-    // ── 5. Register Service Worker ──────────────────────────────────────────────
     registerServiceWorker();
 
-    // ── 6. Storage-quota handler ────────────────────────────────────────────────
-    //
-    // state.js emits 'train:storage-error' when localStorage.setItem() throws.
-    // ui.js renders a #storage-warning banner inside #app; here we also make
-    // the exportJSON shortcut available on the window for the banner's button.
     window.__trainExportJSON = exportJSON;
     onStorageError(() => {
       document.getElementById('storage-warning')?.classList.add('is-visible');
     });
 
-    // ── 7. SW update notification ───────────────────────────────────────────────
-    //
-    // When a new SW version is installed and waiting, show a toast so the user
-    // can reload to get the update.  We use the ui.js showToast indirectly by
-    // dispatching a custom DOM event that ui.js listens for.
     onSwUpdateReady(event => {
       window.dispatchEvent(new CustomEvent('train:show-update-banner', {
         detail: { registration: event.detail.registration },
       }));
     });
-
-    // ── 8. Development helpers ──────────────────────────────────────────────────
-    if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
-      // Log every state change to the console for debugging
-      subscribe(state => {
-        console.debug('[TRAIN] state →', {
-          week:    state.weeks[state.curIdx]?.startDate,
-          mode:    state.weeks[state.curIdx]?.mode,
-          savedAt: state.meta.savedAt,
-        });
-      });
-      // Expose state and dispatch on window for DevTools inspection
-      window.__trainState    = getState;
-      window.__trainDispatch = dispatch;
-      window.__trainA        = A;
-      console.info('[TRAIN] Dev mode: window.__trainState(), __trainDispatch(A.*, payload)');
-    }
   </script>
-
 </body>
 </html>
