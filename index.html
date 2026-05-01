@@ -20,6 +20,14 @@
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./styles.css?v=6">
 
+    <script src="./dragdrop.js"></script>
+  <script>
+    MobileDragDrop.polyfill({
+      holdToDrag: 250
+    });
+    window.addEventListener('touchmove', function() {}, {passive: false});
+  </script>
+  
   <style>
     #app { opacity: 0; transition: opacity 200ms ease; }
     #app.is-ready { opacity: 1; }
