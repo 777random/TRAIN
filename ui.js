@@ -1106,18 +1106,33 @@ function _handleClick(e) {
       }
       break;
 
-    case 'move-ex-up':
-      if (+ei > 0) {
-        dispatch(A.EX_MOVE, { di: +di, fromEi: +ei, toEi: +ei - 1 });
+        case 'move-ex-up': {
+      const toEi = +ei - 1;
+      if (toEi >= 0) {
+        dispatch(A.EX_MOVE, { di: +di, fromEi: +ei, toEi });
+        // Wartet kurz das Neuladen ab und scrollt den Pfeil dann in die Mitte
+        setTimeout(() => {
+          const newBtn = document.querySelector(`[data-action="move-ex-up"][data-di="${di}"][data-ei="${toEi}"]`);
+          if (newBtn) newBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 50);
       }
       break;
+    }
 
-    case 'move-ex-down':
+    case 'move-ex-down': {
       const maxEi = getState().weeks[getState().curIdx].days[+di].exercises.length - 1;
-      if (+ei < maxEi) {
-        dispatch(A.EX_MOVE, { di: +di, fromEi: +ei, toEi: +ei + 1 });
+      const toEi = +ei + 1;
+      if (toEi <= maxEi) {
+        dispatch(A.EX_MOVE, { di: +di, fromEi: +ei, toEi });
+        // Wartet kurz das Neuladen ab und scrollt den Pfeil dann in die Mitte
+        setTimeout(() => {
+          const newBtn = document.querySelector(`[data-action="move-ex-down"][data-di="${di}"][data-ei="${toEi}"]`);
+          if (newBtn) newBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 50);
       }
       break;
+    }
+      
       
 
     // ── Set ────────────────────────────────────────────────────────────────
