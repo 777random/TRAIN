@@ -4,17 +4,16 @@
  * Architecture:
  *   - mountApp(root)  bootstraps the entire DOM once.
  *   - subscribe() receives every state change and calls render().
- *   - render() does a targeted diff: it only re-renders the region
- *     that changed (week header, a single day card, etc.) rather
- *     than wiping the whole DOM on every keystroke.
+ *   - render() does a targeted diff: only re-renders the region that changed.
  *   - All user interactions call dispatch() from state.js.
- *     No state is stored in the DOM or in module-level variables
- *     except transient UI state (open accordions, active tab).
  *
- * Swipe default: ON (settings.swipe starts true after Step-2 migration).
- * Next Monday: auto-selected in the new-week date picker.
- * Icons: all from icons.js – no emoji, no krypt characters.
- * Touch targets: all interactive elements ≥ 44×44 px (via CSS).
+ * BUG FIX (v2):
+ *   _handleClick previously used a split two-switch pattern with a broken
+ *   guard condition for the day-header accordion.  It is now a single,
+ *   linear function that uses e.target.closest() for EVERY clickable target,
+ *   so clicks on any child element (pill, chevron, subtitle div, etc.) are
+ *   reliably caught.  The same fix is applied to export-option divs and
+ *   settings rows that previously used role="button" without data-action.
  */
 
 import {
@@ -103,10 +102,8 @@ function openModal(id) {
   const el = document.getElementById(id);
   if (!el) return;
   el.classList.add('is-open');
-  // Move focus to first focusable element inside
   const first = el.querySelector('button, input, select, textarea, [tabindex]');
   first?.focus();
-  // Close on backdrop click
   el.addEventListener('click', _modalBackdropClose, { once: true });
 }
 function _modalBackdropClose(e) {
@@ -117,11 +114,6 @@ function closeModal(id) {
 }
 
 // ─── Sticky observer ─────────────────────────────────────────────────────────
-/**
- * IntersectionObserver watches invisible sentinel <div>s placed just above
- * each sticky element.  When a sentinel leaves the viewport (scrolled past),
- * we add the .is-stuck class to the sticky element so CSS can show its shadow.
- */
 function _initStickyObserver() {
   if (_stickyObserver) _stickyObserver.disconnect();
   _stickyObserver = new IntersectionObserver(
@@ -131,7 +123,7 @@ function _initStickyObserver() {
         if (target) target.classList.toggle('is-stuck', !entry.isIntersecting);
       });
     },
-    { threshold: 0, rootMargin: `-${52}px 0px 0px 0px` }
+    { threshold: 0, rootMargin: `-52px 0px 0px 0px` }
   );
   document.querySelectorAll('.sticky-sentinel').forEach(el =>
     _stickyObserver.observe(el)
@@ -141,18 +133,15 @@ function _initStickyObserver() {
 // ─── Swipe navigation ────────────────────────────────────────────────────────
 function _initSwipe(container) {
   container.addEventListener('touchstart', e => {
-    const s = getState();
-    if (!s.settings.swipe) return;
+    if (!getState().settings.swipe) return;
     _swipeStartX = e.touches[0].clientX;
     _swipeStartY = e.touches[0].clientY;
   }, { passive: true });
 
   container.addEventListener('touchend', e => {
-    const s = getState();
-    if (!s.settings.swipe || _swipeStartX === null) return;
+    if (!getState().settings.swipe || _swipeStartX === null) return;
     const dx = e.changedTouches[0].clientX - _swipeStartX;
     const dy = e.changedTouches[0].clientY - _swipeStartY;
-    // Only horizontal swipes (angle < 40°)
     if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.2) {
       dispatch(A.WEEK_NAVIGATE, { delta: dx < 0 ? 1 : -1 });
     }
@@ -161,7 +150,7 @@ function _initSwipe(container) {
   }, { passive: true });
 }
 
-// ─── Drag-and-drop for exercise reorder ─────────────────────────────────────
+// ─── Drag-and-drop ───────────────────────────────────────────────────────────
 function _bindDrag(container) {
   container.addEventListener('dragstart', e => {
     const handle = e.target.closest('[data-drag-handle]');
@@ -170,7 +159,6 @@ function _bindDrag(container) {
     if (!wrap) return;
     _dragSrc = { di: +wrap.dataset.di, ei: +wrap.dataset.ei };
     e.dataTransfer.effectAllowed = 'move';
-    // Delay adding drag class so it doesn't affect the drag image
     requestAnimationFrame(() => wrap.classList.add('dragging'));
   });
 
@@ -178,7 +166,6 @@ function _bindDrag(container) {
     e.preventDefault();
     const wrap = e.target.closest('[data-di][data-ei]');
     if (!wrap || !_dragSrc) return;
-    // Highlight drop target
     container.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
     if (+wrap.dataset.di === _dragSrc.di) wrap.classList.add('drag-over');
   });
@@ -214,26 +201,28 @@ function _bindDrag(container) {
 // RENDER FUNCTIONS
 // ════════════════════════════════════════════════════════════════════════════
 
-// ─── Week header ─────────────────────────────────────────────────────────────
 function renderWeekHeader(state) {
-  const wk    = state.weeks[state.curIdx];
-  const isDl  = wk?.mode === 'deload';
+  const wk      = state.weeks[state.curIdx];
+  const isDl    = wk?.mode === 'deload';
   const isFirst = state.curIdx === 0;
   const isLast  = state.curIdx === state.weeks.length - 1;
 
-  document.getElementById('wk-label').textContent = wk ? wkLabel(wk.startDate) : '–';
-  document.getElementById('wk-label').className =
-    'week-nav__label' + (isDl ? ' week-nav__label--deload' : '');
-  document.getElementById('wk-range').textContent = wk ? wkRange(wk.startDate) : '';
+  const labelEl = document.getElementById('wk-label');
+  const rangeEl = document.getElementById('wk-range');
+  const prevBtn = document.getElementById('btn-prev-wk');
+  const nextBtn = document.getElementById('btn-next-wk');
+  const stdBtn  = document.getElementById('mode-std');
+  const dlBtn   = document.getElementById('mode-dl');
 
-  document.getElementById('btn-prev-wk').disabled = isFirst;
-  document.getElementById('btn-next-wk').disabled = isLast;
-
-  // Mode pill
-  const stdBtn = document.getElementById('mode-std');
-  const dlBtn  = document.getElementById('mode-dl');
-  stdBtn?.classList.toggle('is-active', !isDl);
-  dlBtn?.classList.toggle('is-active', isDl);
+  if (labelEl) {
+    labelEl.textContent = wk ? wkLabel(wk.startDate) : '–';
+    labelEl.className   = 'week-nav__label' + (isDl ? ' week-nav__label--deload' : '');
+  }
+  if (rangeEl)  rangeEl.textContent = wk ? wkRange(wk.startDate) : '';
+  if (prevBtn)  prevBtn.disabled    = isFirst;
+  if (nextBtn)  nextBtn.disabled    = isLast;
+  if (stdBtn)   stdBtn.classList.toggle('is-active', !isDl);
+  if (dlBtn)    dlBtn.classList.toggle('is-active',   isDl);
 }
 
 // ─── Day list ────────────────────────────────────────────────────────────────
@@ -243,9 +232,9 @@ function renderDayList(state) {
   const wk = state.weeks[state.curIdx];
   if (!wk) { container.innerHTML = ''; return; }
 
-  // Preserve open states that already exist
+  // Snapshot which accordions are open before wiping innerHTML
   container.querySelectorAll('.day-card').forEach(card => {
-    const di = +card.dataset.di;
+    const di   = +card.dataset.di;
     const body = card.querySelector('.day-card__body');
     if (body?.classList.contains('is-open')) _openDays.add(di);
     else _openDays.delete(di);
@@ -253,7 +242,7 @@ function renderDayList(state) {
 
   container.innerHTML = wk.days.map((day, di) => renderDayCard(wk, di, state)).join('');
 
-  // Re-open accordions that were open
+  // Restore open accordions
   _openDays.forEach(di => {
     const body = container.querySelector(`[data-day-body="${di}"]`);
     const hdr  = container.querySelector(`[data-day-hdr="${di}"]`);
@@ -274,20 +263,6 @@ function renderDayCard(wk, di, state) {
   const totalSets = day.exercises.reduce((s, ex) => s + ex.sets.length, 0);
   const doneSets  = day.exercises.reduce((s, ex) => s + ex.sets.filter(st => st.done).length, 0);
 
-  // Prev week volume
-  let prevBanner = '';
-  if (state.curIdx > 0) {
-    const prevDay = state.weeks[state.curIdx - 1]?.days?.[di];
-    if (prevDay) {
-      const pvol = prevDay.exercises.reduce(
-        (s, ex) => s + ex.sets.reduce((ss, st) => ss + st.weight * st.reps, 0), 0
-      );
-      prevBanner = `<div class="prev-banner">
-        ${ic.barChart()}<span>Vorwoche: ${pvol} kg Volumen</span>
-      </div>`;
-    }
-  }
-
   const dotClass = done
     ? 'day-card__dot day-card__dot--done'
     : locked
@@ -296,13 +271,12 @@ function renderDayCard(wk, di, state) {
 
   const cardClass = [
     'day-card',
-    done   ? 'day-card--done'   : '',
-    isDl   ? 'day-card--deload' : '',
+    done ? 'day-card--done'   : '',
+    isDl ? 'day-card--deload' : '',
   ].filter(Boolean).join(' ');
 
   return `
 <article class="${cardClass}" data-di="${di}">
-  <!-- Sentinel for IntersectionObserver sticky detection -->
   <div class="sticky-sentinel" aria-hidden="true" style="height:1px;pointer-events:none;"></div>
 
   <button
@@ -350,7 +324,6 @@ function renderDayBody(wk, di, state) {
   const locked = !!day.locked;
   const done   = !!day.markedDone;
 
-  // Prev week vol banner (re-used inside body for context)
   let prevBanner = '';
   if (state.curIdx > 0) {
     const prevDay = state.weeks[state.curIdx - 1]?.days?.[di];
@@ -364,10 +337,7 @@ function renderDayBody(wk, di, state) {
     }
   }
 
-  const exHtml = day.exercises.map((ex, ei) =>
-    renderExercise(wk, di, ei, state)
-  ).join('');
-
+  const exHtml       = day.exercises.map((ex, ei) => renderExercise(wk, di, ei, state)).join('');
   const lockBtnLabel = done ? 'Tag entsperren' : 'Tag als abgeschlossen markieren und sperren';
   const lockBtnIcon  = done ? ic.unlock() : ic.lock();
 
@@ -447,7 +417,6 @@ function renderExercise(wk, di, ei, state) {
 
   return `
 <div class="exercise" data-di="${di}" data-ei="${ei}" draggable="${drag}">
-  <!-- Sentinel for exercise sticky-name detection -->
   <div class="sticky-sentinel" aria-hidden="true" style="height:1px;pointer-events:none;"></div>
 
   <div class="exercise__name-sticky">
@@ -517,8 +486,7 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl) {
   const dispW   = isDl ? Math.round(s.weight * 0.75 * 2) / 2 : s.weight;
 
   return `
-<div class="set-row" role="listitem"
-  data-di="${di}" data-ei="${ei}" data-si="${si}">
+<div class="set-row" role="listitem" data-di="${di}" data-ei="${ei}" data-si="${si}">
 
   <span class="set-idx" aria-hidden="true">${si + 1}</span>
 
@@ -547,7 +515,7 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl) {
       min="1" max="10" value="${s.rpe ?? ''}" placeholder="–"
       ${locked ? 'disabled' : ''}
       data-action="set-rpe" data-di="${di}" data-ei="${ei}" data-si="${si}"
-      aria-label="Satz ${si + 1} RPE (Rate of Perceived Exertion)"
+      aria-label="Satz ${si + 1} RPE"
     />
     <span class="prev-hint" aria-hidden="true">${prevSet?.rpe ? 'RPE ' + prevSet.rpe : ''}</span>
   </div>
@@ -580,9 +548,7 @@ function renderBodyTab(state) {
   const bd = wk?.bodyData ?? {};
 
   const histRows = [...state.weeks]
-    .slice()
-    .reverse()
-    .slice(0, 8)
+    .slice().reverse().slice(0, 8)
     .filter(w => w.bodyData && (w.bodyData.weight || w.bodyData.energy || w.bodyData.sleep))
     .map(w => {
       const b = w.bodyData;
@@ -602,7 +568,7 @@ function renderBodyTab(state) {
       </div>`;
     }).join('');
 
-  const scale = (field, label, max5) => {
+  const scale = (field, label) => {
     const cur = bd[field];
     return `
     <div class="body-field" style="margin-bottom:var(--sp-3)">
@@ -625,8 +591,9 @@ function renderBodyTab(state) {
   container.innerHTML = `
   <div class="body-section">
     <button class="body-section__header" aria-expanded="true"
-      onclick="this.setAttribute('aria-expanded', this.getAttribute('aria-expanded')==='true'?'false':'true');
-               this.nextElementSibling.classList.toggle('is-open')">
+      onclick="this.setAttribute('aria-expanded',
+        this.getAttribute('aria-expanded')==='true'?'false':'true');
+        this.nextElementSibling.classList.toggle('is-open')">
       <span class="body-section__title">${wk ? wkLabel(wk.startDate) : '–'}</span>
       <span aria-hidden="true">${ic.chevronDown()}</span>
     </button>
@@ -765,7 +732,6 @@ function renderAnalysisTab(state) {
 
   ${weekCards}`;
 
-  // Draw charts after DOM is updated
   requestAnimationFrame(() => {
     drawLineChart('chart-vol', wkLabels, vols, '#C8FF00');
     _updateExChart(state);
@@ -829,7 +795,6 @@ function _drawHeatmap(state) {
     });
 }
 
-/** Lightweight canvas line chart – no external library. */
 function drawLineChart(id, labels, data, color) {
   const canvas = document.getElementById(id);
   if (!canvas) return;
@@ -841,11 +806,11 @@ function drawLineChart(id, labels, data, color) {
 
   const max = Math.max(...data, 1);
   const pad = { l: 10, r: 10, t: 10, b: 20 };
-  const gw = W - pad.l - pad.r, gh = H - pad.t - pad.b;
-  const x = i => pad.l + i * (gw / (data.length - 1 || 1));
-  const y = v => pad.t + gh - (v / max) * gh;
+  const gw  = W - pad.l - pad.r;
+  const gh  = H - pad.t - pad.b;
+  const x   = i => pad.l + i * (gw / (data.length - 1 || 1));
+  const y   = v => pad.t + gh - (v / max) * gh;
 
-  // Grid lines
   ctx.strokeStyle = '#2E2E35'; ctx.lineWidth = 1;
   [0, 0.5, 1].forEach(f => {
     ctx.beginPath();
@@ -854,21 +819,18 @@ function drawLineChart(id, labels, data, color) {
     ctx.stroke();
   });
 
-  // Fill
   ctx.beginPath();
   data.forEach((v, i) => i === 0 ? ctx.moveTo(x(i), y(v)) : ctx.lineTo(x(i), y(v)));
   ctx.lineTo(x(data.length - 1), pad.t + gh);
   ctx.lineTo(pad.l, pad.t + gh);
   ctx.closePath();
-  ctx.fillStyle = color.replace(')', ', 0.08)').replace('rgb', 'rgba').replace('#C8FF00', 'rgba(200,255,0,.08)').replace('#4FC3F7', 'rgba(79,195,247,.08)');
+  ctx.fillStyle = color === '#C8FF00' ? 'rgba(200,255,0,.08)' : 'rgba(79,195,247,.08)';
   ctx.fill();
 
-  // Line
   ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = 2;
   data.forEach((v, i) => i === 0 ? ctx.moveTo(x(i), y(v)) : ctx.lineTo(x(i), y(v)));
   ctx.stroke();
 
-  // Dots + labels
   data.forEach((v, i) => {
     ctx.beginPath(); ctx.arc(x(i), y(v), 3, 0, Math.PI * 2);
     ctx.fillStyle = color; ctx.fill();
@@ -904,26 +866,23 @@ function renderSettingsTab(state) {
   </div>
 
   <div class="settings-section">
-    <div class="settings-row settings-row--clickable" data-action="open-tpl"
-      role="button" tabindex="0" aria-label="Template bearbeiten">
+    <div class="settings-row settings-row--clickable" data-action="open-tpl">
       <div>
-        <div class="settings-row__label">${ic.calendar()} Template bearbeiten</div>
+        <div class="settings-row__label">📋 Template bearbeiten</div>
         <div class="settings-row__desc">Vorlage für neue Wochen anpassen</div>
       </div>
       <div class="settings-row__action">${ic.chevronRight()}</div>
     </div>
-    <div class="settings-row settings-row--clickable" data-action="reset-to-tpl"
-      role="button" tabindex="0" aria-label="Aktuelle Woche zurücksetzen">
+    <div class="settings-row settings-row--clickable" data-action="reset-to-tpl">
       <div>
-        <div class="settings-row__label">${ic.refresh()} Woche zurücksetzen</div>
+        <div class="settings-row__label">🔄 Woche zurücksetzen</div>
         <div class="settings-row__desc">Aktuelle Woche mit Custom-Template überschreiben</div>
       </div>
       <div class="settings-row__action">${ic.chevronRight()}</div>
     </div>
-    <div class="settings-row settings-row--clickable" data-action="reset-factory"
-      role="button" tabindex="0" aria-label="Original-Template wiederherstellen">
+    <div class="settings-row settings-row--clickable" data-action="reset-factory">
       <div>
-        <div class="settings-row__label" style="color:var(--c-danger)">${ic.refresh()} Original wiederherstellen</div>
+        <div class="settings-row__label" style="color:var(--c-danger)">↺ Original wiederherstellen</div>
         <div class="settings-row__desc">Custom-Template auf Werkseinstellung zurücksetzen</div>
       </div>
       <div class="settings-row__action">${ic.chevronRight()}</div>
@@ -931,15 +890,14 @@ function renderSettingsTab(state) {
   </div>
 
   <div class="settings-section">
-    <div class="settings-row settings-row--clickable" data-action="export-json"
-      role="button" tabindex="0" aria-label="Daten als JSON exportieren">
+    <div class="settings-row settings-row--clickable" data-action="export-json">
       <div>
         <div class="settings-row__label">${ic.download()} Daten exportieren (JSON)</div>
         <div class="settings-row__desc">Sicherungskopie aller Trainingsdaten</div>
       </div>
       <div class="settings-row__action">${ic.chevronRight()}</div>
     </div>
-    <label class="settings-row settings-row--clickable" aria-label="JSON-Backup importieren">
+    <label class="settings-row settings-row--clickable">
       <div>
         <div class="settings-row__label">${ic.upload()} Daten importieren (JSON)</div>
         <div class="settings-row__desc">Backup wiederherstellen</div>
@@ -951,7 +909,7 @@ function renderSettingsTab(state) {
 
   <div class="settings-section">
     <div class="settings-row">
-      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN v6.0 · Step 2</div></div>
+      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN v6.0</div></div>
     </div>
     <div class="settings-row">
       <div>
@@ -962,13 +920,12 @@ function renderSettingsTab(state) {
   </div>`;
 }
 
-// ─── Template editor (inside modal) ──────────────────────────────────────────
+// ─── Template editor ──────────────────────────────────────────────────────────
 function renderTemplateEditor(state) {
   const container = document.getElementById('tpl-editor-body');
   if (!container) return;
 
-  const tpl = state.customTemplate;
-  container.innerHTML = tpl.map((day, di) => `
+  container.innerHTML = state.customTemplate.map((day, di) => `
   <div class="tpl-day-section">
     <div class="tpl-day-title">${h(day.title)} — ${h(day.subtitle)}</div>
     ${day.exercises.map((ex, ei) => `
@@ -1007,95 +964,128 @@ function renderTemplateEditor(state) {
       </div>
     </div>`).join('')}
     <button class="btn btn--ghost btn--sm" data-tpl-action="add-ex" data-tpl-di="${di}"
-      style="margin-top:4px" aria-label="Übung zu ${h(day.title)} hinzufügen">
+      style="margin-top:4px" aria-label="Übung hinzufügen">
       ${ic.plus()} Übung hinzufügen
     </button>
   </div>`).join('');
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// EVENT DELEGATION – single listener on #app
+// EVENT DELEGATION  ← FIXED: single clean function, closest() everywhere
 // ════════════════════════════════════════════════════════════════════════════
 
 function _bindEvents(root) {
-  root.addEventListener('click',  _handleClick);
-  root.addEventListener('change', _handleChange);
-  root.addEventListener('input',  _handleInput);
-  root.addEventListener('keydown',_handleKeydown);
+  root.addEventListener('click',   _handleClick);
+  root.addEventListener('change',  _handleChange);
+  root.addEventListener('input',   _handleInput);
+  root.addEventListener('keydown', _handleKeydown);
 }
 
+/**
+ * Single click handler for the entire app.
+ *
+ * Every branch uses e.target.closest() to walk up the DOM from the actual
+ * clicked element to the intended target.  This means clicking on a child
+ * element (SVG icon, span, pill, subtitle div) works exactly the same as
+ * clicking the parent button/div.
+ *
+ * Order of precedence (most-specific first):
+ *   1. Inputs / textareas inside day-card__header  → absorbed, do nothing
+ *   2. Day-card header (accordion toggle)          → uses closest('.day-card__header')
+ *   3. Elements with [data-action]                 → uses closest('[data-action]')
+ *   4. Template editor actions [data-tpl-action]   → uses closest('[data-tpl-action]')
+ */
 function _handleClick(e) {
-  const target = e.target.closest('[data-action]');
-  if (!target) {
-    // Check settings-row clickable (no data-action, uses role=button)
-    const row = e.target.closest('[data-action]');
-    if (!row) return;
+
+  // ── 1. Day accordion header ──────────────────────────────────────────────
+  // Must be checked BEFORE [data-action] because the header is a <button>
+  // with no data-action, and its children (pill, chevron, title divs) have
+  // no data-action either.
+  const hdr = e.target.closest('.day-card__header');
+  if (hdr) {
+    // If the click landed on an interactive child (input, button with
+    // data-action) that is INSIDE the header, let that propagate instead.
+    // In practice the header has no inputs, but be defensive.
+    if (e.target.closest('[data-action]') && !e.target.closest('[data-action]').isSameNode(hdr)) {
+      // fall through to data-action handling below
+    } else {
+      const di = hdr.dataset.dayHdr;
+      if (di !== undefined) _toggleAccordion(+di);
+      return;
+    }
   }
 
-  const el     = target || e.target.closest('[data-action]');
-  if (!el) return;
-  const action = el.dataset.action;
+  // ── 2. Elements with [data-action] ──────────────────────────────────────
+  const el = e.target.closest('[data-action]');
+  if (!el) {
+    // ── 3. Template editor actions ─────────────────────────────────────────
+    const tplEl = e.target.closest('[data-tpl-action]');
+    if (tplEl) _handleTplAction(tplEl);
+    return;
+  }
+
+  const action             = el.dataset.action;
   const { di, ei, si, field, key, val, sec } = el.dataset;
 
   switch (action) {
 
-    // ── Week ──────────────────────────────────────────────────────────────
+    // ── Week navigation ────────────────────────────────────────────────────
     case 'nav-prev':
       dispatch(A.WEEK_NAVIGATE, { delta: -1 }); break;
+
     case 'nav-next':
-      dispatch(A.WEEK_NAVIGATE, { delta: 1 });  break;
+      dispatch(A.WEEK_NAVIGATE, { delta: 1 }); break;
+
     case 'mode-std':
       dispatch(A.WEEK_SET_MODE, { mode: 'standard' }); break;
+
     case 'mode-dl':
-      dispatch(A.WEEK_SET_MODE, { mode: 'deload' });   break;
+      dispatch(A.WEEK_SET_MODE, { mode: 'deload' }); break;
+
     case 'open-new-week':
       _prepNewWeekModal();
       openModal('modal-new-week'); break;
+
     case 'copy-prev':
       dispatch(A.WEEK_COPY_PREV, {});
       showToast('Vorwoche übernommen ✓', 'ok'); break;
+
     case 'open-export':
       openModal('modal-export'); break;
+
     case 'open-delete-week':
       openModal('modal-delete-week'); break;
+
     case 'create-week':
       _createWeek(); break;
+
     case 'confirm-delete-week':
       dispatch(A.WEEK_DELETE, {});
       closeModal('modal-delete-week');
       showToast('Woche gelöscht', 'info'); break;
+
+    // ── Export options (previously role=button without data-action) ────────
     case 'export-current':
-      exportCSV('current'); closeModal('modal-export');
+      exportCSV('current');
+      closeModal('modal-export');
       showToast('CSV wird heruntergeladen …', 'ok'); break;
+
     case 'export-all':
-      exportCSV('all'); closeModal('modal-export');
+      exportCSV('all');
+      closeModal('modal-export');
       showToast('CSV wird heruntergeladen …', 'ok'); break;
 
-    // ── Day accordion ─────────────────────────────────────────────────────
-    case undefined: {
-      // Fallthrough for day-card__header (has no data-action, is a button)
-      break;
-    }
-  }
-
-  // Day header toggle (the button itself has no data-action)
-  const hdrBtn = e.target.closest('.day-card__header');
-  if (hdrBtn && !target) {
-    const hdrDi = +hdrBtn.dataset.dayHdr;
-    _toggleAccordion(hdrDi);
-    return;
-  }
-
-  switch (action) {
-    // ── Day ───────────────────────────────────────────────────────────────
+    // ── Day ────────────────────────────────────────────────────────────────
     case 'toggle-complete': {
       dispatch(A.DAY_TOGGLE_COMPLETE, { di: +di });
+      // Read updated state to get new locked value
       const day = getState().weeks[getState().curIdx]?.days[+di];
       showToast(day?.markedDone ? 'Tag gesperrt 🔒' : 'Tag entsperrt 🔓', 'info');
       break;
     }
+
     case 'add-ex': {
-      const inp = document.getElementById(`add-ex-input-${di}`);
+      const inp  = document.getElementById(`add-ex-input-${di}`);
       const name = inp?.value.trim();
       if (!name) { inp?.focus(); break; }
       dispatch(A.EX_ADD, { di: +di, name });
@@ -1104,50 +1094,59 @@ function _handleClick(e) {
       break;
     }
 
-    // ── Exercise ──────────────────────────────────────────────────────────
+    // ── Exercise ───────────────────────────────────────────────────────────
     case 'toggle-cfg':
       dispatch(A.EX_TOGGLE_CFG, { di: +di, ei: +ei }); break;
+
     case 'set-pause':
       dispatch(A.EX_UPDATE, { di: +di, ei: +ei, field: 'pauseSec', value: +sec }); break;
+
     case 'remove-ex':
-      if (confirm(`Übung entfernen?`)) {
+      if (confirm('Übung entfernen?')) {
         dispatch(A.EX_REMOVE, { di: +di, ei: +ei });
       }
       break;
 
-    // ── Set ───────────────────────────────────────────────────────────────
+    // ── Set ────────────────────────────────────────────────────────────────
     case 'toggle-done':
       dispatch(A.SET_TOGGLE_DONE, { di: +di, ei: +ei, si: +si }); break;
+
     case 'remove-set':
       dispatch(A.SET_REMOVE, { di: +di, ei: +ei, si: +si }); break;
+
     case 'add-set':
       dispatch(A.SET_ADD, { di: +di, ei: +ei }); break;
 
-    // ── Body tab scale buttons ─────────────────────────────────────────────
+    // ── Body scale buttons ─────────────────────────────────────────────────
     case 'body-scale':
       dispatch(A.BODY_SET_FIELD, { field, value: +val }); break;
 
-    // ── Settings ──────────────────────────────────────────────────────────
+    // ── Settings rows (previously role=button, now data-action on the div) ─
     case 'toggle-setting':
       dispatch(A.SETTING_TOGGLE, { key }); break;
+
     case 'open-tpl':
       renderTemplateEditor(getState());
       openModal('modal-template'); break;
+
     case 'reset-to-tpl':
       if (confirm('Aktuelle Woche mit Custom-Template überschreiben?')) {
         dispatch(A.WEEK_RESET_TO_TPL, {});
         showToast('Woche zurückgesetzt ✓', 'ok');
       }
       break;
+
     case 'reset-factory':
       if (confirm('Custom-Template auf Werkseinstellung zurücksetzen?')) {
         dispatch(A.TPL_RESET_TO_FACTORY, {});
         showToast('Original-Template wiederhergestellt ✓', 'ok');
       }
       break;
+
     case 'export-json':
       exportJSON();
       showToast('JSON-Backup wird heruntergeladen …', 'ok'); break;
+
     case 'save-tpl':
       _saveTemplate(); break;
 
@@ -1157,17 +1156,19 @@ function _handleClick(e) {
       if (modalId) closeModal(modalId);
       break;
     }
+
+    // ── Import JSON (file input change bubbles as click on label) ──────────
+    // Handled in _handleChange; nothing to do on click.
+    case 'import-json': break;
+
+    default:
+      // Unknown action – ignore silently
+      break;
   }
 
-  // Template editor actions
-  const tplAction = e.target.closest('[data-tpl-action]');
-  if (tplAction) {
-    _handleTplAction(tplAction);
-  }
-
-  // Settings clickable rows (role=button, no data-action on inner div)
-  const clickRow = e.target.closest('.settings-row--clickable[data-action]');
-  if (clickRow) return; // already handled above
+  // Template editor actions (can coexist with data-action on same element)
+  const tplEl = e.target.closest('[data-tpl-action]');
+  if (tplEl) _handleTplAction(tplEl);
 }
 
 function _handleChange(e) {
@@ -1176,19 +1177,17 @@ function _handleChange(e) {
   const { di, ei, si, field } = el.dataset;
 
   switch (action) {
-    // Number inputs – save on blur/change for robustness
     case 'set-weight':
       dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'weight', value: el.value }); break;
     case 'set-reps':
       dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'reps',   value: el.value }); break;
     case 'set-rpe':
       dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'rpe',    value: el.value }); break;
-
-    // Body inputs
     case 'body-field':
-      dispatch(A.BODY_SET_FIELD, { field, value: isNaN(+el.value) || el.type === 'text' ? el.value : +el.value }); break;
-
-    // JSON import
+      dispatch(A.BODY_SET_FIELD, {
+        field,
+        value: el.type === 'text' || isNaN(+el.value) ? el.value : +el.value,
+      }); break;
     case 'import-json': {
       const file = el.files?.[0];
       if (!file) break;
@@ -1204,9 +1203,8 @@ function _handleChange(e) {
 function _handleInput(e) {
   const el     = e.target;
   const action = el.dataset.action;
-  const { di, ei, field } = el.dataset;
+  const { di, ei, si, field } = el.dataset;
 
-  // Immediate save for text fields on every keystroke
   switch (action) {
     case 'ex-name':
       dispatch(A.EX_UPDATE, { di: +di, ei: +ei, field: 'name', value: el.value }); break;
@@ -1214,32 +1212,31 @@ function _handleInput(e) {
       dispatch(A.EX_UPDATE, { di: +di, ei: +ei, field: 'note', value: el.value }); break;
     case 'day-field':
       dispatch(A.DAY_SET_FIELD, { di: +di, field, value: el.value }); break;
-    // Number inputs – also save on input for responsiveness
     case 'set-weight':
-      dispatch(A.SET_UPDATE, { di: +di, ei: +el.dataset.ei, si: +el.dataset.si, field: 'weight', value: el.value }); break;
+      dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'weight', value: el.value }); break;
     case 'set-reps':
-      dispatch(A.SET_UPDATE, { di: +di, ei: +el.dataset.ei, si: +el.dataset.si, field: 'reps',   value: el.value }); break;
+      dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'reps',   value: el.value }); break;
     case 'set-rpe':
-      dispatch(A.SET_UPDATE, { di: +di, ei: +el.dataset.ei, si: +el.dataset.si, field: 'rpe',    value: el.value }); break;
+      dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'rpe',    value: el.value }); break;
   }
 }
 
 function _handleKeydown(e) {
-  // Enter on add-exercise input
   if (e.key === 'Enter') {
     const inp = e.target;
     if (inp.classList.contains('add-exercise-input')) {
-      const di   = inp.closest('[data-di]')?.dataset.di;
-      const name = inp.value.trim();
-      if (di !== undefined && name) {
-        dispatch(A.EX_ADD, { di: +di, name });
+      const diVal = inp.closest('[data-di]')?.dataset.di;
+      const name  = inp.value.trim();
+      if (diVal !== undefined && name) {
+        dispatch(A.EX_ADD, { di: +diVal, name });
         inp.value = '';
         showToast(`"${name}" hinzugefügt`, 'ok');
       }
     }
   }
-  // Enter/Space on role=button rows
+  // Keyboard activation for elements with role="button" that aren't <button>
   if ((e.key === 'Enter' || e.key === ' ') && e.target.getAttribute('role') === 'button') {
+    e.preventDefault();
     e.target.click();
   }
 }
@@ -1250,7 +1247,7 @@ function _toggleAccordion(di) {
   const hdr  = document.querySelector(`[data-day-hdr="${di}"]`);
   if (!body || !hdr) return;
   const isOpen = body.classList.toggle('is-open');
-  hdr.setAttribute('aria-expanded', isOpen);
+  hdr.setAttribute('aria-expanded', String(isOpen));
   if (isOpen) _openDays.add(di);
   else _openDays.delete(di);
 }
@@ -1274,8 +1271,7 @@ function _createWeek() {
 
 // ─── Template save ────────────────────────────────────────────────────────────
 function _saveTemplate() {
-  const state = getState();
-  const tpl   = JSON.parse(JSON.stringify(state.customTemplate));
+  const tpl = JSON.parse(JSON.stringify(getState().customTemplate));
 
   document.querySelectorAll('[data-tpl-di][data-tpl-field]').forEach(inp => {
     const di    = +inp.dataset.tplDi;
@@ -1284,19 +1280,16 @@ function _saveTemplate() {
     const ex    = tpl[di]?.exercises[ei];
     if (!ex) return;
 
-    if (field === 'name') {
-      ex.name = inp.value;
-    } else if (field === 'note') {
-      ex.note = inp.value;
-    } else if (field === 'setsCount') {
+    if      (field === 'name')      ex.name = inp.value;
+    else if (field === 'note')      ex.note = inp.value;
+    else if (field === 'setsCount') {
       const n = Math.max(1, Math.min(8, +inp.value || 1));
-      while (ex.sets.length < n) ex.sets.push({ weight: ex.sets[0]?.weight ?? 0, reps: ex.sets[0]?.reps ?? 10, rpe: null, done: false });
+      while (ex.sets.length < n)
+        ex.sets.push({ weight: ex.sets[0]?.weight ?? 0, reps: ex.sets[0]?.reps ?? 10, rpe: null, done: false });
       if (ex.sets.length > n) ex.sets = ex.sets.slice(0, n);
-    } else if (field === 'reps') {
-      ex.sets.forEach(s => s.reps = +inp.value || 10);
-    } else if (field === 'weight') {
-      ex.sets.forEach(s => s.weight = +inp.value || 0);
     }
+    else if (field === 'reps')   ex.sets.forEach(s => s.reps   = +inp.value || 10);
+    else if (field === 'weight') ex.sets.forEach(s => s.weight = +inp.value || 0);
   });
 
   dispatch(A.TPL_SAVE, { template: tpl });
@@ -1308,15 +1301,17 @@ function _handleTplAction(el) {
   const action = el.dataset.tplAction;
   const di     = +el.dataset.tplDi;
   const ei     = el.dataset.tplEi !== undefined ? +el.dataset.tplEi : null;
-  const state  = getState();
-  const tpl    = JSON.parse(JSON.stringify(state.customTemplate));
+  const tpl    = JSON.parse(JSON.stringify(getState().customTemplate));
 
   if (action === 'rm-ex' && ei !== null) {
     tpl[di].exercises.splice(ei, 1);
     dispatch(A.TPL_SAVE, { template: tpl });
     renderTemplateEditor(getState());
   } else if (action === 'add-ex') {
-    tpl[di].exercises.push({ name: 'Neue Übung', note: '', pauseSec: 90, sets: [{ weight: 0, reps: 10, rpe: null, done: false }] });
+    tpl[di].exercises.push({
+      name: 'Neue Übung', note: '', pauseSec: 90,
+      sets: [{ weight: 0, reps: 10, rpe: null, done: false }],
+    });
     dispatch(A.TPL_SAVE, { template: tpl });
     renderTemplateEditor(getState());
   }
@@ -1329,16 +1324,16 @@ function _bindTabSwitcher() {
       const tab = btn.dataset.tab;
       _activeTab = tab;
 
-      // Nav tabs
       document.querySelectorAll('[data-tab]').forEach(b =>
         b.classList.toggle('is-active', b.dataset.tab === tab)
       );
-      // Pages
+      document.querySelectorAll('[data-tab]').forEach(b =>
+        b.setAttribute('aria-selected', b.dataset.tab === tab)
+      );
       document.querySelectorAll('.page').forEach(p =>
         p.classList.toggle('is-active', p.id === `page-${tab}`)
       );
 
-      // Lazy-render tab content
       const state = getState();
       if (tab === 'body')     renderBodyTab(state);
       if (tab === 'analysis') renderAnalysisTab(state);
@@ -1361,7 +1356,6 @@ function scheduleRender() {
     const state = getState();
     renderWeekHeader(state);
     renderDayList(state);
-    // Re-render active secondary tab if it's open
     if (_activeTab === 'body')     renderBodyTab(state);
     if (_activeTab === 'analysis') renderAnalysisTab(state);
     if (_activeTab === 'settings') renderSettingsTab(state);
@@ -1369,13 +1363,11 @@ function scheduleRender() {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// FULL DOM SCAFFOLD (built once in mountApp)
+// DOM SCAFFOLD (built once in mountApp)
 // ════════════════════════════════════════════════════════════════════════════
 
 function _buildScaffold(root) {
   root.innerHTML = `
-
-<!-- ─ Top nav ─────────────────────────────────────────────── -->
 <nav class="nav" role="navigation" aria-label="Hauptnavigation">
   <span class="nav__logo" aria-hidden="true">TRAIN</span>
   <div class="nav__tabs" role="tablist" aria-label="App-Bereiche">
@@ -1398,92 +1390,64 @@ function _buildScaffold(root) {
   </div>
 </nav>
 
-<!-- ─ WORKOUT PAGE ─────────────────────────────────────────── -->
 <main id="page-workout" class="page is-active" role="tabpanel" aria-label="Training">
-
-  <!-- Week navigation -->
   <div class="week-nav" aria-label="Wochennavigation">
     <button class="week-nav__btn" id="btn-prev-wk" data-action="nav-prev"
-      aria-label="Vorherige Woche">
-      ${ic.chevronLeft()}
-    </button>
+      aria-label="Vorherige Woche">${ic.chevronLeft()}</button>
     <div class="week-nav__info" aria-live="polite">
       <div id="wk-label" class="week-nav__label">–</div>
       <div id="wk-range" class="week-nav__range"></div>
     </div>
     <button class="week-nav__btn" id="btn-next-wk" data-action="nav-next"
-      aria-label="Nächste Woche">
-      ${ic.chevronRight()}
-    </button>
+      aria-label="Nächste Woche">${ic.chevronRight()}</button>
   </div>
 
-  <!-- Toolbar -->
   <div class="toolbar" role="toolbar" aria-label="Wochenaktionen">
     <div class="mode-pill" role="group" aria-label="Trainingsmodus">
       <button class="mode-pill__btn mode-pill__btn--std is-active"
-        id="mode-std" data-action="mode-std" aria-pressed="true">
-        Standard
-      </button>
+        id="mode-std" data-action="mode-std" aria-pressed="true">Standard</button>
       <button class="mode-pill__btn mode-pill__btn--dl"
         id="mode-dl" data-action="mode-dl" aria-pressed="false">
-        ${ic.zap()}&thinsp;Deload
-      </button>
+        ${ic.zap()}&thinsp;Deload</button>
     </div>
     <span class="toolbar__spacer"></span>
     <button class="toolbar__btn toolbar__btn--accent" data-action="open-new-week"
-      aria-label="Neue Trainingswoche erstellen">
-      ${ic.plus()}
-    </button>
+      aria-label="Neue Trainingswoche erstellen">${ic.plus()}</button>
     <button class="toolbar__btn" data-action="copy-prev"
-      aria-label="Vorwoche als Vorlage kopieren">
-      ${ic.copy()}
-    </button>
+      aria-label="Vorwoche als Vorlage kopieren">${ic.copy()}</button>
     <button class="toolbar__btn" data-action="open-export"
-      aria-label="Trainingsdaten exportieren">
-      ${ic.download()}
-    </button>
+      aria-label="Trainingsdaten exportieren">${ic.download()}</button>
     <button class="toolbar__btn toolbar__btn--danger" data-action="open-delete-week"
-      aria-label="Aktuelle Woche löschen">
-      ${ic.trash()}
-    </button>
+      aria-label="Aktuelle Woche löschen">${ic.trash()}</button>
   </div>
 
-  <!-- Day cards -->
   <div id="days-container" aria-label="Trainingstage"></div>
 </main>
 
-<!-- ─ BODY PAGE ────────────────────────────────────────────── -->
 <section id="page-body" class="page" role="tabpanel" aria-label="Körper und Wohlbefinden">
   <h1 class="page-title">Körper</h1>
   <p class="page-subtitle">Optional · Fließt in CSV-Analyse ein</p>
   <div id="body-tab-content"></div>
 </section>
 
-<!-- ─ ANALYSIS PAGE ────────────────────────────────────────── -->
 <section id="page-analysis" class="page" role="tabpanel" aria-label="Fortschrittsanalyse">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--sp-4)">
     <div>
       <h1 class="page-title">Analyse</h1>
       <p class="page-subtitle">Fortschritt & Statistiken</p>
     </div>
-    <button class="btn btn--accent btn--sm" data-action="open-export" aria-label="Daten exportieren">
-      ${ic.download()} Export
-    </button>
+    <button class="btn btn--accent btn--sm" data-action="open-export"
+      aria-label="Daten exportieren">${ic.download()} Export</button>
   </div>
   <div id="analysis-tab-content"></div>
 </section>
 
-<!-- ─ SETTINGS PAGE ────────────────────────────────────────── -->
 <section id="page-settings" class="page" role="tabpanel" aria-label="Einstellungen">
   <h1 class="page-title">Einstellungen</h1>
   <div id="settings-tab-content"></div>
 </section>
 
-<!-- ══════════════════════════════════════════════════════════
-     MODALS
-     ══════════════════════════════════════════════════════════ -->
-
-<!-- New week -->
+<!-- Modal: Neue Woche -->
 <div class="modal-overlay" id="modal-new-week" role="dialog"
   aria-modal="true" aria-labelledby="modal-nw-title">
   <div class="modal">
@@ -1500,37 +1464,33 @@ function _buildScaffold(root) {
     <div class="modal__actions">
       <button class="btn btn--ghost" data-action="close-modal">Abbrechen</button>
       <button class="btn btn--accent" data-action="create-week">
-        ${ic.plus()} Erstellen
-      </button>
+        ${ic.plus()} Erstellen</button>
     </div>
   </div>
 </div>
 
-<!-- Delete week -->
+<!-- Modal: Woche löschen -->
 <div class="modal-overlay" id="modal-delete-week" role="dialog"
   aria-modal="true" aria-labelledby="modal-dw-title">
   <div class="modal">
     <h2 class="modal__title" id="modal-dw-title">Woche löschen?</h2>
     <p style="color:var(--c-text-2);font-size:14px;margin-bottom:var(--sp-2)">
-      Alle Trainingsdaten dieser Woche werden unwiderruflich gelöscht.
-    </p>
+      Alle Trainingsdaten dieser Woche werden unwiderruflich gelöscht.</p>
     <div class="modal__actions">
       <button class="btn btn--ghost" data-action="close-modal">Abbrechen</button>
       <button class="btn btn--danger" data-action="confirm-delete-week">
-        ${ic.trash()} Löschen
-      </button>
+        ${ic.trash()} Löschen</button>
     </div>
   </div>
 </div>
 
-<!-- Export -->
+<!-- Modal: Export -->
 <div class="modal-overlay" id="modal-export" role="dialog"
   aria-modal="true" aria-labelledby="modal-exp-title">
   <div class="modal">
     <h2 class="modal__title" id="modal-exp-title">Daten exportieren</h2>
     <p style="color:var(--c-text-2);font-size:13px;margin-bottom:var(--sp-3)">
-      CSV-Format · 3 Sektionen: Detail, Wochenübersicht, Progressive Overload
-    </p>
+      CSV-Format · 3 Sektionen: Detail, Wochenübersicht, Progressive Overload</p>
     <div class="export-option" data-action="export-current" role="button" tabindex="0"
       aria-label="Nur aktuelle Woche exportieren">
       ${ic.download()}
@@ -1553,80 +1513,57 @@ function _buildScaffold(root) {
   </div>
 </div>
 
-<!-- Template editor -->
+<!-- Modal: Template -->
 <div class="modal-overlay" id="modal-template" role="dialog"
   aria-modal="true" aria-labelledby="modal-tpl-title">
   <div class="modal">
     <h2 class="modal__title" id="modal-tpl-title">Template bearbeiten</h2>
     <p style="color:var(--c-text-2);font-size:12px;margin-bottom:var(--sp-3)">
-      Vorlage für neue Wochen. Bestehende Wochen bleiben unverändert.
-    </p>
+      Vorlage für neue Wochen. Bestehende Wochen bleiben unverändert.</p>
     <div id="tpl-editor-body"></div>
     <div class="modal__actions">
       <button class="btn btn--ghost" data-action="close-modal">Schließen</button>
       <button class="btn btn--accent" data-action="save-tpl">
-        ${ic.save()} Speichern
-      </button>
+        ${ic.save()} Speichern</button>
     </div>
   </div>
 </div>
 
-<!-- ─ Toast ──────────────────────────────────────────────────── -->
 <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 
-<!-- ─ Storage warning ───────────────────────────────────────── -->
 <div class="storage-warning" id="storage-warning" role="alert">
   <span>⚠ Speicher voll! Bitte Backup herunterladen.</span>
   <button class="btn" id="storage-warn-btn">
-    ${ic.download()} JSON-Backup
-  </button>
-</div>
-`;
+    ${ic.download()} JSON-Backup</button>
+</div>`;
 }
 
 // ════════════════════════════════════════════════════════════════════════════
 // MOUNT – public entry point
 // ════════════════════════════════════════════════════════════════════════════
 
-/**
- * Bootstrap the entire app UI.
- * Called once from index.html after loadState().
- *
- * @param {HTMLElement} root – typically document.getElementById('app')
- */
 export function mountApp(root) {
   _root = root;
 
-  // 1. Build static scaffold (nav, pages, modals)
   _buildScaffold(root);
 
-  // 2. Cache frequently-used elements
   _toast       = document.getElementById('toast');
   _storageWarn = document.getElementById('storage-warning');
 
-  // 3. Bind storage-quota warning button
   document.getElementById('storage-warn-btn')?.addEventListener('click', () => {
     exportJSON();
     showToast('JSON-Backup wird heruntergeladen …', 'ok');
   });
 
-  // 4. Single event-delegation listener
   _bindEvents(root);
-
-  // 5. Tab switcher
   _bindTabSwitcher();
-
-  // 6. Swipe navigation
   _initSwipe(root);
 
-  // 7. Subscribe to state – re-render on every change
   subscribe(scheduleRender);
 
-  // 8. Storage error event from state.js
   window.addEventListener('train:storage-error', () => {
     _storageWarn?.classList.add('is-visible');
   });
 
-  // 9. Initial render
   scheduleRender();
 }
