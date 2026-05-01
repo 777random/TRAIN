@@ -60,6 +60,7 @@ body {
   overflow-x: hidden;
   padding-bottom: 80px;
   -webkit-font-smoothing: antialiased;
+   overscroll-behavior-y: none; /* Verhindert das "Über-Scrollen" in den schwarzen Bereich */
 }
 img { display: block; }
 svg { display: block; }
