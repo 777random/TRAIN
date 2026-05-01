@@ -1106,6 +1106,20 @@ function _handleClick(e) {
       }
       break;
 
+    case 'move-ex-up':
+      if (+ei > 0) {
+        dispatch(A.EX_MOVE, { di: +di, fromEi: +ei, toEi: +ei - 1 });
+      }
+      break;
+
+    case 'move-ex-down':
+      const maxEi = getState().weeks[getState().curIdx].days[+di].exercises.length - 1;
+      if (+ei < maxEi) {
+        dispatch(A.EX_MOVE, { di: +di, fromEi: +ei, toEi: +ei + 1 });
+      }
+      break;
+      
+
     // ── Set ────────────────────────────────────────────────────────────────
     case 'toggle-done':
       dispatch(A.SET_TOGGLE_DONE, { di: +di, ei: +ei, si: +si }); break;
