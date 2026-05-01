@@ -666,42 +666,17 @@ button, input, select, textarea { font: inherit; }
 ::-webkit-scrollbar { width: 3px; }
 ::-webkit-scrollbar-thumb { background: var(--c-border); border-radius: 2px; }
 
-/* --- FINALES LAYOUT-FIX --- */
+/* --- SICHERER DESIGN-FIX --- */
 
-/* Zentriert alles und gibt den Karten volle Breite */
-.page {
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: center !important;
-  width: 100% !important;
-  padding: 10px !important;
-  box-sizing: border-box !important;
-}
-
+/* Macht die Karten breiter, ohne Claudes Layout zu zerstören */
 .day-card {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
   width: 100% !important;
-  margin-bottom: 12px !important;
-  display: block !important;
 }
 
-/* Der Header (Dunkelgrau & Kontrast) */
+/* Ändert nur die Farbe des Headers für besseren Kontrast */
 .day-card__header {
   background-color: #1C1C22 !important;
   border: 1px solid #33333D !important;
-  border-radius: 12px !important;
-  padding: 16px !important;
-  display: flex !important;
-  justify-content: space-between !important;
-  align-items: center !important;
-  position: relative !important;
-  z-index: 10 !important;
-}
-
-/* Der Bereich unter dem Header (Übungen) */
-.day-card__content {
-  background-color: #131317 !important;
-  border-radius: 0 0 12px 12px !important;
-  padding: 16px 8px 8px 8px !important; 
-  margin-top: -8px !important; 
-  display: block !important;
 }
