@@ -419,14 +419,13 @@ function renderExercise(wk, di, ei, state) {
 <div class="exercise" data-di="${di}" data-ei="${ei}" draggable="${drag}">
   <div class="sticky-sentinel" aria-hidden="true" style="height:1px;pointer-events:none;"></div>
 
-  <div class="exercise__name-sticky">
-    ${drag ? `
-    <span
-      class="exercise__drag-handle"
-      data-drag-handle
-      aria-hidden="true"
-      title="Übung verschieben"
-    >${ic.grip()}</span>` : ''}
+    <div class="exercise__name-sticky">
+    ${!locked ? `
+    <div class="exercise__order-btns">
+      <button class="exercise__order-btn" data-action="move-ex-up" data-di="${di}" data-ei="${ei}" aria-label="Nach oben" ${ei === 0 ? 'disabled' : ''}>▲</button>
+      <button class="exercise__order-btn" data-action="move-ex-down" data-di="${di}" data-ei="${ei}" aria-label="Nach unten" ${ei === wk.days[di].exercises.length - 1 ? 'disabled' : ''}>▼</button>
+    </div>` : ''}
+    
     <input
       class="exercise__name-input"
       type="text"
