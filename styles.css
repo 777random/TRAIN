@@ -276,6 +276,7 @@ button, input, select, textarea { font: inherit; }
 .day-card__body {
   display: grid; grid-template-rows: 0fr;
   transition: grid-template-rows var(--t-normal);
+   overflow: hidden; /* Schneidet den Phantom-Inhalt ab */
 }
 .day-card__body.is-open { grid-template-rows: 1fr; }
 /* clip-overflow on body-inner would kill sticky exercise names –
