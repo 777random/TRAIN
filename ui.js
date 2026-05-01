@@ -1176,7 +1176,14 @@ function _handleChange(e) {
   const action = el.dataset.action;
   const { di, ei, si, field } = el.dataset;
 
+  // Hier wird jetzt ALLES gespeichert, aber erst wenn das Tippen beendet ist ("change")
   switch (action) {
+    case 'ex-name':
+      dispatch(A.EX_UPDATE, { di: +di, ei: +ei, field: 'name', value: el.value }); break;
+    case 'ex-note':
+      dispatch(A.EX_UPDATE, { di: +di, ei: +ei, field: 'note', value: el.value }); break;
+    case 'day-field':
+      dispatch(A.DAY_SET_FIELD, { di: +di, field, value: el.value }); break;
     case 'set-weight':
       dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'weight', value: el.value }); break;
     case 'set-reps':
@@ -1201,25 +1208,11 @@ function _handleChange(e) {
 }
 
 function _handleInput(e) {
-  const el     = e.target;
-  const action = el.dataset.action;
-  const { di, ei, si, field } = el.dataset;
-
-  switch (action) {
-    case 'ex-name':
-      dispatch(A.EX_UPDATE, { di: +di, ei: +ei, field: 'name', value: el.value }); break;
-    case 'ex-note':
-      dispatch(A.EX_UPDATE, { di: +di, ei: +ei, field: 'note', value: el.value }); break;
-    case 'day-field':
-      dispatch(A.DAY_SET_FIELD, { di: +di, field, value: el.value }); break;
-    case 'set-weight':
-      dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'weight', value: el.value }); break;
-    case 'set-reps':
-      dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'reps',   value: el.value }); break;
-    case 'set-rpe':
-      dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'rpe',    value: el.value }); break;
-  }
+  // Absichtlich komplett leer gelassen! 
+  // Das verhindert, dass bei jedem einzelnen Tastendruck das Layout neu lädt 
+  // und dir die Tastatur vor der Nase zuschlägt.
 }
+
 
 function _handleKeydown(e) {
   if (e.key === 'Enter') {
