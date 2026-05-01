@@ -679,3 +679,17 @@ button, input, select, textarea { font: inherit; }
   width: 100% !important;
   box-sizing: border-box !important;
 }
+/* --- OPTISCHE KORREKTUREN FÜR DIE TAGE --- */
+.day-card {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+.day-card__header {
+  background-color: #1C1C22 !important;
+  border: 1px solid #33333D !important;
+  border-radius: 12px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
