@@ -8,6 +8,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="TRAIN">
   <meta name="description" content="Funktionaler Workout-Tracker mit wöchentlichem Progressions-Tracking, Pausentimer und CSV-Export.">
+
   <title>TRAIN</title>
 
   <link rel="manifest" href="./manifest.json">
@@ -22,7 +23,6 @@
   <style>
     #app { opacity: 0; transition: opacity 200ms ease; }
     #app.is-ready { opacity: 1; }
-
     #splash {
       position: fixed; inset: 0; z-index: 9999;
       background: #0E0E10;
@@ -55,25 +55,11 @@
 
   <div id="app" aria-live="polite"></div>
 
-  <script>
-    window.onerror = function(msg, url, line) {
-      alert("FEHLER: " + msg + " (Zeile " + line + ")");
-    };
-    window.onunhandledrejection = function(e) {
-      alert("PROMISE-FEHLER: " + e.reason);
-    };
-
-    // Dieser Detektor fängt jeden Tipp auf den Bildschirm ab!
-    document.addEventListener('click', function(e) {
-      alert("KLICK ERKANNT AUF -> Element: " + e.target.tagName + " | Klasse: " + e.target.className + " | ID: " + e.target.id);
-    }, true);
-  </script>
-  
   <script type="module">
     import { loadState, getState, dispatch, subscribe, A } from './state.js';
     import { exportJSON, importJSON, exportCSV }           from './backup.js';
     import { mountApp }                                    from './ui.js';
-    // import { mountTimer }                               from './timer.js';
+    import { mountTimer }                                  from './timer.js';
     import { registerServiceWorker, onStorageError, onSwUpdateReady } from './registerSW.js';
 
     const restored = loadState();
@@ -84,8 +70,7 @@
     const appRoot = document.getElementById('app');
     mountApp(appRoot);
 
-    // Timer bleibt zum Testen deaktiviert
-    // mountTimer();
+    mountTimer();
 
     appRoot.classList.add('is-ready');
     const splash = document.getElementById('splash');
@@ -105,5 +90,6 @@
       }));
     });
   </script>
+
 </body>
 </html>
