@@ -75,7 +75,15 @@ button, input, select, textarea { font: inherit; }
 :focus:not(:focus-visible) { outline: none; }
 
 /* ── Pages ─────────────────────────────────────────────────── */
-.page { display: none; padding: var(--sp-3); max-width: 680px; margin: 0 auto; }
+.page {
+  display: none;
+  padding: var(--sp-3);
+  max-width: 680px;
+  margin: 0 auto;
+  /* Ensure page never causes horizontal scroll */
+  width: 100%;
+  box-sizing: border-box;
+}
 .page.is-active { display: block; }
 .page-title { font-family: var(--font-display); font-size: 24px; letter-spacing: .1em; margin-bottom: 2px; }
 .page-subtitle { font-size: 12px; color: var(--c-text-3); margin-bottom: var(--sp-4); }
@@ -193,7 +201,13 @@ button, input, select, textarea { font: inherit; }
 .day-card {
   background: var(--c-surface); border: 1px solid var(--c-border);
   border-radius: var(--r-lg); margin-bottom: var(--sp-3);
-  overflow: hidden; transition: border-color var(--t-normal);
+  /* NOTE: overflow:hidden intentionally removed – it breaks position:sticky
+     on child elements (.day-card__header, .exercise__name-sticky).
+     Border-radius on children is used instead. */
+  transition: border-color var(--t-normal);
+  /* Ensure all cards are the same width within the page container */
+  width: 100%;
+  box-sizing: border-box;
 }
 .day-card--done   { border-color: var(--c-ok); }
 .day-card--deload { background: var(--c-deload-bg); border-color: var(--c-deload-bd); }
@@ -203,16 +217,25 @@ button, input, select, textarea { font: inherit; }
   position: sticky; top: var(--nav-h); z-index: 200;
   display: flex; align-items: center; justify-content: space-between;
   padding: 0 var(--sp-3); min-height: var(--day-h);
+  /* Must match the card background exactly so content scrolling
+     behind it is hidden. Use the card's own bg variable. */
   background: var(--c-surface);
+  /* Top radius matches card; bottom radius only when collapsed */
   border-radius: var(--r-lg) var(--r-lg) 0 0;
+  /* Extend background to cover the card border on left/right when stuck */
+  margin: 0 -1px;
+  padding-left: calc(var(--sp-3) + 1px);
+  padding-right: calc(var(--sp-3) + 1px);
+  width: calc(100% + 2px);
   cursor: pointer; user-select: none;
   transition: box-shadow var(--t-normal), border-color var(--t-fast);
 }
 .day-card--deload .day-card__header { background: var(--c-deload-bg); }
-/* Shadow when scrolled behind – added by IntersectionObserver */
+/* Stuck: show bottom border + shadow so content scrolling behind is clear */
 .day-card__header.is-stuck {
   border-bottom: 1px solid var(--c-border);
-  box-shadow: var(--shadow-md);
+  box-shadow: 0 4px 12px rgba(0,0,0,.5);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
 }
 .day-card__header-left { display: flex; align-items: center; gap: var(--sp-3); min-width: 0; }
 .day-card__dot {
@@ -254,7 +277,12 @@ button, input, select, textarea { font: inherit; }
   transition: grid-template-rows var(--t-normal);
 }
 .day-card__body.is-open { grid-template-rows: 1fr; }
-.day-card__body-inner { overflow: hidden; padding: 0 var(--sp-3); }
+/* clip-overflow on body-inner would kill sticky exercise names –
+   use clip instead which only clips paint, not layout */
+.day-card__body-inner {
+  overflow: clip;
+  padding: 0 var(--sp-3);
+}
 .day-card__body.is-open .day-card__body-inner { padding-bottom: var(--sp-3); }
 
 /* ── Info blocks ───────────────────────────────────────────── */
@@ -296,7 +324,12 @@ button, input, select, textarea { font: inherit; }
   z-index: 100;
   display: flex; align-items: center; gap: var(--sp-2);
   padding: var(--sp-1) 0;
+  /* Must match card background. Extend left/right to cover
+     the body-inner padding so the sticky strip looks clean. */
   background: var(--c-surface);
+  margin: 0 calc(-1 * var(--sp-3));
+  padding-left: var(--sp-3);
+  padding-right: var(--sp-3);
   border-bottom: 1px solid transparent;
   transition: border-color var(--t-fast), box-shadow var(--t-fast);
 }
@@ -667,21 +700,6 @@ button, input, select, textarea { font: inherit; }
 ::-webkit-scrollbar { width: 3px; }
 ::-webkit-scrollbar-thumb { background: var(--c-border); border-radius: 2px; }
 
-/* --- SICHERER DESIGN-FIX --- */
-
-/* Macht die Karten breiter, ohne Claudes Layout zu zerstören */
-.day-card {
-  margin-left: 0 !important;
-  margin-right: 0 !important;
-  width: 100% !important;
-}
-
-/* Ändert nur die Farbe des Headers für besseren Kontrast */
-.day-card__header {
-  background-color: #1C1C22 !important;
-  border: 1px solid #33333D !important;
-}
-
 /* ── FIX: SVG-Größen in Inline-Kontexten ───────────────────────────────────
    Das globale "svg { display: block }" lässt SVG-Icons ohne explizite
    Größe auf die volle Container-Breite aufblähen.
@@ -731,4 +749,18 @@ label > svg {
   height: 14px;
   display: inline;
   vertical-align: middle;
+}
+
+/* ── Layout-Korrekturen ─────────────────────────────────────────────────────
+   Stellt sicher dass alle Karten gleich breit sind und korrekt im
+   Page-Container sitzen.                                                   */
+#days-container {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Override für ältere !important-Regeln die noch im Browser-Cache sein könnten */
+.day-card {
+  margin-left: 0;
+  margin-right: 0;
 }
