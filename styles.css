@@ -49,7 +49,13 @@
 
 /* ── Reset ─────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+html { 
+  -webkit-text-size-adjust: 100%; 
+  scroll-behavior: smooth; 
+  background: var(--c-bg); 
+  overscroll-behavior-y: none; 
+}
+
 body {
   background: var(--c-bg);
   color: var(--c-text);
@@ -274,10 +280,26 @@ button, input, select, textarea { font: inherit; }
 
 /* CSS grid accordion trick – no JS height calculation needed */
 .day-card__body {
-  display: grid; grid-template-rows: 0fr;
-  transition: grid-template-rows var(--t-normal);
-   overflow: hidden; /* Schneidet den Phantom-Inhalt ab */
+  display: grid; 
+  grid-template-rows: 0fr;
+  overflow: hidden;
+  /* Macht den Inhalt unsichtbar, NACHDEM er zugeklappt ist (220ms) */
+  visibility: hidden;
+  transition: grid-template-rows var(--t-normal), visibility 0s linear var(--t-normal);
 }
+
+.day-card__body.is-open { 
+  grid-template-rows: 1fr; 
+  /* Macht den Inhalt sofort sichtbar, BEVOR er aufklappt */
+  visibility: visible;
+  transition: grid-template-rows var(--t-normal), visibility 0s linear 0s;
+}
+
+/* Tötet den Phantom-Scroll: Sticky-Verhalten abschalten, wenn zugeklappt */
+.day-card__body:not(.is-open) .exercise__name-sticky {
+  position: static;
+}
+
 .day-card__body.is-open { grid-template-rows: 1fr; }
 /* clip-overflow on body-inner would kill sticky exercise names –
    use clip instead which only clips paint, not layout */
