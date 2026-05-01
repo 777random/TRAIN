@@ -280,6 +280,7 @@ button, input, select, textarea { font: inherit; }
 /* clip-overflow on body-inner would kill sticky exercise names –
    use clip instead which only clips paint, not layout */
 .day-card__body-inner {
+  min-height: 0;
   overflow: clip;
   padding: 0 var(--sp-3);
 }
