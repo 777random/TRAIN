@@ -61,7 +61,8 @@ body {
   padding-bottom: 80px;
   -webkit-font-smoothing: antialiased;
 }
-img, svg { display: block; }
+img { display: block; }
+svg { display: block; }
 button, input, select, textarea { font: inherit; }
 
 /* ── Accessibility ─────────────────────────────────────────── */
@@ -679,4 +680,55 @@ button, input, select, textarea { font: inherit; }
 .day-card__header {
   background-color: #1C1C22 !important;
   border: 1px solid #33333D !important;
+}
+
+/* ── FIX: SVG-Größen in Inline-Kontexten ───────────────────────────────────
+   Das globale "svg { display: block }" lässt SVG-Icons ohne explizite
+   Größe auf die volle Container-Breite aufblähen.
+   Hier werden alle bekannten Icon-Kontexte auf 16-22 px begrenzt.        */
+
+/* Vorwoche-Banner: Bar-Chart-Icon war riesig */
+.prev-banner svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+/* Alle SVGs direkt in Buttons ohne eigene Größenklasse */
+button > svg,
+label > svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+/* Settings-Row Label-Icons (download/upload vor dem Text) */
+.settings-row__label svg {
+  display: inline;
+  width: 16px;
+  height: 16px;
+  vertical-align: middle;
+  margin-right: 4px;
+}
+
+/* Exercise config & remove buttons */
+.exercise__cfg-btn svg,
+.exercise__remove-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Complete-Button Lock/Unlock Icon */
+.complete-btn svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+/* Mode-pill Deload Zap-Icon */
+.mode-pill__btn svg {
+  width: 14px;
+  height: 14px;
+  display: inline;
+  vertical-align: middle;
 }
