@@ -282,7 +282,7 @@ button, input, select, textarea { font: inherit; }
 .day-card__title-wrap { min-width: 0; }
 .day-card__title {
   font-family: var(--font-display); font-size: 20px; letter-spacing: .1em;
-  line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  line-height: 1.1; white-space: nowrap; overflow: clip; text-overflow: ellipsis;
 }
 .day-card__subtitle {
   font-size: 11px; color: var(--c-text-3); margin-top: 1px;
@@ -364,6 +364,7 @@ button, input, select, textarea { font: inherit; }
 /* ══════════════════════════════════════════════════════════════
    EXERCISE – STICKY NAME + SET GRID
    ══════════════════════════════════════════════════════════════ */
+exercise { position: unset; }
 .exercise + .exercise { border-top: 1px solid var(--c-border); }
 
 /* Sticky exercise name – sits below the sticky day header */
