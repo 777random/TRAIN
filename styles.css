@@ -49,11 +49,17 @@
 
 /* ── Reset ─────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { 
-  -webkit-text-size-adjust: 100%; 
-  scroll-behavior: smooth; 
-  background: var(--c-bg); 
-  overscroll-behavior-y: none; 
+
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+  background: var(--c-bg);
+  /* html and body are fixed, non-scrolling shells.
+     #app is the single scroll container.
+     This prevents phantom scroll space when content is short
+     (e.g. all day-accordions collapsed). */
+  height: 100%;
+  overflow: hidden;
 }
 
 body {
@@ -62,15 +68,35 @@ body {
   font-family: var(--font-sans);
   font-size: 15px;
   line-height: 1.5;
-  min-height: 100dvh;
-  overflow-x: hidden;
-  padding-bottom: 80px;
   -webkit-font-smoothing: antialiased;
-   overscroll-behavior-y: none; /* Verhindert das "Über-Scrollen" in den schwarzen Bereich */
+  /* Fixed shell – no scrolling, no min-height that creates phantom space */
+  height: 100%;
+  overflow: hidden;
 }
 img { display: block; }
 svg { display: block; }
 button, input, select, textarea { font: inherit; }
+
+/* ── #app – the ONE scroll container ──────────────────────────
+   All scrolling happens here. html+body are fixed shells.
+   This guarantees:
+   1. No phantom scroll space when content is short.
+   2. No rubber-band overscroll showing the bg colour.
+   3. Sticky children (nav, day headers) work correctly because
+      their nearest scroll ancestor is #app, not body.          */
+#app {
+  /* Fill the full viewport */
+  position: fixed;
+  inset: 0;
+  /* Scroll vertically, clip horizontally */
+  overflow-x: hidden;
+  overflow-y: auto;
+  /* Kill overscroll/rubber-band on iOS and Android */
+  overscroll-behavior: none;
+  /* Smooth momentum scrolling on iOS */
+  -webkit-overflow-scrolling: touch;
+  background: var(--c-bg);
+}
 
 /* ── Accessibility ─────────────────────────────────────────── */
 .sr-only {
@@ -87,9 +113,10 @@ button, input, select, textarea { font: inherit; }
   padding: var(--sp-3);
   max-width: 680px;
   margin: 0 auto;
-  /* Ensure page never causes horizontal scroll */
   width: 100%;
   box-sizing: border-box;
+  /* Bottom padding so content clears the toast/storage-warning bar */
+  padding-bottom: calc(var(--sp-3) + 80px);
 }
 .page.is-active { display: block; }
 .page-title { font-family: var(--font-display); font-size: 24px; letter-spacing: .1em; margin-bottom: 2px; }
