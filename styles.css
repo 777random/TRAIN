@@ -366,7 +366,6 @@ button, input, select, textarea { font: inherit; }
 /* ══════════════════════════════════════════════════════════════
    EXERCISE – STICKY NAME + SET GRID
    ══════════════════════════════════════════════════════════════ */
-.exercise { position: relative; }
 .exercise + .exercise { border-top: 1px solid var(--c-border); }
 
 /* Sticky exercise name – sits below the sticky day header */
