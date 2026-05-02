@@ -323,16 +323,14 @@ button, input, select, textarea { font: inherit; }
 }
 
 /* Tötet den Phantom-Scroll: Sticky-Verhalten abschalten, wenn zugeklappt */
-.day-card__body:not(.is-open) .exercise__name-sticky {
-  position: static;
-}
+/* entfernt */
 
 .day-card__body.is-open { grid-template-rows: 1fr; }
 /* clip-overflow on body-inner would kill sticky exercise names –
    use clip instead which only clips paint, not layout */
 .day-card__body-inner {
   min-height: 0;
-  overflow: clip;
+  overflow: visible;
   padding: 0 var(--sp-3);
 }
 .day-card__body.is-open .day-card__body-inner { padding-bottom: var(--sp-3); }
