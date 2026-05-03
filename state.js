@@ -302,6 +302,8 @@ export const A = Object.freeze({
   EX_UPDATE:           'EX_UPDATE',           // { di, ei, field, value }
   EX_MOVE:             'EX_MOVE',             // { di, fromEi, toEi }
   EX_TOGGLE_CFG:       'EX_TOGGLE_CFG',       // { di, ei }
+  EX_INC_WEIGHT:       'EX_INC_WEIGHT',
+  
   // Set
   SET_ADD:             'SET_ADD',             // { di, ei }
   SET_REMOVE:          'SET_REMOVE',          // { di, ei, si }
@@ -448,6 +450,14 @@ function reduce(state, action) {
       else if (p.field === 'reps') v = Math.max(0, parseInt(v, 10) || 0);
       else if (p.field === 'rpe')  v = (v === '' || v === null) ? null : Math.min(10, Math.max(1, +v));
       s[p.field] = v;
+      break;
+    }
+    case A.EX_INC_WEIGHT: {
+      const ex = _currentWeek()?.days[p.di]?.exercises[p.ei]; if (!ex) break;
+      // Erhöht das Gewicht in allen Sätzen um den übergebenen Wert
+      ex.sets.forEach(s => {
+        if (typeof s.weight === 'number') s.weight += p.amount;
+      });
       break;
     }
     case A.SET_TOGGLE_DONE: {
