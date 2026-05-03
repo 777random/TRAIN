@@ -404,7 +404,7 @@ function renderExercise(wk, di, ei, state) {
     renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl)
   ).join('');
 
-  const pauseRow = ex._showCfg ? `
+    const pauseRow = ex._showCfg ? `
     <div class="pause-row" role="group" aria-label="Pausenzeit wählen">
       <span class="pause-row__label">Pause:</span>
       ${[30, 60, 90, 120].map(sec => `
@@ -413,7 +413,15 @@ function renderExercise(wk, di, ei, state) {
           data-action="set-pause" data-di="${di}" data-ei="${ei}" data-sec="${sec}"
           aria-pressed="${ex.pauseSec === sec}"
         >${sec}s</button>`).join('')}
+    </div>
+    <div class="pause-row" style="padding-top: 0;">
+      <span class="pause-row__label">Progression:</span>
+      <button class="pause-opt" data-action="ex-inc-weight" data-di="${di}" data-ei="${ei}" data-amount="1.25">+1,25 kg</button>
+      <button class="pause-opt" data-action="ex-inc-weight" data-di="${di}" data-ei="${ei}" data-amount="2">+2 kg</button>
+      <button class="pause-opt" data-action="ex-inc-weight" data-di="${di}" data-ei="${ei}" data-amount="2.5">+2,5 kg</button>
+      <button class="pause-opt" data-action="ex-inc-weight" data-di="${di}" data-ei="${ei}" data-amount="5">+5 kg</button>
     </div>` : '';
+  
 
   return `
 <div class="exercise" data-di="${di}" data-ei="${ei}" draggable="${drag}">
