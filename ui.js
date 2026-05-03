@@ -404,7 +404,7 @@ function renderExercise(wk, di, ei, state) {
     renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl)
   ).join('');
 
-    const pauseRow = ex._showCfg ? `
+  const pauseRow = ex._showCfg ? `
     <div class="pause-row" role="group" aria-label="Pausenzeit wählen">
       <span class="pause-row__label">Pause:</span>
       ${[30, 60, 90, 120].map(sec => `
@@ -413,15 +413,7 @@ function renderExercise(wk, di, ei, state) {
           data-action="set-pause" data-di="${di}" data-ei="${ei}" data-sec="${sec}"
           aria-pressed="${ex.pauseSec === sec}"
         >${sec}s</button>`).join('')}
-    </div>
-    <div class="pause-row" style="padding-top: 0;">
-      <span class="pause-row__label">Progression:</span>
-      <button class="pause-opt" data-action="ex-inc-weight" data-di="${di}" data-ei="${ei}" data-amount="1.25">+1,25 kg</button>
-      <button class="pause-opt" data-action="ex-inc-weight" data-di="${di}" data-ei="${ei}" data-amount="2">+2 kg</button>
-      <button class="pause-opt" data-action="ex-inc-weight" data-di="${di}" data-ei="${ei}" data-amount="2.5">+2,5 kg</button>
-      <button class="pause-opt" data-action="ex-inc-weight" data-di="${di}" data-ei="${ei}" data-amount="5">+5 kg</button>
     </div>` : '';
-  
 
   return `
 <div class="exercise" data-di="${di}" data-ei="${ei}" draggable="${drag}">
@@ -1567,37 +1559,6 @@ function _buildScaffold(root) {
 </div>`;
 }
 
-function _handleChange(e) {
-  const el = e.target;
-  const action = el.dataset.action;
-  const { di, field } = el.dataset;
-
-  // Speichert Dinge, die nicht sofort beim Tippen gespeichert werden müssen (Notizen etc.)
-  if (action === 'day-note') {
-    dispatch(A.DAY_UPDATE, { di: +di, field: 'note', value: el.value });
-  } else if (action === 'body-input') {
-    dispatch(A.BODY_UPDATE, { date: getState().weeks[getState().curIdx].startDate, field, value: el.value });
-  } else if (action === 'wk-note') {
-    dispatch(A.WEEK_UPDATE, { field: 'note', value: el.value });
-  }
-}
-
-function _handleInput(e) {
-  const el     = e.target;
-  const action = el.dataset.action;
-  const { di, ei, si, field } = el.dataset;
-
-  // Silent-Update: Speichert Gewichte & Reps SOFORT bei jedem Tastendruck im Hintergrund!
-  if (['set-weight', 'set-reps', 'set-rpe'].includes(action)) {
-    dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field, value: el.value }, true);
-  } else if (['ex-name', 'ex-note'].includes(action)) {
-    dispatch(A.EX_UPDATE, { di: +di, ei: +ei, field, value: el.value }, true);
-  }
-}
-
-
-
-
 // ════════════════════════════════════════════════════════════════════════════
 // MOUNT – public entry point
 // ════════════════════════════════════════════════════════════════════════════
@@ -1615,35 +1576,6 @@ export function mountApp(root) {
     showToast('JSON-Backup wird heruntergeladen …', 'ok');
   });
 
-
-  function _handleChange(e) {
-  const el = e.target;
-  const action = el.dataset.action;
-  const { di, field } = el.dataset;
-
-  if (action === 'day-note') {
-    dispatch(A.DAY_UPDATE, { di: +di, field: 'note', value: el.value });
-  } else if (action === 'body-input') {
-    dispatch(A.BODY_UPDATE, { date: getState().weeks[getState().curIdx].startDate, field, value: el.value });
-  } else if (action === 'wk-note') {
-    dispatch(A.WEEK_UPDATE, { field: 'note', value: el.value });
-  }
-}
-
-function _handleInput(e) {
-  const el     = e.target;
-  const action = el.dataset.action;
-  const { di, ei, si, field } = el.dataset;
-
-  if (['set-weight', 'set-reps', 'set-rpe'].includes(action)) {
-    dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field, value: el.value }, true);
-  } else if (['ex-name', 'ex-note'].includes(action)) {
-    dispatch(A.EX_UPDATE, { di: +di, ei: +ei, field, value: el.value }, true);
-  }
-}
-
-function _bindEvents(root) {
-  
   _bindEvents(root);
   _bindTabSwitcher();
   _initSwipe(root);
