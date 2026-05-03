@@ -343,10 +343,31 @@ function reduce(state, action) {
     }
 
     // ── Week CRUD ────────────────────────────────────────────────────────────
-    case A.WEEK_CREATE: {
+        case A.WEEK_CREATE: {
       if (!p.startDate) break;
       if (state.weeks.find(w => w.startDate === p.startDate)) break; // dedupe
       const days = clone(state.customTemplate ?? FACTORY_TEMPLATE);
+      
+      // --- SMART PROGRESSION: Gewichte der letzten Woche automatisch übernehmen ---
+      if (state.weeks.length > 0) {
+        const lastWeek = state.weeks[state.weeks.length - 1];
+        days.forEach((day, di) => {
+          day.exercises.forEach((ex, ei) => {
+            const lastEx = lastWeek.days[di]?.exercises[ei];
+            // Nur übernehmen, wenn es sich um dieselbe Übung handelt
+            if (lastEx && lastEx.name === ex.name) { 
+              ex.sets.forEach((s, si) => {
+                const lastSet = lastEx.sets[si];
+                if (lastSet) {
+                  s.weight = lastSet.weight;
+                  s.reps = lastSet.reps;
+                }
+              });
+            }
+          });
+        });
+      }
+      
       days.forEach(d => d.exercises.forEach(ex => ex.sets.forEach(s => s.done = false)));
       state.weeks.push({
         id: Date.now(), startDate: p.startDate, note: p.note ?? '',
@@ -355,7 +376,8 @@ function reduce(state, action) {
       state.weeks.sort((a, b) => a.startDate.localeCompare(b.startDate));
       state.curIdx = state.weeks.findIndex(w => w.startDate === p.startDate);
       break;
-    }
+        }
+      
     case A.WEEK_DELETE: {
       if (state.weeks.length <= 1) break;
       state.weeks.splice(state.curIdx, 1);
@@ -443,20 +465,30 @@ function reduce(state, action) {
       ex.sets.splice(p.si, 1);
       break;
     }
-    case A.SET_UPDATE: {
-      const s = _currentWeek()?.days[p.di]?.exercises[p.ei]?.sets[p.si]; if (!s) break;
+        case A.SET_UPDATE: {
+      const ex = _currentWeek()?.days[p.di]?.exercises[p.ei]; if (!ex) break;
+      const s = ex.sets[p.si]; if (!s) break;
+      
       let v = p.value;
       if (p.field === 'weight') v = parseFloat(v) || 0;
       else if (p.field === 'reps') v = Math.max(0, parseInt(v, 10) || 0);
       else if (p.field === 'rpe')  v = (v === '' || v === null) ? null : Math.min(10, Math.max(1, +v));
+      
       s[p.field] = v;
+
+      // --- AUTO-FILL LOGIK (Straight-Sets) ---
+      if (p.si === 0 && p.field === 'weight') {
+        for (let i = 1; i < ex.sets.length; i++) {
+          ex.sets[i].weight = v;
+        }
+      }
       break;
     }
     case A.EX_INC_WEIGHT: {
       const ex = _currentWeek()?.days[p.di]?.exercises[p.ei]; if (!ex) break;
-      // Erhöht das Gewicht in allen Sätzen um den übergebenen Wert
+      // Erhöht das Gewicht in allen Sätzen um den übergebenen Wert absolut sicher
       ex.sets.forEach(s => {
-        if (typeof s.weight === 'number') s.weight += p.amount;
+        s.weight = (parseFloat(s.weight) || 0) + p.amount;
       });
       break;
     }
