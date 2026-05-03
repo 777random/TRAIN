@@ -579,14 +579,14 @@ function reduce(state, action, silent = false) {
       break;
     }
 
-    default:
+        default:
       console.warn('[TRAIN] Unknown action type:', type);
       return; // Don't persist unknown actions
-  }
+  } // <-- Diese Klammer schließt den switch-Block
 
   persistState();
   if (!silent) _notify();
-}
+} // <-- DIESE KLAMMER HAT GEFEHLT! (Schließt die reduce-Funktion)
 
 // ─── Public dispatch ─────────────────────────────────────────────────────────
 
