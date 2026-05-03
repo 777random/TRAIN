@@ -343,12 +343,12 @@ function reduce(state, action) {
     }
 
     // ── Week CRUD ────────────────────────────────────────────────────────────
-        case A.WEEK_CREATE: {
+          case A.WEEK_CREATE: {
       if (!p.startDate) break;
       if (state.weeks.find(w => w.startDate === p.startDate)) break; // dedupe
       const days = clone(state.customTemplate ?? FACTORY_TEMPLATE);
-      
-      // --- SMART PROGRESSION: Gewichte der letzten Woche automatisch übernehmen ---
+
+      // --- SMART PROGRESSION: Gewichte der letzten Woche + Planung übernehmen ---
       if (state.weeks.length > 0) {
         const lastWeek = state.weeks[state.weeks.length - 1];
         days.forEach((day, di) => {
@@ -359,7 +359,7 @@ function reduce(state, action) {
               ex.sets.forEach((s, si) => {
                 const lastSet = lastEx.sets[si];
                 if (lastSet) {
-                  s.weight = lastSet.weight;
+                  s.weight = lastSet.weight + (lastEx.nextWeekPlan || 0);
                   s.reps = lastSet.reps;
                 }
               });
@@ -367,7 +367,7 @@ function reduce(state, action) {
           });
         });
       }
-      
+
       days.forEach(d => d.exercises.forEach(ex => ex.sets.forEach(s => s.done = false)));
       state.weeks.push({
         id: Date.now(), startDate: p.startDate, note: p.note ?? '',
@@ -376,7 +376,8 @@ function reduce(state, action) {
       state.weeks.sort((a, b) => a.startDate.localeCompare(b.startDate));
       state.curIdx = state.weeks.findIndex(w => w.startDate === p.startDate);
       break;
-        }
+          }
+      
       
     case A.WEEK_DELETE: {
       if (state.weeks.length <= 1) break;
@@ -384,7 +385,41 @@ function reduce(state, action) {
       if (state.curIdx >= state.weeks.length) state.curIdx = state.weeks.length - 1;
       break;
     }
-    case A.WEEK_COPY_PREV: {
+    case A.WEEK_COPY_PR    case A.WEEK_CREATE: {
+      if (!p.startDate) break;
+      if (state.weeks.find(w => w.startDate === p.startDate)) break; // dedupe
+      const days = clone(state.customTemplate ?? FACTORY_TEMPLATE);
+
+      // --- SMART PROGRESSION: Gewichte der letzten Woche + Planung übernehmen ---
+      if (state.weeks.length > 0) {
+        const lastWeek = state.weeks[state.weeks.length - 1];
+        days.forEach((day, di) => {
+          day.exercises.forEach((ex, ei) => {
+            const lastEx = lastWeek.days[di]?.exercises[ei];
+            // Nur übernehmen, wenn es sich um dieselbe Übung handelt
+            if (lastEx && lastEx.name === ex.name) { 
+              ex.sets.forEach((s, si) => {
+                const lastSet = lastEx.sets[si];
+                if (lastSet) {
+                  s.weight = lastSet.weight + (lastEx.nextWeekPlan || 0);
+                  s.reps = lastSet.reps;
+                }
+              });
+            }
+          });
+        });
+      }
+
+      days.forEach(d => d.exercises.forEach(ex => ex.sets.forEach(s => s.done = false)));
+      state.weeks.push({
+        id: Date.now(), startDate: p.startDate, note: p.note ?? '',
+        mode: 'standard', days, sessionLog: [], bodyData: {},
+      });
+      state.weeks.sort((a, b) => a.startDate.localeCompare(b.startDate));
+      state.curIdx = state.weeks.findIndex(w => w.startDate === p.startDate);
+      break;
+    }
+      EV: {
       if (state.curIdx === 0) break;
       const d = clone(state.weeks[state.curIdx - 1].days);
       d.forEach(day => {
