@@ -326,7 +326,7 @@ export const A = Object.freeze({
 
 // ─── Reducer ──────────────────────────────────────────────────────────────────
 
-function reduce(state, action) {
+function reduce(state, action, silent = false) {
   // We mutate STATE in place (simpler than immutable for a single-page app
   // without a VDOM), then call persistState(). The state reference stays
   // stable so any code holding `getState()` always sees the latest version.
@@ -500,7 +500,7 @@ function reduce(state, action) {
       ex.sets.splice(p.si, 1);
       break;
     }
-            case A.SET_UPDATE: {
+                case A.SET_UPDATE: {
       const ex = _currentWeek()?.days[p.di]?.exercises[p.ei]; if (!ex) break;
       const s = ex.sets[p.si]; if (!s) break;
       
@@ -510,7 +510,6 @@ function reduce(state, action) {
       else if (p.field === 'rpe')  v = (v === '' || v === null) ? null : Math.min(10, Math.max(1, +v));
       
       s[p.field] = v;
-      // AUTO-FILL ENTFERNT (wie gewünscht)
       break;
     }
     case A.EX_INC_WEIGHT: {
@@ -586,8 +585,8 @@ function reduce(state, action) {
       return; // Don't persist unknown actions
   }
 
-  persistState();
-  _notify();
+    persistState();
+  if (!silent) _notify();
 }
 
 // ─── Public dispatch ─────────────────────────────────────────────────────────
