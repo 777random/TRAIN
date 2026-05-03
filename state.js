@@ -595,14 +595,11 @@ function reduce(state, action) {
 /**
  * Dispatch an action to mutate state.
  *
- * @param {string} type  – one of the A.* constants
- * @param {object} [payload={}]
+ * @param {string} type  – Action type from A
+ * @param {object} payload – Action payload
+ * @param {boolean} silent - If true, does not trigger a UI re-render
  */
-function reduce(state, action, silent = false) { // silent Parameter hinzugefügt
-  const { type, payload: p } = action;
-  // ... (Rest bleibt gleich) ...
-  
-  persistState();
-  if (!silent) _notify(); // Nur benachrichtigen (re-render), wenn nicht silent
+export function dispatch(type, payload = {}, silent = false) {
+  reduce(STATE, { type, payload }, silent);
 }
 
