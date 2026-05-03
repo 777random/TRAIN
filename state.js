@@ -569,11 +569,10 @@ function reduce(state, action, silent = false) {
     }
 
     // ── Full import ───────────────────────────────────────────────────────────
+        // ── Full import ───────────────────────────────────────────────────────────
     case A.STATE_IMPORT: {
       const imported = migrate(p.imported);
       if (!Array.isArray(imported?.weeks)) break;
-      // Replace everything except wipe the current object, so existing
-      // references (e.g. getState()) stay valid.
       Object.assign(state, imported);
       if (!state.weeks.length) _appendDefaultWeek();
       if (state.curIdx >= state.weeks.length) state.curIdx = state.weeks.length - 1;
@@ -585,20 +584,12 @@ function reduce(state, action, silent = false) {
       return; // Don't persist unknown actions
   }
 
-    persistState();
+  persistState();
   if (!silent) _notify();
 }
 
 // ─── Public dispatch ─────────────────────────────────────────────────────────
 
-/**
- * Dispatch an action to mutate state.
- *
- * @param {string} type  – Action type from A
- * @param {object} payload – Action payload
- * @param {boolean} silent - If true, does not trigger a UI re-render
- */
 export function dispatch(type, payload = {}, silent = false) {
   reduce(STATE, { type, payload }, silent);
 }
-
