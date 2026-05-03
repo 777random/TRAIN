@@ -465,7 +465,7 @@ function reduce(state, action) {
       ex.sets.splice(p.si, 1);
       break;
     }
-        case A.SET_UPDATE: {
+            case A.SET_UPDATE: {
       const ex = _currentWeek()?.days[p.di]?.exercises[p.ei]; if (!ex) break;
       const s = ex.sets[p.si]; if (!s) break;
       
@@ -475,23 +475,16 @@ function reduce(state, action) {
       else if (p.field === 'rpe')  v = (v === '' || v === null) ? null : Math.min(10, Math.max(1, +v));
       
       s[p.field] = v;
-
-      // --- AUTO-FILL LOGIK (Straight-Sets) ---
-      if (p.si === 0 && p.field === 'weight') {
-        for (let i = 1; i < ex.sets.length; i++) {
-          ex.sets[i].weight = v;
-        }
-      }
+      // AUTO-FILL ENTFERNT (wie gewünscht)
       break;
     }
     case A.EX_INC_WEIGHT: {
       const ex = _currentWeek()?.days[p.di]?.exercises[p.ei]; if (!ex) break;
-      // Erhöht das Gewicht in allen Sätzen um den übergebenen Wert absolut sicher
-      ex.sets.forEach(s => {
-        s.weight = (parseFloat(s.weight) || 0) + p.amount;
-      });
+      // Speichert die geplante Steigerung für die NÄCHSTE Woche
+      ex.nextWeekPlan = (ex.nextWeekPlan || 0) + p.amount;
       break;
     }
+      
     case A.SET_TOGGLE_DONE: {
       const s = _currentWeek()?.days[p.di]?.exercises[p.ei]?.sets[p.si]; if (!s) break;
       s.done = !s.done;
@@ -570,6 +563,11 @@ function reduce(state, action) {
  * @param {string} type  – one of the A.* constants
  * @param {object} [payload={}]
  */
-export function dispatch(type, payload = {}) {
-  reduce(STATE, { type, payload });
+function reduce(state, action, silent = false) { // silent Parameter hinzugefügt
+  const { type, payload: p } = action;
+  // ... (Rest bleibt gleich) ...
+  
+  persistState();
+  if (!silent) _notify(); // Nur benachrichtigen (re-render), wenn nicht silent
 }
+
