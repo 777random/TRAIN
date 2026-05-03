@@ -302,8 +302,6 @@ export const A = Object.freeze({
   EX_UPDATE:           'EX_UPDATE',           // { di, ei, field, value }
   EX_MOVE:             'EX_MOVE',             // { di, fromEi, toEi }
   EX_TOGGLE_CFG:       'EX_TOGGLE_CFG',       // { di, ei }
-  EX_INC_WEIGHT:       'EX_INC_WEIGHT',
-  
   // Set
   SET_ADD:             'SET_ADD',             // { di, ei }
   SET_REMOVE:          'SET_REMOVE',          // { di, ei, si }
@@ -326,7 +324,7 @@ export const A = Object.freeze({
 
 // ─── Reducer ──────────────────────────────────────────────────────────────────
 
-function reduce(state, action, silent = false) {
+function reduce(state, action) {
   // We mutate STATE in place (simpler than immutable for a single-page app
   // without a VDOM), then call persistState(). The state reference stays
   // stable so any code holding `getState()` always sees the latest version.
@@ -343,31 +341,10 @@ function reduce(state, action, silent = false) {
     }
 
     // ── Week CRUD ────────────────────────────────────────────────────────────
-          case A.WEEK_CREATE: {
+    case A.WEEK_CREATE: {
       if (!p.startDate) break;
       if (state.weeks.find(w => w.startDate === p.startDate)) break; // dedupe
       const days = clone(state.customTemplate ?? FACTORY_TEMPLATE);
-
-      // --- SMART PROGRESSION: Gewichte der letzten Woche + Planung übernehmen ---
-      if (state.weeks.length > 0) {
-        const lastWeek = state.weeks[state.weeks.length - 1];
-        days.forEach((day, di) => {
-          day.exercises.forEach((ex, ei) => {
-            const lastEx = lastWeek.days[di]?.exercises[ei];
-            // Nur übernehmen, wenn es sich um dieselbe Übung handelt
-            if (lastEx && lastEx.name === ex.name) { 
-              ex.sets.forEach((s, si) => {
-                const lastSet = lastEx.sets[si];
-                if (lastSet) {
-                  s.weight = lastSet.weight + (lastEx.nextWeekPlan || 0);
-                  s.reps = lastSet.reps;
-                }
-              });
-            }
-          });
-        });
-      }
-
       days.forEach(d => d.exercises.forEach(ex => ex.sets.forEach(s => s.done = false)));
       state.weeks.push({
         id: Date.now(), startDate: p.startDate, note: p.note ?? '',
@@ -376,50 +353,14 @@ function reduce(state, action, silent = false) {
       state.weeks.sort((a, b) => a.startDate.localeCompare(b.startDate));
       state.curIdx = state.weeks.findIndex(w => w.startDate === p.startDate);
       break;
-          }
-      
-      
+    }
     case A.WEEK_DELETE: {
       if (state.weeks.length <= 1) break;
       state.weeks.splice(state.curIdx, 1);
       if (state.curIdx >= state.weeks.length) state.curIdx = state.weeks.length - 1;
       break;
     }
-    case A.WEEK_COPY_PR    case A.WEEK_CREATE: {
-      if (!p.startDate) break;
-      if (state.weeks.find(w => w.startDate === p.startDate)) break; // dedupe
-      const days = clone(state.customTemplate ?? FACTORY_TEMPLATE);
-
-      // --- SMART PROGRESSION: Gewichte der letzten Woche + Planung übernehmen ---
-      if (state.weeks.length > 0) {
-        const lastWeek = state.weeks[state.weeks.length - 1];
-        days.forEach((day, di) => {
-          day.exercises.forEach((ex, ei) => {
-            const lastEx = lastWeek.days[di]?.exercises[ei];
-            // Nur übernehmen, wenn es sich um dieselbe Übung handelt
-            if (lastEx && lastEx.name === ex.name) { 
-              ex.sets.forEach((s, si) => {
-                const lastSet = lastEx.sets[si];
-                if (lastSet) {
-                  s.weight = lastSet.weight + (lastEx.nextWeekPlan || 0);
-                  s.reps = lastSet.reps;
-                }
-              });
-            }
-          });
-        });
-      }
-
-      days.forEach(d => d.exercises.forEach(ex => ex.sets.forEach(s => s.done = false)));
-      state.weeks.push({
-        id: Date.now(), startDate: p.startDate, note: p.note ?? '',
-        mode: 'standard', days, sessionLog: [], bodyData: {},
-      });
-      state.weeks.sort((a, b) => a.startDate.localeCompare(b.startDate));
-      state.curIdx = state.weeks.findIndex(w => w.startDate === p.startDate);
-      break;
-    }
-      EV: {
+    case A.WEEK_COPY_PREV: {
       if (state.curIdx === 0) break;
       const d = clone(state.weeks[state.curIdx - 1].days);
       d.forEach(day => {
@@ -500,25 +441,15 @@ function reduce(state, action, silent = false) {
       ex.sets.splice(p.si, 1);
       break;
     }
-                case A.SET_UPDATE: {
-      const ex = _currentWeek()?.days[p.di]?.exercises[p.ei]; if (!ex) break;
-      const s = ex.sets[p.si]; if (!s) break;
-      
+    case A.SET_UPDATE: {
+      const s = _currentWeek()?.days[p.di]?.exercises[p.ei]?.sets[p.si]; if (!s) break;
       let v = p.value;
       if (p.field === 'weight') v = parseFloat(v) || 0;
       else if (p.field === 'reps') v = Math.max(0, parseInt(v, 10) || 0);
       else if (p.field === 'rpe')  v = (v === '' || v === null) ? null : Math.min(10, Math.max(1, +v));
-      
       s[p.field] = v;
       break;
     }
-    case A.EX_INC_WEIGHT: {
-      const ex = _currentWeek()?.days[p.di]?.exercises[p.ei]; if (!ex) break;
-      // Speichert die geplante Steigerung für die NÄCHSTE Woche
-      ex.nextWeekPlan = (ex.nextWeekPlan || 0) + p.amount;
-      break;
-    }
-      
     case A.SET_TOGGLE_DONE: {
       const s = _currentWeek()?.days[p.di]?.exercises[p.ei]?.sets[p.si]; if (!s) break;
       s.done = !s.done;
@@ -569,27 +500,34 @@ function reduce(state, action, silent = false) {
     }
 
     // ── Full import ───────────────────────────────────────────────────────────
-        // ── Full import ───────────────────────────────────────────────────────────
     case A.STATE_IMPORT: {
       const imported = migrate(p.imported);
       if (!Array.isArray(imported?.weeks)) break;
+      // Replace everything except wipe the current object, so existing
+      // references (e.g. getState()) stay valid.
       Object.assign(state, imported);
       if (!state.weeks.length) _appendDefaultWeek();
       if (state.curIdx >= state.weeks.length) state.curIdx = state.weeks.length - 1;
       break;
     }
 
-        default:
+    default:
       console.warn('[TRAIN] Unknown action type:', type);
       return; // Don't persist unknown actions
-  } // <-- Diese Klammer schließt den switch-Block
+  }
 
   persistState();
-  if (!silent) _notify();
-} // <-- DIESE KLAMMER HAT GEFEHLT! (Schließt die reduce-Funktion)
+  _notify();
+}
 
 // ─── Public dispatch ─────────────────────────────────────────────────────────
 
-export function dispatch(type, payload = {}, silent = false) {
-  reduce(STATE, { type, payload }, silent);
+/**
+ * Dispatch an action to mutate state.
+ *
+ * @param {string} type  – one of the A.* constants
+ * @param {object} [payload={}]
+ */
+export function dispatch(type, payload = {}) {
+  reduce(STATE, { type, payload });
 }
