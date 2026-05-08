@@ -1135,7 +1135,16 @@ function _handleClick(e) {
       }
       break;
     }
+      
+    case 'inc-weight':
+      dispatch(A.EX_INC_WEIGHT, { di: +di, ei: +ei }); break;
 
+    case 'set-step': {
+      const step = parseFloat(el.dataset.step);
+      dispatch(A.EX_SET_STEP, { di: +di, ei: +ei, step });
+      break;
+    }
+      
     case 'move-ex-down': {
       const maxEi = getState().weeks[getState().curIdx].days[+di].exercises.length - 1;
       const toEi = +ei + 1;
