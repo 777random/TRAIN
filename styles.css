@@ -843,17 +843,41 @@ label > svg {
   cursor: not-allowed;
 }
 
-/* ── Gewicht erhöhen ───────────────────────────────────────── */
-.weight-step-row {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  padding: var(--sp-2) 0 var(--sp-1);
-  flex-wrap: wrap;
+/* ── Übungs-Einstellungen (Zahnrad-Menü) ────────────────────────── */
+.exercise__settings {
+  background-color: #141416; /* Etwas dunkler als var(--c-surface) für Kontrast */
+  border-top: 1px solid var(--c-border);
+  padding: var(--sp-2) var(--sp-3);
+  display: none; /* Versteckt, bis .is-cfg-open aktiv ist */
 }
 
+.exercise.is-cfg-open .exercise__settings {
+  display: block;
+}
+
+/* Pause-Reihe (im Menü) */
+.pause-row {
+  padding: var(--sp-1) 0;
+}
+
+/* Gewicht planen Reihe (im Menü) */
+.weight-plan-row {
+  padding: var(--sp-2) 0;
+  border-top: 1px solid rgba(255,255,255,0.05); /* Sehr feine Trennlinie */
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.weight-plan-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Der große "+2.5kg" Plan-Button */
 .btn-inc-weight {
-  height: 36px;
+  height: 32px;
   padding: 0 var(--sp-3);
   background: var(--c-accent);
   color: #000;
@@ -863,12 +887,9 @@ label > svg {
   font-weight: 700;
   font-size: 13px;
   cursor: pointer;
-  white-space: nowrap;
-  flex-shrink: 0;
-  transition: background var(--t-fast), opacity var(--t-fast);
 }
-.btn-inc-weight:hover { background: var(--c-accent-dk); }
 
+/* Die kleinen Auswahl-Buttons (0, 1.25, etc.) */
 .weight-step-opts {
   display: flex;
   gap: 4px;
@@ -879,7 +900,7 @@ label > svg {
   height: 28px;
   min-width: 40px;
   padding: 0 var(--sp-2);
-  background: var(--c-surface2);
+  background: var(--c-surface);
   border: 1px solid var(--c-border);
   border-radius: var(--r-sm);
   color: var(--c-text-3);
@@ -888,11 +909,15 @@ label > svg {
   cursor: pointer;
   transition: all var(--t-fast);
 }
-.weight-step-btn:hover { border-color: var(--c-accent); color: var(--c-accent); }
+
+.weight-step-btn:hover {
+  border-color: var(--c-text-1);
+}
+
 .weight-step-btn.is-selected {
-  background: var(--c-accent);
+  background: rgba(200, 255, 0, 0.1); /* Neon-Gelb Hauch */
   border-color: var(--c-accent);
-  color: #000;
+  color: var(--c-accent);
   font-weight: 700;
 }
 
