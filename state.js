@@ -433,7 +433,8 @@ function reduce(state, action) {
     case A.EX_INC_WEIGHT: {
       const ex = _currentWeek()?.days[p.di]?.exercises[p.ei]; if (!ex) break;
       const step = p.amount ?? ex.weightStep ?? 2.5;
-      ex.sets.forEach(s => { s.weight = Math.round((s.weight + step) * 100) / 100; });
+      // Ändert NICHT das aktuelle Gewicht, sondern plant für nächste Woche:
+      ex.nextWeekPlan = (ex.nextWeekPlan || 0) + step;
       break;
     }
     case A.EX_SET_STEP: {
