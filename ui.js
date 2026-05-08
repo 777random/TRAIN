@@ -459,12 +459,12 @@ function renderExercise(wk, di, ei, state) {
       aria-label="Gewicht um ${ex.weightStep ?? 2.5} kg erhöhen"
     >＋ ${ex.weightStep ?? 2.5} kg</button>
     <div class="weight-step-opts">
-      ${[1.25, 2.5, 5, 7.5, 10].map(s => `
+      ${[0, 1.25, 2, 2.5, 5, 7.5, 10].map(s => `
         <button
           class="weight-step-btn${(ex.weightStep ?? 2.5) === s ? ' is-selected' : ''}"
           data-action="set-step" data-di="${di}" data-ei="${ei}" data-step="${s}"
           aria-pressed="${(ex.weightStep ?? 2.5) === s}"
-        >${s}</button>`).join('')}
+        >${s === 0 ? 'Reset' : s}</button>`).join('')}
     </div>
   </div>` : ''}
 
