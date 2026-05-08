@@ -404,7 +404,8 @@ function renderExercise(wk, di, ei, state) {
     renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl)
   ).join('');
 
-  const pauseRow = ex._showCfg ? `
+  // --- Das neue Zahnrad-Menü (Config Row) ---
+  const configRow = ex._showCfg ? `
     <div class="pause-row" role="group" aria-label="Pausenzeit wählen">
       <span class="pause-row__label">Pause:</span>
       ${[30, 60, 90, 120].map(sec => `
@@ -413,7 +414,24 @@ function renderExercise(wk, di, ei, state) {
           data-action="set-pause" data-di="${di}" data-ei="${ei}" data-sec="${sec}"
           aria-pressed="${ex.pauseSec === sec}"
         >${sec}s</button>`).join('')}
-    </div>` : '';
+    </div>
+    ${!locked ? `
+    <div class="weight-step-row" role="group" aria-label="Gewicht planen">
+      <button
+        class="btn-inc-weight"
+        data-action="inc-weight" data-di="${di}" data-ei="${ei}"
+        aria-label="Gewicht um ${ex.weightStep ?? 2.5} kg erhöhen"
+      >＋ ${ex.weightStep ?? 2.5} kg</button>
+      <div class="weight-step-opts">
+        ${[0, 1.25, 2, 2.5, 5, 7.5, 10].map(s => `
+          <button
+            class="weight-step-btn${(ex.weightStep ?? 2.5) === s ? ' is-selected' : ''}"
+            data-action="set-step" data-di="${di}" data-ei="${ei}" data-step="${s}"
+            aria-pressed="${(ex.weightStep ?? 2.5) === s}"
+          >${s === 0 ? 'Reset' : s}</button>`).join('')}
+      </div>
+    </div>` : ''}
+  ` : '';
 
   return `
 <div class="exercise" data-di="${di}" data-ei="${ei}" draggable="${drag}">
