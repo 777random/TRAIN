@@ -404,8 +404,7 @@ function renderExercise(wk, di, ei, state) {
     renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl)
   ).join('');
 
-  // --- Das neue Zahnrad-Menü (Config Row) ---
-  const configRow = ex._showCfg ? `
+  const pauseRow = ex._showCfg ? `
     <div class="pause-row" role="group" aria-label="Pausenzeit wählen">
       <span class="pause-row__label">Pause:</span>
       ${[30, 60, 90, 120].map(sec => `
@@ -414,9 +413,7 @@ function renderExercise(wk, di, ei, state) {
           data-action="set-pause" data-di="${di}" data-ei="${ei}" data-sec="${sec}"
           aria-pressed="${ex.pauseSec === sec}"
         >${sec}s</button>`).join('')}
-    </div>
-    
-  ` : '';
+    </div>` : '';
 
   return `
 <div class="exercise" data-di="${di}" data-ei="${ei}" draggable="${drag}">
@@ -438,9 +435,12 @@ function renderExercise(wk, di, ei, state) {
       aria-label="Übungsname"
       maxlength="80"
     />
-    <button class="btn-icon${ex.nextWeekPlan ? ' is-planned' : ''}" data-action="toggle-cfg" data-di="${di}" data-ei="${ei}" aria-label="Übung konfigurieren">
-          ${ic.settings()}
-        </button>
+    <button
+      class="exercise__cfg-btn"
+      data-action="toggle-cfg" data-di="${di}" data-ei="${ei}"
+      aria-label="Pausenzeit einstellen"
+      aria-expanded="${!!ex._showCfg}"
+    >${ic.settings()}</button>
     ${!locked ? `
     <button
       class="exercise__remove-btn"
@@ -449,7 +449,7 @@ function renderExercise(wk, di, ei, state) {
     >${ic.trash()}</button>` : ''}
   </div>
 
-  ${configRow}
+  ${pauseRow}
 
   ${!locked ? `
   <div class="weight-step-row" role="group" aria-label="Gewicht erhöhen">
