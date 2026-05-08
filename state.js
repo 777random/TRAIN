@@ -430,6 +430,17 @@ function reduce(state, action) {
       ex._showCfg = !ex._showCfg;
       break;
     }
+    case A.EX_INC_WEIGHT: {
+      const ex = _currentWeek()?.days[p.di]?.exercises[p.ei]; if (!ex) break;
+      const step = p.amount ?? ex.weightStep ?? 2.5;
+      ex.sets.forEach(s => { s.weight = Math.round((s.weight + step) * 100) / 100; });
+      break;
+    }
+    case A.EX_SET_STEP: {
+      const ex = _currentWeek()?.days[p.di]?.exercises[p.ei]; if (!ex) break;
+      ex.weightStep = p.step;
+      break;
+    }
 
     // ── Set ───────────────────────────────────────────────────────────────────
     case A.SET_ADD: {
