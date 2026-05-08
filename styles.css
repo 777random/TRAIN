@@ -895,3 +895,8 @@ label > svg {
   color: #000;
   font-weight: 700;
 }
+
+/* Geplante Steigerung: Zahnrad leuchtet auf */
+.btn-icon.is-planned {
+  color: var(--c-accent);
+}
