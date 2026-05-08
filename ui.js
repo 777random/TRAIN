@@ -435,12 +435,9 @@ function renderExercise(wk, di, ei, state) {
       aria-label="Übungsname"
       maxlength="80"
     />
-    <button
-      class="exercise__cfg-btn"
-      data-action="toggle-cfg" data-di="${di}" data-ei="${ei}"
-      aria-label="Pausenzeit einstellen"
-      aria-expanded="${!!ex._showCfg}"
-    >${ic.settings()}</button>
+    <button class="btn-icon${ex.nextWeekPlan ? ' is-planned' : ''}" data-action="toggle-cfg" data-di="${di}" data-ei="${ei}" aria-label="Übung konfigurieren">
+          ${ic.settings()}
+        </button>
     ${!locked ? `
     <button
       class="exercise__remove-btn"
