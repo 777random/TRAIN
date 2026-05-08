@@ -449,7 +449,7 @@ function renderExercise(wk, di, ei, state) {
     >${ic.trash()}</button>` : ''}
   </div>
 
-  ${pauseRow}
+  ${configRow}
 
   ${!locked ? `
   <div class="weight-step-row" role="group" aria-label="Gewicht erhöhen">
