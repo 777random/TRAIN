@@ -1138,9 +1138,13 @@ function _handleClick(e) {
       
     case 'inc-weight': {
       dispatch(A.EX_INC_WEIGHT, { di: +di, ei: +ei });
-      // Hole uns die aktuelle Übung, um zu sehen, wie viel insgesamt geplant ist
       const ex = getState().weeks[getState().curIdx].days[di].exercises[ei];
-      showToast(`+${ex.nextWeekPlan} kg für nächste Woche geplant!`, 'ok');
+      
+      if (ex.nextWeekPlan === 0) {
+        showToast(`Planung für nächste Woche zurückgesetzt`, 'ok');
+      } else {
+        showToast(`+${ex.nextWeekPlan} kg für nächste Woche geplant!`, 'ok');
+      }
       break;
     }
 
