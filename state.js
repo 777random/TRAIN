@@ -302,6 +302,8 @@ export const A = Object.freeze({
   EX_UPDATE:           'EX_UPDATE',           // { di, ei, field, value }
   EX_MOVE:             'EX_MOVE',             // { di, fromEi, toEi }
   EX_TOGGLE_CFG:       'EX_TOGGLE_CFG',       // { di, ei }
+  EX_INC_WEIGHT:       'EX_INC_WEIGHT',       // { di, ei, amount } – erhöht alle Sätze sofort
+  EX_SET_STEP:         'EX_SET_STEP',         // { di, ei, step }  – speichert Steigerungsrate
   // Set
   SET_ADD:             'SET_ADD',             // { di, ei }
   SET_REMOVE:          'SET_REMOVE',          // { di, ei, si }
