@@ -451,6 +451,23 @@ function renderExercise(wk, di, ei, state) {
 
   ${pauseRow}
 
+  ${!locked ? `
+  <div class="weight-step-row" role="group" aria-label="Gewicht erhöhen">
+    <button
+      class="btn-inc-weight"
+      data-action="inc-weight" data-di="${di}" data-ei="${ei}"
+      aria-label="Gewicht um ${ex.weightStep ?? 2.5} kg erhöhen"
+    >＋ ${ex.weightStep ?? 2.5} kg</button>
+    <div class="weight-step-opts">
+      ${[1.25, 2.5, 5, 7.5, 10].map(s => `
+        <button
+          class="weight-step-btn${(ex.weightStep ?? 2.5) === s ? ' is-selected' : ''}"
+          data-action="set-step" data-di="${di}" data-ei="${ei}" data-step="${s}"
+          aria-pressed="${(ex.weightStep ?? 2.5) === s}"
+        >${s}</button>`).join('')}
+    </div>
+  </div>` : ''}
+
   <input
     class="exercise__note"
     type="text"
