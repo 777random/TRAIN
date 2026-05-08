@@ -347,6 +347,30 @@ function reduce(state, action) {
       if (!p.startDate) break;
       if (state.weeks.find(w => w.startDate === p.startDate)) break; // dedupe
       const days = clone(state.customTemplate ?? FACTORY_TEMPLATE);
+
+      // --- SMART PROGRESSION: Gewichte der letzten Woche + Planung übernehmen ---
+      if (state.weeks.length > 0) {
+        const lastWeek = state.weeks[state.weeks.length - 1];
+        days.forEach((day, di) => {
+          day.exercises.forEach((ex, ei) => {
+            const lastEx = lastWeek.days[di]?.exercises[ei];
+            // Nur übernehmen, wenn es sich um dieselbe Übung handelt
+            if (lastEx && lastEx.name === ex.name) { 
+              ex.sets.forEach((s, si) => {
+                const lastSet = lastEx.sets[si];
+                if (lastSet) {
+                  // Hier wird die Planung aus der Vorwoche auf das alte Gewicht addiert!
+                  s.weight = lastSet.weight + (lastEx.nextWeekPlan || 0);
+                  s.reps = lastSet.reps;
+                }
+              });
+              // Die eingestellte Steigerungsrate (z.B. 1.25) in die neue Woche mitnehmen
+              ex.weightStep = lastEx.weightStep; 
+            }
+          });
+        });
+      }
+
       days.forEach(d => d.exercises.forEach(ex => ex.sets.forEach(s => s.done = false)));
       state.weeks.push({
         id: Date.now(), startDate: p.startDate, note: p.note ?? '',
