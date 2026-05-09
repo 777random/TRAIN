@@ -415,16 +415,97 @@ function renderExercise(wk, di, ei, state) {
         >${sec}s</button>`).join('')}
     </div>` : '';
 
+const step    = ex.weightStep ?? 2.5;
+  const cfgRow  = ex._showCfg ? `
+    <div class="pause-row" role="group" aria-label="Einstellungen">
+      <span class="pause-row__label">Pause:</span>
+      ${[30, 60, 90, 120].map(sec => `
+        <button
+          class="pause-opt${ex.pauseSec === sec ? ' is-selected' : ''}"
+          data-action="set-pause" data-di="${di}" data-ei="${ei}" data-sec="${sec}"
+          aria-pressed="${ex.pauseSec === sec}"
+        >${sec}s</button>`).join('')}
+      <span class="pause-row__label" style="margin-left:var(--sp-2)">Steigerung:</span>
+      ${[0, 1.25, 2, 2.5, 5, 7.5, 10].map(s => `
+        <button
+          class="weight-step-btn${step === s ? ' is-selected' : ''}"
+          data-action="set-step" data-di="${di}" data-ei="${ei}" data-step="${s}"
+          aria-pressed="${step === s}"
+        >${s === 0 ? 'Reset' : s}</button>`).join('')}
+    </div>` : '';
+
   return `
 <div class="exercise" data-di="${di}" data-ei="${ei}" draggable="${drag}">
   <div class="sticky-sentinel" aria-hidden="true" style="height:1px;pointer-events:none;"></div>
 
-    <div class="exercise__name-sticky">
+  <div class="exercise__name-sticky">
     ${!locked ? `
     <div class="exercise__order-btns">
       <button class="exercise__order-btn" data-action="move-ex-up" data-di="${di}" data-ei="${ei}" aria-label="Nach oben" ${ei === 0 ? 'disabled' : ''}>▲</button>
       <button class="exercise__order-btn" data-action="move-ex-down" data-di="${di}" data-ei="${ei}" aria-label="Nach unten" ${ei === wk.days[di].exercises.length - 1 ? 'disabled' : ''}>▼</button>
     </div>` : ''}
+
+    <input
+      class="exercise__name-input"
+      type="text"
+      value="${h(ex.name)}"
+      ${locked ? 'disabled' : ''}
+      data-action="ex-name" data-di="${di}" data-ei="${ei}"
+      aria-label="Übungsname"
+      maxlength="80"
+    />
+
+    ${!locked ? `
+    <button
+      class="btn-inc-weight-sticky"
+      data-action="inc-weight" data-di="${di}" data-ei="${ei}"
+      aria-label="Gewicht um ${step} kg für nächste Woche erhöhen"
+    >＋${step}kg</button>` : ''}
+
+    <button
+      class="exercise__cfg-btn"
+      data-action="toggle-cfg" data-di="${di}" data-ei="${ei}"
+      aria-label="Einstellungen"
+      aria-expanded="${!!ex._showCfg}"
+    >${ic.settings()}</button>
+
+    ${!locked ? `
+    <button
+      class="exercise__remove-btn"
+      data-action="remove-ex" data-di="${di}" data-ei="${ei}"
+      aria-label="Übung entfernen"
+    >${ic.trash()}</button>` : ''}
+  </div>
+
+  ${cfgRow}
+
+  <input
+    class="exercise__note"
+    type="text"
+    value="${h(ex.note ?? '')}"
+    placeholder="Notiz …"
+    ${locked ? 'disabled' : ''}
+    data-action="ex-note" data-di="${di}" data-ei="${ei}"
+    aria-label="Notiz zu ${h(ex.name)}"
+    maxlength="120"
+  />
+
+  <div class="set-header" aria-hidden="true">
+    <span>#</span><span>kg</span><span>Wdh</span><span>RPE</span><span>✓</span><span></span>
+  </div>
+
+  <div data-set-list="${di}-${ei}" role="list" aria-label="Sätze von ${h(ex.name)}">
+    ${setsHtml}
+  </div>
+
+  ${!locked ? `
+  <button
+    class="add-set-btn"
+    data-action="add-set" data-di="${di}" data-ei="${ei}"
+    aria-label="Satz hinzufügen"
+  >${ic.plus()}<span>Satz hinzufügen</span></button>` : ''}
+</div>`;
+}
     
     <input
       class="exercise__name-input"
