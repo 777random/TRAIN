@@ -288,7 +288,7 @@ export const A = Object.freeze({
   // Navigation
   WEEK_NAVIGATE:       'WEEK_NAVIGATE',       // { delta: ±1 }
   // Week CRUD
-  WEEK_CREATE:         'WEEK_CREATE',         // { startDate, note }
+  WEEK_CREATE:         'WEEK_CREATE',         // { startDate, note, source?: 'prev'|'template' }
   WEEK_DELETE:         'WEEK_DELETE',         // {}
   WEEK_COPY_PREV:      'WEEK_COPY_PREV',      // {}
   WEEK_SET_MODE:       'WEEK_SET_MODE',       // { mode: 'standard'|'deload' }
@@ -316,6 +316,7 @@ export const A = Object.freeze({
   BODY_SET_FIELD:      'BODY_SET_FIELD',      // { field, value }
   // Template
   TPL_SAVE:            'TPL_SAVE',            // { template: DayTemplate[] }
+  SAVE_WEEK_AS_TEMPLATE:'SAVE_WEEK_AS_TEMPLATE', // {}
   TPL_RESET_TO_FACTORY:'TPL_RESET_TO_FACTORY',// {}
   WEEK_RESET_TO_TPL:   'WEEK_RESET_TO_TPL',  // {}
   // Settings
@@ -325,6 +326,31 @@ export const A = Object.freeze({
 });
 
 // ─── Reducer ──────────────────────────────────────────────────────────────────
+
+function _resetClonedDays(days) {
+  days.forEach(day => {
+    day.locked = false;
+    day.markedDone = false;
+    (day.exercises ?? []).forEach(ex => {
+      // UI-only toggles must not leak into new weeks / templates
+      if (ex._showCfg) ex._showCfg = false;
+      (ex.sets ?? []).forEach(s => { s.done = false; });
+    });
+  });
+}
+
+function _applyPlannedProgression(days) {
+  days.forEach(day => {
+    (day.exercises ?? []).forEach(ex => {
+      const plan = ex.nextWeekPlan || 0;
+      if (plan) {
+        (ex.sets ?? []).forEach(s => { s.weight = (parseFloat(s.weight) || 0) + plan; });
+      }
+      // Plan is meant for "next week" only; once applied, clear it.
+      ex.nextWeekPlan = 0;
+    });
+  });
+}
 
 function reduce(state, action) {
   // We mutate STATE in place (simpler than immutable for a single-page app
@@ -346,32 +372,21 @@ function reduce(state, action) {
     case A.WEEK_CREATE: {
       if (!p.startDate) break;
       if (state.weeks.find(w => w.startDate === p.startDate)) break; // dedupe
-      const days = clone(state.customTemplate ?? FACTORY_TEMPLATE);
+      const source = p.source === 'template' ? 'template' : 'prev';
 
-      // --- SMART PROGRESSION: Gewichte der letzten Woche + Planung übernehmen ---
-      if (state.weeks.length > 0) {
+      let days;
+      if (source === 'prev' && state.weeks.length > 0) {
         const lastWeek = state.weeks[state.weeks.length - 1];
-        days.forEach((day, di) => {
-          day.exercises.forEach((ex, ei) => {
-            const lastEx = lastWeek.days[di]?.exercises[ei];
-            // Nur übernehmen, wenn es sich um dieselbe Übung handelt
-            if (lastEx && lastEx.name === ex.name) { 
-              ex.sets.forEach((s, si) => {
-                const lastSet = lastEx.sets[si];
-                if (lastSet) {
-                  // Hier wird die Planung aus der Vorwoche auf das alte Gewicht addiert!
-                  s.weight = lastSet.weight + (lastEx.nextWeekPlan || 0);
-                  s.reps = lastSet.reps;
-                }
-              });
-              // Die eingestellte Steigerungsrate (z.B. 1.25) in die neue Woche mitnehmen
-              ex.weightStep = lastEx.weightStep; 
-            }
-          });
-        });
+        days = clone(lastWeek.days);
+        _applyPlannedProgression(days);
+      } else {
+        // Explicit restart: load global template as-is (no auto-progression mapping)
+        days = clone(state.customTemplate ?? FACTORY_TEMPLATE);
+        // Make sure templates never carry "planned" UI state forward
+        days.forEach(d => (d.exercises ?? []).forEach(ex => { ex.nextWeekPlan = 0; ex._showCfg = false; }));
       }
 
-      days.forEach(d => d.exercises.forEach(ex => ex.sets.forEach(s => s.done = false)));
+      _resetClonedDays(days);
       state.weeks.push({
         id: Date.now(), startDate: p.startDate, note: p.note ?? '',
         mode: 'standard', days, sessionLog: [], bodyData: {},
@@ -532,7 +547,12 @@ function reduce(state, action) {
     case A.WEEK_RESET_TO_TPL: {
       const wk = _currentWeek(); if (!wk) break;
       const days = clone(state.customTemplate ?? FACTORY_TEMPLATE);
-      days.forEach(d => d.exercises.forEach(ex => ex.sets.forEach(s => s.done = false)));
+      days.forEach(d => (d.exercises ?? []).forEach(ex => {
+        ex.nextWeekPlan = 0;
+        ex._showCfg = false;
+        (ex.sets ?? []).forEach(s => s.done = false);
+      }));
+      days.forEach(d => { d.locked = false; d.markedDone = false; });
       wk.days = days;
       break;
     }
@@ -552,6 +572,25 @@ function reduce(state, action) {
       Object.assign(state, imported);
       if (!state.weeks.length) _appendDefaultWeek();
       if (state.curIdx >= state.weeks.length) state.curIdx = state.weeks.length - 1;
+      break;
+    }
+
+    // ── Save current week as template ─────────────────────────────────────────
+    case A.SAVE_WEEK_AS_TEMPLATE: {
+      const wk = _currentWeek();
+      if (!wk) break;
+      const tpl = clone(wk.days);
+      // A template is a clean baseline: no "done", no locks, no pending plans.
+      tpl.forEach(day => {
+        day.locked = false;
+        day.markedDone = false;
+        (day.exercises ?? []).forEach(ex => {
+          ex._showCfg = false;
+          ex.nextWeekPlan = 0;
+          (ex.sets ?? []).forEach(s => { s.done = false; });
+        });
+      });
+      state.customTemplate = tpl;
       break;
     }
 
