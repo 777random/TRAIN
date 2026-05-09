@@ -390,7 +390,9 @@ function renderInfoBlock(type, label, value, di, disabled) {
 }
 
 // ─── Exercise ─────────────────────────────────────────────────────────────────
-function renderExercise(ex, di, ei, wk) {
+function renderExercise(ex, di, ei) {
+  // FEHLERBEHEBUNG: Wir holen uns die 'wk' (Woche) direkt sicher aus dem State!
+  const wk = getState().weeks[getState().curIdx];
   const locked = (wk.mode === 'locked');
   const drag   = !locked ? 'true' : 'false';
 
@@ -428,6 +430,8 @@ function renderExercise(ex, di, ei, wk) {
 
   return `
 <div class="exercise${ex._showCfg ? ' is-cfg-open' : ''}" data-di="${di}" data-ei="${ei}" draggable="${drag}">
+  <div class="sticky-sentinel" aria-hidden="true" style="height:1px;pointer-events:none;"></div>
+  
   <div class="exercise__name-sticky">
     ${!locked ? `
     <div class="exercise__order-btns">
