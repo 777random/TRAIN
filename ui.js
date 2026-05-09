@@ -390,23 +390,24 @@ function renderInfoBlock(type, label, value, di, disabled) {
 }
 
 // ─── Exercise ─────────────────────────────────────────────────────────────────
-function renderExercise(ex, di, ei) {
-  // Wir holen uns die aktuelle Woche direkt aus dem State, statt sie als Parameter zu erwarten
-  const wk = getState().weeks[getState().curIdx];
-  const locked = (wk && wk.mode === 'locked');
-  const drag   = !locked ? 'true' : 'false';
+function renderExercise(wk, di, ei, state) {
+  const ex     = wk.days[di].exercises[ei];
+  const locked = !!wk.days[di].locked;
+  const isDl   = wk.mode === 'deload';
+  const drag   = state.settings.drag && !locked;
 
-  let setsHtml = '';
-  // Wir zeichnen die Sätze
-  if (ex && ex.sets) {
-    ex.sets.forEach((s, si) => {
-      setsHtml += renderSet(s, di, ei, si, locked);
-    });
-  }
+  // Diese wichtige Logik hatte ich vorher komplett übersehen!
+  const prevEx = state.curIdx > 0
+    ? state.weeks[state.curIdx - 1]?.days?.[di]?.exercises?.[ei] ?? null
+    : null;
+
+  const setsHtml = ex.sets.map((s, si) =>
+    renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl)
+  ).join('');
 
   const step = ex.weightStep ?? 2.5;
-  
-  // Das aufgeräumte Zahnrad-Menü
+
+  // --- Das neue, cleane Zahnrad-Menü ---
   const cfgRow = ex._showCfg ? `
     <div class="exercise__settings">
       <div class="pause-row" role="group" aria-label="Einstellungen">
@@ -418,34 +419,35 @@ function renderExercise(ex, di, ei) {
             aria-pressed="${ex.pauseSec === sec}"
           >${sec}s</button>`).join('')}
       </div>
+      ${!locked ? `
       <div class="weight-plan-row" role="group" aria-label="Steigerungsrate">
         <span class="pause-row__label">Schrittweite:</span>
         <div class="weight-step-opts">
-          ${[0, 1.25, 2, 2.5, 5, 7.5, 10].map(stepVal => `
+          ${[0, 1.25, 2, 2.5, 5, 7.5, 10].map(s => `
             <button
-              class="weight-step-btn${step === stepVal ? ' is-selected' : ''}"
-              data-action="set-step" data-di="${di}" data-ei="${ei}" data-step="${stepVal}"
-              aria-pressed="${step === stepVal}"
-            >${stepVal === 0 ? 'Reset' : stepVal}</button>`).join('')}
+              class="weight-step-btn${step === s ? ' is-selected' : ''}"
+              data-action="set-step" data-di="${di}" data-ei="${ei}" data-step="${s}"
+              aria-pressed="${step === s}"
+            >${s === 0 ? 'Reset' : s}</button>`).join('')}
         </div>
-      </div>
+      </div>` : ''}
     </div>` : '';
 
   return `
 <div class="exercise${ex._showCfg ? ' is-cfg-open' : ''}" data-di="${di}" data-ei="${ei}" draggable="${drag}">
   <div class="sticky-sentinel" aria-hidden="true" style="height:1px;pointer-events:none;"></div>
-  
+
   <div class="exercise__name-sticky">
     ${!locked ? `
     <div class="exercise__order-btns">
       <button class="exercise__order-btn" data-action="move-ex-up" data-di="${di}" data-ei="${ei}" aria-label="Nach oben" ${ei === 0 ? 'disabled' : ''}>▲</button>
-      <button class="exercise__order-btn" data-action="move-ex-down" data-di="${di}" data-ei="${ei}" aria-label="Nach unten">▼</button>
+      <button class="exercise__order-btn" data-action="move-ex-down" data-di="${di}" data-ei="${ei}" aria-label="Nach unten" ${ei === wk.days[di].exercises.length - 1 ? 'disabled' : ''}>▼</button>
     </div>` : ''}
-
+    
     <input
       class="exercise__name-input"
       type="text"
-      value="${ex.name || ''}"
+      value="${h(ex.name)}"
       ${locked ? 'disabled' : ''}
       data-action="ex-name" data-di="${di}" data-ei="${ei}"
       aria-label="Übungsname"
@@ -462,15 +464,15 @@ function renderExercise(ex, di, ei) {
     <button
       class="btn-icon${ex.nextWeekPlan ? ' is-planned' : ''}"
       data-action="toggle-cfg" data-di="${di}" data-ei="${ei}"
-      aria-label="Einstellungen"
+      aria-label="Pausenzeit einstellen"
       aria-expanded="${!!ex._showCfg}"
     >${ic.settings()}</button>
-
+    
     ${!locked ? `
     <button
-      class="btn-icon"
+      class="exercise__remove-btn"
       data-action="remove-ex" data-di="${di}" data-ei="${ei}"
-      aria-label="Übung entfernen"
+      aria-label="Übung '${h(ex.name)}' entfernen"
     >${ic.trash()}</button>` : ''}
   </div>
 
@@ -479,11 +481,11 @@ function renderExercise(ex, di, ei) {
   <input
     class="exercise__note"
     type="text"
-    value="${ex.note || ''}"
+    value="${h(ex.note ?? '')}"
     placeholder="Notiz …"
     ${locked ? 'disabled' : ''}
     data-action="ex-note" data-di="${di}" data-ei="${ei}"
-    aria-label="Notiz"
+    aria-label="Notiz zu ${h(ex.name)}"
     maxlength="120"
   />
 
@@ -491,7 +493,7 @@ function renderExercise(ex, di, ei) {
     <span>#</span><span>kg</span><span>Wdh</span><span>RPE</span><span>✓</span><span></span>
   </div>
 
-  <div data-set-list="${di}-${ei}" role="list" aria-label="Sätze">
+  <div data-set-list="${di}-${ei}" role="list" aria-label="Sätze von ${h(ex.name)}">
     ${setsHtml}
   </div>
 
@@ -499,7 +501,7 @@ function renderExercise(ex, di, ei) {
   <button
     class="add-set-btn"
     data-action="add-set" data-di="${di}" data-ei="${ei}"
-    aria-label="Satz hinzufügen"
+    aria-label="Satz zu '${h(ex.name)}' hinzufügen"
   >${ic.plus()}<span>Satz hinzufügen</span></button>` : ''}
 </div>`;
 }
