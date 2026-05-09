@@ -390,12 +390,13 @@ function renderInfoBlock(type, label, value, di, disabled) {
 }
 
 // ─── Exercise ─────────────────────────────────────────────────────────────────
-function renderExercise(ex, di, ei, locked = false) {
+function renderExercise(wk, di, ex, ei) {
+  const locked = (wk.mode === 'locked');
   const drag   = !locked ? 'true' : 'false';
 
   let setsHtml = '';
   ex.sets.forEach((s, si) => {
-    setsHtml += renderSet(s, di, ei, si, locked);
+    setsHtml += renderSet(wk, di, ei, si);
   });
 
   const step = ex.weightStep ?? 2.5;
@@ -477,7 +478,7 @@ function renderExercise(ex, di, ei, locked = false) {
     placeholder="Notiz …"
     ${locked ? 'disabled' : ''}
     data-action="ex-note" data-di="${di}" data-ei="${ei}"
-    aria-label="Notiz zu ${ex.name}"
+    aria-label="Notiz zu ${ex.name || ''}"
     maxlength="120"
   />
 
@@ -485,7 +486,7 @@ function renderExercise(ex, di, ei, locked = false) {
     <span>#</span><span>kg</span><span>Wdh</span><span>RPE</span><span>✓</span><span></span>
   </div>
 
-  <div data-set-list="${di}-${ei}" role="list" aria-label="Sätze von ${ex.name}">
+  <div data-set-list="${di}-${ei}" role="list" aria-label="Sätze von ${ex.name || ''}">
     ${setsHtml}
   </div>
 
