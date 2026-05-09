@@ -390,54 +390,44 @@ function renderInfoBlock(type, label, value, di, disabled) {
 }
 
 // ─── Exercise ─────────────────────────────────────────────────────────────────
-function renderExercise(wk, di, ei, state) {
-  const ex     = wk.days[di].exercises[ei];
-  const locked = !!wk.days[di].locked;
-  const isDl   = wk.mode === 'deload';
-  const drag   = state.settings.drag && !locked;
+function renderExercise(ex, di, ei, wk) {
+  const locked = (wk.mode === 'locked');
+  const drag   = !locked ? 'true' : 'false';
 
-  const prevEx = state.curIdx > 0
-    ? state.weeks[state.curIdx - 1]?.days?.[di]?.exercises?.[ei] ?? null
-    : null;
+  let setsHtml = '';
+  ex.sets.forEach((s, si) => {
+    setsHtml += renderSet(s, di, ei, si, locked);
+  });
 
-  const setsHtml = ex.sets.map((s, si) =>
-    renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl)
-  ).join('');
-
-  const pauseRow = ex._showCfg ? `
-    <div class="pause-row" role="group" aria-label="Pausenzeit wählen">
-      <span class="pause-row__label">Pause:</span>
-      ${[30, 60, 90, 120].map(sec => `
-        <button
-          class="pause-opt${ex.pauseSec === sec ? ' is-selected' : ''}"
-          data-action="set-pause" data-di="${di}" data-ei="${ei}" data-sec="${sec}"
-          aria-pressed="${ex.pauseSec === sec}"
-        >${sec}s</button>`).join('')}
-    </div>` : '';
-
-const step    = ex.weightStep ?? 2.5;
-  const cfgRow  = ex._showCfg ? `
-    <div class="pause-row" role="group" aria-label="Einstellungen">
-      <span class="pause-row__label">Pause:</span>
-      ${[30, 60, 90, 120].map(sec => `
-        <button
-          class="pause-opt${ex.pauseSec === sec ? ' is-selected' : ''}"
-          data-action="set-pause" data-di="${di}" data-ei="${ei}" data-sec="${sec}"
-          aria-pressed="${ex.pauseSec === sec}"
-        >${sec}s</button>`).join('')}
-      <span class="pause-row__label" style="margin-left:var(--sp-2)">Steigerung:</span>
-      ${[0, 1.25, 2, 2.5, 5, 7.5, 10].map(s => `
-        <button
-          class="weight-step-btn${step === s ? ' is-selected' : ''}"
-          data-action="set-step" data-di="${di}" data-ei="${ei}" data-step="${s}"
-          aria-pressed="${step === s}"
-        >${s === 0 ? 'Reset' : s}</button>`).join('')}
+  const step = ex.weightStep ?? 2.5;
+  
+  // Das aufgeräumte Zahnrad-Menü (nur noch Pause und Steigerungsauswahl)
+  const cfgRow = ex._showCfg ? `
+    <div class="exercise__settings">
+      <div class="pause-row" role="group" aria-label="Einstellungen">
+        <span class="pause-row__label">Pause:</span>
+        ${[30, 60, 90, 120].map(sec => `
+          <button
+            class="pause-opt${ex.pauseSec === sec ? ' is-selected' : ''}"
+            data-action="set-pause" data-di="${di}" data-ei="${ei}" data-sec="${sec}"
+            aria-pressed="${ex.pauseSec === sec}"
+          >${sec}s</button>`).join('')}
+      </div>
+      <div class="weight-plan-row" role="group" aria-label="Steigerungsrate">
+        <span class="pause-row__label">Schrittweite:</span>
+        <div class="weight-step-opts">
+          ${[0, 1.25, 2, 2.5, 5, 7.5, 10].map(s => `
+            <button
+              class="weight-step-btn${step === s ? ' is-selected' : ''}"
+              data-action="set-step" data-di="${di}" data-ei="${ei}" data-step="${s}"
+              aria-pressed="${step === s}"
+            >${s === 0 ? 'Reset' : s}</button>`).join('')}
+        </div>
+      </div>
     </div>` : '';
 
   return `
-<div class="exercise" data-di="${di}" data-ei="${ei}" draggable="${drag}">
-  <div class="sticky-sentinel" aria-hidden="true" style="height:1px;pointer-events:none;"></div>
-
+<div class="exercise${ex._showCfg ? ' is-cfg-open' : ''}" data-di="${di}" data-ei="${ei}" draggable="${drag}">
   <div class="exercise__name-sticky">
     ${!locked ? `
     <div class="exercise__order-btns">
@@ -463,7 +453,7 @@ const step    = ex.weightStep ?? 2.5;
     >＋${step}kg</button>` : ''}
 
     <button
-      class="exercise__cfg-btn"
+      class="btn-icon${ex.nextWeekPlan ? ' is-planned' : ''}"
       data-action="toggle-cfg" data-di="${di}" data-ei="${ei}"
       aria-label="Einstellungen"
       aria-expanded="${!!ex._showCfg}"
@@ -471,7 +461,7 @@ const step    = ex.weightStep ?? 2.5;
 
     ${!locked ? `
     <button
-      class="exercise__remove-btn"
+      class="btn-icon"
       data-action="remove-ex" data-di="${di}" data-ei="${ei}"
       aria-label="Übung entfernen"
     >${ic.trash()}</button>` : ''}
