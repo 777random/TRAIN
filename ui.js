@@ -485,7 +485,7 @@ function renderExercise(ex, di, ei, locked = false) {
     <span>#</span><span>kg</span><span>Wdh</span><span>RPE</span><span>✓</span><span></span>
   </div>
 
-  <div data-set-list="${di}-${ei}" role="list" aria-label="Sätze von ${ex.name || ''}">
+  <div data-set-list="${di}-${ei}" role="list" aria-label="Sätze von ${ex.name}">
     ${setsHtml}
   </div>
 
