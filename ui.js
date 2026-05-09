@@ -439,7 +439,7 @@ function renderExercise(ex, di, ei, locked = false) {
     <input
       class="exercise__name-input"
       type="text"
-      value="${h(ex.name)}"
+      value="${ex.name || ''}"
       ${locked ? 'disabled' : ''}
       data-action="ex-name" data-di="${di}" data-ei="${ei}"
       aria-label="Übungsname"
@@ -473,11 +473,11 @@ function renderExercise(ex, di, ei, locked = false) {
   <input
     class="exercise__note"
     type="text"
-    value="${h(ex.note ?? '')}"
+    value="${ex.note ?? ''}"
     placeholder="Notiz …"
     ${locked ? 'disabled' : ''}
     data-action="ex-note" data-di="${di}" data-ei="${ei}"
-    aria-label="Notiz zu ${h(ex.name)}"
+    aria-label="Notiz zu ${ex.name || ''}"
     maxlength="120"
   />
 
@@ -485,7 +485,7 @@ function renderExercise(ex, di, ei, locked = false) {
     <span>#</span><span>kg</span><span>Wdh</span><span>RPE</span><span>✓</span><span></span>
   </div>
 
-  <div data-set-list="${di}-${ei}" role="list" aria-label="Sätze von ${h(ex.name)}">
+  <div data-set-list="${di}-${ei}" role="list" aria-label="Sätze von ${ex.name || ''}">
     ${setsHtml}
   </div>
 
