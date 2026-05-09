@@ -390,14 +390,16 @@ function renderInfoBlock(type, label, value, di, disabled) {
 }
 
 // ─── Exercise ─────────────────────────────────────────────────────────────────
-function renderExercise(wk, di, ex, ei) {
+function renderExercise(ex, di, ei) {
+  // Wir holen uns die aktuelle Woche direkt aus dem State, statt sie als Parameter zu erwarten
+  const wk = getState().weeks[getState().curIdx];
   const locked = (wk && wk.mode === 'locked');
   const drag   = !locked ? 'true' : 'false';
 
   let setsHtml = '';
+  // Wir zeichnen die Sätze
   if (ex && ex.sets) {
     ex.sets.forEach((s, si) => {
-      // Hier wurde auch die Reihenfolge korrigiert!
       setsHtml += renderSet(s, di, ei, si, locked);
     });
   }
@@ -437,7 +439,7 @@ function renderExercise(wk, di, ex, ei) {
     ${!locked ? `
     <div class="exercise__order-btns">
       <button class="exercise__order-btn" data-action="move-ex-up" data-di="${di}" data-ei="${ei}" aria-label="Nach oben" ${ei === 0 ? 'disabled' : ''}>▲</button>
-      <button class="exercise__order-btn" data-action="move-ex-down" data-di="${di}" data-ei="${ei}" aria-label="Nach unten" ${wk.days && wk.days[di] && ei === wk.days[di].exercises.length - 1 ? 'disabled' : ''}>▼</button>
+      <button class="exercise__order-btn" data-action="move-ex-down" data-di="${di}" data-ei="${ei}" aria-label="Nach unten">▼</button>
     </div>` : ''}
 
     <input
@@ -477,11 +479,11 @@ function renderExercise(wk, di, ex, ei) {
   <input
     class="exercise__note"
     type="text"
-    value="${ex.note ?? ''}"
+    value="${ex.note || ''}"
     placeholder="Notiz …"
     ${locked ? 'disabled' : ''}
     data-action="ex-note" data-di="${di}" data-ei="${ei}"
-    aria-label="Notiz zu ${ex.name || ''}"
+    aria-label="Notiz"
     maxlength="120"
   />
 
@@ -489,7 +491,7 @@ function renderExercise(wk, di, ex, ei) {
     <span>#</span><span>kg</span><span>Wdh</span><span>RPE</span><span>✓</span><span></span>
   </div>
 
-  <div data-set-list="${di}-${ei}" role="list" aria-label="Sätze von ${ex.name || ''}">
+  <div data-set-list="${di}-${ei}" role="list" aria-label="Sätze">
     ${setsHtml}
   </div>
 
