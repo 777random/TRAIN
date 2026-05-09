@@ -1084,10 +1084,21 @@ function _handleClick(e) {
     case 'create-week':
       _createWeek(); break;
 
+    case 'create-week-prev':
+      _createWeek('prev'); break;
+
+    case 'create-week-template':
+      _createWeek('template'); break;
+
     case 'confirm-delete-week':
       dispatch(A.WEEK_DELETE, {});
       closeModal('modal-delete-week');
       showToast('Woche gelöscht', 'info'); break;
+
+    case 'save-week-as-template':
+      dispatch(A.SAVE_WEEK_AS_TEMPLATE, {});
+      showToast('Woche als Standard-Vorlage gespeichert ✓', 'ok');
+      break;
 
     // ── Export options (previously role=button without data-action) ────────
     case 'export-current':
@@ -1325,13 +1336,18 @@ function _prepNewWeekModal() {
   if (noteInput) noteInput.value = '';
 }
 
-function _createWeek() {
+function _createWeek(source) {
   const date = document.getElementById('new-week-date')?.value;
   const note = document.getElementById('new-week-note')?.value ?? '';
   if (!date) { showToast('Bitte Datum wählen', 'warn'); return; }
-  dispatch(A.WEEK_CREATE, { startDate: date, note });
+  let src = source;
+  if (!src) {
+    src = document.querySelector('input[name="new-week-source"]:checked')?.value;
+  }
+  const resolved = src === 'template' ? 'template' : 'prev';
+  dispatch(A.WEEK_CREATE, { startDate: date, note, source: resolved });
   closeModal('modal-new-week');
-  showToast('Neue Woche erstellt ✓', 'ok');
+  showToast(resolved === 'template' ? 'Neue Woche aus Vorlage erstellt ✓' : 'Neue Woche aus Vorwoche erstellt ✓', 'ok');
 }
 
 // ─── Template save ────────────────────────────────────────────────────────────
@@ -1480,6 +1496,8 @@ function _buildScaffold(root) {
       aria-label="Neue Trainingswoche erstellen">${ic.plus()}</button>
     <button class="toolbar__btn" data-action="copy-prev"
       aria-label="Vorwoche als Vorlage kopieren">${ic.copy()}</button>
+    <button class="toolbar__btn" data-action="save-week-as-template"
+      aria-label="Aktuelle Woche als Standard-Vorlage speichern">${ic.save()}</button>
     <button class="toolbar__btn" data-action="open-export"
       aria-label="Trainingsdaten exportieren">${ic.download()}</button>
     <button class="toolbar__btn toolbar__btn--danger" data-action="open-delete-week"
@@ -1525,6 +1543,23 @@ function _buildScaffold(root) {
       <label class="form-label" for="new-week-note">Notiz</label>
       <input type="text" class="form-input" id="new-week-note"
         placeholder="z. B. Deload, Urlaub …" maxlength="80"/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Basis</label>
+      <label class="nw-source">
+        <input type="radio" name="new-week-source" value="prev" checked />
+        <div class="nw-source__txt">
+          <div class="nw-source__ttl">Aus Vorwoche übernehmen (Standard)</div>
+          <div class="nw-source__desc">Übernimmt Übungsänderungen und wendet geplante Steigerungen an.</div>
+        </div>
+      </label>
+      <label class="nw-source">
+        <input type="radio" name="new-week-source" value="template" />
+        <div class="nw-source__txt">
+          <div class="nw-source__ttl">Aus Vorlage laden (Neustart)</div>
+          <div class="nw-source__desc">Startet einen neuen Cycle basierend auf deiner Standard-Vorlage.</div>
+        </div>
+      </label>
     </div>
     <div class="modal__actions">
       <button class="btn btn--ghost" data-action="close-modal">Abbrechen</button>
