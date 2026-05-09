@@ -390,14 +390,18 @@ function renderInfoBlock(type, label, value, di, disabled) {
 }
 
 // ─── Exercise ─────────────────────────────────────────────────────────────────
-function renderExercise(wk, di, ex, ei) {
-  const locked = (wk.mode === 'locked');
+function renderExercise(ex, di, ei, wk) {
+  // Sicherheits-Check: Falls wk mal fehlt (z.B. im Vorlagen-Editor)
+  const locked = (wk && wk.mode === 'locked');
   const drag   = !locked ? 'true' : 'false';
 
   let setsHtml = '';
-  ex.sets.forEach((s, si) => {
-    setsHtml += renderSet(wk, di, ei, si);
-  });
+  // Sicherheits-Check: Nur ausführen, wenn die Übung Sätze hat
+  if (ex && ex.sets) {
+    ex.sets.forEach((s, si) => {
+      setsHtml += renderSet(s, di, ei, si, locked);
+    });
+  }
 
   const step = ex.weightStep ?? 2.5;
   
@@ -451,7 +455,7 @@ function renderExercise(wk, di, ex, ei) {
     <button
       class="btn-inc-weight-sticky"
       data-action="inc-weight" data-di="${di}" data-ei="${ei}"
-      aria-label="Gewicht um ${step} kg für nächste Woche erhöhen"
+      aria-label="Gewicht um ${step} kg erhöhen"
     >＋${step}kg</button>` : ''}
 
     <button
