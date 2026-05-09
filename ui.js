@@ -477,7 +477,7 @@ function renderExercise(ex, di, ei, locked = false) {
     placeholder="Notiz …"
     ${locked ? 'disabled' : ''}
     data-action="ex-note" data-di="${di}" data-ei="${ei}"
-    aria-label="Notiz zu ${ex.name || ''}"
+    aria-label="Notiz zu ${ex.name}"
     maxlength="120"
   />
 
