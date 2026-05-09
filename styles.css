@@ -404,6 +404,25 @@ exercise { position: unset; }
 .exercise__name-input:focus { border-bottom: 1px solid var(--c-accent); outline: none; }
 .exercise__name-input:disabled { opacity: .7; }
 
+.btn-icon {
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  flex-shrink: 0;
+  color: var(--c-text-3);
+  transition: color var(--t-fast), background var(--t-fast);
+}
+.btn-icon svg { width: 16px; height: 16px; }
+.btn-icon:hover { color: var(--c-accent); background: var(--c-surface2); }
+.btn-icon:disabled { opacity: .4; cursor: not-allowed; }
+.btn-icon.is-planned { color: var(--c-accent); }
+
 .exercise__cfg-btn, .exercise__remove-btn {
   width: 36px; height: 36px; border: none; background: none;
   display: flex; align-items: center; justify-content: center;
@@ -416,6 +435,14 @@ exercise { position: unset; }
 .exercise__remove-btn svg { width: 16px; height: 16px; }
 .exercise__remove-btn:hover { color: var(--c-danger); }
 
+.exercise__settings {
+  background: var(--c-surface2);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-md);
+  padding: var(--sp-2) var(--sp-3);
+  margin: var(--sp-2) 0 var(--sp-2);
+}
+
 .pause-row { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-1) 0 var(--sp-2); flex-wrap: wrap; }
 .pause-row__label { font-size: 11px; color: var(--c-text-3); }
 .pause-opt {
@@ -426,6 +453,22 @@ exercise { position: unset; }
 }
 .pause-opt:hover { border-color: var(--c-accent); color: var(--c-accent); }
 .pause-opt.is-selected { background: var(--c-accent); border-color: var(--c-accent); color: #000; font-weight: 700; }
+
+.weight-plan-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  padding: var(--sp-1) 0 0;
+  flex-wrap: wrap;
+  border-top: 1px solid rgba(46,46,53,.6);
+  margin-top: var(--sp-1);
+}
+.weight-step-opts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
 
 .exercise__note {
   width: 100%; background: none; border: none; border-bottom: 1px solid var(--c-border);
