@@ -390,22 +390,21 @@ function renderInfoBlock(type, label, value, di, disabled) {
 }
 
 // ─── Exercise ─────────────────────────────────────────────────────────────────
-function renderExercise(ex, di, ei, wk) {
-  // Sicherheits-Check: Falls wk mal fehlt (z.B. im Vorlagen-Editor)
+function renderExercise(wk, di, ex, ei) {
   const locked = (wk && wk.mode === 'locked');
   const drag   = !locked ? 'true' : 'false';
 
   let setsHtml = '';
-  // Sicherheits-Check: Nur ausführen, wenn die Übung Sätze hat
   if (ex && ex.sets) {
     ex.sets.forEach((s, si) => {
+      // Hier wurde auch die Reihenfolge korrigiert!
       setsHtml += renderSet(s, di, ei, si, locked);
     });
   }
 
   const step = ex.weightStep ?? 2.5;
   
-  // Das aufgeräumte Zahnrad-Menü (nur noch Pause und Steigerungsauswahl)
+  // Das aufgeräumte Zahnrad-Menü
   const cfgRow = ex._showCfg ? `
     <div class="exercise__settings">
       <div class="pause-row" role="group" aria-label="Einstellungen">
@@ -420,12 +419,12 @@ function renderExercise(ex, di, ei, wk) {
       <div class="weight-plan-row" role="group" aria-label="Steigerungsrate">
         <span class="pause-row__label">Schrittweite:</span>
         <div class="weight-step-opts">
-          ${[0, 1.25, 2, 2.5, 5, 7.5, 10].map(s => `
+          ${[0, 1.25, 2, 2.5, 5, 7.5, 10].map(stepVal => `
             <button
-              class="weight-step-btn${step === s ? ' is-selected' : ''}"
-              data-action="set-step" data-di="${di}" data-ei="${ei}" data-step="${s}"
-              aria-pressed="${step === s}"
-            >${s === 0 ? 'Reset' : s}</button>`).join('')}
+              class="weight-step-btn${step === stepVal ? ' is-selected' : ''}"
+              data-action="set-step" data-di="${di}" data-ei="${ei}" data-step="${stepVal}"
+              aria-pressed="${step === stepVal}"
+            >${stepVal === 0 ? 'Reset' : stepVal}</button>`).join('')}
         </div>
       </div>
     </div>` : '';
@@ -438,7 +437,7 @@ function renderExercise(ex, di, ei, wk) {
     ${!locked ? `
     <div class="exercise__order-btns">
       <button class="exercise__order-btn" data-action="move-ex-up" data-di="${di}" data-ei="${ei}" aria-label="Nach oben" ${ei === 0 ? 'disabled' : ''}>▲</button>
-      <button class="exercise__order-btn" data-action="move-ex-down" data-di="${di}" data-ei="${ei}" aria-label="Nach unten">▼</button>
+      <button class="exercise__order-btn" data-action="move-ex-down" data-di="${di}" data-ei="${ei}" aria-label="Nach unten" ${wk.days && wk.days[di] && ei === wk.days[di].exercises.length - 1 ? 'disabled' : ''}>▼</button>
     </div>` : ''}
 
     <input
