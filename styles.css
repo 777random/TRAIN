@@ -843,38 +843,34 @@ label > svg {
   cursor: not-allowed;
 }
 
-/* ── Gewicht erhöhen ───────────────────────────────────────── */
-.weight-step-row {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  padding: var(--sp-2) 0 var(--sp-1);
-  flex-wrap: wrap;
-}
+/* ── Gewicht erhöhen (sticky header chip) ──────────────────── */
 
-.btn-inc-weight {
-  height: 36px;
-  padding: 0 var(--sp-3);
+/* Kompakter Chip im sticky Header */
+.btn-inc-weight-sticky {
+  height: 28px;
+  padding: 0 var(--sp-2);
   background: var(--c-accent);
   color: #000;
   border: none;
-  border-radius: var(--r-md);
+  border-radius: var(--r-sm);
   font-family: var(--font-sans);
   font-weight: 700;
-  font-size: 13px;
+  font-size: 12px;
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;
-  transition: background var(--t-fast), opacity var(--t-fast);
-}
-.btn-inc-weight:hover { background: var(--c-accent-dk); }
-
-.weight-step-opts {
+  transition: background var(--t-fast), transform var(--t-fast);
+  /* Touch-Target trotz kleiner Optik */
+  min-width: 44px;
+  min-height: 36px;
   display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
 }
+.btn-inc-weight-sticky:hover  { background: var(--c-accent-dk); }
+.btn-inc-weight-sticky:active { transform: scale(.95); }
 
+/* Stufenwahl im cfg-Panel (hinter ⚙️) */
 .weight-step-btn {
   height: 28px;
   min-width: 40px;
