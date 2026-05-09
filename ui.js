@@ -390,10 +390,7 @@ function renderInfoBlock(type, label, value, di, disabled) {
 }
 
 // ─── Exercise ─────────────────────────────────────────────────────────────────
-function renderExercise(ex, di, ei) {
-  // FEHLERBEHEBUNG: Wir holen uns die 'wk' (Woche) direkt sicher aus dem State!
-  const wk = getState().weeks[getState().curIdx];
-  const locked = (wk.mode === 'locked');
+function renderExercise(ex, di, ei, locked = false) {
   const drag   = !locked ? 'true' : 'false';
 
   let setsHtml = '';
@@ -436,7 +433,7 @@ function renderExercise(ex, di, ei) {
     ${!locked ? `
     <div class="exercise__order-btns">
       <button class="exercise__order-btn" data-action="move-ex-up" data-di="${di}" data-ei="${ei}" aria-label="Nach oben" ${ei === 0 ? 'disabled' : ''}>▲</button>
-      <button class="exercise__order-btn" data-action="move-ex-down" data-di="${di}" data-ei="${ei}" aria-label="Nach unten" ${ei === wk.days[di].exercises.length - 1 ? 'disabled' : ''}>▼</button>
+      <button class="exercise__order-btn" data-action="move-ex-down" data-di="${di}" data-ei="${ei}" aria-label="Nach unten">▼</button>
     </div>` : ''}
 
     <input
@@ -500,7 +497,6 @@ function renderExercise(ex, di, ei) {
   >${ic.plus()}<span>Satz hinzufügen</span></button>` : ''}
 </div>`;
 }
-
 // ─── Set row ─────────────────────────────────────────────────────────────────
 function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl) {
   const prevSet = prevEx?.sets?.[si] ?? null;
