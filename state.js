@@ -24,7 +24,7 @@
 
 export const STORAGE_KEY        = 'train_v6';
 export const STORAGE_KEY_SHADOW = 'train_v6_shadow';
-export const SCHEMA_VERSION     = 7;
+export const SCHEMA_VERSION     = 8;
 
 // ─── Factory helpers ──────────────────────────────────────────────────────────
 
@@ -187,6 +187,22 @@ function _normalizeAllTrainingSets(raw) {
   _walkTemplateDays(raw.customTemplate, _normalizeSetRecord);
 }
 
+/** Exercise metric: reps | sec | m (default reps). */
+function _normalizeExerciseMetric(ex) {
+  if (ex.metric !== 'reps' && ex.metric !== 'sec' && ex.metric !== 'm') ex.metric = 'reps';
+}
+
+function _normalizeAllExerciseMetrics(raw) {
+  (raw.weeks ?? []).forEach(wk => {
+    (wk.days ?? []).forEach(day => {
+      (day.exercises ?? []).forEach(_normalizeExerciseMetric);
+    });
+  });
+  (raw.customTemplate ?? []).forEach(day => {
+    (day.exercises ?? []).forEach(_normalizeExerciseMetric);
+  });
+}
+
 /**
  * Ensures a loaded state object conforms to the current schema.
  * Add a new `case` for every future schema bump.
@@ -231,6 +247,17 @@ function migrate(raw) {
     raw.meta = {
       ...raw.meta,
       schemaVersion: 7,
+      savedAt:   raw.meta?.savedAt   ?? null,
+      createdAt: raw.meta?.createdAt ?? new Date().toISOString(),
+    };
+  }
+
+  // v7 → v8: exercise.metric (reps | sec | m)
+  if ((raw.meta?.schemaVersion ?? 0) < 8) {
+    _normalizeAllExerciseMetrics(raw);
+    raw.meta = {
+      ...raw.meta,
+      schemaVersion: 8,
       savedAt:   raw.meta?.savedAt   ?? null,
       createdAt: raw.meta?.createdAt ?? new Date().toISOString(),
     };
@@ -348,6 +375,7 @@ export const A = Object.freeze({
   EX_TOGGLE_CFG:       'EX_TOGGLE_CFG',       // { di, ei }
   EX_INC_WEIGHT:       'EX_INC_WEIGHT',       // { di, ei, amount } – erhöht alle Sätze sofort
   EX_SET_STEP:         'EX_SET_STEP',         // { di, ei, step }  – speichert Steigerungsrate
+  EX_SET_METRIC:       'EX_SET_METRIC',       // { di, ei, metric: 'reps'|'sec'|'m' }
   // Set
   SET_ADD:             'SET_ADD',             // { di, ei }
   SET_REMOVE:          'SET_REMOVE',          // { di, ei, si }
@@ -489,7 +517,7 @@ function reduce(state, action) {
     case A.EX_ADD: {
       const day = _currentWeek()?.days[p.di]; if (!day) break;
       day.exercises.push({
-        name: p.name, note: '', pauseSec: 90,
+        name: p.name, note: '', pauseSec: 90, metric: 'reps',
         sets: [mkSet(), mkSet(), mkSet()],
       });
       break;
@@ -537,6 +565,12 @@ function reduce(state, action) {
       ex.weightStep = p.step;
       break;
     }
+    case A.EX_SET_METRIC: {
+      const ex = _currentWeek()?.days[p.di]?.exercises[p.ei]; if (!ex) break;
+      const m = p.metric;
+      if (m === 'reps' || m === 'sec' || m === 'm') ex.metric = m;
+      break;
+    }
 
     // ── Set ───────────────────────────────────────────────────────────────────
     case A.SET_ADD: {
@@ -554,7 +588,10 @@ function reduce(state, action) {
       const s = _currentWeek()?.days[p.di]?.exercises[p.ei]?.sets[p.si]; if (!s) break;
       let v = p.value;
       if (p.field === 'weight') v = parseFloat(v) || 0;
-      else if (p.field === 'reps') v = Math.max(0, parseInt(v, 10) || 0);
+      else if (p.field === 'reps') {
+        const n = parseFloat(v);
+        v = Math.max(0, Number.isFinite(n) ? n : 0);
+      }
       else if (p.field === 'rpe')  v = (v === '' || v === null) ? null : Math.min(10, Math.max(1, +v));
       s[p.field] = v;
       break;
@@ -597,10 +634,12 @@ function reduce(state, action) {
     case A.TPL_SAVE: {
       state.customTemplate = p.template;
       _walkTemplateDays(state.customTemplate, _normalizeSetRecord);
+      _normalizeAllExerciseMetrics(state);
       break;
     }
     case A.TPL_RESET_TO_FACTORY: {
       state.customTemplate = clone(FACTORY_TEMPLATE);
+      _normalizeAllExerciseMetrics(state);
       break;
     }
     case A.WEEK_RESET_TO_TPL: {

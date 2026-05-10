@@ -406,6 +406,8 @@ function renderExercise(wk, di, ei, state) {
   ).join('');
 
   const step = ex.weightStep ?? 2.5;
+  const metric = ex.metric === 'sec' || ex.metric === 'm' ? ex.metric : 'reps';
+  const metricHdr = metric === 'sec' ? 'Sek' : metric === 'm' ? 'm' : 'Wdh';
 
   // --- Das neue, cleane Zahnrad-Menü ---
   const cfgRow = ex._showCfg ? `
@@ -419,6 +421,23 @@ function renderExercise(wk, di, ei, state) {
             aria-pressed="${ex.pauseSec === sec}"
           >${sec}s</button>`).join('')}
       </div>
+      ${!locked ? `
+      <div class="weight-plan-row" role="group" aria-label="Leistungsmetrik">
+        <span class="pause-row__label">Metrik:</span>
+        <div class="weight-step-opts">
+          ${[
+            { id: 'reps', label: 'Wdh' },
+            { id: 'sec', label: 'Sek' },
+            { id: 'm', label: 'm' },
+          ].map(({ id, label }) => `
+            <button
+              type="button"
+              class="weight-step-btn${metric === id ? ' is-selected' : ''}"
+              data-action="set-metric" data-di="${di}" data-ei="${ei}" data-metric="${id}"
+              aria-pressed="${metric === id}"
+            >${label}</button>`).join('')}
+        </div>
+      </div>` : ''}
       ${!locked ? `
       <div class="weight-plan-row" role="group" aria-label="Steigerungsrate">
         <span class="pause-row__label">Schrittweite:</span>
@@ -490,7 +509,7 @@ function renderExercise(wk, di, ei, state) {
   />
 
   <div class="set-header" aria-hidden="true">
-    <span>#</span><span>kg</span><span>Wdh</span><span>RPE</span><span>✓</span><span></span>
+    <span>#</span><span>kg</span><span>${metricHdr}</span><span>RPE</span><span>✓</span><span></span>
   </div>
 
   <div data-set-list="${di}-${ei}" role="list" aria-label="Sätze von ${h(ex.name)}">
@@ -509,6 +528,23 @@ function renderExercise(wk, di, ei, state) {
 function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl) {
   const prevSet = prevEx?.sets?.[si] ?? null;
   const dispW   = isDl ? Math.round(s.weight * 0.75 * 2) / 2 : s.weight;
+  const metric  = ex.metric === 'sec' || ex.metric === 'm' ? ex.metric : 'reps';
+  const repStep = metric === 'm' ? '0.1' : '1';
+  const repMode = metric === 'm' ? 'decimal' : 'numeric';
+  const repPh   = metric === 'sec' ? 'Sek' : metric === 'm' ? 'm' : 'Wdh';
+  const repAria = metric === 'sec'
+    ? `Satz ${si + 1} Dauer in Sekunden`
+    : metric === 'm'
+      ? `Satz ${si + 1} Distanz in Metern`
+      : `Satz ${si + 1} Wiederholungen`;
+  const prevVal = prevSet ? prevSet.reps : null;
+  const prevRepHint = prevVal == null || prevVal === ''
+    ? ''
+    : metric === 'sec'
+      ? `${prevVal}s`
+      : metric === 'm'
+        ? `${prevVal} m`
+        : `${prevVal}×`;
 
   let st = s.status;
   if (st !== 'pending' && st !== 'success' && st !== 'fail') {
@@ -534,13 +570,13 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl) {
   </div>
 
   <div class="set-cell">
-    <input class="num-input" type="number" inputmode="numeric"
-      min="0" value="${s.reps}"
+    <input class="num-input" type="number" inputmode="${repMode}"
+      min="0" step="${repStep}" placeholder="${repPh}" value="${s.reps}"
       ${locked ? 'disabled' : ''}
       data-action="set-reps" data-di="${di}" data-ei="${ei}" data-si="${si}"
-      aria-label="Satz ${si + 1} Wiederholungen"
+      aria-label="${repAria}"
     />
-    <span class="prev-hint" aria-hidden="true">${prevSet ? prevSet.reps + '×' : ''}</span>
+    <span class="prev-hint" aria-hidden="true">${prevRepHint}</span>
   </div>
 
   <div class="set-cell">
@@ -1180,6 +1216,14 @@ function _handleClick(e) {
       dispatch(A.EX_SET_STEP, { di: +di, ei: +ei, step });
       break;
     }
+
+    case 'set-metric': {
+      const m = el.dataset.metric;
+      if (m === 'reps' || m === 'sec' || m === 'm') {
+        dispatch(A.EX_SET_METRIC, { di: +di, ei: +ei, metric: m });
+      }
+      break;
+    }
       
     case 'move-ex-down': {
       const maxEi = getState().weeks[getState().curIdx].days[+di].exercises.length - 1;
@@ -1397,8 +1441,8 @@ function _handleTplAction(el) {
     renderTemplateEditor(getState());
   } else if (action === 'add-ex') {
     tpl[di].exercises.push({
-      name: 'Neue Übung', note: '', pauseSec: 90,
-      sets: [{ weight: 0, reps: 10, rpe: null, done: false }],
+      name: 'Neue Übung', note: '', pauseSec: 90, metric: 'reps',
+      sets: [{ weight: 0, reps: 10, rpe: null, status: 'pending', done: false }],
     });
     dispatch(A.TPL_SAVE, { template: tpl });
     renderTemplateEditor(getState());
