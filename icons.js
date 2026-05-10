@@ -33,6 +33,10 @@ export const chevronUp = () =>
 export const chevronDown = () =>
   SVG('<polyline points="6 9 12 15 18 9"/>');
 
+/** Fill down – copy Satz-Werte auf folgende Sätze */
+export const autofillDown = () =>
+  SVG('<line x1="12" y1="4" x2="12" y2="15"/><polyline points="7 11 12 16 17 11"/>');
+
 // ─── Actions ─────────────────────────────────────────────────────────────────
 
 /** Plus / Add */

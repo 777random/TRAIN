@@ -546,6 +546,22 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl) {
         ? `${prevVal} m`
         : `${prevVal}×`;
 
+  const hasAutofill = !locked && si < ex.sets.length - 1;
+  const metricValLabel = metric === 'sec' ? 'Sekunden' : metric === 'm' ? 'Meter' : 'Wiederholungen';
+  const autofillBtn = hasAutofill ? `
+    <button
+      type="button"
+      class="btn-autofill"
+      data-action="autofill-down" data-di="${di}" data-ei="${ei}" data-si="${si}"
+      aria-label="Gewicht und ${metricValLabel} von Satz ${si + 1} auf alle folgenden Sätze übernehmen"
+    >${ic.autofillDown()}</button>` : '';
+  const metricCellFooter = hasAutofill
+    ? `<div class="set-cell__footer">
+        <span class="prev-hint" aria-hidden="true">${prevRepHint}</span>
+        ${autofillBtn}
+      </div>`
+    : `<span class="prev-hint" aria-hidden="true">${prevRepHint}</span>`;
+
   let st = s.status;
   if (st !== 'pending' && st !== 'success' && st !== 'fail') {
     st = s.done ? 'success' : 'pending';
@@ -576,7 +592,7 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl) {
       data-action="set-reps" data-di="${di}" data-ei="${ei}" data-si="${si}"
       aria-label="${repAria}"
     />
-    <span class="prev-hint" aria-hidden="true">${prevRepHint}</span>
+    ${metricCellFooter}
   </div>
 
   <div class="set-cell">
@@ -1250,6 +1266,11 @@ function _handleClick(e) {
 
     case 'add-set':
       dispatch(A.SET_ADD, { di: +di, ei: +ei }); break;
+
+    case 'autofill-down':
+      dispatch(A.SET_AUTOFILL_DOWN, { di: +di, ei: +ei, si: +si });
+      showToast('In folgende Sätze übernommen', 'ok');
+      break;
 
     // ── Body scale buttons ─────────────────────────────────────────────────
     case 'body-scale':
