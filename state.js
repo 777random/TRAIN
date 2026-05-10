@@ -24,13 +24,13 @@
 
 export const STORAGE_KEY        = 'train_v6';
 export const STORAGE_KEY_SHADOW = 'train_v6_shadow';
-export const SCHEMA_VERSION     = 6;
+export const SCHEMA_VERSION     = 7;
 
 // ─── Factory helpers ──────────────────────────────────────────────────────────
 
 /** Creates a fresh set entry. */
 export function mkSet(weight = 0, reps = 10) {
-  return { weight, reps, rpe: null, done: false };
+  return { weight, reps, rpe: null, status: 'pending', done: false };
 }
 
 /** Deep-clone anything JSON-serialisable. */
@@ -154,6 +154,39 @@ function persistState() {
 
 // ─── Migration helpers ────────────────────────────────────────────────────────
 
+/** Canonical set status: pending | success | fail. Keeps legacy `done` in sync. */
+function _normalizeSetRecord(s) {
+  const ok = st => st === 'pending' || st === 'success' || st === 'fail';
+  if (ok(s.status)) {
+    s.done = s.status === 'success';
+    if (s.failed !== undefined) delete s.failed;
+    return;
+  }
+  if (s.failed === true) {
+    s.status = 'fail';
+    s.done = false;
+    delete s.failed;
+    return;
+  }
+  if (s.done === true) s.status = 'success';
+  else s.status = 'pending';
+  s.done = s.status === 'success';
+}
+
+function _walkTemplateDays(days, fn) {
+  (days ?? []).forEach(day => {
+    (day.exercises ?? []).forEach(ex => {
+      (ex.sets ?? []).forEach(fn);
+    });
+  });
+}
+
+/** v6→v7: training-set status tri-state + backward-compatible `done`. */
+function _normalizeAllTrainingSets(raw) {
+  (raw.weeks ?? []).forEach(wk => _walkTemplateDays(wk.days, _normalizeSetRecord));
+  _walkTemplateDays(raw.customTemplate, _normalizeSetRecord);
+}
+
 /**
  * Ensures a loaded state object conforms to the current schema.
  * Add a new `case` for every future schema bump.
@@ -186,7 +219,18 @@ function migrate(raw) {
     if (raw.settings.swipe === undefined) raw.settings.swipe = true;
     if (raw.settings.drag  === undefined) raw.settings.drag  = true;
     raw.meta = {
-      schemaVersion: SCHEMA_VERSION,
+      schemaVersion: 6,
+      savedAt:   raw.meta?.savedAt   ?? null,
+      createdAt: raw.meta?.createdAt ?? new Date().toISOString(),
+    };
+  }
+
+  // v6 → v7: set status tri-state (import / localStorage stays compatible)
+  if ((raw.meta?.schemaVersion ?? 0) < 7) {
+    _normalizeAllTrainingSets(raw);
+    raw.meta = {
+      ...raw.meta,
+      schemaVersion: 7,
       savedAt:   raw.meta?.savedAt   ?? null,
       createdAt: raw.meta?.createdAt ?? new Date().toISOString(),
     };
@@ -334,7 +378,10 @@ function _resetClonedDays(days) {
     (day.exercises ?? []).forEach(ex => {
       // UI-only toggles must not leak into new weeks / templates
       if (ex._showCfg) ex._showCfg = false;
-      (ex.sets ?? []).forEach(s => { s.done = false; });
+      (ex.sets ?? []).forEach(s => {
+        s.status = 'pending';
+        s.done = false;
+      });
     });
   });
 }
@@ -406,7 +453,10 @@ function reduce(state, action) {
       const d = clone(state.weeks[state.curIdx - 1].days);
       d.forEach(day => {
         day.markedDone = false; day.locked = false;
-        day.exercises.forEach(ex => ex.sets.forEach(s => s.done = false));
+        day.exercises.forEach(ex => ex.sets.forEach(s => {
+          s.status = 'pending';
+          s.done = false;
+        }));
       });
       state.weeks[state.curIdx].days = d;
       break;
@@ -511,7 +561,15 @@ function reduce(state, action) {
     }
     case A.SET_TOGGLE_DONE: {
       const s = _currentWeek()?.days[p.di]?.exercises[p.ei]?.sets[p.si]; if (!s) break;
-      s.done = !s.done;
+      const order = ['pending', 'success', 'fail'];
+      let cur = s.status;
+      if (cur !== 'pending' && cur !== 'success' && cur !== 'fail') {
+        cur = s.done ? 'success' : 'pending';
+      }
+      const i = Math.max(0, order.indexOf(cur));
+      const next = order[(i + 1) % 3];
+      s.status = next;
+      s.done = next === 'success';
       break;
     }
 
@@ -538,6 +596,7 @@ function reduce(state, action) {
     // ── Template ──────────────────────────────────────────────────────────────
     case A.TPL_SAVE: {
       state.customTemplate = p.template;
+      _walkTemplateDays(state.customTemplate, _normalizeSetRecord);
       break;
     }
     case A.TPL_RESET_TO_FACTORY: {
@@ -550,7 +609,10 @@ function reduce(state, action) {
       days.forEach(d => (d.exercises ?? []).forEach(ex => {
         ex.nextWeekPlan = 0;
         ex._showCfg = false;
-        (ex.sets ?? []).forEach(s => s.done = false);
+        (ex.sets ?? []).forEach(s => {
+          s.status = 'pending';
+          s.done = false;
+        });
       }));
       days.forEach(d => { d.locked = false; d.markedDone = false; });
       wk.days = days;
@@ -587,7 +649,10 @@ function reduce(state, action) {
         (day.exercises ?? []).forEach(ex => {
           ex._showCfg = false;
           ex.nextWeekPlan = 0;
-          (ex.sets ?? []).forEach(s => { s.done = false; });
+          (ex.sets ?? []).forEach(s => {
+            s.status = 'pending';
+            s.done = false;
+          });
         });
       });
       state.customTemplate = tpl;

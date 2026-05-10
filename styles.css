@@ -539,8 +539,17 @@ exercise { position: unset; }
   transition: all var(--t-fast);
 }
 .set-done-btn svg { width: 16px; height: 16px; }
-.set-done-btn:hover:not(.is-done) { border-color: var(--c-accent); }
+.set-done-btn:hover:not(.is-done):not(.is-fail) { border-color: var(--c-accent); }
 .set-done-btn.is-done { background: var(--c-accent); border-color: var(--c-accent); color: #000; }
+.set-done-btn.is-fail {
+  background: var(--c-danger);
+  border-color: var(--c-danger);
+  color: #fff;
+}
+.set-done-btn.is-fail:hover:not(:disabled) {
+  background: #e53935;
+  border-color: #e53935;
+}
 .set-done-btn:disabled { opacity: .5; cursor: not-allowed; }
 
 .set-remove-btn {

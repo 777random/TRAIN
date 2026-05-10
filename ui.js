@@ -510,6 +510,14 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl) {
   const prevSet = prevEx?.sets?.[si] ?? null;
   const dispW   = isDl ? Math.round(s.weight * 0.75 * 2) / 2 : s.weight;
 
+  let st = s.status;
+  if (st !== 'pending' && st !== 'success' && st !== 'fail') {
+    st = s.done ? 'success' : 'pending';
+  }
+  const doneClass = st === 'success' ? ' is-done' : st === 'fail' ? ' is-fail' : '';
+  const doneIcon  = st === 'success' ? ic.check() : st === 'fail' ? ic.xMark() : '';
+  const stLabel   = st === 'success' ? 'erfolgreich' : st === 'fail' ? 'nicht geschafft' : 'offen';
+
   return `
 <div class="set-row" role="listitem" data-di="${di}" data-ei="${ei}" data-si="${si}">
 
@@ -547,12 +555,11 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl) {
 
   <div class="set-done-wrap">
     <button
-      class="set-done-btn${s.done ? ' is-done' : ''}"
+      class="set-done-btn${doneClass}"
       ${locked ? 'disabled' : ''}
       data-action="toggle-done" data-di="${di}" data-ei="${ei}" data-si="${si}"
-      aria-label="Satz ${si + 1} ${s.done ? 'als nicht erledigt markieren' : 'als erledigt markieren'}"
-      aria-pressed="${s.done}"
-    >${s.done ? ic.check() : ''}</button>
+      aria-label="Satz ${si + 1}: ${stLabel}. Tippen für nächsten Status (offen → erfolgreich → nicht geschafft)."
+    >${doneIcon}</button>
     <span class="prev-hint" aria-hidden="true"></span>
   </div>
 

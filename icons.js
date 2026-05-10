@@ -8,11 +8,6 @@
  *     the aria-label – the icon itself is decorative.
  *   • Are stroked (not filled) for a clean, modern look consistent
  *     with the app's design language.
- *
- * Usage:
- *   btn.innerHTML = icon.plus() + '<span class="sr-only">Neue Woche</span>';
- *   // or via the helper:
- *   btn.innerHTML = iconBtn(icon.plus(), 'Neue Woche');
  */
 
 const SVG = (path, extra = '') =>
@@ -84,6 +79,10 @@ export const settings = () =>
 /** Check / Done */
 export const check = () =>
   SVG('<polyline points="20 6 9 17 4 12"/>');
+
+/** X mark – set failed / not completed */
+export const xMark = () =>
+  SVG('<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>');
 
 /** Close / X */
 export const x = () =>
