@@ -999,11 +999,3 @@ label > svg {
   color: #000;
   font-weight: 700;
 }
-
-/* ── Phase 1: Grüne Tages-Header ───────────────────────────── */
-.day-header__title,
-.day-title,
-.day-card summary {
-  color: var(--c-accent) !important;
-}
-

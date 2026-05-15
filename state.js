@@ -611,24 +611,18 @@ function reduce(state, action) {
       break;
     }
     case A.SET_AUTOFILL_DOWN: {
-      const wk = _currentWeek();
-      if (!wk) break;
-      const ex = wk.days[p.di]?.exercises[p.ei];
-      if (!ex || !ex.sets) break;
-
-      const src = ex.sets[p.si];
-      if (!src) break;
-
-      // Iteriere über alle Sätze, die UNTER dem aktuellen Satz liegen
-      for (let i = p.si + 1; i < ex.sets.length; i++) {
-        // 1. Gewicht wird immer auf ALLE folgenden Sätze kopiert
-        ex.sets[i].weight = src.weight;
-        
-        // 2. Metrik (Wdh/sek/m) und RPE werden NUR auf den direkt nächsten Satz kopiert
-        if (i === p.si + 1) {
-          ex.sets[i].reps = src.reps;
-          ex.sets[i].rpe = src.rpe;
-        }
+      const ex = _currentWeek()?.days[p.di]?.exercises[p.ei]; if (!ex) break;
+      const si = p.si;
+      const sets = ex.sets;
+      if (si < 0 || si >= sets.length - 1) break;
+      const src = sets[si]; if (!src) break;
+      const w = parseFloat(src.weight) || 0;
+      const n = parseFloat(src.reps);
+      const repVal = Math.max(0, Number.isFinite(n) ? n : 0);
+      for (let j = si + 1; j < sets.length; j++) {
+        const t = sets[j];
+        t.weight = w;
+        t.reps = repVal;
       }
       break;
     }
