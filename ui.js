@@ -644,7 +644,29 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl) {
     data-action="remove-set" data-di="${di}" data-ei="${ei}" data-si="${si}"
     aria-label="Satz ${si + 1} entfernen"
   >${ic.minus()}</button>
-</div>`;
+
+  ${!locked ? `
+  <button
+    class="set-note-btn${s.note ? ' has-note' : ''}"
+    data-action="toggle-set-note" data-di="${di}" data-ei="${ei}" data-si="${si}"
+    aria-label="Notiz zu Satz ${si + 1}"
+    aria-expanded="${!!s._showNote}"
+  >✏</button>` : ''}
+
+</div>
+${s._showNote || s.note ? `
+<div class="set-note-row" data-di="${di}" data-ei="${ei}" data-si="${si}">
+  <input
+    class="set-note-input"
+    type="text"
+    value="${h(s.note ?? '')}"
+    placeholder="Notiz zu Satz ${si + 1} …"
+    ${locked ? 'disabled' : ''}
+    data-action="set-note" data-di="${di}" data-ei="${ei}" data-si="${si}"
+    aria-label="Notiz zu Satz ${si + 1}"
+    maxlength="120"
+  />
+</div>` : ''}`;
 }
 
 // ─── Body tab ────────────────────────────────────────────────────────────────
