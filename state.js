@@ -405,11 +405,14 @@ function _resetClonedDays(days) {
     day.locked = false;
     day.markedDone = false;
     (day.exercises ?? []).forEach(ex => {
-      // UI-only toggles must not leak into new weeks / templates
       if (ex._showCfg) ex._showCfg = false;
       (ex.sets ?? []).forEach(s => {
         s.status = 'pending';
-        s.done = false;
+        s.done   = false;
+        // Frisches Template: Reps und RPE leeren.
+        // Gewicht bleibt (inkl. geplanter Progression).
+        s.reps = null;
+        s.rpe  = null;
       });
     });
   });
