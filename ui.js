@@ -1368,6 +1368,15 @@ function _handleChange(e) {
       dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'reps',   value: el.value }); break;
     case 'set-rpe':
       dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'rpe',    value: el.value }); break;
+    case 'set-targets': {
+      const tField = el.dataset.field;
+      dispatch(A.EX_SET_TARGETS, {
+        di: +el.dataset.di,
+        ei: +el.dataset.ei,
+        [tField]: +el.value || 0,
+      });
+      break;
+    }
     case 'body-field':
       dispatch(A.BODY_SET_FIELD, {
         field,
