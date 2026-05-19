@@ -484,7 +484,7 @@ exercise { position: unset; }
 /* Set grid: #idx | kg | reps | rpe | done | remove */
 .set-header, .set-row {
   display: grid;
-  grid-template-columns: 22px 1fr 1fr 52px 36px 28px;
+  grid-template-columns: 22px 1fr 1fr 52px 36px 28px 24px;
   gap: var(--sp-1); align-items: start;
 }
 .set-header {
