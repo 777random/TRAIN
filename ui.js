@@ -450,6 +450,29 @@ function renderExercise(wk, di, ei, state) {
             >${s === 0 ? 'Reset' : s}</button>`).join('')}
         </div>
       </div>` : ''}
+      ${!locked ? `
+      <div class="weight-plan-row" role="group" aria-label="Zielvorgaben">
+        <span class="pause-row__label">Ziel:</span>
+        <input
+          class="target-input"
+          type="number" inputmode="numeric" min="1" max="10"
+          value="${ex.targetSets ?? ''}"
+          placeholder="Sätze"
+          data-action="set-targets" data-field="targetSets"
+          data-di="${di}" data-ei="${ei}"
+          aria-label="Ziel Sätze"
+        />
+        <span class="pause-row__label">×</span>
+        <input
+          class="target-input"
+          type="number" inputmode="numeric" min="1" max="100"
+          value="${ex.targetReps ?? ''}"
+          placeholder="Wdh"
+          data-action="set-targets" data-field="targetReps"
+          data-di="${di}" data-ei="${ei}"
+          aria-label="Ziel Wiederholungen"
+        />
+      </div>` : ''}
     </div>` : '';
 
   return `
