@@ -565,6 +565,12 @@ function reduce(state, action) {
       }
       break;
     }
+    case A.EX_SET_TARGETS: {
+      const ex = _currentWeek()?.days[p.di]?.exercises[p.ei]; if (!ex) break;
+      if (p.targetSets !== undefined) ex.targetSets = Math.max(1, Math.min(10, +p.targetSets || 0));
+      if (p.targetReps !== undefined) ex.targetReps = Math.max(1, Math.min(100, +p.targetReps || 0));
+      break;
+    }
     case A.EX_SET_STEP: {
       const ex = _currentWeek()?.days[p.di]?.exercises[p.ei]; if (!ex) break;
       ex.weightStep = p.step;
