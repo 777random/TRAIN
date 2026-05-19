@@ -622,17 +622,20 @@ function reduce(state, action) {
     }
     case A.SET_AUTOFILL_DOWN: {
       const ex = _currentWeek()?.days[p.di]?.exercises[p.ei]; if (!ex) break;
-      const si = p.si;
+      const si   = p.si;
       const sets = ex.sets;
       if (si < 0 || si >= sets.length - 1) break;
       const src = sets[si]; if (!src) break;
-      const w = parseFloat(src.weight) || 0;
-      const n = parseFloat(src.reps);
-      const repVal = Math.max(0, Number.isFinite(n) ? n : 0);
+
+      const w      = parseFloat(src.weight) || 0;
+      const repsRaw = parseFloat(src.reps);
+      const repsVal = Math.max(0, Number.isFinite(repsRaw) ? repsRaw : 0);
+
       for (let j = si + 1; j < sets.length; j++) {
-        const t = sets[j];
-        t.weight = w;
-        t.reps = repVal;
+        // Gewicht → alle Sätze darunter
+        sets[j].weight = w;
+        // Reps → nur den direkt nächsten Satz; RPE nie kopieren
+        if (j === si + 1) sets[j].reps = repsVal;
       }
       break;
     }
