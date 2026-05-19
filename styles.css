@@ -1000,3 +1000,24 @@ label > svg {
   color: #000;
   font-weight: 700;
 }
+/* ── Zielvorgaben Inputs im ⚙️-Panel ──────────────────────── */
+.target-input {
+  width: 58px;
+  height: 28px;
+  background: var(--c-surface2);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-sm);
+  color: var(--c-text);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  text-align: center;
+  padding: 0 var(--sp-1);
+  outline: none;
+  appearance: textfield;
+  -moz-appearance: textfield;
+  transition: border-color var(--t-fast);
+}
+.target-input::-webkit-outer-spin-button,
+.target-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+.target-input:focus { border-color: var(--c-accent); }
+.target-input::placeholder { color: var(--c-text-3); font-size: 11px; }
