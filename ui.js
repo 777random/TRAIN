@@ -1303,6 +1303,12 @@ function _handleClick(e) {
       
 
     // ── Set ────────────────────────────────────────────────────────────────
+    case 'toggle-set-note': {
+      const wk  = getState().weeks[getState().curIdx];
+      const s   = wk?.days[+di]?.exercises[+ei]?.sets[+si];
+      if (s) { s._showNote = !s._showNote; scheduleRender(); }
+      break;
+    }
     case 'toggle-done':
       dispatch(A.SET_TOGGLE_DONE, { di: +di, ei: +ei, si: +si }); break;
 
