@@ -30,7 +30,7 @@ export const SCHEMA_VERSION     = 8;
 
 /** Creates a fresh set entry. */
 export function mkSet(weight = 0, reps = 10) {
-  return { weight, reps, rpe: null, status: 'pending', done: false };
+  return { weight, reps, rpe: null, done: false, note: '' };
 }
 
 /** Deep-clone anything JSON-serialisable. */
