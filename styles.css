@@ -1021,3 +1021,47 @@ label > svg {
 .target-input::-webkit-inner-spin-button { -webkit-appearance: none; }
 .target-input:focus { border-color: var(--c-accent); }
 .target-input::placeholder { color: var(--c-text-3); font-size: 11px; }
+
+/* ── Satz-Notiz ─────────────────────────────────────────────── */
+.set-note-btn {
+  background: none;
+  border: none;
+  color: var(--c-text-3);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+  opacity: 0.4;
+  transition: opacity var(--t-fast), color var(--t-fast);
+  /* Kein eigener Grid-Slot – schwebt hinter dem minus-Button */
+  grid-column: 6;
+  align-self: start;
+  margin-top: 6px;
+}
+.set-note-btn:hover  { opacity: 1; color: var(--c-accent); }
+.set-note-btn.has-note { opacity: 1; color: var(--c-accent); }
+
+.set-note-row {
+  /* Erstreckt sich über alle 6 Grid-Spalten */
+  grid-column: 1 / -1;
+  padding: var(--sp-1) 0 var(--sp-2);
+}
+.set-note-input {
+  width: 100%;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--c-border);
+  color: var(--c-text-2);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-style: italic;
+  padding: 2px 0;
+  outline: none;
+  transition: border-color var(--t-fast), color var(--t-fast);
+}
+.set-note-input::placeholder { color: var(--c-text-3); }
+.set-note-input:focus {
+  border-color: var(--c-accent);
+  color: var(--c-text);
+}
+
