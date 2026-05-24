@@ -1065,3 +1065,36 @@ label > svg {
   color: var(--c-text);
 }
 
+/* ── Autofill-Button (Pfeil in Wdh-Zelle) ──────────────────── */
+.btn-autofill {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--c-text-3);
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color var(--t-fast), transform var(--t-fast);
+  /* Touch-Target */
+  min-width: 32px;
+  min-height: 28px;
+}
+.btn-autofill svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+.btn-autofill:hover  { color: var(--c-accent); }
+.btn-autofill:active { transform: scale(.9); }
+
+/* Footer-Wrapper in der Wdh-Zelle (prev-hint + autofill nebeneinander) */
+.set-cell__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 13px;
+}
+.set-cell__footer .prev-hint {
+  flex: 1;
+}
