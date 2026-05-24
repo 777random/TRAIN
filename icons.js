@@ -153,3 +153,14 @@ export const info = () =>
  */
 export const srOnly = label =>
   `<span class="sr-only">${label}</span>`;
+
+
+/** Autofill-Down – Pfeil nach unten mit Abschlussbalken */
+export const autofillDown = () =>
+  SVG(`
+    <g stroke-linecap="round" stroke-linejoin="round">
+      <line x1="12" y1="4.5" x2="12" y2="13.5" />
+      <polyline points="8.5 10 12 13.5 15.5 10" />
+      <line x1="7.5" y1="17.5" x2="16.5" y2="17.5" />
+    </g>
+  `);
