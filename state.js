@@ -628,29 +628,15 @@ function reduce(state, action) {
       if (si < 0 || si >= sets.length - 1) break;
       const src = sets[si]; if (!src) break;
 
-      // Gewicht: sauber parsen, 0 erlaubt
-      const wVal = parseFloat(src.weight);
-      const w    = Number.isFinite(wVal) ? wVal : 0;
-
-      // Reps: null/leer/string sicher behandeln
+      const w      = parseFloat(src.weight) || 0;
       const repsRaw = parseFloat(src.reps);
-      const repsVal = Number.isFinite(repsRaw) ? Math.max(0, repsRaw) : null;
-
-      // RPE: null erlaubt (kein Wert = kein Eintrag)
-      const rpeRaw = parseFloat(src.rpe);
-      const rpeVal = Number.isFinite(rpeRaw)
-        ? Math.min(10, Math.max(1, rpeRaw))
-        : null;
+      const repsVal = Math.max(0, Number.isFinite(repsRaw) ? repsRaw : 0);
 
       for (let j = si + 1; j < sets.length; j++) {
-        // Gewicht → ALLE Sätze darunter
+        // Gewicht → alle Sätze darunter
         sets[j].weight = w;
-
-        // Reps + RPE → NUR den direkt nächsten Satz
-        if (j === si + 1) {
-          sets[j].reps = repsVal;
-          sets[j].rpe  = rpeVal;
-        }
+        // Reps → nur den direkt nächsten Satz; RPE nie kopieren
+        if (j === si + 1) sets[j].reps = repsVal;
       }
       break;
     }
