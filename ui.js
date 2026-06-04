@@ -246,18 +246,6 @@ function renderDayList(state) {
                    : locked ? 'day-card__dot day-card__dot--locked'
                    : 'day-card__dot';
 
-      // Day-level target comparison
-      const tTotal = day.exercises.reduce((s, ex) => s + (ex.targetSets || 0), 0);
-      const tMet   = tTotal > 0
-        ? day.exercises.reduce((s, ex) => {
-            const ds = ex.sets.filter(st => st.done).length;
-            return s + Math.min(ds, ex.targetSets || 0);
-          }, 0)
-        : 0;
-      const targetHtml = tTotal > 0
-        ? `<div class="day-tab__target">${ic.check()} ${tMet}/${tTotal}</div>`
-        : '';
-
       return `<button
         class="day-tab${isAct ? ' is-active' : ''}${done ? ' day-tab--done' : ''}${isDl ? ' day-tab--deload' : ''}"
         data-day-hdr="${di}"
@@ -267,7 +255,6 @@ function renderDayList(state) {
         <div class="${dotCls}" aria-hidden="true"></div>
         <div class="day-tab__title">${h(day.title)}${isDl ? '<span class="deload-badge">D</span>' : ''}</div>
         <div class="day-tab__counts"><strong>${done_s}</strong>/${total}</div>
-        ${targetHtml}
       </button>`;
     }).join('')}
   </div>`;
