@@ -245,7 +245,7 @@ function renderDayList(state) {
     doneSets  = ad.exercises.reduce((s, ex) => s + ex.sets.filter(st => st.done).length, 0);
   }
   const pct = totalSets > 0 ? Math.round(doneSets / totalSets * 100) : 0;
-  const progressHtml = _activeDayIdx !== null ? `
+  const progressHtml = _activeDayIdx !== null && state.settings.showProgress ? `
   <div class="training-progress" aria-label="${doneSets} von ${totalSets} Sätzen erledigt">
     <div class="training-progress__bar" style="width:${pct}%"></div>
     <span class="training-progress__label">${pct}% · ${doneSets}/${totalSets} Sätze</span>
@@ -292,6 +292,11 @@ function renderDayList(state) {
   }
 
   container.innerHTML = tabsHtml + panelHtml;
+
+  // Adjust sticky offset for exercise names based on whether progress bar is shown
+  const tabsH = (_activeDayIdx !== null && state.settings.showProgress) ? 108 : 80;
+  document.documentElement.style.setProperty('--tabs-h', `${tabsH}px`);
+
   _initStickyObserver();
   if (_activeDayIdx !== null) _bindDrag(container);
 }
@@ -1063,8 +1068,9 @@ function renderSettingsTab(state) {
 
   container.innerHTML = `
   <div class="settings-section">
-    ${tog('swipe', 'Swipe-Navigation', 'Wischen zum Wochenwechsel')}
-    ${tog('drag',  'Drag & Drop',       'Übungen per Griff verschieben')}
+    ${tog('swipe',        'Swipe-Navigation',    'Wischen zum Wochenwechsel')}
+    ${tog('drag',         'Drag & Drop',          'Übungen per Griff verschieben')}
+    ${tog('showProgress', 'Fortschrittsbalken',   'Erledigte Sätze als Balken unter den Tagen')}
   </div>
 
   <div class="settings-section">
