@@ -45,7 +45,7 @@
   --touch: 44px;
   --nav-h: 52px;
   --day-h: 58px;
-  --tabs-h: 72px; /* height of sticky day-tabs-row */
+  --tabs-h: 108px; /* tabs (72px) + progress bar (28px) + gap (8px) */
 }
 
 /* ── Reset ─────────────────────────────────────────────────── */
@@ -303,7 +303,7 @@ button, input, select, textarea { font: inherit; }
 .training-progress {
   position: relative; height: 28px;
   background: var(--c-surface2); border-radius: var(--r-full);
-  overflow: hidden; margin-bottom: var(--sp-3);
+  overflow: hidden; margin-top: var(--sp-2);
 }
 .training-progress__bar {
   position: absolute; inset: 0; right: auto;

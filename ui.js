@@ -237,6 +237,20 @@ function renderDayList(state) {
 
   const isDl = wk.mode === 'deload';
 
+  // ── Progress bar (for the active day, shown inside sticky tabs row) ──────
+  let totalSets = 0, doneSets = 0;
+  if (_activeDayIdx !== null && wk.days[_activeDayIdx]) {
+    const ad = wk.days[_activeDayIdx];
+    totalSets = ad.exercises.reduce((s, ex) => s + ex.sets.length, 0);
+    doneSets  = ad.exercises.reduce((s, ex) => s + ex.sets.filter(st => st.done).length, 0);
+  }
+  const pct = totalSets > 0 ? Math.round(doneSets / totalSets * 100) : 0;
+  const progressHtml = _activeDayIdx !== null ? `
+  <div class="training-progress" aria-label="${doneSets} von ${totalSets} Sätzen erledigt">
+    <div class="training-progress__bar" style="width:${pct}%"></div>
+    <span class="training-progress__label">${pct}% · ${doneSets}/${totalSets} Sätze</span>
+  </div>` : '';
+
   // ── Tab row (all days side by side) ──────────────────────────────────────
   const tabsHtml = `<div class="day-tabs-row" role="tablist" aria-label="Trainingstage">
     ${wk.days.map((day, di) => {
@@ -260,6 +274,7 @@ function renderDayList(state) {
         <div class="day-tab__counts"><strong>${done_s}</strong>/${total}</div>
       </button>`;
     }).join('')}
+  ${progressHtml}
   </div>`;
 
   // ── Content panel (only the active day, full width) ───────────────────────
@@ -351,15 +366,6 @@ function renderDayBody(wk, di, state) {
   const locked = !!day.locked;
   const done   = !!day.markedDone;
 
-  const totalSets = day.exercises.reduce((s, ex) => s + ex.sets.length, 0);
-  const doneSets  = day.exercises.reduce((s, ex) => s + ex.sets.filter(st => st.done).length, 0);
-  const pct       = totalSets > 0 ? Math.round(doneSets / totalSets * 100) : 0;
-  const progressBar = `
-  <div class="training-progress" aria-label="${doneSets} von ${totalSets} Sätzen erledigt">
-    <div class="training-progress__bar" style="width:${pct}%"></div>
-    <span class="training-progress__label">${pct}% · ${doneSets}/${totalSets} Sätze</span>
-  </div>`;
-
   let prevBanner = '';
   if (state.curIdx > 0) {
     const prevDay = state.weeks[state.curIdx - 1]?.days?.[di];
@@ -378,7 +384,6 @@ function renderDayBody(wk, di, state) {
   const lockBtnIcon  = done ? ic.unlock() : ic.lock();
 
   return `
-    ${progressBar}
     ${renderInfoBlock('warmup', '🔥 Aufwärmen', day.warmup, di, locked)}
     ${prevBanner}
     <div data-ex-list="${di}">${exHtml}</div>
@@ -788,8 +793,22 @@ function renderBodyTab(state) {
               data-action="body-field" data-field="weight"
               aria-label="Körpergewicht in kg"
             />
-            ${bmi ? `<div class="bmi-badge">BMI ${bmi} <span>${bmiLabel}</span></div>` : ''}
           </div>
+          <div class="body-field">
+            <label for="body-height">Körpergröße (cm)</label>
+            <input id="body-height" class="body-input" type="number" step="1"
+              min="100" max="250"
+              value="${heightCm ?? ''}" placeholder="178"
+              data-action="set-height"
+              aria-label="Körpergröße in cm"
+            />
+          </div>
+        </div>
+        ${bmi ? `
+        <div class="bmi-badge" style="margin-bottom:var(--sp-3)">
+          BMI ${bmi} <span>${bmiLabel}</span>
+        </div>` : ''}
+        <div class="body-grid">
           <div class="body-field">
             <label for="body-sleep">Schlaf (Std)</label>
             <input id="body-sleep" class="body-input" type="number" step="0.5"
@@ -798,6 +817,7 @@ function renderBodyTab(state) {
               aria-label="Schlafdauer in Stunden"
             />
           </div>
+          <div></div>
         </div>
         ${scale('energy',   'Energielevel')}
         ${scale('wellbeing','Wohlbefinden')}
@@ -1045,24 +1065,6 @@ function renderSettingsTab(state) {
   <div class="settings-section">
     ${tog('swipe', 'Swipe-Navigation', 'Wischen zum Wochenwechsel')}
     ${tog('drag',  'Drag & Drop',       'Übungen per Griff verschieben')}
-    <div class="settings-row">
-      <div>
-        <div class="settings-row__label">Körpergröße</div>
-        <div class="settings-row__desc">Für BMI-Berechnung im Körper-Tab</div>
-      </div>
-      <div style="display:flex;align-items:center;gap:6px">
-        <input
-          class="body-input" type="number" inputmode="decimal"
-          min="100" max="250" step="1"
-          value="${state.settings.heightCm ?? ''}"
-          placeholder="178"
-          style="width:72px;height:36px;font-size:14px;text-align:center"
-          data-action="set-height"
-          aria-label="Körpergröße in cm"
-        />
-        <span style="font-size:12px;color:var(--c-text-3)">cm</span>
-      </div>
-    </div>
   </div>
 
   <div class="settings-section">
