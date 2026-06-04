@@ -45,7 +45,7 @@
   --touch: 44px;
   --nav-h: 52px;
   --day-h: 58px;
-  --tabs-h: 108px; /* tabs (72px) + progress bar (28px) + gap (8px) */
+  --tabs-h: 108px; /* fallback; overridden dynamically after first render */
 }
 
 /* ── Reset ─────────────────────────────────────────────────── */
@@ -255,12 +255,6 @@ button, input, select, textarea { font: inherit; }
   transition: border-color var(--t-fast), background var(--t-fast);
   user-select: none;
 }
-.day-tab--add {
-  flex: 0 0 40px; min-width: 40px;
-  color: var(--c-text-3); border-style: dashed;
-}
-.day-tab--add:hover { color: var(--c-accent); border-color: var(--c-accent); }
-.day-tab--add svg { width: 18px; height: 18px; }
 .day-tab:hover { background: var(--c-surface2); border-color: var(--c-border-hi); }
 .day-tab.is-active { border-color: var(--c-accent); background: var(--c-surface2); }
 .day-tab--done { border-color: var(--c-ok); }

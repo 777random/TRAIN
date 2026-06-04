@@ -282,7 +282,6 @@ function renderDayList(state) {
   </div>` : '';
 
   // ── Tab row (all days side by side) ──────────────────────────────────────
-  const canAddDay = wk.days.length < 7;
   const tabsHtml = `<div class="day-tabs-row" role="tablist" aria-label="Trainingstage">
     ${wk.days.map((day, di) => {
       const done   = !!day.markedDone;
@@ -305,10 +304,6 @@ function renderDayList(state) {
         <div class="day-tab__counts"><strong>${done_s}</strong>/${total}</div>
       </button>`;
     }).join('')}
-  ${canAddDay ? `
-    <button class="day-tab day-tab--add" data-action="add-day"
-      aria-label="Trainingstag hinzufügen"
-    >${ic.plus()}</button>` : ''}
   ${progressHtml}
   </div>`;
 
@@ -328,9 +323,13 @@ function renderDayList(state) {
 
   container.innerHTML = tabsHtml + panelHtml;
 
-  // Adjust sticky offset for exercise names based on whether a day is open
-  const tabsH = _activeDayIdx !== null ? 108 : 80;
-  document.documentElement.style.setProperty('--tabs-h', `${tabsH}px`);
+  // Measure actual tabs-row height after paint to close the sticky gap exactly
+  requestAnimationFrame(() => {
+    const tabsRow = container.querySelector('.day-tabs-row');
+    if (tabsRow) {
+      document.documentElement.style.setProperty('--tabs-h', `${tabsRow.offsetHeight}px`);
+    }
+  });
 
   _initStickyObserver();
   if (_activeDayIdx !== null) _bindDrag(container);
@@ -443,24 +442,15 @@ function renderDayBody(wk, di, state) {
         aria-label="Übung hinzufügen"
       >${ic.plus()}${ic.srOnly('Hinzufügen')}</button>
     </div>` : ''}
-    <div style="display:flex;gap:var(--sp-2)">
-      <button
-        class="complete-btn${done ? ' is-done' : ''}"
-        style="flex:1"
-        data-action="toggle-complete" data-di="${di}"
-        aria-pressed="${done}"
-        aria-label="${lockBtnLabel}"
-      >
-        ${lockBtnIcon}
-        ${done ? 'Gesperrt – Tippen zum Entsperren' : 'Abgeschlossen & sperren'}
-      </button>
-      ${!done ? `<button
-        class="complete-btn"
-        style="flex:0 0 auto;padding:0 var(--sp-3);color:var(--c-danger);border-color:var(--c-danger)"
-        data-action="remove-day" data-di="${di}"
-        aria-label="Tag entfernen"
-      >${ic.trash()}</button>` : ''}
-    </div>
+    <button
+      class="complete-btn${done ? ' is-done' : ''}"
+      data-action="toggle-complete" data-di="${di}"
+      aria-pressed="${done}"
+      aria-label="${lockBtnLabel}"
+    >
+      ${lockBtnIcon}
+      ${done ? 'Gesperrt – Tippen zum Entsperren' : 'Abgeschlossen & sperren'}
+    </button>
     ${renderInfoBlock('cooldown', '🧘 Cooldown', day.cooldown, di, locked)}
   `;
 }
@@ -540,6 +530,17 @@ function renderExercise(wk, di, ei, state) {
               aria-pressed="${step === s}"
             >${s === 0 ? 'Reset' : s}</button>`).join('')}
         </div>
+      </div>` : ''}
+      ${!locked ? `
+      <div class="weight-plan-row" role="group" aria-label="Gewichtsscheiben">
+        <span class="pause-row__label">Scheiben:</span>
+        <button
+          type="button"
+          class="weight-step-btn${ex.showPlates ? ' is-selected' : ''}"
+          data-action="toggle-plates" data-di="${di}" data-ei="${ei}"
+          aria-pressed="${!!ex.showPlates}"
+        >${ex.showPlates ? 'An' : 'Aus'}</button>
+        ${ex.showPlates ? '<span class="pause-row__label" style="color:var(--c-text-3);font-size:10px">Langhantel 20 kg Basis</span>' : ''}
       </div>` : ''}
       ${!locked ? `
       <div class="weight-plan-row" role="group" aria-label="Zielvorgaben">
@@ -697,7 +698,7 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl) {
       aria-label="Satz ${si + 1} Gewicht in kg"
     />
     <span class="prev-hint" aria-hidden="true">${prevSet ? prevSet.weight + ' kg' : ''}</span>
-    ${(() => { const pl = dispW > 20 ? calcPlates(dispW) : null; return pl ? `<span class="plate-hint" aria-hidden="true" title="Scheiben je Seite">▪ ${pl}</span>` : ''; })()}
+    ${ex.showPlates && dispW > 0 ? (() => { const pl = calcPlates(dispW); return pl ? `<span class="plate-hint" aria-hidden="true" title="Scheiben je Seite">▪ ${pl}</span>` : ''; })() : ''}
   </div>
 
   <div class="set-cell">
@@ -1099,6 +1100,7 @@ function drawLineChart(id, labels, data, color) {
 function renderSettingsTab(state) {
   const container = document.getElementById('settings-tab-content');
   if (!container) return;
+  const wk = state.weeks[state.curIdx] ?? null;
 
   const tog = (key, label, desc) => `
   <div class="settings-row">
@@ -1115,6 +1117,28 @@ function renderSettingsTab(state) {
   <div class="settings-section">
     ${tog('swipe', 'Swipe-Navigation', 'Wischen zum Wochenwechsel')}
     ${tog('drag',  'Drag & Drop',      'Übungen per Griff verschieben')}
+  </div>
+
+  <div class="settings-section">
+    <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:var(--sp-2)">
+      <div style="display:flex;justify-content:space-between;width:100%;align-items:center">
+        <div>
+          <div class="settings-row__label">Trainingstage</div>
+          <div class="settings-row__desc">Aktuelle Woche · max. 7 Tage</div>
+        </div>
+        ${wk && wk.days.length < 7 ? `<button class="btn btn--ghost btn--sm" data-action="add-day">${ic.plus()} Tag hinzufügen</button>` : ''}
+      </div>
+      ${wk ? wk.days.map((day, di) => `
+      <div style="display:flex;align-items:center;justify-content:space-between;width:100%;gap:var(--sp-2)">
+        <span style="font-size:13px;font-weight:600;color:var(--c-accent);font-family:var(--font-display);letter-spacing:.08em">${h(day.title)}</span>
+        <span style="font-size:11px;color:var(--c-text-3)">${day.exercises.length} Übungen</span>
+        ${di === wk.days.length - 1 && wk.days.length > 1 ? `
+        <button class="btn btn--sm" style="border-color:var(--c-danger);color:var(--c-danger);padding:0 var(--sp-2)"
+          data-action="remove-day" data-di="${di}"
+          aria-label="${h(day.title)} entfernen"
+        >${ic.minus()}</button>` : '<div style="width:52px"></div>'}
+      </div>`).join('') : ''}
+    </div>
   </div>
 
   <div class="settings-section">
@@ -1338,6 +1362,7 @@ function _handleClick(e) {
     case 'add-day':
       dispatch(A.DAY_ADD, {});
       showToast('Neuer Trainingstag hinzugefügt', 'ok');
+      if (_activeTab === 'settings') renderSettingsTab(getState());
       break;
 
     case 'remove-day': {
@@ -1350,6 +1375,7 @@ function _handleClick(e) {
       else if (_activeDayIdx > _di) _activeDayIdx--;
       dispatch(A.DAY_REMOVE, { di: _di });
       showToast('Tag entfernt', 'info');
+      if (_activeTab === 'settings') renderSettingsTab(getState());
       break;
     }
 
@@ -1412,6 +1438,12 @@ function _handleClick(e) {
     case 'set-step': {
       const step = parseFloat(el.dataset.step);
       dispatch(A.EX_SET_STEP, { di: +di, ei: +ei, step });
+      break;
+    }
+
+    case 'toggle-plates': {
+      const _ex = getState().weeks[getState().curIdx]?.days[+di]?.exercises[+ei];
+      if (_ex) dispatch(A.EX_UPDATE, { di: +di, ei: +ei, field: 'showPlates', value: !_ex.showPlates });
       break;
     }
 
