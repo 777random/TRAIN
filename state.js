@@ -112,9 +112,10 @@ function buildDefaultState() {
     weeks: [],                // Week[]
     customTemplate: clone(FACTORY_TEMPLATE),
     settings: {
-      swipe:    true,   // touch-swipe week navigation
-      drag:     true,   // drag-and-drop exercise reorder
-      heightCm: null,   // user height in cm for BMI calculation
+      swipe:        true,   // touch-swipe week navigation
+      drag:         true,   // drag-and-drop exercise reorder
+      heightCm:     null,   // user height in cm for BMI calculation
+      targetWeight: null,   // body weight goal in kg
     },
   };
 }
@@ -246,9 +247,10 @@ function migrate(raw) {
     if (!raw.settings)       raw.settings = { swipe: true, drag: true };
     // Ensure swipe is explicitly true for users upgrading from pre-Step-2 state
     // (where swipe was false by default). drag keeps its persisted value.
-    if (raw.settings.swipe    === undefined) raw.settings.swipe    = true;
-    if (raw.settings.drag     === undefined) raw.settings.drag     = true;
-    if (raw.settings.heightCm === undefined) raw.settings.heightCm = null;
+    if (raw.settings.swipe        === undefined) raw.settings.swipe        = true;
+    if (raw.settings.drag         === undefined) raw.settings.drag         = true;
+    if (raw.settings.heightCm     === undefined) raw.settings.heightCm     = null;
+    if (raw.settings.targetWeight === undefined) raw.settings.targetWeight = null;
     raw.meta = {
       schemaVersion: 6,
       savedAt:   raw.meta?.savedAt   ?? null,
@@ -646,7 +648,8 @@ function reduce(state, action) {
       break;
     }
     case A.SET_UPDATE: {
-      const s = _currentWeek()?.days[p.di]?.exercises[p.ei]?.sets[p.si]; if (!s) break;
+      const ex = _currentWeek()?.days[p.di]?.exercises[p.ei]; if (!ex) break;
+      const s  = ex.sets[p.si]; if (!s) break;
       let v = p.value;
       if      (p.field === 'weight') v = parseFloat(v) || 0;
       else if (p.field === 'reps') {
@@ -656,6 +659,10 @@ function reduce(state, action) {
       else if (p.field === 'rpe')  v = (v === '' || v === null) ? null : Math.min(10, Math.max(1, +v));
       else if (p.field === 'note') v = String(v ?? '').slice(0, 120);
       s[p.field] = v;
+      // Straight sets: auto-propagate weight or reps to all following sets
+      if (ex.setType === 'straight' && (p.field === 'weight' || p.field === 'reps')) {
+        for (let j = p.si + 1; j < ex.sets.length; j++) ex.sets[j][p.field] = v;
+      }
       break;
     }
     case A.SET_TOGGLE_DONE: {

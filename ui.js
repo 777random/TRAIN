@@ -532,6 +532,21 @@ function renderExercise(wk, di, ei, state) {
         </div>
       </div>` : ''}
       ${!locked ? `
+      <div class="weight-plan-row" role="group" aria-label="Satz-Typ">
+        <span class="pause-row__label">Typ:</span>
+        <div class="weight-step-opts">
+          ${[['straight','Straight'],['pyramid','Pyramide']].map(([val, lbl]) => `
+            <button type="button"
+              class="weight-step-btn${(ex.setType ?? 'pyramid') === val ? ' is-selected' : ''}"
+              data-action="set-settype" data-di="${di}" data-ei="${ei}" data-val="${val}"
+              aria-pressed="${(ex.setType ?? 'pyramid') === val}"
+            >${lbl}</button>`).join('')}
+        </div>
+        ${(ex.setType ?? 'pyramid') === 'straight'
+          ? '<span class="pause-row__label" style="color:var(--c-text-3);font-size:10px">Wdh+Gewicht werden automatisch kopiert</span>'
+          : ''}
+      </div>` : ''}
+      ${!locked ? `
       <div class="weight-plan-row" role="group" aria-label="Gewichtsscheiben">
         <span class="pause-row__label">Scheiben:</span>
         <button
@@ -776,12 +791,16 @@ function renderBodyTab(state) {
   if (!container) return;
   const wk = state.weeks[state.curIdx];
   const bd = wk?.bodyData ?? {};
-  const heightCm = state.settings?.heightCm;
+  const heightCm     = state.settings?.heightCm;
+  const targetWeight = state.settings?.targetWeight;
   const bmi = heightCm && bd.weight
     ? (bd.weight / Math.pow(heightCm / 100, 2)).toFixed(1)
     : null;
   const bmiLabel = bmi
     ? (+bmi < 18.5 ? 'Untergewicht' : +bmi < 25 ? 'Normalgewicht' : +bmi < 30 ? 'Übergewicht' : 'Adipositas')
+    : null;
+  const weightDiff = targetWeight && bd.weight
+    ? (targetWeight - bd.weight)
     : null;
 
   const histRows = [...state.weeks]
@@ -868,7 +887,18 @@ function renderBodyTab(state) {
               aria-label="Schlafdauer in Stunden"
             />
           </div>
-          <div></div>
+          <div class="body-field">
+            <label for="body-target-weight">Zielgewicht (kg)</label>
+            <input id="body-target-weight" class="body-input" type="number" step="0.1"
+              value="${targetWeight ?? ''}" placeholder="80.0"
+              data-action="set-target-weight"
+              aria-label="Zielgewicht in kg"
+            />
+            ${weightDiff !== null ? `
+            <div class="bmi-badge" style="color:${Math.abs(weightDiff) < 0.1 ? 'var(--c-ok)' : 'var(--c-text-3)'}">
+              ${Math.abs(weightDiff) < 0.1 ? '✓ Ziel erreicht!' : weightDiff > 0 ? `noch ${weightDiff.toFixed(1)} kg` : `${Math.abs(weightDiff).toFixed(1)} kg drüber`}
+            </div>` : ''}
+          </div>
         </div>
         ${scale('energy',   'Energielevel')}
         ${scale('wellbeing','Wohlbefinden')}
@@ -1441,6 +1471,14 @@ function _handleClick(e) {
       break;
     }
 
+    case 'set-settype': {
+      const _val = el.dataset.val;
+      if (_val === 'straight' || _val === 'pyramid') {
+        dispatch(A.EX_UPDATE, { di: +di, ei: +ei, field: 'setType', value: _val });
+      }
+      break;
+    }
+
     case 'toggle-plates': {
       const _ex = getState().weeks[getState().curIdx]?.days[+di]?.exercises[+ei];
       if (_ex) dispatch(A.EX_UPDATE, { di: +di, ei: +ei, field: 'showPlates', value: !_ex.showPlates });
@@ -1608,6 +1646,11 @@ function _handleChange(e) {
     case 'set-height': {
       const h = parseFloat(el.value);
       dispatch(A.SETTING_SET, { key: 'heightCm', value: Number.isFinite(h) && h > 0 ? h : null });
+      break;
+    }
+    case 'set-target-weight': {
+      const tw = parseFloat(el.value);
+      dispatch(A.SETTING_SET, { key: 'targetWeight', value: Number.isFinite(tw) && tw > 0 ? tw : null });
       break;
     }
     case 'body-field':

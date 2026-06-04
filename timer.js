@@ -39,6 +39,29 @@
 
 import { dispatch, subscribe, getState, A } from './state.js';
 
+// ─── Wake Lock ────────────────────────────────────────────────────────────────
+
+let _wakeLock = null;
+
+async function _acquireWakeLock() {
+  if (!('wakeLock' in navigator) || _wakeLock) return;
+  try {
+    _wakeLock = await navigator.wakeLock.request('screen');
+    // Re-acquire automatically if the page becomes visible again
+    _wakeLock.addEventListener('release', () => { _wakeLock = null; });
+  } catch (_) { /* not supported or permission denied — silent fail */ }
+}
+
+function _releaseWakeLock() {
+  _wakeLock?.release().catch(() => {});
+  _wakeLock = null;
+}
+
+// Re-acquire after tab becomes visible (wake lock drops on visibility change)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && _pauseEnd) _acquireWakeLock();
+});
+
 // ─── Module state ─────────────────────────────────────────────────────────────
 
 let _sessStart    = null;   // Date.now() when session started, null if stopped
@@ -128,6 +151,7 @@ function _tickPause() {
   if (remaining <= 0) {
     _pauseEnd = null;
     _hidePauseOverlay();
+    _releaseWakeLock();
     _showGoPopup();
     return;
   }
@@ -151,12 +175,14 @@ function _startPause(seconds) {
 
   _showPauseOverlay();
   _pauseRAF = requestAnimationFrame(_tickPause);
+  _acquireWakeLock();
 }
 
 function _dismissPause() {
   cancelAnimationFrame(_pauseRAF);
   _pauseEnd = null;
   _hidePauseOverlay();
+  _releaseWakeLock();
 }
 
 function _showPauseOverlay() {
