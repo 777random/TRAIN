@@ -26,8 +26,8 @@ import * as ic from './icons.js';
 
 // ─── Module-level UI state (transient, never persisted) ──────────────────────
 
-/** Set of day-indices whose accordion is currently open. */
-const _openDays = new Set();
+/** Index of the currently-open training day (null = all closed). */
+let _activeDayIdx = null;
 
 /** Currently active top-level tab id. */
 let _activeTab = 'workout';
@@ -232,26 +232,63 @@ function renderDayList(state) {
   const wk = state.weeks[state.curIdx];
   if (!wk) { container.innerHTML = ''; return; }
 
-  // Snapshot which accordions are open before wiping innerHTML
-  container.querySelectorAll('.day-card').forEach(card => {
-    const di   = +card.dataset.di;
-    const body = card.querySelector('.day-card__body');
-    if (body?.classList.contains('is-open')) _openDays.add(di);
-    else _openDays.delete(di);
-  });
+  const isDl = wk.mode === 'deload';
 
-  container.innerHTML = wk.days.map((day, di) => renderDayCard(wk, di, state)).join('');
+  // ── Tab row (all days side by side) ──────────────────────────────────────
+  const tabsHtml = `<div class="day-tabs-row" role="tablist" aria-label="Trainingstage">
+    ${wk.days.map((day, di) => {
+      const done   = !!day.markedDone;
+      const locked = !!day.locked;
+      const isAct  = _activeDayIdx === di;
+      const total  = day.exercises.reduce((s, ex) => s + ex.sets.length, 0);
+      const done_s = day.exercises.reduce((s, ex) => s + ex.sets.filter(st => st.done).length, 0);
+      const dotCls = done ? 'day-card__dot day-card__dot--done'
+                   : locked ? 'day-card__dot day-card__dot--locked'
+                   : 'day-card__dot';
 
-  // Restore open accordions
-  _openDays.forEach(di => {
-    const body = container.querySelector(`[data-day-body="${di}"]`);
-    const hdr  = container.querySelector(`[data-day-hdr="${di}"]`);
-    body?.classList.add('is-open');
-    hdr?.setAttribute('aria-expanded', 'true');
-  });
+      // Day-level target comparison
+      const tTotal = day.exercises.reduce((s, ex) => s + (ex.targetSets || 0), 0);
+      const tMet   = tTotal > 0
+        ? day.exercises.reduce((s, ex) => {
+            const ds = ex.sets.filter(st => st.done).length;
+            return s + Math.min(ds, ex.targetSets || 0);
+          }, 0)
+        : 0;
+      const targetHtml = tTotal > 0
+        ? `<div class="day-tab__target">${ic.check()} ${tMet}/${tTotal}</div>`
+        : '';
 
+      return `<button
+        class="day-tab${isAct ? ' is-active' : ''}${done ? ' day-tab--done' : ''}${isDl ? ' day-tab--deload' : ''}"
+        data-day-hdr="${di}"
+        role="tab" aria-selected="${isAct}" aria-controls="day-panel-${di}"
+        id="day-tab-${di}"
+      >
+        <div class="${dotCls}" aria-hidden="true"></div>
+        <div class="day-tab__title">${h(day.title)}${isDl ? '<span class="deload-badge">D</span>' : ''}</div>
+        <div class="day-tab__counts"><strong>${done_s}</strong>/${total}</div>
+        ${targetHtml}
+      </button>`;
+    }).join('')}
+  </div>`;
+
+  // ── Content panel (only the active day, full width) ───────────────────────
+  let panelHtml = '';
+  if (_activeDayIdx !== null && wk.days[_activeDayIdx]) {
+    const di  = _activeDayIdx;
+    const day = wk.days[di];
+    panelHtml = `<div
+      class="day-panel${day.markedDone ? ' day-card--done' : ''}${isDl ? ' day-card--deload' : ''}"
+      id="day-panel-${di}" data-day-body="${di}"
+      role="tabpanel" aria-labelledby="day-tab-${di}"
+    >
+      <div class="day-card__body-inner">${renderDayBody(wk, di, state)}</div>
+    </div>`;
+  }
+
+  container.innerHTML = tabsHtml + panelHtml;
   _initStickyObserver();
-  _bindDrag(container);
+  if (_activeDayIdx !== null) _bindDrag(container);
 }
 
 function renderDayCard(wk, di, state) {
@@ -531,19 +568,6 @@ function renderExercise(wk, di, ei, state) {
     maxlength="120"
   />
 
-  ${(() => {
-    const tSets = ex.targetSets;
-    const tReps = ex.targetReps;
-    if (!tSets && !tReps) return '';
-    const doneSets = ex.sets.filter(s => s.done).length;
-    const setsOk   = tSets ? doneSets >= tSets : true;
-    const label    = [
-      tSets ? `${doneSets}/${tSets} Sätze` : '',
-      tReps ? `${tReps} ${metricHdr}` : '',
-    ].filter(Boolean).join(' · ');
-    return `<div class="exercise__target-bar${setsOk && tSets ? ' is-met' : ''}" aria-label="Zielvorgabe: ${label}">${ic.check()} ${label}</div>`;
-  })()}
-
   <div class="set-header" aria-hidden="true">
     <span>#</span><span>kg</span><span>${metricHdr}</span><span>RPE</span><span>✓</span><span></span>
   </div>
@@ -638,7 +662,14 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl) {
       data-action="set-rpe" data-di="${di}" data-ei="${ei}" data-si="${si}"
       aria-label="Satz ${si + 1} RPE"
     />
-    <span class="prev-hint" aria-hidden="true">${prevSet?.rpe ? 'RPE ' + prevSet.rpe : ''}</span>
+    ${!locked && si < ex.sets.length - 1 ? `
+    <div class="set-cell__footer">
+      <span class="prev-hint" aria-hidden="true">${prevSet?.rpe ? prevSet.rpe : ''}</span>
+      <button type="button" class="btn-autofill"
+        data-action="autofill-rpe" data-di="${di}" data-ei="${ei}" data-si="${si}"
+        aria-label="RPE von Satz ${si + 1} auf nächsten Satz übernehmen"
+      >${ic.autofillDown()}</button>
+    </div>` : `<span class="prev-hint" aria-hidden="true">${prevSet?.rpe ? prevSet.rpe : ''}</span>`}
   </div>
 
   <div class="set-done-wrap">
@@ -1140,22 +1171,12 @@ function _bindEvents(root) {
  */
 function _handleClick(e) {
 
-  // ── 1. Day accordion header ──────────────────────────────────────────────
-  // Must be checked BEFORE [data-action] because the header is a <button>
-  // with no data-action, and its children (pill, chevron, title divs) have
-  // no data-action either.
-  const hdr = e.target.closest('.day-card__header');
+  // ── 1. Day tab button ────────────────────────────────────────────────────
+  const hdr = e.target.closest('.day-tab');
   if (hdr) {
-    // If the click landed on an interactive child (input, button with
-    // data-action) that is INSIDE the header, let that propagate instead.
-    // In practice the header has no inputs, but be defensive.
-    if (e.target.closest('[data-action]') && !e.target.closest('[data-action]').isSameNode(hdr)) {
-      // fall through to data-action handling below
-    } else {
-      const di = hdr.dataset.dayHdr;
-      if (di !== undefined) _toggleAccordion(+di);
-      return;
-    }
+    const di = hdr.dataset.dayHdr;
+    if (di !== undefined) _toggleAccordion(+di);
+    return;
   }
 
   // ── 2. Elements with [data-action] ──────────────────────────────────────
@@ -1332,6 +1353,13 @@ function _handleClick(e) {
     case 'add-set':
       dispatch(A.SET_ADD, { di: +di, ei: +ei }); break;
 
+    case 'autofill-rpe': {
+      const _rpeInp = document.querySelector(`[data-action="set-rpe"][data-di="${di}"][data-ei="${ei}"][data-si="${si}"]`);
+      if (_rpeInp) dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'rpe', value: _rpeInp.value });
+      dispatch(A.SET_AUTOFILL_RPE, { di: +di, ei: +ei, si: +si });
+      showToast('RPE auf nächsten Satz übernommen', 'ok');
+      break;
+    }
     case 'autofill-down': {
       // Flush any uncommitted input values to state before autofilling
       const _wInp = document.querySelector(`[data-action="set-weight"][data-di="${di}"][data-ei="${ei}"][data-si="${si}"]`);
@@ -1472,15 +1500,10 @@ function _handleKeydown(e) {
   }
 }
 
-// ─── Accordion toggle ─────────────────────────────────────────────────────────
+// ─── Day tab toggle ───────────────────────────────────────────────────────────
 function _toggleAccordion(di) {
-  const body = document.querySelector(`[data-day-body="${di}"]`);
-  const hdr  = document.querySelector(`[data-day-hdr="${di}"]`);
-  if (!body || !hdr) return;
-  const isOpen = body.classList.toggle('is-open');
-  hdr.setAttribute('aria-expanded', String(isOpen));
-  if (isOpen) _openDays.add(di);
-  else _openDays.delete(di);
+  _activeDayIdx = _activeDayIdx === di ? null : di;
+  scheduleRender();
 }
 
 // ─── New week modal ───────────────────────────────────────────────────────────

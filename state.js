@@ -382,7 +382,8 @@ export const A = Object.freeze({
   SET_REMOVE:          'SET_REMOVE',          // { di, ei, si }
   SET_UPDATE:          'SET_UPDATE',          // { di, ei, si, field, value }
   SET_TOGGLE_DONE:     'SET_TOGGLE_DONE',     // { di, ei, si }
-  SET_AUTOFILL_DOWN:   'SET_AUTOFILL_DOWN',   // { di, ei, si } — weight + reps → folgende Sätze
+  SET_AUTOFILL_DOWN:   'SET_AUTOFILL_DOWN',   // { di, ei, si } — weight (all) + reps (next)
+  SET_AUTOFILL_RPE:    'SET_AUTOFILL_RPE',    // { di, ei, si } — rpe → next set only
   // Session log
   SESSION_START:       'SESSION_START',       // {}  – writes start timestamp into STATE (not persisted as log entry until stop)
   SESSION_STOP:        'SESSION_STOP',        // { duration, time }
@@ -634,11 +635,17 @@ function reduce(state, action) {
 
       for (let j = si + 1; j < sets.length; j++) {
         sets[j].weight = w;
-        if (j === si + 1) {
-          sets[j].reps = repsVal;
-          if (src.rpe != null) sets[j].rpe = src.rpe;
-        }
+        if (j === si + 1) sets[j].reps = repsVal;
       }
+      break;
+    }
+    case A.SET_AUTOFILL_RPE: {
+      const ex = _currentWeek()?.days[p.di]?.exercises[p.ei]; if (!ex) break;
+      const sets = ex.sets;
+      const si   = p.si;
+      if (si < 0 || si >= sets.length - 1) break;
+      const src = sets[si]; if (!src || src.rpe == null) break;
+      sets[si + 1].rpe = src.rpe;
       break;
     }
 

@@ -45,6 +45,7 @@
   --touch: 44px;
   --nav-h: 52px;
   --day-h: 58px;
+  --tabs-h: 72px; /* height of sticky day-tabs-row */
 }
 
 /* ── Reset ─────────────────────────────────────────────────── */
@@ -230,111 +231,78 @@ button, input, select, textarea { font: inherit; }
 .btn:disabled { opacity: .4; cursor: not-allowed; }
 
 /* ══════════════════════════════════════════════════════════════
-   DAY CARD + STICKY ACCORDION
+   DAY TABS ROW – horizontal header strip
    ══════════════════════════════════════════════════════════════ */
-.day-card {
-  background: var(--c-surface); border: 1px solid var(--c-border);
-  border-radius: var(--r-lg); margin-bottom: var(--sp-3);
-  /* NOTE: overflow:hidden intentionally removed – it breaks position:sticky
-     on child elements (.day-card__header, .exercise__name-sticky).
-     Border-radius on children is used instead. */
-  transition: border-color var(--t-normal);
-  /* Ensure all cards are the same width within the page container */
-  width: 100%;
-  box-sizing: border-box;
-}
-.day-card--done   { border-color: var(--c-ok); }
-.day-card--deload { background: var(--c-deload-bg); border-color: var(--c-deload-bd); }
-
-/* Sticky day header – sits below the top nav */
-.day-card__header {
+.day-tabs-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--sp-2);
   position: sticky; top: var(--nav-h); z-index: 200;
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 0 var(--sp-3); min-height: var(--day-h); height: var(--day-h);
-  /* Must match the card background exactly so content scrolling
-     behind it is hidden. Use the card's own bg variable. */
-  background: var(--c-surface);
-  /* Top radius matches card; bottom radius only when collapsed */
-  border-radius: var(--r-lg) var(--r-lg) 0 0;
-  /* Extend background to cover the card border on left/right when stuck */
-  margin: 0 -1px;
-  padding-left: calc(var(--sp-3) + 1px);
-  padding-right: calc(var(--sp-3) + 1px);
-  width: calc(100% + 2px);
-  cursor: pointer; user-select: none;
-  transition: box-shadow var(--t-normal), border-color var(--t-fast);
-}
-.day-card--deload .day-card__header { background: var(--c-deload-bg); }
-/* Stuck: show bottom border + shadow so content scrolling behind is clear */
-.day-card__header.is-stuck {
+  background: var(--c-bg);
+  padding: var(--sp-2) 0;
+  margin: 0 calc(-1 * var(--sp-3));
+  padding-left: var(--sp-3);
+  padding-right: var(--sp-3);
   border-bottom: 1px solid var(--c-border);
-  box-shadow: 0 4px 12px rgba(0,0,0,.5);
-  border-radius: var(--r-lg) var(--r-lg) 0 0;
 }
-.day-card__header-left { display: flex; align-items: center; gap: var(--sp-3); min-width: 0; }
+
+.day-tab {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 3px; padding: var(--sp-2) var(--sp-1);
+  border: 1px solid var(--c-border); border-radius: var(--r-md);
+  background: var(--c-surface); cursor: pointer;
+  height: var(--day-h); min-width: 0;
+  transition: border-color var(--t-fast), background var(--t-fast);
+  user-select: none;
+}
+.day-tab:hover { background: var(--c-surface2); border-color: var(--c-border-hi); }
+.day-tab.is-active { border-color: var(--c-accent); background: var(--c-surface2); }
+.day-tab--done { border-color: var(--c-ok); }
+.day-tab--deload { background: var(--c-deload-bg); border-color: var(--c-deload-bd); }
+
 .day-card__dot {
-  width: 10px; height: 10px; border-radius: var(--r-full);
+  width: 8px; height: 8px; border-radius: var(--r-full);
   background: var(--c-border); flex-shrink: 0;
   transition: background var(--t-normal), box-shadow var(--t-normal);
 }
-.day-card__dot--done   { background: var(--c-ok); box-shadow: 0 0 6px var(--c-ok); }
+.day-card__dot--done   { background: var(--c-ok); box-shadow: 0 0 5px var(--c-ok); }
 .day-card__dot--locked { background: var(--c-deload); }
-.day-card__title-wrap { min-width: 0; }
-.day-card__title {
-  font-family: var(--font-display); font-size: 20px; letter-spacing: .1em;
-  line-height: 1.1; white-space: nowrap; overflow: clip; text-overflow: ellipsis;
-  color: var(--c-accent);
+
+.day-tab__title {
+  font-family: var(--font-display); font-size: 17px; letter-spacing: .1em;
+  color: var(--c-accent); line-height: 1; white-space: nowrap;
 }
-.day-card__subtitle {
-  font-size: 11px; color: var(--c-text-3); margin-top: 1px;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+.day-tab--deload .day-tab__title { color: var(--c-deload); }
+.day-tab__counts {
+  font-size: 10px; color: var(--c-text-3); white-space: nowrap;
 }
+.day-tab__counts strong { color: var(--c-text-2); }
+.day-tab__target {
+  font-size: 9px; color: var(--c-ok); white-space: nowrap;
+  display: flex; align-items: center; gap: 2px;
+}
+.day-tab__target svg { width: 9px; height: 9px; }
+
 .deload-badge {
   display: inline-block; font-family: var(--font-sans);
   font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
-  background: var(--c-deload); color: #000; padding: 1px 6px;
-  border-radius: var(--r-sm); margin-left: var(--sp-2); vertical-align: middle;
-}
-.day-card__header-right { display: flex; align-items: center; gap: var(--sp-2); flex-shrink: 0; }
-.day-card__pill {
-  font-size: 11px; color: var(--c-text-3); background: var(--c-surface2);
-  padding: 2px 8px; border-radius: var(--r-full); white-space: nowrap;
-}
-.day-card__chevron {
-  width: 20px; height: 20px; color: var(--c-text-3);
-  transition: transform var(--t-normal); flex-shrink: 0; pointer-events: none;
-}
-.day-card__header[aria-expanded="true"] .day-card__chevron { transform: rotate(180deg); }
-
-/* CSS grid accordion trick – no JS height calculation needed */
-.day-card__body {
-  display: grid; 
-  grid-template-rows: 0fr;
-  overflow: hidden;
-  /* Macht den Inhalt unsichtbar, NACHDEM er zugeklappt ist (220ms) */
-  visibility: hidden;
-  transition: grid-template-rows var(--t-normal), visibility 0s linear var(--t-normal);
+  background: var(--c-deload); color: #000; padding: 1px 4px;
+  border-radius: var(--r-sm); margin-left: 3px; vertical-align: middle;
 }
 
-.day-card__body.is-open { 
-  grid-template-rows: 1fr; 
-  /* Macht den Inhalt sofort sichtbar, BEVOR er aufklappt */
-  visibility: visible;
-  transition: grid-template-rows var(--t-normal), visibility 0s linear 0s;
+/* ── Day content panel (full-width, below tabs) ─────────────── */
+.day-panel {
+  background: var(--c-surface); border: 1px solid var(--c-border);
+  border-radius: var(--r-lg); margin-top: var(--sp-2);
+  /* No overflow:hidden – breaks sticky exercise names */
 }
-
-/* Tötet den Phantom-Scroll: Sticky-Verhalten abschalten, wenn zugeklappt */
-/* entfernt */
-
-.day-card__body.is-open { grid-template-rows: 1fr; }
-/* clip-overflow on body-inner would kill sticky exercise names –
-   use clip instead which only clips paint, not layout */
+.day-panel.day-card--done   { border-color: var(--c-ok); }
+.day-panel.day-card--deload { background: var(--c-deload-bg); border-color: var(--c-deload-bd); }
 .day-card__body-inner {
-  min-height: 0;
   overflow: visible;
-  padding: 0 var(--sp-3);
+  padding: var(--sp-3);
+  padding-bottom: var(--sp-4);
 }
-.day-card__body.is-open .day-card__body-inner { padding-bottom: var(--sp-3); }
 
 /* ── Info blocks ───────────────────────────────────────────── */
 .info-block {
@@ -371,7 +339,7 @@ exercise { position: unset; }
 /* Sticky exercise name – sits below the sticky day header */
 .exercise__name-sticky {
   position: sticky;
-  top: calc(var(--nav-h) + var(--day-h));
+  top: calc(var(--nav-h) + var(--tabs-h));
   z-index: 100;
   display: flex; align-items: center; gap: var(--sp-1);
   padding: var(--sp-1) 0;
@@ -481,10 +449,10 @@ exercise { position: unset; }
 .exercise__note:focus { border-color: var(--c-accent); color: var(--c-text); outline: none; }
 .exercise__note:disabled { opacity: .6; }
 
-/* Set grid: #idx | kg | reps | rpe | done | remove */
+/* Set grid: #idx | kg | reps | rpe | done | remove | note */
 .set-header, .set-row {
   display: grid;
-  grid-template-columns: 22px 1fr 1fr 52px 36px 28px 24px;
+  grid-template-columns: 22px 1fr 1fr 60px 36px 28px 24px;
   gap: var(--sp-1); align-items: start;
 }
 .set-header {
