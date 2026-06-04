@@ -124,6 +124,10 @@ export const calendar = () =>
 export const save = () =>
   SVG('<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>');
 
+/** Undo – curved left arrow */
+export const undo = () =>
+  SVG('<path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>');
+
 /** Refresh / reset */
 export const refresh = () =>
   SVG('<polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/>');

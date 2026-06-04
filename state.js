@@ -118,6 +118,19 @@ function buildDefaultState() {
   };
 }
 
+// ─── Undo stack ───────────────────────────────────────────────────────────────
+
+const _undoStack = [];
+const _MAX_UNDO  = 20;
+
+// Actions that are pure navigation or external events — not worth undoing.
+const _NO_UNDO = new Set([
+  'UNDO', 'WEEK_NAVIGATE', 'STATE_IMPORT', 'SESSION_START', 'SESSION_STOP',
+]);
+
+/** Returns true when there is at least one undo snapshot available. */
+export function canUndo() { return _undoStack.length > 0; }
+
 // ─── Internal STATE + subscriber registry ────────────────────────────────────
 
 let STATE = buildDefaultState();
@@ -398,6 +411,8 @@ export const A = Object.freeze({
   SETTING_TOGGLE:      'SETTING_TOGGLE',      // { key }
   // Backup
   STATE_IMPORT:        'STATE_IMPORT',        // { imported: StateObject }
+  // Undo
+  UNDO:                'UNDO',               // {}
 });
 
 // ─── Reducer ──────────────────────────────────────────────────────────────────
@@ -434,11 +449,18 @@ function _applyPlannedProgression(days) {
 }
 
 function reduce(state, action) {
-  // We mutate STATE in place (simpler than immutable for a single-page app
-  // without a VDOM), then call persistState(). The state reference stays
-  // stable so any code holding `getState()` always sees the latest version.
-
   const { type, payload: p } = action;
+
+  // Snapshot before every undoable mutation
+  if (!_NO_UNDO.has(type)) {
+    _undoStack.push(clone({
+      curIdx:         state.curIdx,
+      weeks:          state.weeks,
+      customTemplate: state.customTemplate,
+      settings:       state.settings,
+    }));
+    if (_undoStack.length > _MAX_UNDO) _undoStack.shift();
+  }
 
   switch (type) {
 
@@ -734,6 +756,17 @@ function reduce(state, action) {
         });
       });
       state.customTemplate = tpl;
+      break;
+    }
+
+    // ── Undo ──────────────────────────────────────────────────────────────────
+    case A.UNDO: {
+      const prev = _undoStack.pop();
+      if (!prev) return; // nothing to undo — skip persist+notify
+      state.curIdx         = prev.curIdx;
+      state.weeks          = prev.weeks;
+      state.customTemplate = prev.customTemplate;
+      state.settings       = prev.settings;
       break;
     }
 

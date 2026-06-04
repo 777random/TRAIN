@@ -17,7 +17,7 @@
  */
 
 import {
-  getState, dispatch, subscribe, A,
+  getState, dispatch, subscribe, A, canUndo,
 } from './state.js';
 import {
   exportJSON, importJSON, exportCSV,
@@ -223,6 +223,9 @@ function renderWeekHeader(state) {
   if (nextBtn)  nextBtn.disabled    = isLast;
   if (stdBtn)   stdBtn.classList.toggle('is-active', !isDl);
   if (dlBtn)    dlBtn.classList.toggle('is-active',   isDl);
+
+  const undoBtn = document.getElementById('btn-undo');
+  if (undoBtn) undoBtn.disabled = !canUndo();
 }
 
 // ─── Day list ────────────────────────────────────────────────────────────────
@@ -1181,6 +1184,11 @@ function _handleClick(e) {
   switch (action) {
 
     // ── Week navigation ────────────────────────────────────────────────────
+    case 'undo':
+      dispatch(A.UNDO, {});
+      showToast('Rückgängig gemacht ↩', 'ok');
+      break;
+
     case 'nav-prev':
       dispatch(A.WEEK_NAVIGATE, { delta: -1 }); break;
 
@@ -1657,6 +1665,8 @@ function _buildScaffold(root) {
         ${ic.zap()}&thinsp;Deload</button>
     </div>
     <span class="toolbar__spacer"></span>
+    <button class="toolbar__btn" id="btn-undo" data-action="undo"
+      aria-label="Rückgängig machen" disabled>${ic.undo()}</button>
     <button class="toolbar__btn toolbar__btn--accent" data-action="open-new-week"
       aria-label="Neue Trainingswoche erstellen">${ic.plus()}</button>
     <button class="toolbar__btn" data-action="copy-prev"
