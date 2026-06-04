@@ -633,10 +633,11 @@ function reduce(state, action) {
       const repsVal = Math.max(0, Number.isFinite(repsRaw) ? repsRaw : 0);
 
       for (let j = si + 1; j < sets.length; j++) {
-        // Gewicht → alle Sätze darunter
         sets[j].weight = w;
-        // Reps → nur den direkt nächsten Satz; RPE nie kopieren
-        if (j === si + 1) sets[j].reps = repsVal;
+        if (j === si + 1) {
+          sets[j].reps = repsVal;
+          if (src.rpe != null) sets[j].rpe = src.rpe;
+        }
       }
       break;
     }

@@ -531,6 +531,19 @@ function renderExercise(wk, di, ei, state) {
     maxlength="120"
   />
 
+  ${(() => {
+    const tSets = ex.targetSets;
+    const tReps = ex.targetReps;
+    if (!tSets && !tReps) return '';
+    const doneSets = ex.sets.filter(s => s.done).length;
+    const setsOk   = tSets ? doneSets >= tSets : true;
+    const label    = [
+      tSets ? `${doneSets}/${tSets} Sätze` : '',
+      tReps ? `${tReps} ${metricHdr}` : '',
+    ].filter(Boolean).join(' · ');
+    return `<div class="exercise__target-bar${setsOk && tSets ? ' is-met' : ''}" aria-label="Zielvorgabe: ${label}">${ic.check()} ${label}</div>`;
+  })()}
+
   <div class="set-header" aria-hidden="true">
     <span>#</span><span>kg</span><span>${metricHdr}</span><span>RPE</span><span>✓</span><span></span>
   </div>
@@ -649,12 +662,12 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl) {
   <button
     class="set-note-btn${s.note ? ' has-note' : ''}"
     data-action="toggle-set-note" data-di="${di}" data-ei="${ei}" data-si="${si}"
-    aria-label="Notiz zu Satz ${si + 1}"
+    aria-label="Notiz zu Satz ${si + 1}${s.note ? ' (Notiz vorhanden)' : ''}"
     aria-expanded="${!!s._showNote}"
-  >✏</button>` : ''}
+  >${ic.noteIcon()}</button>` : ''}
 
 </div>
-${s._showNote || s.note ? `
+${s._showNote ? `
 <div class="set-note-row" data-di="${di}" data-ei="${ei}" data-si="${si}">
   <input
     class="set-note-input"
@@ -665,6 +678,7 @@ ${s._showNote || s.note ? `
     data-action="set-note" data-di="${di}" data-ei="${ei}" data-si="${si}"
     aria-label="Notiz zu Satz ${si + 1}"
     maxlength="120"
+    autofocus
   />
 </div>` : ''}`;
 }
@@ -1318,10 +1332,18 @@ function _handleClick(e) {
     case 'add-set':
       dispatch(A.SET_ADD, { di: +di, ei: +ei }); break;
 
-    case 'autofill-down':
+    case 'autofill-down': {
+      // Flush any uncommitted input values to state before autofilling
+      const _wInp = document.querySelector(`[data-action="set-weight"][data-di="${di}"][data-ei="${ei}"][data-si="${si}"]`);
+      const _rInp = document.querySelector(`[data-action="set-reps"][data-di="${di}"][data-ei="${ei}"][data-si="${si}"]`);
+      const _pInp = document.querySelector(`[data-action="set-rpe"][data-di="${di}"][data-ei="${ei}"][data-si="${si}"]`);
+      if (_wInp) dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'weight', value: _wInp.value });
+      if (_rInp) dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'reps',   value: _rInp.value });
+      if (_pInp) dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'rpe',    value: _pInp.value });
       dispatch(A.SET_AUTOFILL_DOWN, { di: +di, ei: +ei, si: +si });
       showToast('In folgende Sätze übernommen', 'ok');
       break;
+    }
 
     // ── Body scale buttons ─────────────────────────────────────────────────
     case 'body-scale':

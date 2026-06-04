@@ -250,7 +250,7 @@ button, input, select, textarea { font: inherit; }
 .day-card__header {
   position: sticky; top: var(--nav-h); z-index: 200;
   display: flex; align-items: center; justify-content: space-between;
-  padding: 0 var(--sp-3); min-height: var(--day-h);
+  padding: 0 var(--sp-3); min-height: var(--day-h); height: var(--day-h);
   /* Must match the card background exactly so content scrolling
      behind it is hidden. Use the card's own bg variable. */
   background: var(--c-surface);
@@ -597,6 +597,40 @@ exercise { position: unset; }
 .set-remove-btn svg { width: 16px; height: 16px; }
 .set-remove-btn:hover { color: var(--c-danger); }
 .set-remove-btn:disabled { opacity: .3; cursor: not-allowed; }
+
+.set-note-btn {
+  width: 24px; height: 34px; background: none; border: none;
+  color: var(--c-text-3); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: var(--r-sm);
+  transition: color var(--t-fast);
+  /* expand touch area beyond visual size */
+  padding: 0 2px; margin: 0 -2px;
+}
+.set-note-btn svg { width: 14px; height: 14px; }
+.set-note-btn:hover { color: var(--c-blue); }
+.set-note-btn.has-note { color: var(--c-blue); }
+
+.set-note-row {
+  padding: 4px 0 6px;
+  border-bottom: 1px solid rgba(46,46,53,.5);
+}
+.set-note-input {
+  width: 100%; background: var(--c-surface2); border: 1px solid var(--c-blue);
+  border-radius: var(--r-sm); color: var(--c-text); font-size: 13px;
+  padding: 5px var(--sp-2); outline: none;
+}
+.set-note-input::placeholder { color: var(--c-text-3); }
+.set-note-input:disabled { opacity: .6; }
+
+.exercise__target-bar {
+  display: flex; align-items: center; gap: var(--sp-1);
+  font-size: 11px; color: var(--c-text-3);
+  padding: 3px 0 var(--sp-1); border-bottom: 1px solid var(--c-border);
+  margin-bottom: var(--sp-1);
+}
+.exercise__target-bar svg { width: 12px; height: 12px; flex-shrink: 0; }
+.exercise__target-bar.is-met { color: var(--c-ok); }
 
 .add-set-btn {
   display: flex; align-items: center; gap: var(--sp-1);
