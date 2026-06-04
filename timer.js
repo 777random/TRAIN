@@ -494,15 +494,40 @@ function _injectStyles() {
 }
 
 // ─── Wire pause overlay dismiss ───────────────────────────────────────────────
+//
+// Protection against accidental taps: the dismiss button requires two taps
+// within 2 seconds. The first tap shows a "tap again" hint; the second confirms.
+
+let _dismissTapAt = 0;
 
 function _bindOverlayEvents(overlay) {
-  // Dismiss button inside overlay
-  document.getElementById('pause-dismiss-btn')?.addEventListener('click', e => {
+  const btn = document.getElementById('pause-dismiss-btn');
+  if (!btn) return;
+
+  btn.addEventListener('click', e => {
     e.stopPropagation();
-    _dismissPause();
+    const now = Date.now();
+    if (now - _dismissTapAt < 2000) {
+      // Second tap within 2 s → dismiss
+      _dismissTapAt = 0;
+      _dismissPause();
+    } else {
+      // First tap → show confirmation hint
+      _dismissTapAt = now;
+      const hint = overlay.querySelector('.pause-overlay__label span');
+      if (hint) {
+        const original = hint.textContent;
+        hint.textContent = 'Nochmal tippen ✓';
+        hint.style.color = 'var(--c-accent)';
+        setTimeout(() => {
+          hint.textContent  = original;
+          hint.style.color  = '';
+          _dismissTapAt = 0;
+        }, 2000);
+      }
+    }
   });
-  // Tapping anywhere on the overlay also dismisses
-  overlay.addEventListener('click', _dismissPause);
+  // Intentionally no overlay-level click handler — only the button dismisses.
 }
 
 // ─── Wire clock into toolbar ──────────────────────────────────────────────────
