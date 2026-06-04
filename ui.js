@@ -87,6 +87,35 @@ function wkRange(sd) {
   return `${fmt(d)} – ${fmt(end)}`;
 }
 
+/**
+ * Calculates plates per side for an Olympic bar (20 kg default).
+ * Returns a compact string like "10+5+2.5" or null if not achievable.
+ */
+function calcPlates(totalKg, barKg = 20) {
+  const perSide = Math.round((totalKg - barKg) * 100) / 100 / 2;
+  if (perSide <= 0) return null;
+  const available = [25, 20, 15, 10, 5, 2.5, 1.25];
+  const used = [];
+  let rem = perSide;
+  for (const p of available) {
+    while (rem >= p - 0.001) {
+      used.push(p);
+      rem = Math.round((rem - p) * 100) / 100;
+    }
+  }
+  if (rem > 0.01) return null;
+  // Compact: group duplicates → "2×10+2.5"
+  const groups = [];
+  let i = 0;
+  while (i < used.length) {
+    let count = 1;
+    while (i + count < used.length && used[i + count] === used[i]) count++;
+    groups.push(count > 1 ? `${count}×${used[i]}` : `${used[i]}`);
+    i += count;
+  }
+  return groups.join('+');
+}
+
 /** Show a toast. type: 'ok' | 'info' | 'warn' */
 function showToast(msg, type = 'info') {
   if (!_toast) return;
@@ -253,6 +282,7 @@ function renderDayList(state) {
   </div>` : '';
 
   // ── Tab row (all days side by side) ──────────────────────────────────────
+  const canAddDay = wk.days.length < 7;
   const tabsHtml = `<div class="day-tabs-row" role="tablist" aria-label="Trainingstage">
     ${wk.days.map((day, di) => {
       const done   = !!day.markedDone;
@@ -275,6 +305,10 @@ function renderDayList(state) {
         <div class="day-tab__counts"><strong>${done_s}</strong>/${total}</div>
       </button>`;
     }).join('')}
+  ${canAddDay ? `
+    <button class="day-tab day-tab--add" data-action="add-day"
+      aria-label="Trainingstag hinzufügen"
+    >${ic.plus()}</button>` : ''}
   ${progressHtml}
   </div>`;
 
@@ -409,15 +443,24 @@ function renderDayBody(wk, di, state) {
         aria-label="Übung hinzufügen"
       >${ic.plus()}${ic.srOnly('Hinzufügen')}</button>
     </div>` : ''}
-    <button
-      class="complete-btn${done ? ' is-done' : ''}"
-      data-action="toggle-complete" data-di="${di}"
-      aria-pressed="${done}"
-      aria-label="${lockBtnLabel}"
-    >
-      ${lockBtnIcon}
-      ${done ? 'Gesperrt – Tippen zum Entsperren' : 'Abgeschlossen & sperren'}
-    </button>
+    <div style="display:flex;gap:var(--sp-2)">
+      <button
+        class="complete-btn${done ? ' is-done' : ''}"
+        style="flex:1"
+        data-action="toggle-complete" data-di="${di}"
+        aria-pressed="${done}"
+        aria-label="${lockBtnLabel}"
+      >
+        ${lockBtnIcon}
+        ${done ? 'Gesperrt – Tippen zum Entsperren' : 'Abgeschlossen & sperren'}
+      </button>
+      ${!done ? `<button
+        class="complete-btn"
+        style="flex:0 0 auto;padding:0 var(--sp-3);color:var(--c-danger);border-color:var(--c-danger)"
+        data-action="remove-day" data-di="${di}"
+        aria-label="Tag entfernen"
+      >${ic.trash()}</button>` : ''}
+    </div>
     ${renderInfoBlock('cooldown', '🧘 Cooldown', day.cooldown, di, locked)}
   `;
 }
@@ -654,6 +697,7 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl) {
       aria-label="Satz ${si + 1} Gewicht in kg"
     />
     <span class="prev-hint" aria-hidden="true">${prevSet ? prevSet.weight + ' kg' : ''}</span>
+    ${(() => { const pl = dispW > 20 ? calcPlates(dispW) : null; return pl ? `<span class="plate-hint" aria-hidden="true" title="Scheiben je Seite">▪ ${pl}</span>` : ''; })()}
   </div>
 
   <div class="set-cell">
@@ -1291,6 +1335,24 @@ function _handleClick(e) {
       showToast('CSV wird heruntergeladen …', 'ok'); break;
 
     // ── Day ────────────────────────────────────────────────────────────────
+    case 'add-day':
+      dispatch(A.DAY_ADD, {});
+      showToast('Neuer Trainingstag hinzugefügt', 'ok');
+      break;
+
+    case 'remove-day': {
+      const _di = +el.dataset.di;
+      const _day = getState().weeks[getState().curIdx]?.days[_di];
+      if (_day?.exercises?.length > 0) {
+        if (!confirm(`"${_day.title}" wirklich entfernen? Alle Übungen gehen verloren.`)) break;
+      }
+      if (_activeDayIdx === _di) _activeDayIdx = null;
+      else if (_activeDayIdx > _di) _activeDayIdx--;
+      dispatch(A.DAY_REMOVE, { di: _di });
+      showToast('Tag entfernt', 'info');
+      break;
+    }
+
     case 'toggle-complete': {
       dispatch(A.DAY_TOGGLE_COMPLETE, { di: +di });
       // Read updated state to get new locked value
@@ -1542,17 +1604,48 @@ function _handleInput(e) {
 
 function _handleKeydown(e) {
   if (e.key === 'Enter') {
-    const inp = e.target;
+    const inp    = e.target;
+    const action = inp.dataset.action;
+    const { di, ei, si } = inp.dataset;
+
+    // Add-exercise input → add the exercise
     if (inp.classList.contains('add-exercise-input')) {
-      const diVal = inp.closest('[data-di]')?.dataset.di;
-      const name  = inp.value.trim();
-      if (diVal !== undefined && name) {
-        dispatch(A.EX_ADD, { di: +diVal, name });
+      const name = inp.value.trim();
+      if (di !== undefined && name) {
+        dispatch(A.EX_ADD, { di: +di, name });
         inp.value = '';
         showToast(`"${name}" hinzugefügt`, 'ok');
       }
+      return;
+    }
+
+    // Set inputs: weight → reps → rpe → next set weight
+    if (action === 'set-weight') {
+      e.preventDefault();
+      document.querySelector(
+        `[data-action="set-reps"][data-di="${di}"][data-ei="${ei}"][data-si="${si}"]`
+      )?.focus();
+      return;
+    }
+    if (action === 'set-reps') {
+      e.preventDefault();
+      document.querySelector(
+        `[data-action="set-rpe"][data-di="${di}"][data-ei="${ei}"][data-si="${si}"]`
+      )?.focus();
+      return;
+    }
+    if (action === 'set-rpe') {
+      e.preventDefault();
+      const nextSi = +si + 1;
+      const nextWeight = document.querySelector(
+        `[data-action="set-weight"][data-di="${di}"][data-ei="${ei}"][data-si="${nextSi}"]`
+      );
+      if (nextWeight) nextWeight.focus();
+      else inp.blur(); // last set — close keyboard
+      return;
     }
   }
+
   // Keyboard activation for elements with role="button" that aren't <button>
   if ((e.key === 'Enter' || e.key === ' ') && e.target.getAttribute('role') === 'button') {
     e.preventDefault();

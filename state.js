@@ -380,6 +380,8 @@ export const A = Object.freeze({
   WEEK_SET_MODE:       'WEEK_SET_MODE',       // { mode: 'standard'|'deload' }
   WEEK_SET_NOTE:       'WEEK_SET_NOTE',       // { note }
   // Day
+  DAY_ADD:             'DAY_ADD',             // {}
+  DAY_REMOVE:          'DAY_REMOVE',          // { di }
   DAY_TOGGLE_COMPLETE: 'DAY_TOGGLE_COMPLETE', // { di }
   DAY_SET_FIELD:       'DAY_SET_FIELD',       // { di, field, value }
   // Exercise
@@ -532,6 +534,28 @@ function reduce(state, action) {
     }
 
     // ── Day ──────────────────────────────────────────────────────────────────
+    case A.DAY_ADD: {
+      const wk = _currentWeek(); if (!wk) break;
+      const labels = ['A','B','C','D','E','F','G'];
+      const label  = labels[wk.days.length] ?? String(wk.days.length + 1);
+      wk.days.push({
+        id:         Date.now(),
+        title:      `Tag ${label}`,
+        subtitle:   '',
+        warmup:     '',
+        cooldown:   '',
+        locked:     false,
+        markedDone: false,
+        exercises:  [],
+      });
+      break;
+    }
+    case A.DAY_REMOVE: {
+      const wk = _currentWeek(); if (!wk) break;
+      if (wk.days.length <= 1) break;
+      wk.days.splice(p.di, 1);
+      break;
+    }
     case A.DAY_TOGGLE_COMPLETE: {
       const day = _currentWeek()?.days[p.di]; if (!day) break;
       day.markedDone = !day.markedDone;

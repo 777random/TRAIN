@@ -234,8 +234,8 @@ button, input, select, textarea { font: inherit; }
    DAY TABS ROW – horizontal header strip
    ══════════════════════════════════════════════════════════════ */
 .day-tabs-row {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  display: flex; flex-wrap: nowrap; overflow-x: auto;
+  scrollbar-width: none; gap: var(--sp-2);
   gap: var(--sp-2);
   position: sticky; top: var(--nav-h); z-index: 200;
   background: var(--c-bg);
@@ -251,10 +251,16 @@ button, input, select, textarea { font: inherit; }
   gap: 3px; padding: var(--sp-2) var(--sp-1);
   border: 1px solid var(--c-border); border-radius: var(--r-md);
   background: var(--c-surface); cursor: pointer;
-  height: var(--day-h); min-width: 0;
+  height: var(--day-h); flex: 1; min-width: 64px;
   transition: border-color var(--t-fast), background var(--t-fast);
   user-select: none;
 }
+.day-tab--add {
+  flex: 0 0 40px; min-width: 40px;
+  color: var(--c-text-3); border-style: dashed;
+}
+.day-tab--add:hover { color: var(--c-accent); border-color: var(--c-accent); }
+.day-tab--add svg { width: 18px; height: 18px; }
 .day-tab:hover { background: var(--c-surface2); border-color: var(--c-border-hi); }
 .day-tab.is-active { border-color: var(--c-accent); background: var(--c-surface2); }
 .day-tab--done { border-color: var(--c-ok); }
@@ -514,6 +520,11 @@ exercise { position: unset; }
   font-size: 9px; color: var(--c-text-3); text-align: center;
   height: 13px; line-height: 13px; white-space: nowrap;
   overflow: hidden; text-overflow: ellipsis;
+}
+.plate-hint {
+  font-size: 8px; color: var(--c-blue); text-align: center;
+  line-height: 13px; white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis; display: block;
 }
 
 .set-cell__footer {
