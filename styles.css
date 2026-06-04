@@ -300,10 +300,22 @@ button, input, select, textarea { font: inherit; }
 }
 
 /* ── Training progress bar ─────────────────────────────────── */
+.training-progress-wrap {
+  display: flex; align-items: center; gap: var(--sp-2);
+  margin-top: var(--sp-2);
+}
+.training-progress__toggle {
+  flex-shrink: 0; width: 24px; height: 24px;
+  background: none; border: none; cursor: pointer;
+  color: var(--c-text-3); display: flex; align-items: center; justify-content: center;
+  border-radius: var(--r-sm); transition: color var(--t-fast);
+}
+.training-progress__toggle:hover { color: var(--c-text-2); }
+.training-progress__toggle svg { width: 14px; height: 14px; pointer-events: none; }
 .training-progress {
-  position: relative; height: 28px;
+  flex: 1; position: relative; height: 28px;
   background: var(--c-surface2); border-radius: var(--r-full);
-  overflow: hidden; margin-top: var(--sp-2);
+  overflow: hidden;
 }
 .training-progress__bar {
   position: absolute; inset: 0; right: auto;

@@ -29,6 +29,9 @@ import * as ic from './icons.js';
 /** Index of the currently-open training day (null = all closed). */
 let _activeDayIdx = null;
 
+/** Whether the progress bar inside the tabs row is expanded. */
+let _progressVisible = true;
+
 /** Currently active top-level tab id. */
 let _activeTab = 'workout';
 
@@ -245,10 +248,17 @@ function renderDayList(state) {
     doneSets  = ad.exercises.reduce((s, ex) => s + ex.sets.filter(st => st.done).length, 0);
   }
   const pct = totalSets > 0 ? Math.round(doneSets / totalSets * 100) : 0;
-  const progressHtml = _activeDayIdx !== null && state.settings.showProgress ? `
-  <div class="training-progress" aria-label="${doneSets} von ${totalSets} Sätzen erledigt">
-    <div class="training-progress__bar" style="width:${pct}%"></div>
-    <span class="training-progress__label">${pct}% · ${doneSets}/${totalSets} Sätze</span>
+  const progressHtml = _activeDayIdx !== null ? `
+  <div class="training-progress-wrap">
+    <button class="training-progress__toggle" data-action="toggle-progress"
+      aria-label="${_progressVisible ? 'Fortschritt ausblenden' : 'Fortschritt einblenden'}"
+      aria-expanded="${_progressVisible}"
+    >${_progressVisible ? ic.chevronUp() : ic.chevronDown()}</button>
+    ${_progressVisible ? `
+    <div class="training-progress" aria-label="${doneSets} von ${totalSets} Sätzen erledigt">
+      <div class="training-progress__bar" style="width:${pct}%"></div>
+      <span class="training-progress__label">${pct}% · ${doneSets}/${totalSets} Sätze</span>
+    </div>` : ''}
   </div>` : '';
 
   // ── Tab row (all days side by side) ──────────────────────────────────────
@@ -293,8 +303,8 @@ function renderDayList(state) {
 
   container.innerHTML = tabsHtml + panelHtml;
 
-  // Adjust sticky offset for exercise names based on whether progress bar is shown
-  const tabsH = (_activeDayIdx !== null && state.settings.showProgress) ? 108 : 80;
+  // Adjust sticky offset for exercise names based on whether progress bar is visible
+  const tabsH = (_activeDayIdx !== null && _progressVisible) ? 116 : 88;
   document.documentElement.style.setProperty('--tabs-h', `${tabsH}px`);
 
   _initStickyObserver();
@@ -1068,9 +1078,8 @@ function renderSettingsTab(state) {
 
   container.innerHTML = `
   <div class="settings-section">
-    ${tog('swipe',        'Swipe-Navigation',    'Wischen zum Wochenwechsel')}
-    ${tog('drag',         'Drag & Drop',          'Übungen per Griff verschieben')}
-    ${tog('showProgress', 'Fortschrittsbalken',   'Erledigte Sätze als Balken unter den Tagen')}
+    ${tog('swipe', 'Swipe-Navigation', 'Wischen zum Wochenwechsel')}
+    ${tog('drag',  'Drag & Drop',      'Übungen per Griff verschieben')}
   </div>
 
   <div class="settings-section">
@@ -1231,6 +1240,11 @@ function _handleClick(e) {
     case 'undo':
       dispatch(A.UNDO, {});
       showToast('Rückgängig gemacht ↩', 'ok');
+      break;
+
+    case 'toggle-progress':
+      _progressVisible = !_progressVisible;
+      scheduleRender();
       break;
 
     case 'nav-prev':

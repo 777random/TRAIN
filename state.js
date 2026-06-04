@@ -112,10 +112,9 @@ function buildDefaultState() {
     weeks: [],                // Week[]
     customTemplate: clone(FACTORY_TEMPLATE),
     settings: {
-      swipe:        true,   // touch-swipe week navigation
-      drag:         true,   // drag-and-drop exercise reorder
-      showProgress: true,   // show training progress bar below day tabs
-      heightCm:     null,   // user height in cm for BMI calculation
+      swipe:    true,   // touch-swipe week navigation
+      drag:     true,   // drag-and-drop exercise reorder
+      heightCm: null,   // user height in cm for BMI calculation
     },
   };
 }
@@ -247,10 +246,9 @@ function migrate(raw) {
     if (!raw.settings)       raw.settings = { swipe: true, drag: true };
     // Ensure swipe is explicitly true for users upgrading from pre-Step-2 state
     // (where swipe was false by default). drag keeps its persisted value.
-    if (raw.settings.swipe        === undefined) raw.settings.swipe        = true;
-    if (raw.settings.drag         === undefined) raw.settings.drag         = true;
-    if (raw.settings.showProgress === undefined) raw.settings.showProgress = true;
-    if (raw.settings.heightCm     === undefined) raw.settings.heightCm     = null;
+    if (raw.settings.swipe    === undefined) raw.settings.swipe    = true;
+    if (raw.settings.drag     === undefined) raw.settings.drag     = true;
+    if (raw.settings.heightCm === undefined) raw.settings.heightCm = null;
     raw.meta = {
       schemaVersion: 6,
       savedAt:   raw.meta?.savedAt   ?? null,
