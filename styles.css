@@ -299,6 +299,28 @@ button, input, select, textarea { font: inherit; }
   padding-bottom: var(--sp-4);
 }
 
+/* ── Training progress bar ─────────────────────────────────── */
+.training-progress {
+  position: relative; height: 28px;
+  background: var(--c-surface2); border-radius: var(--r-full);
+  overflow: hidden; margin-bottom: var(--sp-3);
+}
+.training-progress__bar {
+  position: absolute; inset: 0; right: auto;
+  background: var(--c-accent); border-radius: var(--r-full);
+  transition: width var(--t-normal);
+  min-width: 0;
+}
+.training-progress__label {
+  position: relative; z-index: 1;
+  display: flex; align-items: center; height: 100%;
+  padding: 0 var(--sp-3);
+  font-size: 11px; font-weight: 600;
+  color: #000;
+  mix-blend-mode: difference;
+  filter: invert(1);
+}
+
 /* ── Info blocks ───────────────────────────────────────────── */
 .info-block {
   background: var(--c-surface2); border-radius: var(--r-md);
@@ -650,6 +672,11 @@ exercise { position: unset; }
   transition: border-color var(--t-fast);
 }
 .body-input:focus { border-color: var(--c-accent); outline: none; }
+.bmi-badge {
+  margin-top: 4px; font-size: 12px; font-weight: 600; color: var(--c-accent);
+  display: flex; gap: 6px; align-items: center;
+}
+.bmi-badge span { font-weight: 400; color: var(--c-text-3); font-size: 11px; }
 .scale-row { display: flex; gap: var(--sp-1); flex-wrap: wrap; margin-top: var(--sp-1); }
 .scale-btn {
   flex: 1; min-width: 36px; height: var(--touch);

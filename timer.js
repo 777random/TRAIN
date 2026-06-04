@@ -551,9 +551,11 @@ function _bindAppInteractions() {
       // so we read the NEW state (set.done flipped).
       // Use a microtask so state is already updated:
       queueMicrotask(() => {
-        const newState = getState();
-        const newSet   = newState.weeks[newState.curIdx]?.days?.[di]?.exercises?.[ei]?.sets?.[+doneBtn.dataset.si];
-        if (newSet?.done) {
+        const newState  = getState();
+        const newEx     = newState.weeks[newState.curIdx]?.days?.[di]?.exercises?.[ei];
+        const newSet    = newEx?.sets?.[+doneBtn.dataset.si];
+        const isLastSet = +doneBtn.dataset.si === (newEx?.sets?.length ?? 0) - 1;
+        if (newSet?.done && !isLastSet) {
           window.dispatchEvent(new CustomEvent('train:set-done', {
             detail: { pauseSec: ex?.pauseSec ?? 90 },
           }));

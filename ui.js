@@ -351,6 +351,15 @@ function renderDayBody(wk, di, state) {
   const locked = !!day.locked;
   const done   = !!day.markedDone;
 
+  const totalSets = day.exercises.reduce((s, ex) => s + ex.sets.length, 0);
+  const doneSets  = day.exercises.reduce((s, ex) => s + ex.sets.filter(st => st.done).length, 0);
+  const pct       = totalSets > 0 ? Math.round(doneSets / totalSets * 100) : 0;
+  const progressBar = `
+  <div class="training-progress" aria-label="${doneSets} von ${totalSets} Sätzen erledigt">
+    <div class="training-progress__bar" style="width:${pct}%"></div>
+    <span class="training-progress__label">${pct}% · ${doneSets}/${totalSets} Sätze</span>
+  </div>`;
+
   let prevBanner = '';
   if (state.curIdx > 0) {
     const prevDay = state.weeks[state.curIdx - 1]?.days?.[di];
@@ -369,6 +378,7 @@ function renderDayBody(wk, di, state) {
   const lockBtnIcon  = done ? ic.unlock() : ic.lock();
 
   return `
+    ${progressBar}
     ${renderInfoBlock('warmup', '🔥 Aufwärmen', day.warmup, di, locked)}
     ${prevBanner}
     <div data-ex-list="${di}">${exHtml}</div>
@@ -710,6 +720,13 @@ function renderBodyTab(state) {
   if (!container) return;
   const wk = state.weeks[state.curIdx];
   const bd = wk?.bodyData ?? {};
+  const heightCm = state.settings?.heightCm;
+  const bmi = heightCm && bd.weight
+    ? (bd.weight / Math.pow(heightCm / 100, 2)).toFixed(1)
+    : null;
+  const bmiLabel = bmi
+    ? (+bmi < 18.5 ? 'Untergewicht' : +bmi < 25 ? 'Normalgewicht' : +bmi < 30 ? 'Übergewicht' : 'Adipositas')
+    : null;
 
   const histRows = [...state.weeks]
     .slice().reverse().slice(0, 8)
@@ -771,6 +788,7 @@ function renderBodyTab(state) {
               data-action="body-field" data-field="weight"
               aria-label="Körpergewicht in kg"
             />
+            ${bmi ? `<div class="bmi-badge">BMI ${bmi} <span>${bmiLabel}</span></div>` : ''}
           </div>
           <div class="body-field">
             <label for="body-sleep">Schlaf (Std)</label>
@@ -1027,6 +1045,24 @@ function renderSettingsTab(state) {
   <div class="settings-section">
     ${tog('swipe', 'Swipe-Navigation', 'Wischen zum Wochenwechsel')}
     ${tog('drag',  'Drag & Drop',       'Übungen per Griff verschieben')}
+    <div class="settings-row">
+      <div>
+        <div class="settings-row__label">Körpergröße</div>
+        <div class="settings-row__desc">Für BMI-Berechnung im Körper-Tab</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <input
+          class="body-input" type="number" inputmode="decimal"
+          min="100" max="250" step="1"
+          value="${state.settings.heightCm ?? ''}"
+          placeholder="178"
+          style="width:72px;height:36px;font-size:14px;text-align:center"
+          data-action="set-height"
+          aria-label="Körpergröße in cm"
+        />
+        <span style="font-size:12px;color:var(--c-text-3)">cm</span>
+      </div>
+    </div>
   </div>
 
   <div class="settings-section">
@@ -1206,6 +1242,7 @@ function _handleClick(e) {
       openModal('modal-new-week'); break;
 
     case 'copy-prev':
+      if (!confirm('Aktuelle Woche mit der Vorwoche überschreiben?\nAlle aktuellen Einträge gehen verloren.')) break;
       dispatch(A.WEEK_COPY_PREV, {});
       showToast('Vorwoche übernommen ✓', 'ok'); break;
 
@@ -1339,8 +1376,23 @@ function _handleClick(e) {
       if (s) { s._showNote = !s._showNote; scheduleRender(); }
       break;
     }
-    case 'toggle-done':
-      dispatch(A.SET_TOGGLE_DONE, { di: +di, ei: +ei, si: +si }); break;
+    case 'toggle-done': {
+      const _s = getState().weeks[getState().curIdx]?.days[+di]?.exercises[+ei]?.sets[+si];
+      // Validate only when marking pending → success (not when un-doing)
+      if (_s && _s.status === 'pending') {
+        const _wInp = document.querySelector(`[data-action="set-weight"][data-di="${di}"][data-ei="${ei}"][data-si="${si}"]`);
+        const _rInp = document.querySelector(`[data-action="set-reps"][data-di="${di}"][data-ei="${ei}"][data-si="${si}"]`);
+        const _rVal = parseFloat(_rInp?.value);
+        if (!Number.isFinite(_rVal) || _rVal <= 0) {
+          showToast('Bitte zuerst Wiederholungen eintragen ✋', 'warn'); break;
+        }
+        // Flush uncommitted input values to state before toggling
+        if (_wInp) dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'weight', value: _wInp.value });
+        if (_rInp) dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'reps',   value: _rInp.value });
+      }
+      dispatch(A.SET_TOGGLE_DONE, { di: +di, ei: +ei, si: +si });
+      break;
+    }
 
     case 'remove-set':
       dispatch(A.SET_REMOVE, { di: +di, ei: +ei, si: +si }); break;
@@ -1449,6 +1501,11 @@ function _handleChange(e) {
         ei: +el.dataset.ei,
         [tField]: +el.value || 0,
       });
+      break;
+    }
+    case 'set-height': {
+      const h = parseFloat(el.value);
+      dispatch(A.SETTING_SET, { key: 'heightCm', value: Number.isFinite(h) && h > 0 ? h : null });
       break;
     }
     case 'body-field':
