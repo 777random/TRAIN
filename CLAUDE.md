@@ -16,6 +16,17 @@ When editing CSS, bump the cache-buster version in `index.html`:
 ```
 This forces the Service Worker to serve the new stylesheet instead of the cached version.
 
+## Git workflow
+
+Commit and push to GitHub regularly throughout all work — after every logical unit of change, not just at the end. This ensures no work is ever lost and the history stays readable.
+
+Commit message format: `type(scope): short description`
+- `feat(ui): add weight progression chart`
+- `fix(state): correct undo stack for SET_TOGGLE_DONE`
+- `chore: bump CSS cache-buster to v27`
+
+Push after every commit: `git push`
+
 ## Local milestone backups
 
 After every milestone: copy all project files (except `backups/` and `.git/`) into `backups/TRAIN_<YYYY-MM-DD>_<milestone-name>/`. The `backups/` folder is gitignored. Then commit and push to GitHub.
