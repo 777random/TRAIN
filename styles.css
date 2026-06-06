@@ -235,10 +235,11 @@ button, input, select, textarea { font: inherit; }
 /* ══════════════════════════════════════════════════════════════
    DAY TABS ROW – horizontal header strip
    ══════════════════════════════════════════════════════════════ */
+/* 3.4: horizontal-scroll strip, max 36px row height */
 .day-tabs-row {
   display: flex; flex-wrap: nowrap; overflow-x: auto;
   scrollbar-width: none; gap: var(--sp-2);
-  gap: var(--sp-2);
+  max-height: 36px; align-items: center;
   position: sticky; top: var(--nav-h); z-index: 200;
   background: var(--c-bg);
   padding: var(--sp-2) 0;
@@ -248,9 +249,12 @@ button, input, select, textarea { font: inherit; }
   border-bottom: 1px solid var(--c-border);
 }
 
+/* 3.4: compact 28×28 square pill, single letter */
 .day-tab {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 3px; padding: var(--sp-2) var(--sp-1);
+  width: 28px; height: 28px; padding: 0; flex-shrink: 0;
+  font-family: var(--font-display); font-size: 15px; letter-spacing: .08em;
+  color: var(--c-text-2);
   border: 1px solid var(--c-border); border-radius: var(--r-md);
   background: var(--c-surface); cursor: pointer;
   height: var(--day-h); flex: 1; min-width: 64px;
@@ -258,9 +262,9 @@ button, input, select, textarea { font: inherit; }
   user-select: none;
 }
 .day-tab:hover { background: var(--c-surface2); border-color: var(--c-border-hi); }
-.day-tab.is-active { border-color: var(--c-accent); background: var(--c-surface2); }
-.day-tab--done { border-color: var(--c-ok); }
-.day-tab--deload { background: var(--c-deload-bg); border-color: var(--c-deload-bd); }
+.day-tab.is-active { border-color: var(--c-accent); background: var(--c-surface2); color: var(--c-accent); }
+.day-tab--done { border-color: var(--c-ok); color: var(--c-ok); }
+.day-tab--deload { background: var(--c-deload-bg); border-color: var(--c-deload-bd); color: var(--c-deload); }
 
 .day-card__dot {
   width: 8px; height: 8px; border-radius: var(--r-full);

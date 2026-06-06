@@ -38,6 +38,9 @@ let _activeTab = 'workout';
 /** Insights visible in analysis tab (2.1). */
 let _showInsights = false;
 
+/** Whether insights tooltip has been shown (3.2). */
+let _insightsTooltipShown = false;
+
 /** Insights visible in body tab (2.2). */
 let _showBodyInsights = false;
 
@@ -163,15 +166,15 @@ function calcPlates(totalKg, barKg = 20) {
   return groups.join('+');
 }
 
-/** Show a toast. type: 'ok' | 'info' | 'warn' */
-function showToast(msg, type = 'info') {
+/** Show a toast. type: 'ok' | 'info' | 'warn'. Optional durationMs overrides default 2600ms. */
+function showToast(msg, type = 'info', durationMs = 2600) {
   if (!_toast) return;
   _toast.textContent = msg;
   _toast.className   = `toast is-visible toast--${type}`;
   clearTimeout(_toastTimer);
   _toastTimer = setTimeout(() => {
     _toast.classList.remove('is-visible');
-  }, 2600);
+  }, durationMs);
 }
 
 /** Open a modal by id. */
@@ -339,16 +342,16 @@ function renderDayList(state) {
       const dotCls = done ? 'day-card__dot day-card__dot--done'
                    : locked ? 'day-card__dot day-card__dot--locked'
                    : 'day-card__dot';
+      // 3.4: compact 28×28 square with single letter from title
+      const letter = day.title.replace(/[^A-Za-zÄÖÜäöüß0-9]/g, '').charAt(0) || String(di + 1);
       return `<button
         class="day-tab${isAct ? ' is-active' : ''}${done ? ' day-tab--done' : ''}${isDl ? ' day-tab--deload' : ''}"
         data-day-hdr="${di}"
         role="tab" aria-selected="${isAct}" aria-controls="day-panel-${di}"
         id="day-tab-${di}"
-      >
-        <div class="${dotCls}" aria-hidden="true"></div>
-        <div class="day-tab__title">${h(day.title)}${isDl ? '<span class="deload-badge">D</span>' : ''}</div>
-        <div class="day-tab__counts"><strong>${done_s}</strong>/${total}</div>
-      </button>`;
+        title="${h(day.title)}"
+        aria-label="${h(day.title)}${done_s}/${total} Sätze"
+      >${letter}</button>`;
     }).join('')}
     <button
       class="day-overview-toggle${_overviewMode ? ' is-active' : ''}"
@@ -1303,18 +1306,28 @@ function renderAnalysisTab(state) {
     ? insights.map(msg => `<div class="insight-card">${ic.lightbulb()}<span>${msg}</span></div>`).join('')
     : '';
 
-  container.innerHTML = `
+  ${(() => {
+    // 3.1: Ø Session + Gesamt time from sessionLog
+    const allLogs  = state.weeks.flatMap(w => w.sessionLog ?? []);
+    const totalMin = allLogs.length ? Math.round(allLogs.reduce((s, l) => s + l.duration, 0) / 60) : null;
+    const avgMin   = allLogs.length ? Math.round(totalMin / allLogs.length) : null;
+    const fmtMin   = m => m >= 60 ? `${Math.floor(m/60)}h${m%60 ? String(m%60).padStart(2,'0') : ''}` : `${m}'`;
+    return `
   <div class="streak-row">
     <div class="streak-card"><div class="streak-num">${streak.cur}</div><div class="streak-lbl">Streak</div></div>
     <div class="streak-card"><div class="streak-num">${streak.best}</div><div class="streak-lbl">Best</div></div>
     <div class="streak-card"><div class="streak-num">${state.weeks.length}</div><div class="streak-lbl">Wochen</div></div>
+    ${avgMin != null ? `<div class="streak-card"><div class="streak-num">${fmtMin(avgMin)}</div><div class="streak-lbl">Ø Session</div></div>` : ''}
+    ${totalMin != null ? `<div class="streak-card"><div class="streak-num">${fmtMin(totalMin)}</div><div class="streak-lbl">Gesamt</div></div>` : ''}
     ${state.weeks.length >= 2 ? `
     <button class="streak-card insight-toggle${_showInsights ? ' is-active' : ''}"
       data-action="toggle-insights"
       aria-pressed="${_showInsights}"
-      aria-label="Insights ${_showInsights ? 'ausblenden' : 'anzeigen'}"
-    >${ic.lightbulb()}<div class="streak-lbl">Insights</div></button>` : ''}
-  </div>
+      aria-label="Fortschritt analysieren"
+      title="Zeigt automatisch erkannte Muster …"
+    >${ic.lightbulb()}<div class="streak-lbl">Fortschritt 💡</div></button>` : ''}
+  </div>`;
+  })()}
 
   ${insightHtml}
 
@@ -1836,9 +1849,15 @@ function _handleClick(e) {
       scheduleRender();
       break;
 
-    // ── Analysis insights toggle (2.1) ─────────────────────────────────────
+    // ── Analysis insights toggle (3.2) ─────────────────────────────────────
     case 'toggle-insights':
-      _showInsights = !_showInsights;
+      if (!_insightsTooltipShown) {
+        _insightsTooltipShown = true;
+        showToast('Zeigt automatisch erkannte Muster in deinen Trainingsdaten', 'info', 4000);
+        _showInsights = true;
+      } else {
+        _showInsights = !_showInsights;
+      }
       scheduleRender();
       break;
 
@@ -2792,13 +2811,31 @@ export function mountApp(root) {
 
   // Auto-backup reminder (3.11): toast if >30 days since last backup
   setTimeout(() => {
-    const last = getState().settings?.lastBackupDate;
+    const st   = getState();
+    const last = st.settings?.lastBackupDate;
     if (!last) {
       showToast('Tipp: Erstelle regelmäßig ein JSON-Backup (Einstellungen → Daten).', 'warn');
     } else {
       const daysSince = Math.floor((Date.now() - new Date(last)) / 86_400_000);
       if (daysSince > 30) {
         showToast(`Letztes Backup vor ${daysSince} Tagen – jetzt sichern!`, 'warn');
+      }
+    }
+
+    // 3.3: Fatigue hint – 3 consecutive sessionRating=1 sessions
+    const lastHint = st.settings?.lastFatigueHintDate;
+    const daysSinceHint = lastHint ? Math.floor((Date.now() - new Date(lastHint)) / 86_400_000) : Infinity;
+    if (daysSinceHint >= 7) {
+      const sorted = [...st.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
+      const doneDays = sorted.flatMap(w => w.days.filter(d => d.markedDone));
+      const last3    = doneDays.slice(-3);
+      if (last3.length === 3 && last3.every(d => d.sessionRating === 1)) {
+        const today = new Date().toISOString().split('T')[0];
+        dispatch(A.SETTING_SET, { key: 'lastFatigueHintDate', value: today });
+        showToast(
+          'In deinen letzten 3 Einheiten hast du \'Erschöpft\' gewählt – plane eine Erholungswoche ein.',
+          'warn', 5000
+        );
       }
     }
   }, 2000);
