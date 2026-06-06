@@ -29,6 +29,8 @@ import * as ic from './icons.js';
 /** Index of the currently-open training day (null = all closed). */
 let _activeDayIdx = null;
 
+/** When true: all days shown as collapsed overview cards instead of one active panel. */
+let _overviewMode = false;
 
 /** Currently active top-level tab id. */
 let _activeTab = 'workout';
@@ -267,32 +269,31 @@ function renderDayList(state) {
 
   const isDl = wk.mode === 'deload';
 
-  // ── Progress bar (for the active day, shown inside sticky tabs row) ──────
+  // ── Progress bar for active day ───────────────────────────────────────────
   let totalSets = 0, doneSets = 0;
-  if (_activeDayIdx !== null && wk.days[_activeDayIdx]) {
+  if (!_overviewMode && _activeDayIdx !== null && wk.days[_activeDayIdx]) {
     const ad = wk.days[_activeDayIdx];
     totalSets = ad.exercises.reduce((s, ex) => s + ex.sets.length, 0);
     doneSets  = ad.exercises.reduce((s, ex) => s + ex.sets.filter(st => st.done).length, 0);
   }
   const pct = totalSets > 0 ? Math.round(doneSets / totalSets * 100) : 0;
-  const progressHtml = _activeDayIdx !== null ? `
+  const progressHtml = (!_overviewMode && _activeDayIdx !== null) ? `
   <div class="training-progress" aria-label="${doneSets} von ${totalSets} Sätzen erledigt">
     <div class="training-progress__bar" style="width:${pct}%"></div>
     <span class="training-progress__label">${pct}% · ${doneSets}/${totalSets} Sätze</span>
   </div>` : '';
 
-  // ── Tab row (all days side by side) ──────────────────────────────────────
+  // ── Tab pills row + overview toggle ───────────────────────────────────────
   const tabsHtml = `<div class="day-tabs-row" role="tablist" aria-label="Trainingstage">
     ${wk.days.map((day, di) => {
       const done   = !!day.markedDone;
       const locked = !!day.locked;
-      const isAct  = _activeDayIdx === di;
+      const isAct  = !_overviewMode && _activeDayIdx === di;
       const total  = day.exercises.reduce((s, ex) => s + ex.sets.length, 0);
       const done_s = day.exercises.reduce((s, ex) => s + ex.sets.filter(st => st.done).length, 0);
       const dotCls = done ? 'day-card__dot day-card__dot--done'
                    : locked ? 'day-card__dot day-card__dot--locked'
                    : 'day-card__dot';
-
       return `<button
         class="day-tab${isAct ? ' is-active' : ''}${done ? ' day-tab--done' : ''}${isDl ? ' day-tab--deload' : ''}"
         data-day-hdr="${di}"
@@ -304,15 +305,44 @@ function renderDayList(state) {
         <div class="day-tab__counts"><strong>${done_s}</strong>/${total}</div>
       </button>`;
     }).join('')}
+    <button
+      class="day-overview-toggle${_overviewMode ? ' is-active' : ''}"
+      data-action="toggle-overview"
+      aria-label="${_overviewMode ? 'Einzelansicht' : 'Übersicht'}"
+      aria-pressed="${_overviewMode}"
+      title="${_overviewMode ? 'Einzelansicht' : 'Alle Tage anzeigen'}"
+    >${ic.columns()}</button>
   ${progressHtml}
   </div>`;
 
-  // ── Content panel (only the active day, full width) ───────────────────────
-  let panelHtml = '';
-  if (_activeDayIdx !== null && wk.days[_activeDayIdx]) {
+  // ── Content: overview grid or single active panel ─────────────────────────
+  let contentHtml = '';
+  if (_overviewMode) {
+    contentHtml = `<div class="day-overview-grid">
+      ${wk.days.map((day, di) => {
+        const done   = !!day.markedDone;
+        const total  = day.exercises.reduce((s, ex) => s + ex.sets.length, 0);
+        const done_s = day.exercises.reduce((s, ex) => s + ex.sets.filter(st => st.done).length, 0);
+        const vol    = day.exercises.reduce((s, ex) => s + ex.sets.filter(st => st.status === 'success').reduce((ss, st) => ss + (st.weight ?? 0) * (st.reps ?? 0), 0), 0);
+        const dpct   = total > 0 ? Math.round(done_s / total * 100) : 0;
+        return `<div class="day-overview-card${done ? ' day-overview-card--done' : ''}${isDl ? ' day-overview-card--deload' : ''}"
+          data-action="overview-open-day" data-di="${di}" role="button" tabindex="0"
+          aria-label="${h(day.title)} öffnen">
+          <div class="day-overview-card__title">${h(day.title)}${isDl ? '<span class="deload-badge">D</span>' : ''}</div>
+          <div class="day-overview-card__sub">${h(day.subtitle ?? '')}</div>
+          <div class="day-overview-card__stats">
+            <span>${done_s}/${total} Sätze</span>
+            ${vol > 0 ? `<span>${vol >= 1000 ? (vol/1000).toFixed(1)+'t' : vol+'kg'}</span>` : ''}
+          </div>
+          <div class="day-overview-card__bar"><div style="width:${dpct}%;height:3px;background:var(--c-accent);border-radius:2px"></div></div>
+          ${done ? `<div class="day-overview-card__done-badge">✓</div>` : ''}
+        </div>`;
+      }).join('')}
+    </div>`;
+  } else if (_activeDayIdx !== null && wk.days[_activeDayIdx]) {
     const di  = _activeDayIdx;
     const day = wk.days[di];
-    panelHtml = `<div
+    contentHtml = `<div
       class="day-panel${day.markedDone ? ' day-card--done' : ''}${isDl ? ' day-card--deload' : ''}"
       id="day-panel-${di}" data-day-body="${di}"
       role="tabpanel" aria-labelledby="day-tab-${di}"
@@ -321,9 +351,8 @@ function renderDayList(state) {
     </div>`;
   }
 
-  container.innerHTML = tabsHtml + panelHtml;
+  container.innerHTML = tabsHtml + contentHtml;
 
-  // Measure actual tabs-row height after paint to close the sticky gap exactly
   requestAnimationFrame(() => {
     const tabsRow = container.querySelector('.day-tabs-row');
     if (tabsRow) {
@@ -332,7 +361,7 @@ function renderDayList(state) {
   });
 
   _initStickyObserver();
-  if (_activeDayIdx !== null) _bindDrag(container);
+  if (!_overviewMode && _activeDayIdx !== null) _bindDrag(container);
 }
 
 function renderDayCard(wk, di, state) {
@@ -543,7 +572,7 @@ function renderExercise(wk, di, ei, state) {
             >${lbl}</button>`).join('')}
         </div>
         ${(ex.setType ?? 'pyramid') === 'straight'
-          ? '<span class="pause-row__label" style="color:var(--c-text-3);font-size:10px">Wdh+Gewicht werden automatisch kopiert</span>'
+          ? '<span class="pause-row__label" style="color:var(--c-text-3);font-size:10px">Gewicht wird automatisch auf alle Sätze kopiert</span>'
           : ''}
       </div>` : ''}
       ${!locked ? `
@@ -656,8 +685,9 @@ function renderExercise(wk, di, ei, state) {
 }
 // ─── Set row ─────────────────────────────────────────────────────────────────
 function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl) {
-  const prevSet = prevEx?.sets?.[si] ?? null;
-  const dispW   = isDl ? Math.round(s.weight * 0.75 * 2) / 2 : s.weight;
+  const prevSet    = prevEx?.sets?.[si] ?? null;
+  const dlFactor   = getState().settings?.deloadFactor ?? 0.75;
+  const dispW      = isDl ? Math.round(s.weight * dlFactor * 2) / 2 : s.weight;
   const metric  = ex.metric === 'sec' || ex.metric === 'm' ? ex.metric : 'reps';
   const repStep = metric === 'm' ? '0.1' : '1';
   const repMode = metric === 'm' ? 'decimal' : 'numeric';
@@ -864,17 +894,8 @@ function renderBodyTab(state) {
               aria-label="Körpergewicht in kg"
             />
           </div>
-          <div class="body-field">
-            <label for="body-height">Körpergröße (cm)</label>
-            <input id="body-height" class="body-input" type="number" step="1"
-              min="100" max="250"
-              value="${heightCm ?? ''}" placeholder="178"
-              data-action="set-height"
-              aria-label="Körpergröße in cm"
-            />
-          </div>
         </div>
-        ${bmi ? `
+        ${state.settings?.showBmi && bmi ? `
         <div class="bmi-badge" style="margin-bottom:var(--sp-3)">
           BMI ${bmi} <span>${bmiLabel}</span>
         </div>` : ''}
@@ -1130,18 +1151,25 @@ function drawLineChart(id, labels, data, color) {
 function renderSettingsTab(state) {
   const container = document.getElementById('settings-tab-content');
   if (!container) return;
-  const wk = state.weeks[state.curIdx] ?? null;
+  const wk  = state.weeks[state.curIdx] ?? null;
+  const s   = state.settings ?? {};
 
   const tog = (key, label, desc) => `
   <div class="settings-row">
     <div><div class="settings-row__label">${label}</div><div class="settings-row__desc">${desc}</div></div>
     <button
-      class="toggle${state.settings[key] ? ' is-on' : ''}"
+      class="toggle${s[key] ? ' is-on' : ''}"
       data-action="toggle-setting" data-key="${key}"
-      role="switch" aria-checked="${state.settings[key]}"
+      role="switch" aria-checked="${!!s[key]}"
       aria-label="${label}"
     ></button>
   </div>`;
+
+  // Deload factor pill options
+  const dlFactor   = s.deloadFactor ?? 0.75;
+  const dlCustom   = s.deloadFactorCustom;
+  const dlPresets  = [0.5, 0.6, 0.7, 0.75, 0.8];
+  const isCustomDl = !dlPresets.includes(dlFactor);
 
   container.innerHTML = `
   <div class="settings-section">
@@ -1149,13 +1177,76 @@ function renderSettingsTab(state) {
     ${tog('drag',  'Drag & Drop',      'Übungen per Griff verschieben')}
   </div>
 
+  <!-- Körper & BMI -->
   <div class="settings-section">
+    <div class="settings-section__title">Körper</div>
+    ${tog('showBmi', 'BMI anzeigen', 'Zeigt BMI im Körper-Tab unterhalb des Gewichts')}
+    <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:var(--sp-1)">
+      <div class="settings-row__label">Körpergröße (cm)</div>
+      <div class="settings-row__desc">Wird für die BMI-Berechnung benötigt</div>
+      <input class="body-input" type="number" step="1" min="100" max="250"
+        value="${s.heightCm ?? ''}" placeholder="178"
+        data-action="set-height"
+        style="margin-top:var(--sp-1);width:120px"
+        aria-label="Körpergröße in cm"
+      />
+    </div>
+    <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:var(--sp-1)">
+      <div class="settings-row__label">Stangengewicht Langhantel (kg)</div>
+      <input class="body-input" type="number" step="0.5" min="5" max="50"
+        value="${s.barbellWeight ?? 20}" placeholder="20"
+        data-action="set-barbell-weight"
+        style="margin-top:var(--sp-1);width:120px"
+        aria-label="Stangengewicht in kg"
+      />
+    </div>
+  </div>
+
+  <!-- Deload -->
+  <div class="settings-section">
+    <div class="settings-section__title">Deload</div>
+    <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:var(--sp-2)">
+      <div>
+        <div class="settings-row__label">Deload-Faktor</div>
+        <div class="settings-row__desc">Aktuelle Einstellung: <strong>${Math.round((s.deloadFactor ?? 0.75) * 100)}%</strong></div>
+      </div>
+      <details class="deload-details">
+        <summary class="deload-details__summary">Erweiterte Einstellungen</summary>
+        <div class="deload-details__body">
+          <div class="weight-step-opts" style="margin-top:var(--sp-2)">
+            ${dlPresets.map(f => `
+              <button type="button"
+                class="weight-step-btn${dlFactor === f && !isCustomDl ? ' is-selected' : ''}"
+                data-action="set-deload-factor" data-factor="${f}"
+                aria-pressed="${dlFactor === f && !isCustomDl}"
+              >${Math.round(f*100)}%</button>`).join('')}
+            <button type="button"
+              class="weight-step-btn${isCustomDl ? ' is-selected' : ''}"
+              data-action="set-deload-factor-custom"
+              aria-pressed="${isCustomDl}"
+            >Individuell</button>
+          </div>
+          ${isCustomDl ? `
+          <div style="margin-top:var(--sp-2);display:flex;align-items:center;gap:var(--sp-2)">
+            <input class="body-input" type="number" min="1" max="99" step="1"
+              value="${Math.round((s.deloadFactor ?? 0.75) * 100)}"
+              data-action="set-deload-factor-value"
+              style="width:80px"
+              aria-label="Deload-Faktor in Prozent"
+            />
+            <span style="font-size:12px;color:var(--c-text-3)">%</span>
+          </div>` : ''}
+        </div>
+      </details>
+    </div>
+  </div>
+
+  <!-- Trainingstage -->
+  <div class="settings-section">
+    <div class="settings-section__title">Trainingstage verwalten</div>
     <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:var(--sp-2)">
       <div style="display:flex;justify-content:space-between;width:100%;align-items:center">
-        <div>
-          <div class="settings-row__label">Trainingstage</div>
-          <div class="settings-row__desc">Aktuelle Woche · max. 7 Tage</div>
-        </div>
+        <div class="settings-row__desc">Aktuelle Woche · max. 7 Tage</div>
         ${wk && wk.days.length < 7 ? `<button class="btn btn--ghost btn--sm" data-action="add-day">${ic.plus()} Tag hinzufügen</button>` : ''}
       </div>
       ${wk ? wk.days.map((day, di) => `
@@ -1171,7 +1262,43 @@ function renderSettingsTab(state) {
     </div>
   </div>
 
+  <!-- Wochen-Management -->
   <div class="settings-section">
+    <div class="settings-section__title">Wochen-Management</div>
+    <div class="settings-row settings-row--clickable" data-action="copy-prev">
+      <div>
+        <div class="settings-row__label">${ic.copy()} Vorwoche übernehmen</div>
+        <div class="settings-row__desc">Aktuelle Woche mit der Vorwoche überschreiben</div>
+      </div>
+      <div class="settings-row__action">${ic.chevronRight()}</div>
+    </div>
+    <div class="settings-row settings-row--clickable" data-action="save-week-as-template">
+      <div>
+        <div class="settings-row__label">${ic.save()} Als Template speichern</div>
+        <div class="settings-row__desc">Aktuelle Woche als Standard-Vorlage sichern</div>
+      </div>
+      <div class="settings-row__action">${ic.chevronRight()}</div>
+    </div>
+    <div class="settings-row settings-row--clickable" data-action="open-export">
+      <div>
+        <div class="settings-row__label">${ic.download()} Woche exportieren (CSV)</div>
+        <div class="settings-row__desc">Trainingsdaten herunterladen</div>
+      </div>
+      <div class="settings-row__action">${ic.chevronRight()}</div>
+    </div>
+    <div class="settings-row settings-row--clickable" data-action="open-delete-week"
+      style="color:var(--c-danger)">
+      <div>
+        <div class="settings-row__label" style="color:var(--c-danger)">${ic.trash()} Aktuelle Woche löschen</div>
+        <div class="settings-row__desc">Wird unwiderruflich entfernt</div>
+      </div>
+      <div class="settings-row__action">${ic.chevronRight()}</div>
+    </div>
+  </div>
+
+  <!-- Template -->
+  <div class="settings-section">
+    <div class="settings-section__title">Vorlage</div>
     <div class="settings-row settings-row--clickable" data-action="open-tpl">
       <div>
         <div class="settings-row__label">📋 Template bearbeiten</div>
@@ -1195,11 +1322,13 @@ function renderSettingsTab(state) {
     </div>
   </div>
 
+  <!-- Daten -->
   <div class="settings-section">
+    <div class="settings-section__title">Daten</div>
     <div class="settings-row settings-row--clickable" data-action="export-json">
       <div>
         <div class="settings-row__label">${ic.download()} Daten exportieren (JSON)</div>
-        <div class="settings-row__desc">Sicherungskopie aller Trainingsdaten</div>
+        <div class="settings-row__desc">Vollständige Sicherungskopie</div>
       </div>
       <div class="settings-row__action">${ic.chevronRight()}</div>
     </div>
@@ -1215,7 +1344,7 @@ function renderSettingsTab(state) {
 
   <div class="settings-section">
     <div class="settings-row">
-      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN v6.0</div></div>
+      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN v9.0</div></div>
     </div>
     <div class="settings-row">
       <div>
@@ -1324,6 +1453,19 @@ function _handleClick(e) {
   const { di, ei, si, field, key, val, sec } = el.dataset;
 
   switch (action) {
+
+    // ── Overview mode ─────────────────────────────────────────────────────
+    case 'toggle-overview':
+      _overviewMode = !_overviewMode;
+      scheduleRender();
+      break;
+
+    case 'overview-open-day': {
+      _overviewMode  = false;
+      _activeDayIdx  = +el.dataset.di;
+      scheduleRender();
+      break;
+    }
 
     // ── Week navigation ────────────────────────────────────────────────────
     case 'undo':
@@ -1568,6 +1710,22 @@ function _handleClick(e) {
     case 'toggle-setting':
       dispatch(A.SETTING_TOGGLE, { key }); break;
 
+    case 'set-deload-factor': {
+      const factor = parseFloat(el.dataset.factor);
+      if (Number.isFinite(factor)) {
+        dispatch(A.SETTING_SET, { key: 'deloadFactor', value: factor });
+        dispatch(A.SETTING_SET, { key: 'deloadFactorCustom', value: null });
+        if (_activeTab === 'settings') renderSettingsTab(getState());
+      }
+      break;
+    }
+    case 'set-deload-factor-custom': {
+      const cur = getState().settings?.deloadFactor ?? 0.75;
+      dispatch(A.SETTING_SET, { key: 'deloadFactorCustom', value: cur });
+      if (_activeTab === 'settings') renderSettingsTab(getState());
+      break;
+    }
+
     case 'open-tpl':
       renderTemplateEditor(getState());
       openModal('modal-template'); break;
@@ -1644,13 +1802,25 @@ function _handleChange(e) {
       break;
     }
     case 'set-height': {
-      const h = parseFloat(el.value);
-      dispatch(A.SETTING_SET, { key: 'heightCm', value: Number.isFinite(h) && h > 0 ? h : null });
+      const hv = parseFloat(el.value);
+      dispatch(A.SETTING_SET, { key: 'heightCm', value: Number.isFinite(hv) && hv > 0 ? hv : null });
       break;
     }
     case 'set-target-weight': {
       const tw = parseFloat(el.value);
       dispatch(A.SETTING_SET, { key: 'targetWeight', value: Number.isFinite(tw) && tw > 0 ? tw : null });
+      break;
+    }
+    case 'set-barbell-weight': {
+      const bw = parseFloat(el.value);
+      dispatch(A.SETTING_SET, { key: 'barbellWeight', value: Number.isFinite(bw) && bw > 0 ? bw : 20 });
+      break;
+    }
+    case 'set-deload-factor-value': {
+      const pct = parseFloat(el.value);
+      if (Number.isFinite(pct) && pct >= 1 && pct <= 99) {
+        dispatch(A.SETTING_SET, { key: 'deloadFactor', value: Math.round(pct) / 100 });
+      }
       break;
     }
     case 'body-field':
@@ -1902,14 +2072,6 @@ function _buildScaffold(root) {
       aria-label="Rückgängig machen" disabled>${ic.undo()}</button>
     <button class="toolbar__btn toolbar__btn--accent" data-action="open-new-week"
       aria-label="Neue Trainingswoche erstellen">${ic.plus()}</button>
-    <button class="toolbar__btn" data-action="copy-prev"
-      aria-label="Vorwoche als Vorlage kopieren">${ic.copy()}</button>
-    <button class="toolbar__btn" data-action="save-week-as-template"
-      aria-label="Aktuelle Woche als Standard-Vorlage speichern">${ic.save()}</button>
-    <button class="toolbar__btn" data-action="open-export"
-      aria-label="Trainingsdaten exportieren">${ic.download()}</button>
-    <button class="toolbar__btn toolbar__btn--danger" data-action="open-delete-week"
-      aria-label="Aktuelle Woche löschen">${ic.trash()}</button>
   </div>
 
   <div id="days-container" aria-label="Trainingstage"></div>

@@ -152,6 +152,30 @@ export const info = () =>
 export const noteIcon = () =>
   SVG('<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>');
 
+/** Columns / grid – overview mode toggle */
+export const columns = () =>
+  SVG('<rect x="3" y="3" width="7" height="18" rx="1"/><rect x="14" y="3" width="7" height="18" rx="1"/>');
+
+/** Trophy – personal record */
+export const trophy = () =>
+  SVG('<path d="M6 9H4a2 2 0 0 1-2-2V5h4"/><path d="M18 9h2a2 2 0 0 0 2-2V5h-4"/><path d="M6 9a6 6 0 0 0 12 0V3H6z"/><path d="M12 15v4"/><path d="M8 19h8"/>');
+
+/** Lightbulb – insights */
+export const lightbulb = () =>
+  SVG('<path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 1 7 7c0 2.4-1.3 4.5-3 5.7V17a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1v-2.3C6.3 13.5 5 11.4 5 9a7 7 0 0 1 7-7z"/>');
+
+/** Tag – exercise tags */
+export const tag = () =>
+  SVG('<path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>');
+
+/** Share – native share sheet */
+export const share = () =>
+  SVG('<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>');
+
+/** Dumbbell mini – muscle groups */
+export const muscleGroup = () =>
+  SVG('<path d="M6.5 6.5h11"/><path d="M6.5 17.5h11"/><path d="M4 9.5v5"/><path d="M2 10.5v3"/><path d="M20 9.5v5"/><path d="M22 10.5v3"/>');
+
 // ─── Helper: screen-reader-only text ─────────────────────────────────────────
 
 /**

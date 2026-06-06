@@ -24,7 +24,7 @@
 
 export const STORAGE_KEY        = 'train_v6';
 export const STORAGE_KEY_SHADOW = 'train_v6_shadow';
-export const SCHEMA_VERSION     = 8;
+export const SCHEMA_VERSION     = 9;
 
 // ─── Factory helpers ──────────────────────────────────────────────────────────
 
@@ -111,11 +111,18 @@ function buildDefaultState() {
     curIdx: 0,
     weeks: [],                // Week[]
     customTemplate: clone(FACTORY_TEMPLATE),
+    templates: [],            // { id, name, days[] }[]  – named templates (v9)
+    prs: {},                  // { [exerciseName]: { maxWeight, maxVolume, maxEstimated1RM, date } }
     settings: {
-      swipe:        true,   // touch-swipe week navigation
-      drag:         true,   // drag-and-drop exercise reorder
-      heightCm:     null,   // user height in cm for BMI calculation
-      targetWeight: null,   // body weight goal in kg
+      swipe:              true,
+      drag:               true,
+      heightCm:           null,
+      targetWeight:       null,
+      showBmi:            false,
+      deloadFactor:       0.75,
+      deloadFactorCustom: null,
+      barbellWeight:      20,
+      lastBackupDate:     null,
     },
   };
 }
@@ -280,6 +287,43 @@ function migrate(raw) {
     };
   }
 
+  // v8 → v9: new settings fields, prs, templates, per-week restDays,
+  //           per-day sessionNote/sessionRating, per-exercise tags/supersetId
+  if ((raw.meta?.schemaVersion ?? 0) < 9) {
+    const s = raw.settings ?? {};
+    if (s.showBmi            === undefined) s.showBmi            = false;
+    if (s.deloadFactor       === undefined) s.deloadFactor       = 0.75;
+    if (s.deloadFactorCustom === undefined) s.deloadFactorCustom = null;
+    if (s.barbellWeight      === undefined) s.barbellWeight      = 20;
+    if (s.lastBackupDate     === undefined) s.lastBackupDate     = null;
+    raw.settings = s;
+
+    if (!raw.prs)       raw.prs       = {};
+    if (!raw.templates) raw.templates = [];
+
+    const normDay = day => {
+      if (day.sessionNote   === undefined) day.sessionNote   = '';
+      if (day.sessionRating === undefined) day.sessionRating = null;
+      (day.exercises ?? []).forEach(ex => {
+        if (!Array.isArray(ex.tags)) ex.tags = [];
+        if (ex.supersetId === undefined) ex.supersetId = null;
+      });
+    };
+    const normWeek = wk => {
+      if (!Array.isArray(wk.restDays)) wk.restDays = [];
+      (wk.days ?? []).forEach(normDay);
+    };
+    (raw.weeks ?? []).forEach(normWeek);
+    (raw.customTemplate ?? []).forEach(normDay);
+
+    raw.meta = {
+      ...raw.meta,
+      schemaVersion: 9,
+      savedAt:   raw.meta?.savedAt   ?? null,
+      createdAt: raw.meta?.createdAt ?? new Date().toISOString(),
+    };
+  }
+
   return raw;
 }
 
@@ -359,6 +403,7 @@ function _appendDefaultWeek(startDate) {
     days,
     sessionLog: [],
     bodyData:   {},
+    restDays:   [],
   });
   STATE.curIdx = STATE.weeks.length - 1;
 }
@@ -420,23 +465,30 @@ export const A = Object.freeze({
   STATE_IMPORT:        'STATE_IMPORT',        // { imported: StateObject }
   // Undo
   UNDO:                'UNDO',               // {}
+  // Templates (v9)
+  TEMPLATE_ADD:        'TEMPLATE_ADD',        // { name, days? }
+  TEMPLATE_UPDATE:     'TEMPLATE_UPDATE',     // { id, name?, days? }
+  TEMPLATE_DELETE:     'TEMPLATE_DELETE',     // { id }
+  // Rest days (v9)
+  WEEK_ADD_REST_DAY:   'WEEK_ADD_REST_DAY',  // { date, note? }
+  WEEK_REMOVE_REST_DAY:'WEEK_REMOVE_REST_DAY',// { date }
 });
 
 // ─── Reducer ──────────────────────────────────────────────────────────────────
 
 function _resetClonedDays(days) {
   days.forEach(day => {
-    day.locked = false;
-    day.markedDone = false;
+    day.locked        = false;
+    day.markedDone    = false;
+    day.sessionNote   = '';
+    day.sessionRating = null;
     (day.exercises ?? []).forEach(ex => {
       if (ex._showCfg) ex._showCfg = false;
       (ex.sets ?? []).forEach(s => {
         s.status = 'pending';
         s.done   = false;
-        // Frisches Template: Reps und RPE leeren.
-        // Gewicht bleibt (inkl. geplanter Progression).
-        s.reps = null;
-        s.rpe  = null;
+        s.reps   = null;
+        s.rpe    = null;
       });
     });
   });
@@ -499,7 +551,7 @@ function reduce(state, action) {
       _resetClonedDays(days);
       state.weeks.push({
         id: Date.now(), startDate: p.startDate, note: p.note ?? '',
-        mode: 'standard', days, sessionLog: [], bodyData: {},
+        mode: 'standard', days, sessionLog: [], bodyData: {}, restDays: [],
       });
       state.weeks.sort((a, b) => a.startDate.localeCompare(b.startDate));
       state.curIdx = state.weeks.findIndex(w => w.startDate === p.startDate);
@@ -659,9 +711,9 @@ function reduce(state, action) {
       else if (p.field === 'rpe')  v = (v === '' || v === null) ? null : Math.min(10, Math.max(1, +v));
       else if (p.field === 'note') v = String(v ?? '').slice(0, 120);
       s[p.field] = v;
-      // Straight sets: auto-propagate weight or reps to all following sets
-      if (ex.setType === 'straight' && (p.field === 'weight' || p.field === 'reps')) {
-        for (let j = p.si + 1; j < ex.sets.length; j++) ex.sets[j][p.field] = v;
+      // Straight sets: auto-propagate weight only to all following sets (1.3)
+      if (ex.setType === 'straight' && p.field === 'weight') {
+        for (let j = p.si + 1; j < ex.sets.length; j++) ex.sets[j].weight = v;
       }
       break;
     }
@@ -675,7 +727,27 @@ function reduce(state, action) {
       const i = Math.max(0, order.indexOf(cur));
       const next = order[(i + 1) % 3];
       s.status = next;
-      s.done = next === 'success';
+      s.done   = next === 'success';
+
+      // Update PRs when a set is newly marked success in a non-deload week (3.1)
+      if (next === 'success' && _currentWeek()?.mode !== 'deload') {
+        const ex     = _currentWeek()?.days[p.di]?.exercises[p.ei];
+        const weight = parseFloat(s.weight) || 0;
+        const reps   = parseFloat(s.reps)   || 0;
+        if (ex && weight > 0 && reps > 0) {
+          const volume       = weight * reps;
+          const est1RM       = reps <= 10 ? weight * (1 + reps / 30) : 0;
+          const name         = ex.name;
+          if (!state.prs) state.prs = {};
+          const prev         = state.prs[name] ?? { maxWeight: 0, maxVolume: 0, maxEstimated1RM: 0, date: null };
+          const newMaxW      = Math.max(prev.maxWeight,      weight);
+          const newMaxV      = Math.max(prev.maxVolume,      volume);
+          const newMaxE      = Math.max(prev.maxEstimated1RM, est1RM);
+          if (newMaxW > prev.maxWeight || newMaxV > prev.maxVolume || newMaxE > prev.maxEstimated1RM) {
+            state.prs[name] = { maxWeight: newMaxW, maxVolume: newMaxV, maxEstimated1RM: newMaxE, date: new Date().toISOString().split('T')[0] };
+          }
+        }
+      }
       break;
     }
     case A.SET_AUTOFILL_DOWN: {
@@ -684,14 +756,9 @@ function reduce(state, action) {
       const sets = ex.sets;
       if (si < 0 || si >= sets.length - 1) break;
       const src = sets[si]; if (!src) break;
-
-      const w      = parseFloat(src.weight) || 0;
-      const repsRaw = parseFloat(src.reps);
-      const repsVal = Math.max(0, Number.isFinite(repsRaw) ? repsRaw : 0);
-
+      const w = parseFloat(src.weight) || 0;
       for (let j = si + 1; j < sets.length; j++) {
         sets[j].weight = w;
-        if (j === si + 1) sets[j].reps = repsVal;
       }
       break;
     }
@@ -767,9 +834,9 @@ function reduce(state, action) {
     case A.STATE_IMPORT: {
       const imported = migrate(p.imported);
       if (!Array.isArray(imported?.weeks)) break;
-      // Replace everything except wipe the current object, so existing
-      // references (e.g. getState()) stay valid.
       Object.assign(state, imported);
+      if (!state.prs)       state.prs       = {};
+      if (!state.templates) state.templates = [];
       if (!state.weeks.length) _appendDefaultWeek();
       if (state.curIdx >= state.weeks.length) state.curIdx = state.weeks.length - 1;
       break;
@@ -805,6 +872,44 @@ function reduce(state, action) {
       state.weeks          = prev.weeks;
       state.customTemplate = prev.customTemplate;
       state.settings       = prev.settings;
+      break;
+    }
+
+    // ── Named templates (v9) ─────────────────────────────────────────────────
+    case A.TEMPLATE_ADD: {
+      if (!Array.isArray(state.templates)) state.templates = [];
+      state.templates.push({
+        id:   Date.now() + Math.random(),
+        name: p.name ?? 'Neues Template',
+        days: p.days ? clone(p.days) : clone(state.customTemplate ?? FACTORY_TEMPLATE),
+      });
+      break;
+    }
+    case A.TEMPLATE_UPDATE: {
+      const tIdx = (state.templates ?? []).findIndex(t => t.id === p.id);
+      if (tIdx !== -1) {
+        if (p.name !== undefined) state.templates[tIdx].name = p.name;
+        if (p.days !== undefined) state.templates[tIdx].days = clone(p.days);
+      }
+      break;
+    }
+    case A.TEMPLATE_DELETE: {
+      state.templates = (state.templates ?? []).filter(t => t.id !== p.id);
+      break;
+    }
+
+    // ── Rest days (v9) ───────────────────────────────────────────────────────
+    case A.WEEK_ADD_REST_DAY: {
+      const wk = _currentWeek(); if (!wk) break;
+      if (!Array.isArray(wk.restDays)) wk.restDays = [];
+      if (!wk.restDays.find(r => r.date === p.date)) {
+        wk.restDays.push({ date: p.date, note: p.note ?? '' });
+      }
+      break;
+    }
+    case A.WEEK_REMOVE_REST_DAY: {
+      const wk = _currentWeek(); if (!wk) break;
+      wk.restDays = (wk.restDays ?? []).filter(r => r.date !== p.date);
       break;
     }
 
