@@ -1349,3 +1349,22 @@ details[open] > .deload-details__summary::before { content: '▾ '; }
 .tpl-list-item { display: flex; justify-content: space-between; align-items: center; padding: var(--sp-2) var(--sp-4); border-bottom: 1px solid var(--c-border); }
 .tpl-list-item:last-child { border-bottom: none; }
 
+/* ── Day inline edit (2.3) ─────────────────────────────────── */
+.day-editable-wrap { display: flex; align-items: center; gap: 4px; }
+.day-editable {
+  cursor: text; border-radius: 3px;
+  transition: background var(--t-fast);
+}
+.day-editable:hover { background: rgba(255,255,255,.06); }
+.day-subtitle-placeholder { color: var(--c-text-3); font-style: italic; font-size: 12px; }
+.day-inline-edit {
+  background: var(--c-surface2); border: 1px solid var(--c-accent);
+  border-radius: var(--r-sm); color: var(--c-text); outline: none;
+  padding: 2px 6px; width: 100%; max-width: 240px;
+}
+.day-inline-edit--title {
+  font-family: var(--font-display); font-size: 19px; letter-spacing: .06em;
+  color: var(--c-accent);
+}
+.day-inline-edit--sub { font-size: 12px; color: var(--c-text-2); }
+

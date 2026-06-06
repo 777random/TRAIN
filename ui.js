@@ -444,11 +444,19 @@ function renderDayCard(wk, di, state) {
     <div class="day-card__header-left">
       <div class="${dotClass}" aria-hidden="true"></div>
       <div class="day-card__title-wrap">
-        <div class="day-card__title">
-          ${h(day.title)}
+        <div class="day-card__title day-editable-wrap">
+          <span class="day-editable" data-action="edit-day-field"
+            data-di="${di}" data-field="title"
+            aria-label="${h(day.title)} bearbeiten"
+          >${h(day.title)}</span>
           ${isDl ? '<span class="deload-badge">Deload</span>' : ''}
         </div>
-        <div class="day-card__subtitle">${h(day.subtitle)}</div>
+        <div class="day-card__subtitle day-editable-wrap">
+          <span class="day-editable day-editable--sub" data-action="edit-day-field"
+            data-di="${di}" data-field="subtitle"
+            aria-label="${h(day.subtitle || 'Schwerpunkt')} bearbeiten"
+          >${h(day.subtitle) || '<span class="day-subtitle-placeholder">Schwerpunkt …</span>'}</span>
+        </div>
       </div>
     </div>
     <div class="day-card__header-right">
@@ -483,11 +491,14 @@ function renderDayBody(wk, di, state) {
   if (state.curIdx > 0) {
     const prevDay = state.weeks[state.curIdx - 1]?.days?.[di];
     if (prevDay) {
-      const pvol = prevDay.exercises.reduce(
-        (s, ex) => s + ex.sets.reduce((ss, st) => ss + st.weight * st.reps, 0), 0
-      );
+      // 2.1: completion % + streak instead of kg volume
+      const totalSets   = prevDay.exercises.reduce((s, ex) => s + ex.sets.length, 0);
+      const doneSets    = prevDay.exercises.reduce((s, ex) => s + ex.sets.filter(st => st.status === 'success').length, 0);
+      const pct         = totalSets > 0 ? Math.round(doneSets / totalSets * 100) : 0;
+      const streak      = _calcStreak(state);
+      const streakPart  = streak.cur >= 2 ? `&nbsp;&nbsp;🔥 ${streak.cur} Wochen` : '';
       prevBanner = `<div class="prev-banner" role="status">
-        ${ic.barChart()}<span>Vorwoche: ${pvol} kg Gesamtvolumen</span>
+        ${ic.barChart()}<span>Vorwoche: ${pct}% abgeschlossen (${doneSets}/${totalSets} Sätze)${streakPart}</span>
       </div>`;
     }
   }
@@ -511,7 +522,7 @@ function renderDayBody(wk, di, state) {
       <textarea
         class="session-note-input"
         rows="3"
-        placeholder="Wie lief das Training? Besonderheiten …"
+        placeholder="Was war heute besonders? (Technik, Schmerzen, Fokus …)"
         data-action="day-field" data-di="${di}" data-field="sessionNote"
         aria-label="Trainingsnotiz"
         ${locked ? 'disabled' : ''}
@@ -797,12 +808,6 @@ function renderExercise(wk, di, ei, state) {
       : '';
   })()}
 
-  <!-- Soll-Ist badge (2.5) -->
-  ${(ex.targetSets && ex.targetReps) ? `
-  <div class="soll-ist-badge" aria-label="Ziel: ${ex.targetSets}×${ex.targetReps}">
-    Ziel: ${ex.targetSets}×${ex.targetReps}
-  </div>` : ''}
-
   <div class="set-header" aria-hidden="true">
     <span>#</span><span>kg</span><span>${metricHdr}</span><span>RPE</span><span>✓</span><span></span>
   </div>
@@ -811,7 +816,7 @@ function renderExercise(wk, di, ei, state) {
     ${setsHtml}
   </div>
 
-  <!-- Fulfillment meter (2.5) -->
+  <!-- Soll-Ist + Fulfillment combined row (2.4): always visible, no toggle -->
   ${(() => {
     if (!ex.targetSets || !ex.targetReps) return '';
     const target   = ex.targetSets * ex.targetReps;
@@ -823,7 +828,7 @@ function renderExercise(wk, di, ei, state) {
       <div class="fulfill-meter__bar-wrap">
         <div class="fulfill-meter__bar" style="width:${pct}%;background:${color}"></div>
       </div>
-      <span class="fulfill-meter__label" style="color:${color}">${achieved}/${target} Wdh</span>
+      <span class="fulfill-meter__label" style="color:${color}">Ziel: ${ex.targetSets}×${ex.targetReps} | Ist: ${achieved}/${target} Wdh</span>
     </div>`;
   })()}
 
@@ -1919,11 +1924,36 @@ function _handleClick(e) {
       showToast('CSV wird heruntergeladen …', 'ok'); break;
 
     // ── Day ────────────────────────────────────────────────────────────────
-    case 'add-day':
-      dispatch(A.DAY_ADD, {});
+    case 'add-day': {
+      // 2.2: show clone dialog instead of directly adding empty day
+      const wkDays = getState().weeks[getState().curIdx]?.days ?? [];
+      const opts   = document.getElementById('add-day-options');
+      if (opts) {
+        opts.innerHTML = [
+          `<label class="nw-source nw-source--check">
+            <input type="radio" name="add-day-src" value="empty" checked />
+            <span>Leerer Tag</span>
+          </label>`,
+          ...wkDays.map((d, i) => `
+          <label class="nw-source nw-source--check">
+            <input type="radio" name="add-day-src" value="${i}" />
+            <span>${h(d.title)}${d.subtitle ? ` – ${h(d.subtitle)}` : ''} klonen</span>
+          </label>`),
+        ].join('');
+      }
+      openModal('modal-add-day');
+      break;
+    }
+    case 'confirm-add-day': {
+      const sel     = document.querySelector('input[name="add-day-src"]:checked');
+      const srcVal  = sel?.value ?? 'empty';
+      const sourceDi = srcVal === 'empty' ? null : +srcVal;
+      dispatch(A.DAY_ADD_CLONE, { sourceDi });
+      closeModal('modal-add-day');
       showToast('Neuer Trainingstag hinzugefügt', 'ok');
       if (_activeTab === 'settings') renderSettingsTab(getState());
       break;
+    }
 
     case 'remove-day': {
       const _di = +el.dataset.di;
@@ -1944,6 +1974,35 @@ function _handleClick(e) {
       // Read updated state to get new locked value
       const day = getState().weeks[getState().curIdx]?.days[+di];
       showToast(day?.markedDone ? 'Tag gesperrt 🔒' : 'Tag entsperrt 🔓', 'info');
+      break;
+    }
+
+    case 'edit-day-field': {
+      // 2.3: inline-edit day title / subtitle
+      e.stopPropagation();
+      const field   = el.dataset.field;
+      const curVal  = getState().weeks[getState().curIdx]?.days[+di]?.[field] ?? '';
+      const inp     = document.createElement('input');
+      inp.type      = 'text';
+      inp.value     = curVal;
+      inp.className = field === 'title' ? 'day-inline-edit day-inline-edit--title' : 'day-inline-edit day-inline-edit--sub';
+      inp.maxLength = 60;
+      inp.setAttribute('aria-label', field === 'title' ? 'Tag-Titel bearbeiten' : 'Tag-Schwerpunkt bearbeiten');
+      el.replaceWith(inp);
+      inp.focus();
+      inp.select();
+      const _save = () => {
+        const val = inp.value.trim();
+        dispatch(A.DAY_SET_FIELD, { di: +di, field, value: val });
+      };
+      inp.addEventListener('blur', _save, { once: true });
+      inp.addEventListener('keydown', ev => {
+        if (ev.key === 'Enter') { ev.preventDefault(); inp.blur(); }
+        if (ev.key === 'Escape') {
+          inp.removeEventListener('blur', _save);
+          inp.blur();
+        }
+      });
       break;
     }
 
@@ -2676,6 +2735,19 @@ function _buildScaffold(root) {
       <button class="btn btn--ghost" data-action="close-modal">Schließen</button>
       <button class="btn btn--accent" data-action="save-tpl">
         ${ic.save()} Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Tag hinzufügen / klonen (2.2) -->
+<div class="modal-overlay" id="modal-add-day" role="dialog"
+  aria-modal="true" aria-labelledby="modal-add-day-title">
+  <div class="modal">
+    <h2 class="modal__title" id="modal-add-day-title">Neuer Trainingstag</h2>
+    <div id="add-day-options" style="display:flex;flex-direction:column;gap:var(--sp-2);margin-bottom:var(--sp-4)"></div>
+    <div class="modal__actions">
+      <button class="btn btn--ghost" data-action="close-modal" data-target="modal-add-day">Abbrechen</button>
+      <button class="btn btn--accent" data-action="confirm-add-day">Hinzufügen</button>
     </div>
   </div>
 </div>

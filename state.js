@@ -428,6 +428,7 @@ export const A = Object.freeze({
   WEEK_SET_NOTE:       'WEEK_SET_NOTE',       // { note }
   // Day
   DAY_ADD:             'DAY_ADD',             // {}
+  DAY_ADD_CLONE:       'DAY_ADD_CLONE',       // { sourceDi: number|null } – null = empty
   DAY_REMOVE:          'DAY_REMOVE',          // { di }
   DAY_TOGGLE_COMPLETE: 'DAY_TOGGLE_COMPLETE', // { di }
   DAY_SET_FIELD:       'DAY_SET_FIELD',       // { di, field, value }
@@ -602,6 +603,27 @@ function reduce(state, action) {
         markedDone: false,
         exercises:  [],
       });
+      break;
+    }
+    case A.DAY_ADD_CLONE: {
+      const wk = _currentWeek(); if (!wk) break;
+      const labels  = ['A','B','C','D','E','F','G'];
+      const label   = labels[wk.days.length] ?? String(wk.days.length + 1);
+      const srcDay  = p.sourceDi != null ? wk.days[p.sourceDi] : null;
+      const newDay = {
+        id:         Date.now(),
+        title:      `Tag ${label}`,
+        subtitle:   srcDay?.subtitle ?? '',
+        warmup:     srcDay?.warmup  ?? '',
+        cooldown:   srcDay?.cooldown ?? '',
+        locked:     false,
+        markedDone: false,
+        exercises:  srcDay ? srcDay.exercises.map(ex => ({
+          ...JSON.parse(JSON.stringify(ex)),
+          sets: ex.sets.map(s => ({ ...s, status: 'pending', done: false })),
+        })) : [],
+      };
+      wk.days.push(newDay);
       break;
     }
     case A.DAY_REMOVE: {
