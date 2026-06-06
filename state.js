@@ -26,6 +26,18 @@ export const STORAGE_KEY        = 'train_v6';
 export const STORAGE_KEY_SHADOW = 'train_v6_shadow';
 export const SCHEMA_VERSION     = 9;
 
+// 4.1: Canonical tag taxonomy
+export const AVAILABLE_TAGS = {
+  muskelgruppen:   ['Brust','Rücken','Latissimus','Trapez','Unterer Rücken','Beine','Quadrizeps','Beinbizeps','Gluteus','Waden','Bauch','Schulter','Vordere Schulter','Seitliche Schulter','Hintere Schulter','Bizeps','Trizeps','Unterarme'],
+  trainingsziel:   ['Hypertrophie','Maximalkraft','Schnellkraft','Athletik','Mobilität'],
+  uebungsstil:     ['Langhantel','Kurzhantel','Kabelzug','Maschine','Kettlebell','Eigengewicht'],
+  bewegungsmuster: ['Push','Pull','Hinge','Squat','Carry'],
+  kontext:         ['Wettkampf','Reha','Home-Workout'],
+};
+
+/** Flat list of all tags (used as default for activeTags). */
+export const ALL_TAGS_FLAT = Object.values(AVAILABLE_TAGS).flat();
+
 // ─── Factory helpers ──────────────────────────────────────────────────────────
 
 /** Creates a fresh set entry. */
@@ -123,6 +135,7 @@ function buildDefaultState() {
       deloadFactorCustom: null,
       barbellWeight:      20,
       lastBackupDate:     null,
+      activeTags:         ALL_TAGS_FLAT,  // 4.1: defaults to all tags enabled
     },
   };
 }

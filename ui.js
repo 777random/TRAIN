@@ -17,7 +17,7 @@
  */
 
 import {
-  getState, dispatch, subscribe, A, canUndo,
+  getState, dispatch, subscribe, A, canUndo, AVAILABLE_TAGS, ALL_TAGS_FLAT,
 } from './state.js';
 import {
   exportJSON, importJSON, exportCSV,
@@ -65,12 +65,7 @@ let _root        = null;
 let _toast       = null;
 let _storageWarn = null;
 
-// ─── Exercise tags (3.12) ────────────────────────────────────────────────────
-const _EXERCISE_TAGS = [
-  'Brust', 'Rücken', 'Schultern', 'Bizeps', 'Trizeps', 'Beine', 'Po', 'Bauch',
-  'Ganzkörper', 'Langhantel', 'Kurzhantel', 'Kettlebell', 'Maschine', 'Körpergewicht',
-  'Drücken', 'Ziehen', 'Kniebeugen', 'Hinge', 'Carry',
-];
+// _EXERCISE_TAGS removed in 4.1 – use AVAILABLE_TAGS / settings.activeTags instead
 
 // ─── Standard exercise list (3.2) ────────────────────────────────────────────
 const _STANDARD_EXERCISES = [
@@ -730,7 +725,7 @@ function renderExercise(wk, di, ei, state) {
       <div class="weight-plan-row exercise-tags-row" role="group" aria-label="Tags">
         <span class="pause-row__label">Tags:</span>
         <div class="tag-chips">
-          ${_EXERCISE_TAGS.map(tag => {
+          ${(state.settings?.activeTags ?? ALL_TAGS_FLAT).map(tag => {
             const active = (ex.tags ?? []).includes(tag);
             return `<button
               type="button"
@@ -740,12 +735,13 @@ function renderExercise(wk, di, ei, state) {
             >${h(tag)}</button>`;
           }).join('')}
         </div>
+        <div style="font-size:11px;color:var(--c-text-3);margin-top:2px">Nur aktivierte Tags erscheinen hier.</div>
       </div>
     </div>` : '';
 
   return `
 <div class="exercise${ex._showCfg ? ' is-cfg-open' : ''}${ex.supersetId ? ' is-superset' : ''}" data-di="${di}" data-ei="${ei}" draggable="${drag}">
-  ${ex.supersetId ? '<div class="ss-badge">SS</div>' : ''}
+  ${ex.supersetId ? '<div class="ss-badge">SUPER</div>' : ''}
   <div class="sticky-sentinel" aria-hidden="true" style="height:1px;pointer-events:none;"></div>
 
   <div class="exercise__name-sticky">
@@ -1711,6 +1707,31 @@ function renderSettingsTab(state) {
     </div>
   </div>
 
+  <!-- Tags verwalten (4.1) -->
+  <div class="settings-section">
+    <div class="settings-section__title">Tags verwalten</div>
+    <div class="settings-row__desc" style="padding:0 0 8px">Nur aktivierte Tags erscheinen bei der Übungs-Einstellung.</div>
+    ${Object.entries(AVAILABLE_TAGS).map(([cat, tags]) => {
+      const catLabel = { muskelgruppen:'Muskelgruppen', trainingsziel:'Trainingsziel', uebungsstil:'Übungsstil', bewegungsmuster:'Bewegungsmuster', kontext:'Kontext' }[cat] ?? cat;
+      const active   = s.activeTags ?? ALL_TAGS_FLAT;
+      return `
+      <details class="deload-details" style="margin-bottom:4px">
+        <summary class="deload-details__summary">${catLabel}</summary>
+        <div class="deload-details__body" style="display:flex;flex-wrap:wrap;gap:6px;padding:8px 0">
+          ${tags.map(tag => `
+          <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:12px">
+            <input type="checkbox"
+              data-action="toggle-active-tag"
+              data-tag="${h(tag)}"
+              ${active.includes(tag) ? 'checked' : ''}
+            />
+            ${h(tag)}
+          </label>`).join('')}
+        </div>
+      </details>`;
+    }).join('')}
+  </div>
+
   <!-- Daten -->
   <div class="settings-section">
     <div class="settings-section__title">Daten</div>
@@ -1882,6 +1903,11 @@ function _handleClick(e) {
       scheduleRender();
       break;
     }
+
+    // ── TRAIN logo home button (5.1) ───────────────────────────────────────
+    case 'go-home':
+      _switchToTab('workout');
+      break;
 
     // ── Week navigation ────────────────────────────────────────────────────
     case 'undo':
@@ -2362,6 +2388,14 @@ function _handleChange(e) {
       el.value = '';
       break;
     }
+    case 'toggle-active-tag': {
+      // 4.1: toggle a tag in settings.activeTags without re-rendering (checkbox handles own state)
+      const tag    = el.dataset.tag;
+      const cur    = getState().settings?.activeTags ?? ALL_TAGS_FLAT;
+      const next   = el.checked ? [...cur, tag] : cur.filter(t => t !== tag);
+      dispatch(A.SETTING_SET, { key: 'activeTags', value: next });
+      break;
+    }
   }
 }
 
@@ -2559,27 +2593,24 @@ function _handleTplAction(el) {
 }
 
 // ─── Tab switching ────────────────────────────────────────────────────────────
+function _switchToTab(tab) {
+  _activeTab = tab;
+  document.querySelectorAll('[data-tab]').forEach(b => {
+    b.classList.toggle('is-active', b.dataset.tab === tab);
+    b.setAttribute('aria-selected', b.dataset.tab === tab);
+  });
+  document.querySelectorAll('.page').forEach(p =>
+    p.classList.toggle('is-active', p.id === `page-${tab}`)
+  );
+  const state = getState();
+  if (tab === 'body')     renderBodyTab(state);
+  if (tab === 'analysis') renderAnalysisTab(state);
+  if (tab === 'settings') renderSettingsTab(state);
+}
+
 function _bindTabSwitcher() {
   document.querySelectorAll('[data-tab]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const tab = btn.dataset.tab;
-      _activeTab = tab;
-
-      document.querySelectorAll('[data-tab]').forEach(b =>
-        b.classList.toggle('is-active', b.dataset.tab === tab)
-      );
-      document.querySelectorAll('[data-tab]').forEach(b =>
-        b.setAttribute('aria-selected', b.dataset.tab === tab)
-      );
-      document.querySelectorAll('.page').forEach(p =>
-        p.classList.toggle('is-active', p.id === `page-${tab}`)
-      );
-
-      const state = getState();
-      if (tab === 'body')     renderBodyTab(state);
-      if (tab === 'analysis') renderAnalysisTab(state);
-      if (tab === 'settings') renderSettingsTab(state);
-    });
+    btn.addEventListener('click', () => _switchToTab(btn.dataset.tab));
   });
 }
 
@@ -2610,7 +2641,7 @@ function scheduleRender() {
 function _buildScaffold(root) {
   root.innerHTML = `
 <nav class="nav" role="navigation" aria-label="Hauptnavigation">
-  <span class="nav__logo" aria-hidden="true">TRAIN</span>
+  <button class="nav__logo" data-action="go-home" aria-label="Zur Trainingsübersicht">TRAIN</button>
   <div class="nav__tabs" role="tablist" aria-label="App-Bereiche">
     <button class="nav__tab is-active" role="tab" data-tab="workout"
       aria-selected="true" aria-controls="page-workout">
