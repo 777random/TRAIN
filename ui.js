@@ -41,6 +41,9 @@ let _showInsights = false;
 /** Insights visible in body tab (2.2). */
 let _showBodyInsights = false;
 
+/** Show custom deload input even when current factor is a preset (1.4). */
+let _showCustomDeload = false;
+
 /** IntersectionObserver instance for sticky-header detection. */
 let _stickyObserver = null;
 
@@ -914,12 +917,13 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl) {
     ${metricCellFooter}
   </div>
 
-  <!-- RPE scrollable buttons (3.8) -->
+  <!-- RPE vertical buttons (1.1) – order: 10 top, – bottom -->
   <div class="set-cell set-cell--rpe">
     ${locked
       ? `<span class="rpe-static">${s.rpe ?? '–'}</span>`
-      : `<div class="rpe-btns" role="group" aria-label="Satz ${si + 1} RPE">
-          ${['–', 6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10].map(v => {
+      : `<div class="rpe-btns" role="group" aria-label="Satz ${si + 1} RPE"
+            data-rpe-group data-di="${di}" data-ei="${ei}" data-si="${si}">
+          ${[10, 9.5, 9, 8.5, 8, 7.5, 7, 6.5, 6, '–'].map(v => {
             const isNone = v === '–';
             const cur    = s.rpe ?? null;
             const isSel  = isNone ? cur === null : cur === v;
@@ -1520,7 +1524,7 @@ function renderSettingsTab(state) {
   const dlFactor   = s.deloadFactor ?? 0.75;
   const dlCustom   = s.deloadFactorCustom;
   const dlPresets  = [0.5, 0.6, 0.7, 0.75, 0.8];
-  const isCustomDl = !dlPresets.includes(dlFactor);
+  const isCustomDl = !dlPresets.includes(dlFactor) || _showCustomDeload;
 
   container.innerHTML = `
   <div class="settings-section">
@@ -1580,7 +1584,7 @@ function renderSettingsTab(state) {
           ${isCustomDl ? `
           <div style="margin-top:var(--sp-2);display:flex;align-items:center;gap:var(--sp-2)">
             <input class="body-input" type="number" min="1" max="99" step="1"
-              value="${Math.round((s.deloadFactor ?? 0.75) * 100)}"
+              value="${dlCustom != null ? Math.round(dlCustom * 100) : Math.round(dlFactor * 100)}"
               data-action="set-deload-factor-value"
               style="width:80px"
               aria-label="Deload-Faktor in Prozent"
@@ -2092,6 +2096,13 @@ function _handleClick(e) {
     case 'set-rpe-val': {
       const rpeVal = el.dataset.val === '' ? null : +el.dataset.val;
       dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'rpe', value: rpeVal });
+      // Scroll selected button into view after re-render (1.1)
+      setTimeout(() => {
+        const sel = document.querySelector(
+          `.rpe-btns[data-di="${di}"][data-ei="${ei}"][data-si="${si}"] .rpe-btn.is-selected`
+        );
+        sel?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }, 50);
       break;
     }
 
@@ -2101,13 +2112,11 @@ function _handleClick(e) {
       break;
     }
     case 'autofill-down': {
-      // Flush any uncommitted input values to state before autofilling
+      // Flush uncommitted weight/reps inputs before autofilling (1.3: RPE is buttons, no flush needed)
       const _wInp = document.querySelector(`[data-action="set-weight"][data-di="${di}"][data-ei="${ei}"][data-si="${si}"]`);
       const _rInp = document.querySelector(`[data-action="set-reps"][data-di="${di}"][data-ei="${ei}"][data-si="${si}"]`);
-      const _pInp = document.querySelector(`[data-action="set-rpe"][data-di="${di}"][data-ei="${ei}"][data-si="${si}"]`);
       if (_wInp) dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'weight', value: _wInp.value });
       if (_rInp) dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'reps',   value: _rInp.value });
-      if (_pInp) dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'rpe',    value: _pInp.value });
       dispatch(A.SET_AUTOFILL_DOWN, { di: +di, ei: +ei, si: +si });
       showToast('In folgende Sätze übernommen', 'ok');
       break;
@@ -2124,6 +2133,7 @@ function _handleClick(e) {
     case 'set-deload-factor': {
       const factor = parseFloat(el.dataset.factor);
       if (Number.isFinite(factor)) {
+        _showCustomDeload = false;
         dispatch(A.SETTING_SET, { key: 'deloadFactor', value: factor });
         dispatch(A.SETTING_SET, { key: 'deloadFactorCustom', value: null });
         if (_activeTab === 'settings') renderSettingsTab(getState());
@@ -2131,9 +2141,12 @@ function _handleClick(e) {
       break;
     }
     case 'set-deload-factor-custom': {
-      const cur = getState().settings?.deloadFactor ?? 0.75;
-      dispatch(A.SETTING_SET, { key: 'deloadFactorCustom', value: cur });
+      _showCustomDeload = true;
       if (_activeTab === 'settings') renderSettingsTab(getState());
+      setTimeout(() => {
+        const inp = document.querySelector('[data-action="set-deload-factor-value"]');
+        inp?.focus();
+      }, 30);
       break;
     }
 
@@ -2250,7 +2263,10 @@ function _handleChange(e) {
     case 'set-deload-factor-value': {
       const pct = parseFloat(el.value);
       if (Number.isFinite(pct) && pct >= 1 && pct <= 99) {
-        dispatch(A.SETTING_SET, { key: 'deloadFactor', value: Math.round(pct) / 100 });
+        const f = Math.round(pct) / 100;
+        _showCustomDeload = false;
+        dispatch(A.SETTING_SET, { key: 'deloadFactor',       value: f });
+        dispatch(A.SETTING_SET, { key: 'deloadFactorCustom', value: f });
       }
       break;
     }
@@ -2305,19 +2321,18 @@ function _handleKeydown(e) {
     }
     if (action === 'set-reps') {
       e.preventDefault();
-      document.querySelector(
-        `[data-action="set-rpe"][data-di="${di}"][data-ei="${ei}"][data-si="${si}"]`
-      )?.focus();
-      return;
-    }
-    if (action === 'set-rpe') {
-      e.preventDefault();
       const nextSi = +si + 1;
       const nextWeight = document.querySelector(
         `[data-action="set-weight"][data-di="${di}"][data-ei="${ei}"][data-si="${nextSi}"]`
       );
       if (nextWeight) nextWeight.focus();
-      else inp.blur(); // last set — close keyboard
+      else {
+        inp.blur();
+        // Focus the add-set button when on the last set (1.2)
+        document.querySelector(
+          `[data-action="add-set"][data-di="${di}"][data-ei="${ei}"]`
+        )?.focus();
+      }
       return;
     }
   }

@@ -757,9 +757,12 @@ function reduce(state, action) {
       if (si < 0 || si >= sets.length - 1) break;
       const src = sets[si]; if (!src) break;
       const w = parseFloat(src.weight) || 0;
+      const r = parseFloat(src.reps)   || 0;
+      // Weight → all following sets; Reps → next set only (1.3)
       for (let j = si + 1; j < sets.length; j++) {
         sets[j].weight = w;
       }
+      if (sets[si + 1]) sets[si + 1].reps = r;
       break;
     }
     case A.SET_AUTOFILL_RPE: {

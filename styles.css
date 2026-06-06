@@ -180,6 +180,8 @@ button, input, select, textarea { font: inherit; }
 .toolbar {
   display: flex; gap: var(--sp-2); align-items: center;
   padding-bottom: var(--sp-3); flex-wrap: wrap;
+  position: sticky; top: var(--nav-h); z-index: 250;
+  background: var(--c-bg);
 }
 .mode-pill {
   display: flex; background: var(--c-surface);
@@ -754,10 +756,15 @@ exercise { position: unset; }
 
 /* ── RPE button group (3.8) ────────────────────────────────── */
 .set-cell--rpe  { overflow: hidden; }
-.rpe-btns       { display: flex; overflow-x: auto; gap: 4px; padding-bottom: 2px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+/* Vertical scroll list, 10 at top → – at bottom (1.1) */
+.rpe-btns       {
+  display: flex; flex-direction: column; overflow-y: auto; overflow-x: hidden;
+  max-height: 120px; gap: 3px; padding-right: 2px;
+  -webkit-overflow-scrolling: touch; scrollbar-width: none;
+}
 .rpe-btns::-webkit-scrollbar { display: none; }
 .rpe-btn {
-  flex-shrink: 0; min-width: 32px; height: 28px;
+  flex-shrink: 0; width: 36px; height: 28px;
   background: var(--c-surface2); border: 1px solid var(--c-border);
   border-radius: var(--r-sm); font-size: 11px; color: var(--c-text-3);
   cursor: pointer; transition: background var(--t-fast), color var(--t-fast);
