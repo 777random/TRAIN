@@ -35,6 +35,12 @@ let _overviewMode = false;
 /** Currently active top-level tab id. */
 let _activeTab = 'workout';
 
+/** Insights visible in analysis tab (2.1). */
+let _showInsights = false;
+
+/** Insights visible in body tab (2.2). */
+let _showBodyInsights = false;
+
 /** IntersectionObserver instance for sticky-header detection. */
 let _stickyObserver = null;
 
@@ -451,8 +457,32 @@ function renderDayBody(wk, di, state) {
   const lockBtnLabel = done ? 'Tag entsperren' : 'Tag als abgeschlossen markieren und sperren';
   const lockBtnIcon  = done ? ic.unlock() : ic.lock();
 
+  // Session note (2.4): collapsed under warmup, icon shows state
+  const noteVal    = day.sessionNote ?? '';
+  const noteHasVal = noteVal.trim().length > 0;
+  const noteBlock  = `
+  <div class="session-note-block">
+    <button
+      class="session-note-toggle${noteHasVal ? ' has-note' : ''}"
+      onclick="this.nextElementSibling.classList.toggle('is-open')"
+      aria-expanded="false"
+      aria-label="Trainingsnotiz"
+    >📝 <span>${noteHasVal ? 'Notiz' : 'Trainingsnotiz hinzufügen'}</span></button>
+    <div class="session-note-body">
+      <textarea
+        class="session-note-input"
+        rows="3"
+        placeholder="Wie lief das Training? Besonderheiten …"
+        data-action="day-field" data-di="${di}" data-field="sessionNote"
+        aria-label="Trainingsnotiz"
+        ${locked ? 'disabled' : ''}
+      >${h(noteVal)}</textarea>
+    </div>
+  </div>`;
+
   return `
     ${renderInfoBlock('warmup', '🔥 Aufwärmen', day.warmup, di, locked)}
+    ${noteBlock}
     ${prevBanner}
     <div data-ex-list="${di}">${exHtml}</div>
     ${!locked ? `
@@ -667,6 +697,12 @@ function renderExercise(wk, di, ei, state) {
     maxlength="120"
   />
 
+  <!-- Soll-Ist badge (2.5) -->
+  ${(ex.targetSets && ex.targetReps) ? `
+  <div class="soll-ist-badge" aria-label="Ziel: ${ex.targetSets}×${ex.targetReps}">
+    Ziel: ${ex.targetSets}×${ex.targetReps}
+  </div>` : ''}
+
   <div class="set-header" aria-hidden="true">
     <span>#</span><span>kg</span><span>${metricHdr}</span><span>RPE</span><span>✓</span><span></span>
   </div>
@@ -674,6 +710,22 @@ function renderExercise(wk, di, ei, state) {
   <div data-set-list="${di}-${ei}" role="list" aria-label="Sätze von ${h(ex.name)}">
     ${setsHtml}
   </div>
+
+  <!-- Fulfillment meter (2.5) -->
+  ${(() => {
+    if (!ex.targetSets || !ex.targetReps) return '';
+    const target   = ex.targetSets * ex.targetReps;
+    const achieved = ex.sets.filter(s => s.status === 'success').reduce((sum, s) => sum + (s.reps ?? 0), 0);
+    const pct      = target > 0 ? Math.min(Math.round(achieved / target * 100), 100) : 0;
+    const color    = pct >= 100 ? 'var(--c-ok)' : pct >= 80 ? 'var(--c-warn)' : 'var(--c-danger)';
+    return `
+    <div class="fulfill-meter" aria-label="Zielerfüllung ${pct}%">
+      <div class="fulfill-meter__bar-wrap">
+        <div class="fulfill-meter__bar" style="width:${pct}%;background:${color}"></div>
+      </div>
+      <span class="fulfill-meter__label" style="color:${color}">${achieved}/${target} Wdh</span>
+    </div>`;
+  })()}
 
   ${!locked ? `
   <button
@@ -854,6 +906,42 @@ function renderBodyTab(state) {
       </div>`;
     }).join('');
 
+  // Body correlation insight (2.2): only if ≥4 weeks have sleep data
+  const weeksWithSleep = state.weeks.filter(w => w.bodyData?.sleep);
+  let bodyInsightHtml = '';
+  if (weeksWithSleep.length >= 4) {
+    const avgSleepHigh = weeksWithSleep
+      .filter(w => (w.bodyData.sleep ?? 0) >= 7.5)
+      .map(w => _trueVol(w));
+    const avgSleepLow  = weeksWithSleep
+      .filter(w => (w.bodyData.sleep ?? 0) < 7.5)
+      .map(w => _trueVol(w));
+    const mean = arr => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+    const highMean = mean(avgSleepHigh), lowMean = mean(avgSleepLow);
+    let insightMsg = '';
+    if (avgSleepHigh.length >= 2 && avgSleepLow.length >= 2 && highMean > 0 && lowMean > 0) {
+      const diff = Math.round((highMean - lowMean) / lowMean * 100);
+      if (Math.abs(diff) >= 10) {
+        insightMsg = diff > 0
+          ? `Bei Wochen mit ≥7,5 Std. Schlaf war dein Tatsächliches Volumen durchschnittlich ${diff}% höher.`
+          : `Bei wenig Schlaf (&lt;7,5 Std.) war dein Tatsächliches Volumen ${Math.abs(diff)}% höher – du arbeitest hart auch wenn müde!`;
+      }
+    }
+    if (insightMsg) {
+      bodyInsightHtml = `
+      <div style="margin-bottom:var(--sp-3)">
+        <button class="insight-toggle${_showBodyInsights ? ' is-active' : ''}"
+          data-action="toggle-body-insights"
+          aria-pressed="${_showBodyInsights}"
+          style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--c-text-3);background:none;border:none;cursor:pointer;padding:0"
+        >
+          ${ic.lightbulb()} Interessante Beobachtung
+        </button>
+        ${_showBodyInsights ? `<div class="insight-card" style="margin-top:var(--sp-2)">${ic.lightbulb()}<span>${insightMsg}</span></div>` : ''}
+      </div>`;
+    }
+  }
+
   const scale = (field, label) => {
     const cur = bd[field];
     return `
@@ -934,9 +1022,74 @@ function renderBodyTab(state) {
       </div>
     </div>
   </div>
+  ${bodyInsightHtml}
   ${histRows ? `
   <div style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--c-text-3);margin-bottom:8px">Verlauf</div>
   ${histRows}` : ''}`;
+}
+
+// ─── Tatsächliches Volumen helper (only success sets) ────────────────────────
+function _trueVol(week) {
+  return week.days.reduce((s, d) =>
+    s + d.exercises.reduce((ss, ex) =>
+      ss + ex.sets.filter(st => st.status === 'success').reduce((sss, st) =>
+        sss + (st.weight ?? 0) * (st.reps ?? 0), 0), 0), 0);
+}
+
+// ─── Analysis insights (max 2, priority-ordered) ─────────────────────────────
+function _buildInsights(state, sorted) {
+  const insights = [];
+  const prs = state.prs ?? {};
+
+  // Priority 1: Neue Bestleistung diese Woche
+  const curWk = sorted[sorted.length - 1];
+  if (curWk) {
+    for (const day of curWk.days) {
+      for (const ex of day.exercises) {
+        const pr = prs[ex.name];
+        if (!pr) continue;
+        const maxW = Math.max(...ex.sets.filter(s => s.status === 'success').map(s => s.weight ?? 0));
+        if (maxW > 0 && maxW >= pr.maxWeight && pr.date === new Date().toISOString().split('T')[0]) {
+          insights.push(`🏆 Neue Bestleistung bei <strong>${h(ex.name)}</strong>: ${maxW} kg!`);
+          if (insights.length >= 2) return insights;
+        }
+      }
+    }
+  }
+
+  // Priority 2: Stärkstes Tatsächliches Volumen aller Zeiten
+  if (sorted.length >= 2) {
+    const curVol  = _trueVol(sorted[sorted.length - 1]);
+    const prevMax = Math.max(...sorted.slice(0, -1).map(_trueVol));
+    if (curVol > prevMax && curVol > 0) {
+      insights.push(`💪 Dein bisher stärkstes <strong>Tatsächliches Volumen</strong>: ${curVol >= 1000 ? (curVol/1000).toFixed(1)+'t' : curVol+' kg'}!`);
+      if (insights.length >= 2) return insights;
+    }
+  }
+
+  // Priority 3: Stagnation über 3+ Wochen (Δ < 2%)
+  if (sorted.length >= 4) {
+    const last3 = sorted.slice(-3).map(_trueVol);
+    const base  = last3[0];
+    if (base > 0 && last3.every(v => Math.abs(v - base) / base < 0.02)) {
+      insights.push(`📊 Dein Tatsächliches Volumen stagniert seit ${last3.length} Wochen – Zeit für Progression?`);
+      if (insights.length >= 2) return insights;
+    }
+  }
+
+  // Priority 4: Volumen-Trend über letzte 4 Wochen
+  if (sorted.length >= 4 && insights.length < 2) {
+    const last4 = sorted.slice(-4).map(_trueVol);
+    const first = last4[0], last = last4[last4.length - 1];
+    if (first > 0) {
+      const pct = Math.round((last - first) / first * 100);
+      if (Math.abs(pct) >= 5) {
+        insights.push(`📈 Letzte 4 Wochen: ${pct > 0 ? '+' : ''}${pct}% Tatsächliches Volumen`);
+      }
+    }
+  }
+
+  return insights.slice(0, 2);
 }
 
 // ─── Analysis tab ─────────────────────────────────────────────────────────────
@@ -944,31 +1097,30 @@ function renderAnalysisTab(state) {
   const container = document.getElementById('analysis-tab-content');
   if (!container) return;
 
-  const streak = _calcStreak(state);
-  const sorted = [...state.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
-  const last8  = sorted.slice(-8);
-  const vols   = last8.map(w =>
-    w.days.reduce((s, d) =>
-      s + d.exercises.reduce((ss, ex) =>
-        ss + ex.sets.reduce((sss, st) => sss + st.weight * st.reps, 0), 0), 0)
-  );
+  const streak   = _calcStreak(state);
+  const sorted   = [...state.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
+  const last8    = sorted.slice(-8);
+  // Tatsächliches Volumen: nur success-Sätze (2.1)
+  const vols     = last8.map(_trueVol);
   const wkLabels = last8.map(w => wkLabel(w.startDate).split('·')[0].trim());
 
   const allExNames = [...new Set(
     state.weeks.flatMap(w => w.days.flatMap(d => d.exercises.map(e => e.name)))
   )].sort();
 
+  const insights = _buildInsights(state, sorted);
+
   const weekCards = [...sorted].reverse().map((wk, wi, arr) => {
     const tot  = wk.days.reduce((s, d) => s + d.exercises.reduce((ss, ex) => ss + ex.sets.length, 0), 0);
-    const don  = wk.days.reduce((s, d) => s + d.exercises.reduce((ss, ex) => ss + ex.sets.filter(st => st.done).length, 0), 0);
-    const vol  = wk.days.reduce((s, d) => s + d.exercises.reduce((ss, ex) => ss + ex.sets.reduce((sss, st) => sss + st.weight * st.reps, 0), 0), 0);
+    const don  = wk.days.reduce((s, d) => s + d.exercises.reduce((ss, ex) => ss + ex.sets.filter(st => st.status === 'success').length, 0), 0);
+    const vol  = _trueVol(wk);
     const pct  = tot > 0 ? Math.round(don / tot * 100) : 0;
     const dd   = wk.days.filter(d => !!d.markedDone).length;
     const isDl = wk.mode === 'deload';
     const prev = arr[wi + 1];
     let vd = '';
     if (prev) {
-      const pv = prev.days.reduce((s, d) => s + d.exercises.reduce((ss, ex) => ss + ex.sets.reduce((sss, st) => sss + st.weight * st.reps, 0), 0), 0);
+      const pv = _trueVol(prev);
       if (pv > 0) {
         const df = Math.round((vol - pv) / pv * 100);
         vd = df > 0
@@ -976,9 +1128,31 @@ function renderAnalysisTab(state) {
           : df < 0 ? `<span class="diff-dn"> ↓${Math.abs(df)}%</span>` : '';
       }
     }
+
+    // Day durations from sessionLog (2.6)
+    const dayDurations = wk.days.map((day, di) => {
+      const logs = (wk.sessionLog ?? []).filter(l => l.dayIdx === di);
+      if (!logs.length) return '';
+      const mins = Math.round(logs.reduce((s, l) => s + l.duration, 0) / 60);
+      return `<span class="pw-day-dur">${h(day.title)}: ${mins} min</span>`;
+    }).filter(Boolean).join(' · ');
+
+    // Average session duration
     const avgDur = wk.sessionLog?.length
       ? Math.round(wk.sessionLog.reduce((s, l) => s + l.duration, 0) / wk.sessionLog.length / 60)
       : null;
+
+    // Target fulfillment (2.5)
+    let avgFulfill = null;
+    const withTargets = wk.days.flatMap(d => d.exercises.filter(ex => ex.targetSets && ex.targetReps));
+    if (withTargets.length > 0) {
+      const rates = withTargets.map(ex => {
+        const target   = (ex.targetSets ?? 0) * (ex.targetReps ?? 0);
+        const achieved = ex.sets.filter(s => s.status === 'success').reduce((sum, s) => sum + (s.reps ?? 0), 0);
+        return target > 0 ? Math.min(achieved / target, 1) : 0;
+      });
+      avgFulfill = Math.round(rates.reduce((a, b) => a + b, 0) / rates.length * 100);
+    }
 
     return `
     <div class="pw-card${isDl ? ' pw-card--deload' : ''}">
@@ -989,28 +1163,42 @@ function renderAnalysisTab(state) {
             ${isDl ? '<span class="deload-badge">Deload</span>' : ''}
           </div>
           <div class="pw-card__date">${wkRange(wk.startDate)}${wk.note ? ' · ' + h(wk.note) : ''}</div>
+          ${dayDurations ? `<div class="pw-day-durs">${dayDurations}</div>` : ''}
         </div>
         <div class="pw-card__pct" style="color:${pct===100?'var(--c-ok)':'var(--c-text)'}">${pct}%</div>
       </div>
       <div class="pw-card__stats">
-        <div><div class="pw-stat__num" style="color:${isDl?'var(--c-deload)':'var(--c-accent)'}">${dd}/3</div><div class="pw-stat__lbl">Tage</div></div>
-        <div><div class="pw-stat__num">${don}</div><div class="pw-stat__lbl">Sätze</div></div>
-        <div><div class="pw-stat__num">${vol >= 1000 ? (vol/1000).toFixed(1)+'t' : vol+'kg'}</div><div class="pw-stat__lbl">Volumen${vd}</div></div>
+        <div><div class="pw-stat__num" style="color:${isDl?'var(--c-deload)':'var(--c-accent)'}">${dd}/${wk.days.length}</div><div class="pw-stat__lbl">Tage</div></div>
+        <div><div class="pw-stat__num">${don}</div><div class="pw-stat__lbl">Sätze ✓</div></div>
+        <div><div class="pw-stat__num">${vol >= 1000 ? (vol/1000).toFixed(1)+'t' : vol+'kg'}</div><div class="pw-stat__lbl">Tats. Vol.${vd}</div></div>
         ${avgDur ? `<div><div class="pw-stat__num">${avgDur}'</div><div class="pw-stat__lbl">Ø Dauer</div></div>` : ''}
+        ${avgFulfill !== null ? `<div><div class="pw-stat__num" style="color:${avgFulfill>=100?'var(--c-ok)':avgFulfill>=80?'var(--c-warn)':'var(--c-danger)'}">${avgFulfill}%</div><div class="pw-stat__lbl">Ziel-Erf.</div></div>` : ''}
       </div>
       <div class="progress-bar-wrap"><div class="progress-bar" style="width:${pct}%"></div></div>
     </div>`;
   }).join('');
+
+  const insightHtml = _showInsights && insights.length > 0
+    ? insights.map(msg => `<div class="insight-card">${ic.lightbulb()}<span>${msg}</span></div>`).join('')
+    : '';
 
   container.innerHTML = `
   <div class="streak-row">
     <div class="streak-card"><div class="streak-num">${streak.cur}</div><div class="streak-lbl">Streak</div></div>
     <div class="streak-card"><div class="streak-num">${streak.best}</div><div class="streak-lbl">Best</div></div>
     <div class="streak-card"><div class="streak-num">${state.weeks.length}</div><div class="streak-lbl">Wochen</div></div>
+    ${state.weeks.length >= 2 ? `
+    <button class="streak-card insight-toggle${_showInsights ? ' is-active' : ''}"
+      data-action="toggle-insights"
+      aria-pressed="${_showInsights}"
+      aria-label="Insights ${_showInsights ? 'ausblenden' : 'anzeigen'}"
+    >${ic.lightbulb()}<div class="streak-lbl">Insights</div></button>` : ''}
   </div>
 
+  ${insightHtml}
+
   <div class="chart-card">
-    <div class="chart-card__title">Volumen-Verlauf</div>
+    <div class="chart-card__title">Tatsächliches Volumen</div>
     <div class="chart-wrap"><canvas id="chart-vol" aria-label="Volumen-Verlauf Diagramm" role="img"></canvas></div>
   </div>
 
@@ -1460,6 +1648,18 @@ function _handleClick(e) {
       scheduleRender();
       break;
 
+    // ── Analysis insights toggle (2.1) ─────────────────────────────────────
+    case 'toggle-insights':
+      _showInsights = !_showInsights;
+      scheduleRender();
+      break;
+
+    // ── Body correlation insight toggle (2.2) ──────────────────────────────
+    case 'toggle-body-insights':
+      _showBodyInsights = !_showBodyInsights;
+      scheduleRender();
+      break;
+
     case 'overview-open-day': {
       _overviewMode  = false;
       _activeDayIdx  = +el.dataset.di;
@@ -1501,13 +1701,9 @@ function _handleClick(e) {
       openModal('modal-delete-week'); break;
 
     case 'create-week':
-      _createWeek(); break;
-
     case 'create-week-prev':
-      _createWeek('prev'); break;
-
     case 'create-week-template':
-      _createWeek('template'); break;
+      _createWeek(); break;
 
     case 'confirm-delete-week':
       dispatch(A.WEEK_DELETE, {});
@@ -1904,26 +2100,86 @@ function _toggleAccordion(di) {
   scheduleRender();
 }
 
-// ─── New week modal ───────────────────────────────────────────────────────────
+// ─── New week modal (2.3) ─────────────────────────────────────────────────────
 function _prepNewWeekModal() {
-  const dateInput = document.getElementById('new-week-date');
-  if (dateInput) dateInput.value = nextMonday();
-  const noteInput = document.getElementById('new-week-note');
-  if (noteInput) noteInput.value = '';
+  const state = getState();
+  const body  = document.getElementById('new-week-modal-body');
+  if (!body) return;
+
+  // Progression suggestions: which exercises are ready for weight increase?
+  const curWk   = state.weeks[state.curIdx];
+  const suggestions = [];
+  if (curWk) {
+    for (const day of curWk.days) {
+      for (const ex of day.exercises) {
+        if (!ex.targetSets || !ex.targetReps) continue;
+        const successSets = ex.sets.filter(s => s.status === 'success');
+        const allMetTarget = successSets.length >= ex.targetSets
+          && successSets.every(s => (s.reps ?? 0) >= ex.targetReps);
+        if (allMetTarget && successSets.length > 0) {
+          const maxW = Math.max(...successSets.map(s => s.weight ?? 0));
+          const step = ex.weightStep ?? 2.5;
+          suggestions.push({ name: ex.name, from: maxW, to: maxW + step });
+        }
+      }
+    }
+  }
+
+  const suggestHtml = suggestions.length > 0 ? `
+  <div class="nw-suggestions">
+    <div class="nw-suggestions__title">Empfohlene Steigerungen</div>
+    ${suggestions.map(s =>
+      `<div class="nw-suggestion-row">
+        <span>${h(s.name)}</span>
+        <span class="nw-sug-weight">${s.from} → <strong>${s.to} kg</strong></span>
+      </div>`).join('')}
+  </div>` : '';
+
+  // Named templates from state.templates[]
+  const templates = state.templates ?? [];
+  const templateOptions = templates.length > 0
+    ? templates.map((t, i) => `<option value="tpl-${i}">${h(t.name ?? `Vorlage ${i+1}`)}</option>`).join('')
+    : '<option value="custom">Standard-Vorlage</option>';
+
+  body.innerHTML = `
+  <div class="form-group">
+    <label class="form-label" for="new-week-date">Wochenstart (Montag)</label>
+    <input type="date" class="form-input" id="new-week-date" aria-required="true" value="${nextMonday()}"/>
+  </div>
+  <div class="form-group">
+    <label class="form-label" for="new-week-note">Notiz</label>
+    <input type="text" class="form-input" id="new-week-note"
+      placeholder="z. B. Deload, Urlaub …" maxlength="80"/>
+  </div>
+  <div class="form-group">
+    <label class="nw-source nw-source--check">
+      <input type="checkbox" id="nw-copy-prev" checked />
+      <span>Vorwoche als Vorlage übernehmen</span>
+    </label>
+  </div>
+  <div class="form-group" id="nw-template-group">
+    <label class="form-label" for="nw-template-select">Vorlage</label>
+    <select class="form-input" id="nw-template-select">${templateOptions}</select>
+  </div>
+  ${suggestHtml}`;
+
+  // Show/hide template select based on checkbox
+  const cb     = body.querySelector('#nw-copy-prev');
+  const tplGrp = body.querySelector('#nw-template-group');
+  const toggle = () => { tplGrp.style.display = cb.checked ? 'none' : ''; };
+  toggle();
+  cb.addEventListener('change', toggle);
 }
 
-function _createWeek(source) {
-  const date = document.getElementById('new-week-date')?.value;
-  const note = document.getElementById('new-week-note')?.value ?? '';
+function _createWeek() {
+  const date     = document.getElementById('new-week-date')?.value;
+  const note     = document.getElementById('new-week-note')?.value ?? '';
+  const copyPrev = document.getElementById('nw-copy-prev')?.checked ?? true;
   if (!date) { showToast('Bitte Datum wählen', 'warn'); return; }
-  let src = source;
-  if (!src) {
-    src = document.querySelector('input[name="new-week-source"]:checked')?.value;
-  }
-  const resolved = src === 'template' ? 'template' : 'prev';
-  dispatch(A.WEEK_CREATE, { startDate: date, note, source: resolved });
+  const source = copyPrev ? 'prev' : 'template';
+  dispatch(A.WEEK_CREATE, { startDate: date, note, source });
   closeModal('modal-new-week');
-  showToast(resolved === 'template' ? 'Neue Woche aus Vorlage erstellt ✓' : 'Neue Woche aus Vorwoche erstellt ✓', 'ok');
+  showToast(source === 'template' ? 'Neue Woche aus Vorlage erstellt ✓' : 'Neue Woche aus Vorwoche erstellt ✓', 'ok');
 }
 
 // ─── Template save ────────────────────────────────────────────────────────────
@@ -2105,32 +2361,7 @@ function _buildScaffold(root) {
   aria-modal="true" aria-labelledby="modal-nw-title">
   <div class="modal">
     <h2 class="modal__title" id="modal-nw-title">Neue Woche</h2>
-    <div class="form-group">
-      <label class="form-label" for="new-week-date">Wochenstart (Montag)</label>
-      <input type="date" class="form-input" id="new-week-date" aria-required="true"/>
-    </div>
-    <div class="form-group">
-      <label class="form-label" for="new-week-note">Notiz</label>
-      <input type="text" class="form-input" id="new-week-note"
-        placeholder="z. B. Deload, Urlaub …" maxlength="80"/>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Basis</label>
-      <label class="nw-source">
-        <input type="radio" name="new-week-source" value="prev" checked />
-        <div class="nw-source__txt">
-          <div class="nw-source__ttl">Aus Vorwoche übernehmen (Standard)</div>
-          <div class="nw-source__desc">Übernimmt Übungsänderungen und wendet geplante Steigerungen an.</div>
-        </div>
-      </label>
-      <label class="nw-source">
-        <input type="radio" name="new-week-source" value="template" />
-        <div class="nw-source__txt">
-          <div class="nw-source__ttl">Aus Vorlage laden (Neustart)</div>
-          <div class="nw-source__desc">Startet einen neuen Cycle basierend auf deiner Standard-Vorlage.</div>
-        </div>
-      </label>
-    </div>
+    <div id="new-week-modal-body"><!-- filled by _prepNewWeekModal() --></div>
     <div class="modal__actions">
       <button class="btn btn--ghost" data-action="close-modal">Abbrechen</button>
       <button class="btn btn--accent" data-action="create-week">

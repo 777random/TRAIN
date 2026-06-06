@@ -340,6 +340,25 @@ button, input, select, textarea { font: inherit; }
 .info-block textarea:focus { color: var(--c-text); outline: none; }
 .info-block textarea:disabled { opacity: .6; }
 
+/* ── Session note (2.4) ────────────────────────────────────── */
+.session-note-block   { margin: var(--sp-2) 0; }
+.session-note-toggle  {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--c-text-3); background: none; border: none;
+  cursor: pointer; padding: 4px 0; min-height: var(--touch);
+}
+.session-note-toggle.has-note { color: var(--c-accent); }
+.session-note-body    { display: none; }
+.session-note-body.is-open { display: block; }
+.session-note-input   {
+  width: 100%; background: var(--c-surface2); border: 1px solid var(--c-border);
+  border-radius: var(--r-md); color: var(--c-text); font-size: 13px;
+  padding: var(--sp-2) var(--sp-3); resize: vertical; min-height: 60px;
+  margin-top: 4px;
+}
+.session-note-input:focus { border-color: var(--c-accent); outline: none; }
+.session-note-input:disabled { opacity: .6; }
+
 .prev-banner {
   display: flex; align-items: center; gap: var(--sp-2);
   font-size: 11px; color: var(--c-accent);
@@ -614,6 +633,18 @@ exercise { position: unset; }
 .set-note-input:disabled { opacity: .6; }
 
 
+/* ── Soll-Ist (2.5) ─────────────────────────────────────────── */
+.soll-ist-badge {
+  display: inline-block; font-size: 10px; letter-spacing: .08em;
+  background: rgba(200,255,0,.1); border: 1px solid rgba(200,255,0,.25);
+  border-radius: var(--r-full); padding: 2px 8px; margin-bottom: 4px;
+  color: var(--c-accent);
+}
+.fulfill-meter { display: flex; align-items: center; gap: var(--sp-2); margin: 4px 0 var(--sp-2); }
+.fulfill-meter__bar-wrap { flex: 1; height: 4px; background: var(--c-surface2); border-radius: var(--r-full); overflow: hidden; }
+.fulfill-meter__bar      { height: 100%; border-radius: var(--r-full); transition: width .3s; }
+.fulfill-meter__label    { font-size: 10px; white-space: nowrap; }
+
 .add-set-btn {
   display: flex; align-items: center; gap: var(--sp-1);
   border: 1px dashed var(--c-border); background: none; color: var(--c-text-3);
@@ -728,6 +759,22 @@ exercise { position: unset; }
 .pw-stat__lbl   { font-size: 9px; color: var(--c-text-3); letter-spacing: .1em; text-transform: uppercase; }
 .diff-up { color: var(--c-ok); } .diff-dn { color: var(--c-danger); }
 .progress-bar-wrap { margin-top: var(--sp-2); background: var(--c-surface2); border-radius: var(--r-full); height: 3px; overflow: hidden; }
+
+/* Day-level durations under week card title (2.6) */
+.pw-day-durs { font-size: 10px; color: var(--c-text-3); margin-top: 4px; }
+.pw-day-dur  { white-space: nowrap; }
+
+/* Analysis insights card (2.1) */
+.insight-toggle       { display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; gap: 2px; }
+.insight-toggle.is-active { color: var(--c-accent); }
+.insight-toggle svg   { width: 20px; height: 20px; }
+.insight-card {
+  display: flex; align-items: flex-start; gap: var(--sp-3);
+  background: var(--c-surface); border: 1px solid var(--c-accent);
+  border-radius: var(--r-md); padding: var(--sp-3); margin-bottom: var(--sp-3);
+  font-size: 13px; line-height: 1.5; color: var(--c-text);
+}
+.insight-card svg { width: 18px; height: 18px; flex-shrink: 0; color: var(--c-accent); margin-top: 1px; }
 .progress-bar { height: 100%; background: var(--c-accent); border-radius: var(--r-full); transition: width var(--t-normal); }
 .pw-card--deload .progress-bar { background: var(--c-deload); }
 .chart-select {
@@ -830,6 +877,21 @@ exercise { position: unset; }
   border-color: rgba(200,255,0,.35);
   box-shadow: 0 0 0 2px rgba(200,255,0,.08) inset;
 }
+.nw-source--check {
+  display: flex; align-items: center; gap: 10px; cursor: pointer;
+  background: none; border: none; padding: 0; font-size: 14px; color: var(--c-text);
+}
+.nw-source--check input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--c-accent); cursor: pointer; }
+
+/* Progression suggestion preview in new week dialog (2.3) */
+.nw-suggestions {
+  background: var(--c-surface2); border: 1px solid var(--c-border);
+  border-radius: var(--r-md); padding: var(--sp-3); margin-bottom: var(--sp-3);
+}
+.nw-suggestions__title { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--c-text-3); margin-bottom: var(--sp-2); }
+.nw-suggestion-row { display: flex; justify-content: space-between; font-size: 13px; padding: 3px 0; }
+.nw-sug-weight { color: var(--c-text-3); }
+.nw-sug-weight strong { color: var(--c-ok); }
 .export-option {
   display: flex; align-items: flex-start; gap: var(--sp-3);
   background: var(--c-surface2); border: 1px solid var(--c-border);
