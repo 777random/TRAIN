@@ -1302,6 +1302,7 @@ function renderAnalysisTab(state) {
     ? insights.map(msg => `<div class="insight-card">${ic.lightbulb()}<span>${msg}</span></div>`).join('')
     : '';
 
+  container.innerHTML = `
   ${(() => {
     // 3.1: Ø Session + Gesamt time from sessionLog
     const allLogs  = state.weeks.flatMap(w => w.sessionLog ?? []);
