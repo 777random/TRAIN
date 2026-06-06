@@ -338,8 +338,22 @@ function renderDayList(state) {
     <span class="training-progress__label">${pct}% · ${doneSets}/${totalSets} Sätze</span>
   </div>` : '';
 
-  // ── Tab pills row + overview toggle ───────────────────────────────────────
+  // ── Unified sticky bar: toolbar row + day pills + progress bar ───────────
   const tabsHtml = `<div class="day-tab-bar" role="tablist" aria-label="Trainingstage">
+  <div class="day-tab-bar__toolbar" role="toolbar" aria-label="Wochenaktionen">
+    <div class="mode-pill" role="group" aria-label="Trainingsmodus">
+      <button class="mode-pill__btn mode-pill__btn--std${!isDl ? ' is-active' : ''}"
+        id="mode-std" data-action="mode-std" aria-pressed="${!isDl}">Standard</button>
+      <button class="mode-pill__btn mode-pill__btn--dl${isDl ? ' is-active' : ''}"
+        id="mode-dl" data-action="mode-dl" aria-pressed="${isDl}">
+        ${ic.zap()}&thinsp;Deload</button>
+    </div>
+    <span class="toolbar__spacer"></span>
+    <button class="toolbar__btn" id="btn-undo" data-action="undo"
+      aria-label="Rückgängig machen"${!canUndo() ? ' disabled' : ''}>${ic.undo()}</button>
+    <button class="toolbar__btn toolbar__btn--accent" data-action="open-new-week"
+      aria-label="Neue Trainingswoche erstellen">${ic.plus()}</button>
+  </div>
   <div class="day-tab-pills${wk.days.length >= 4 ? ' is-scrollable' : ''}">
     ${wk.days.map((day, di) => {
       const done   = !!day.markedDone;
@@ -2703,21 +2717,6 @@ function _buildScaffold(root) {
     </div>
     <button class="week-nav__btn" id="btn-next-wk" data-action="nav-next"
       aria-label="Nächste Woche">${ic.chevronRight()}</button>
-  </div>
-
-  <div class="toolbar" role="toolbar" aria-label="Wochenaktionen">
-    <div class="mode-pill" role="group" aria-label="Trainingsmodus">
-      <button class="mode-pill__btn mode-pill__btn--std is-active"
-        id="mode-std" data-action="mode-std" aria-pressed="true">Standard</button>
-      <button class="mode-pill__btn mode-pill__btn--dl"
-        id="mode-dl" data-action="mode-dl" aria-pressed="false">
-        ${ic.zap()}&thinsp;Deload</button>
-    </div>
-    <span class="toolbar__spacer"></span>
-    <button class="toolbar__btn" id="btn-undo" data-action="undo"
-      aria-label="Rückgängig machen" disabled>${ic.undo()}</button>
-    <button class="toolbar__btn toolbar__btn--accent" data-action="open-new-week"
-      aria-label="Neue Trainingswoche erstellen">${ic.plus()}</button>
   </div>
 
   <div id="days-container" aria-label="Trainingstage"></div>

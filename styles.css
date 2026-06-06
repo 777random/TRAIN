@@ -180,12 +180,14 @@ button, input, select, textarea { font: inherit; }
 .week-nav__label--deload { color: var(--c-deload); }
 .week-nav__range { font-size: 11px; color: var(--c-text-3); }
 
-/* ── Toolbar ───────────────────────────────────────────────── */
+/* ── Toolbar (now lives inside .day-tab-bar) ───────────────── */
 .toolbar {
   display: flex; gap: var(--sp-2); align-items: center;
   padding-bottom: var(--sp-3); flex-wrap: wrap;
-  position: sticky; top: var(--nav-h); z-index: 250;
-  background: var(--c-bg);
+}
+.day-tab-bar__toolbar {
+  display: flex; gap: var(--sp-2); align-items: center;
+  padding-bottom: var(--sp-2);
 }
 .mode-pill {
   display: flex; background: var(--c-surface);
