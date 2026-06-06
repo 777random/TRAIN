@@ -47,6 +47,12 @@ let _showBodyInsights = false;
 /** Show custom deload input even when current factor is a preset (1.4). */
 let _showCustomDeload = false;
 
+/** Key of currently open RPE popover: `${di}-${ei}-${si}` or null. */
+let _rpePopoverKey = null;
+
+/** Tracks whether the first-day auto-open has already happened. */
+let _autoOpened = false;
+
 /** IntersectionObserver instance for sticky-header detection. */
 let _stickyObserver = null;
 
@@ -312,6 +318,12 @@ function renderDayList(state) {
 
   const isDl = wk.mode === 'deload';
 
+  // 1.1: Auto-open first day on initial load (prevents black screen)
+  if (!_autoOpened && _activeDayIdx === null && !_overviewMode && wk.days.length > 0) {
+    _autoOpened = true;
+    _activeDayIdx = 0;
+  }
+
   // ── Progress bar for active day ───────────────────────────────────────────
   let totalSets = 0, doneSets = 0;
   if (!_overviewMode && _activeDayIdx !== null && wk.days[_activeDayIdx]) {
@@ -327,26 +339,22 @@ function renderDayList(state) {
   </div>` : '';
 
   // ── Tab pills row + overview toggle ───────────────────────────────────────
-  const tabsHtml = `<div class="day-tabs-row" role="tablist" aria-label="Trainingstage">
+  const tabsHtml = `<div class="day-tab-bar" role="tablist" aria-label="Trainingstage">
+  <div class="day-tab-pills${wk.days.length >= 4 ? ' is-scrollable' : ''}">
     ${wk.days.map((day, di) => {
       const done   = !!day.markedDone;
       const locked = !!day.locked;
       const isAct  = !_overviewMode && _activeDayIdx === di;
       const total  = day.exercises.reduce((s, ex) => s + ex.sets.length, 0);
       const done_s = day.exercises.reduce((s, ex) => s + ex.sets.filter(st => st.done).length, 0);
-      const dotCls = done ? 'day-card__dot day-card__dot--done'
-                   : locked ? 'day-card__dot day-card__dot--locked'
-                   : 'day-card__dot';
-      // 3.4: compact 28×28 square with single letter from title
-      const letter = day.title.replace(/[^A-Za-zÄÖÜäöüß0-9]/g, '').charAt(0) || String(di + 1);
       return `<button
         class="day-tab${isAct ? ' is-active' : ''}${done ? ' day-tab--done' : ''}${isDl ? ' day-tab--deload' : ''}"
         data-day-hdr="${di}"
         role="tab" aria-selected="${isAct}" aria-controls="day-panel-${di}"
         id="day-tab-${di}"
         title="${h(day.title)}"
-        aria-label="${h(day.title)}${done_s}/${total} Sätze"
-      >${letter}</button>`;
+        aria-label="${h(day.title)} – ${done_s}/${total} Sätze"
+      >${h(day.title)}</button>`;
     }).join('')}
     <button
       class="day-overview-toggle${_overviewMode ? ' is-active' : ''}"
@@ -355,8 +363,9 @@ function renderDayList(state) {
       aria-pressed="${_overviewMode}"
       title="${_overviewMode ? 'Einzelansicht' : 'Alle Tage anzeigen'}"
     >${ic.columns()}</button>
+  </div>
   ${progressHtml}
-  </div>`;
+</div>`;
 
   // ── Content: overview grid or single active panel ─────────────────────────
   let contentHtml = '';
@@ -397,7 +406,7 @@ function renderDayList(state) {
   container.innerHTML = tabsHtml + contentHtml;
 
   requestAnimationFrame(() => {
-    const tabsRow = container.querySelector('.day-tabs-row');
+    const tabsRow = container.querySelector('.day-tab-bar');
     if (tabsRow) {
       document.documentElement.style.setProperty('--tabs-h', `${tabsRow.offsetHeight}px`);
     }
@@ -889,11 +898,9 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl) {
   const prs   = getState().prs ?? {};
   const exPR  = prs[ex.name];
   const isPR  = st === 'success' && exPR && (s.weight ?? 0) > 0 && s.weight >= exPR.maxWeight;
-  const doneIcon = isPR
-    ? ic.trophy()
-    : st === 'success' ? ic.check()
-    : st === 'fail'    ? ic.xMark()
-    : '';
+  const doneIcon = st === 'success' ? ic.check()
+               : st === 'fail'    ? ic.xMark()
+               : '';
 
   return `
 <div class="set-row" role="listitem" data-di="${di}" data-ei="${ei}" data-si="${si}">
@@ -907,6 +914,7 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl) {
       data-action="set-weight" data-di="${di}" data-ei="${ei}" data-si="${si}"
       aria-label="Satz ${si + 1} Gewicht in kg"
     />
+    ${isPR ? `<span class="pr-badge" aria-label="Bestleistung!">${ic.trophy()}</span>` : ''}
     <span class="prev-hint" aria-hidden="true">${prevSet ? prevSet.weight + ' kg' : ''}</span>
     ${ex.showPlates && dispW > 0 ? (() => { const pl = calcPlates(dispW); return pl ? `<span class="plate-hint" aria-hidden="true" title="Scheiben je Seite">▪ ${pl}</span>` : ''; })() : ''}
   </div>
@@ -921,27 +929,40 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl) {
     ${metricCellFooter}
   </div>
 
-  <!-- RPE vertical buttons (1.1) – order: 10 top, – bottom -->
+  <!-- RPE popover trigger (2.2) -->
   <div class="set-cell set-cell--rpe">
     ${locked
       ? `<span class="rpe-static">${s.rpe ?? '–'}</span>`
-      : `<div class="rpe-btns" role="group" aria-label="Satz ${si + 1} RPE"
-            data-rpe-group data-di="${di}" data-ei="${ei}" data-si="${si}">
-          ${[10, 9.5, 9, 8.5, 8, 7.5, 7, 6.5, 6, '–'].map(v => {
-            const isNone = v === '–';
-            const cur    = s.rpe ?? null;
-            const isSel  = isNone ? cur === null : cur === v;
-            return `<button type="button"
-              class="rpe-btn${isSel ? ' is-selected' : ''}"
-              data-action="set-rpe-val"
-              data-di="${di}" data-ei="${ei}" data-si="${si}"
-              data-val="${isNone ? '' : v}"
-              aria-pressed="${isSel}"
-              aria-label="RPE ${v}"
-            >${v}</button>`;
-          }).join('')}
-        </div>
-        <span class="prev-hint" aria-hidden="true">${prevSet?.rpe ? prevSet.rpe : ''}</span>`
+      : (() => {
+          const cur    = s.rpe ?? null;
+          const label  = cur !== null ? String(cur) : '–';
+          const key    = `${di}-${ei}-${si}`;
+          const isOpen = _rpePopoverKey === key;
+          return `<button type="button"
+            class="rpe-trigger${cur !== null ? ' has-val' : ''}"
+            data-action="open-rpe-popover"
+            data-di="${di}" data-ei="${ei}" data-si="${si}"
+            aria-label="RPE für Satz ${si + 1}: ${label}. Tippen zum Auswählen."
+            aria-expanded="${isOpen}"
+          >${label}</button>
+          ${isOpen ? `<div class="rpe-popover">
+            <div class="rpe-popover__grid">
+              ${['–', 6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10].map(v => {
+                const isNone = v === '–';
+                const isSel  = isNone ? cur === null : cur === v;
+                return `<button type="button"
+                  class="rpe-popover__btn${isSel ? ' is-selected' : ''}"
+                  data-action="set-rpe-val"
+                  data-di="${di}" data-ei="${ei}" data-si="${si}"
+                  data-val="${isNone ? '' : v}"
+                  aria-pressed="${isSel}"
+                  aria-label="RPE ${v}"
+                >${v}</button>`;
+              }).join('')}
+            </div>
+          </div>` : ''}
+          <span class="prev-hint" aria-hidden="true">${prevSet?.rpe ? prevSet.rpe : ''}</span>`;
+        })()
     }
   </div>
 
@@ -952,7 +973,7 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl) {
       data-action="toggle-done" data-di="${di}" data-ei="${ei}" data-si="${si}"
       aria-label="Satz ${si + 1}: ${stLabel}${isPR ? ' – Bestleistung!' : ''}. Tippen für nächsten Status (offen → erfolgreich → nicht geschafft)."
     >${doneIcon}</button>
-    <span class="prev-hint" aria-hidden="true">${isPR ? '🏆' : ''}</span>
+    <span class="prev-hint" aria-hidden="true"></span>
   </div>
 
   <button
@@ -1717,10 +1738,10 @@ function renderSettingsTab(state) {
       const active   = s.activeTags ?? ALL_TAGS_FLAT;
       return `
       <details class="deload-details" style="margin-bottom:4px">
-        <summary class="deload-details__summary">${catLabel}</summary>
+        <summary class="deload-details__summary" style="padding-left:var(--sp-4)">${catLabel}</summary>
         <div class="deload-details__body" style="display:flex;flex-wrap:wrap;gap:6px;padding:8px 0">
           ${tags.map(tag => `
-          <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:12px">
+          <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:12px;padding-left:var(--sp-4)">
             <input type="checkbox"
               data-action="toggle-active-tag"
               data-tag="${h(tag)}"
@@ -1842,6 +1863,14 @@ function _bindEvents(root) {
  *   4. Template editor actions [data-tpl-action]   → uses closest('[data-tpl-action]')
  */
 function _handleClick(e) {
+
+  // Close RPE popover when clicking outside it (2.2)
+  if (_rpePopoverKey !== null
+      && !e.target.closest('.rpe-popover')
+      && !e.target.closest('[data-action="open-rpe-popover"]')) {
+    _rpePopoverKey = null;
+    scheduleRender();
+  }
 
   // ── 1. Day tab button ────────────────────────────────────────────────────
   const hdr = e.target.closest('.day-tab');
@@ -2197,17 +2226,18 @@ function _handleClick(e) {
     case 'add-set':
       dispatch(A.SET_ADD, { di: +di, ei: +ei }); break;
 
-    // RPE button group (3.8)
+    // RPE popover (2.2)
+    case 'open-rpe-popover': {
+      const key = `${di}-${ei}-${si}`;
+      _rpePopoverKey = _rpePopoverKey === key ? null : key;
+      scheduleRender();
+      break;
+    }
+
     case 'set-rpe-val': {
       const rpeVal = el.dataset.val === '' ? null : +el.dataset.val;
       dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'rpe', value: rpeVal });
-      // Scroll selected button into view after re-render (1.1)
-      setTimeout(() => {
-        const sel = document.querySelector(
-          `.rpe-btns[data-di="${di}"][data-ei="${ei}"][data-si="${si}"] .rpe-btn.is-selected`
-        );
-        sel?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-      }, 50);
+      _rpePopoverKey = null;
       break;
     }
 
@@ -2867,6 +2897,23 @@ export function mountApp(root) {
         showToast(
           'In deinen letzten 3 Einheiten hast du \'Erschöpft\' gewählt – plane eine Erholungswoche ein.',
           'warn', 5000
+        );
+      }
+    }
+
+    // 3.1: Positive feedback – 3 consecutive sessionRating=3
+    const lastMotHint = st.settings?.lastMotivationHintDate;
+    const daysSinceMotHint = lastMotHint ? Math.floor((Date.now() - new Date(lastMotHint)) / 86_400_000) : Infinity;
+    if (daysSinceMotHint >= 7) {
+      const sortedMot  = [...st.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
+      const doneDaysMot = sortedMot.flatMap(w => w.days.filter(d => d.markedDone));
+      const last3mot   = doneDaysMot.slice(-3);
+      if (last3mot.length === 3 && last3mot.every(d => d.sessionRating === 3)) {
+        const todayStr = new Date().toISOString().split('T')[0];
+        dispatch(A.SETTING_SET, { key: 'lastMotivationHintDate', value: todayStr });
+        showToast(
+          "Die letzten 3 Einheiten hast du mit 'Stark' bewertet – mach weiter so! 💪",
+          'ok', 5000
         );
       }
     }

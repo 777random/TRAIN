@@ -176,6 +176,12 @@ export const share = () =>
 export const muscleGroup = () =>
   SVG('<path d="M6.5 6.5h11"/><path d="M6.5 17.5h11"/><path d="M4 9.5v5"/><path d="M2 10.5v3"/><path d="M20 9.5v5"/><path d="M22 10.5v3"/>');
 
+/** Body muscle – muscle group icon for Analyse tab (3.2) */
+export const bodyMuscle = () =>
+  SVG(`<path d="M12 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/>
+       <path d="M6.5 8.5C5 9.5 4 11 4 13v1.5c0 1 .5 2 1.5 2.5L7 22h10l1.5-5c1-.5 1.5-1.5 1.5-2.5V13c0-2-1-3.5-2.5-4.5"/>
+       <path d="M9 14c0 1.5.5 3 1.5 4M15 14c0 1.5-.5 3-1.5 4"/>`);
+
 // ─── Helper: screen-reader-only text ─────────────────────────────────────────
 
 /**
