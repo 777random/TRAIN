@@ -23,6 +23,7 @@ import {
   exportJSON, importJSON, exportCSV,
 } from './backup.js';
 import * as ic from './icons.js';
+import { fireTrigger } from './triggerEngine.js';
 
 // ─── Module-level UI state (transient, never persisted) ──────────────────────
 
@@ -1191,61 +1192,6 @@ function _trueVol(week) {
         sss + (st.weight ?? 0) * (st.reps ?? 0), 0), 0), 0);
 }
 
-// ─── Analysis insights (max 2, priority-ordered) ─────────────────────────────
-function _buildInsights(state, sorted) {
-  const insights = [];
-  const prs = state.prs ?? {};
-
-  // Priority 1: Neue Bestleistung diese Woche
-  const curWk = sorted[sorted.length - 1];
-  if (curWk) {
-    for (const day of curWk.days) {
-      for (const ex of day.exercises) {
-        const pr = prs[ex.name];
-        if (!pr) continue;
-        const maxW = Math.max(...ex.sets.filter(s => s.status === 'success').map(s => s.weight ?? 0));
-        if (maxW > 0 && maxW >= pr.maxWeight && pr.date === new Date().toISOString().split('T')[0]) {
-          insights.push(`🏆 Neue Bestleistung bei <strong>${h(ex.name)}</strong>: ${maxW} kg!`);
-          if (insights.length >= 2) return insights;
-        }
-      }
-    }
-  }
-
-  // Priority 2: Stärkstes Tatsächliches Volumen aller Zeiten
-  if (sorted.length >= 2) {
-    const curVol  = _trueVol(sorted[sorted.length - 1]);
-    const prevMax = Math.max(...sorted.slice(0, -1).map(_trueVol));
-    if (curVol > prevMax && curVol > 0) {
-      insights.push(`💪 Dein bisher stärkstes <strong>Tatsächliches Volumen</strong>: ${curVol >= 1000 ? (curVol/1000).toFixed(1)+'t' : curVol+' kg'}!`);
-      if (insights.length >= 2) return insights;
-    }
-  }
-
-  // Priority 3: Stagnation über 3+ Wochen (Δ < 2%)
-  if (sorted.length >= 4) {
-    const last3 = sorted.slice(-3).map(_trueVol);
-    const base  = last3[0];
-    if (base > 0 && last3.every(v => Math.abs(v - base) / base < 0.02)) {
-      insights.push(`📊 Dein Tatsächliches Volumen stagniert seit ${last3.length} Wochen – Zeit für Progression?`);
-      if (insights.length >= 2) return insights;
-    }
-  }
-
-  // Priority 4: Volumen-Trend über letzte 4 Wochen
-  if (sorted.length >= 4 && insights.length < 2) {
-    const last4 = sorted.slice(-4).map(_trueVol);
-    const first = last4[0], last = last4[last4.length - 1];
-    if (first > 0) {
-      const pct = Math.round((last - first) / first * 100);
-      if (Math.abs(pct) >= 5) {
-        insights.push(`📈 Letzte 4 Wochen: ${pct > 0 ? '+' : ''}${pct}% Tatsächliches Volumen`);
-      }
-    }
-  }
-
-  return insights.slice(0, 2);
-}
 
 // ─── Analysis tab ─────────────────────────────────────────────────────────────
 function renderAnalysisTab(state) {
@@ -1263,7 +1209,7 @@ function renderAnalysisTab(state) {
     state.weeks.flatMap(w => w.days.flatMap(d => d.exercises.map(e => e.name)))
   )].sort();
 
-  const insights = _buildInsights(state, sorted);
+  const insights = state.insights ?? [];
 
   const weekCards = [...sorted].reverse().map((wk, wi, arr) => {
     const tot  = wk.days.reduce((s, d) => s + d.exercises.reduce((ss, ex) => ss + ex.sets.length, 0), 0);
@@ -1333,8 +1279,17 @@ function renderAnalysisTab(state) {
     </div>`;
   }).join('');
 
+  const _typeColor = { progression:'var(--c-accent)', stagnation:'var(--c-warn)', recovery:'var(--c-blue)', balance:'var(--c-deload)', goal:'var(--c-accent)', consistency:'var(--c-ok)', warning:'var(--c-danger)', motivation:'var(--c-accent)' };
   const insightHtml = _showInsights && insights.length > 0
-    ? insights.map(msg => `<div class="insight-card">${ic.lightbulb()}<span>${msg}</span></div>`).join('')
+    ? insights.map(ins => `
+      <div class="insight-card insight-card--${h(ins.type ?? 'info')}">
+        <div class="insight-card__hdr">
+          <span class="insight-card__badge" style="color:${_typeColor[ins.type] ?? 'var(--c-accent)'}">${h(ins.title)}</span>
+          <span class="insight-card__id">${h(ins.id)}</span>
+        </div>
+        <p class="insight-card__msg">${h(ins.message)}</p>
+        ${ins.recommendation ? `<p class="insight-card__rec">${h(ins.recommendation)}</p>` : ''}
+      </div>`).join('')
     : '';
 
   container.innerHTML = `
@@ -1352,12 +1307,11 @@ function renderAnalysisTab(state) {
     ${avgMin != null ? `<div class="streak-card"><div class="streak-num">${fmtMin(avgMin)}</div><div class="streak-lbl">Ø Session</div></div>` : ''}
     ${totalMin != null ? `<div class="streak-card"><div class="streak-num">${fmtMin(totalMin)}</div><div class="streak-lbl">Gesamt</div></div>` : ''}
     ${state.weeks.length >= 2 ? `
-    <button class="streak-card insight-toggle${_showInsights ? ' is-active' : ''}"
+    <button class="streak-card insight-toggle${_showInsights ? ' is-active' : ''}${insights.length > 0 ? ' has-insights' : ''}"
       data-action="toggle-insights"
       aria-pressed="${_showInsights}"
-      aria-label="Fortschritt analysieren"
-      title="Zeigt automatisch erkannte Muster …"
-    >${ic.lightbulb()}<div class="streak-lbl">Fortschritt 💡</div></button>` : ''}
+      aria-label="Coach-Insights anzeigen"
+    >${ic.lightbulb()}<div class="streak-lbl">Coach${insights.length > 0 ? ` (${insights.length})` : ''}</div></button>` : ''}
   </div>`;
   })()}
 
@@ -2060,9 +2014,17 @@ function _handleClick(e) {
 
     case 'toggle-complete': {
       dispatch(A.DAY_TOGGLE_COMPLETE, { di: +di });
-      // Read updated state to get new locked value
-      const day = getState().weeks[getState().curIdx]?.days[+di];
+      const afterStC  = getState();
+      const day       = afterStC.weeks[afterStC.curIdx]?.days[+di];
       showToast(day?.markedDone ? 'Tag gesperrt 🔒' : 'Tag entsperrt 🔓', 'info');
+      if (day?.markedDone) {
+        const allDone  = afterStC.weeks[afterStC.curIdx]?.days.every(d => d.markedDone);
+        const trigger  = allDone ? 'WOCHE_ABGESCHLOSSEN' : 'TAG_ABGESCHLOSSEN';
+        const triggered = fireTrigger(trigger, { di: +di });
+        for (const ins of triggered) {
+          if (ins.immediate) showToast(ins.message, ins.type === 'warning' ? 'warn' : 'ok', 5000);
+        }
+      }
       break;
     }
 
@@ -2231,6 +2193,17 @@ function _handleClick(e) {
         if (_rInp) dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'reps',   value: _rInp.value });
       }
       dispatch(A.SET_TOGGLE_DONE, { di: +di, ei: +ei, si: +si });
+      // Fire insight trigger when set is checked success
+      {
+        const afterSt  = getState();
+        const afterSet = afterSt.weeks[afterSt.curIdx]?.days[+di]?.exercises[+ei]?.sets[+si];
+        if (afterSet?.status === 'success') {
+          const triggered = fireTrigger('SATZ_ABGEHAKT', { di: +di, ei: +ei, si: +si });
+          for (const ins of triggered) {
+            if (ins.immediate) showToast(ins.message, ins.type === 'warning' ? 'warn' : 'ok', ins.id === 'P-05' ? 4000 : 3000);
+          }
+        }
+      }
       break;
     }
 
@@ -2587,6 +2560,10 @@ function _createWeek() {
   dispatch(A.WEEK_CREATE, { startDate: date, note, source });
   closeModal('modal-new-week');
   showToast(source === 'template' ? 'Neue Woche aus Vorlage erstellt ✓' : 'Neue Woche aus Vorwoche erstellt ✓', 'ok');
+  const triggered = fireTrigger('NEUE_WOCHE_ERSTELLT', {});
+  for (const ins of triggered) {
+    if (ins.immediate) showToast(ins.message, ins.type === 'warning' ? 'warn' : 'ok', 5000);
+  }
 }
 
 // ─── Template save ────────────────────────────────────────────────────────────
@@ -2870,7 +2847,7 @@ export function mountApp(root) {
 
   scheduleRender();
 
-  // Auto-backup reminder (3.11): toast if >30 days since last backup
+  // Auto-backup reminder: toast if >30 days since last backup
   setTimeout(() => {
     const st   = getState();
     const last = st.settings?.lastBackupDate;
@@ -2878,43 +2855,13 @@ export function mountApp(root) {
       showToast('Tipp: Erstelle regelmäßig ein JSON-Backup (Einstellungen → Daten).', 'warn');
     } else {
       const daysSince = Math.floor((Date.now() - new Date(last)) / 86_400_000);
-      if (daysSince > 30) {
-        showToast(`Letztes Backup vor ${daysSince} Tagen – jetzt sichern!`, 'warn');
-      }
+      if (daysSince > 30) showToast(`Letztes Backup vor ${daysSince} Tagen – jetzt sichern!`, 'warn');
     }
 
-    // 3.3: Fatigue hint – 3 consecutive sessionRating=1 sessions
-    const lastHint = st.settings?.lastFatigueHintDate;
-    const daysSinceHint = lastHint ? Math.floor((Date.now() - new Date(lastHint)) / 86_400_000) : Infinity;
-    if (daysSinceHint >= 7) {
-      const sorted = [...st.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
-      const doneDays = sorted.flatMap(w => w.days.filter(d => d.markedDone));
-      const last3    = doneDays.slice(-3);
-      if (last3.length === 3 && last3.every(d => d.sessionRating === 1)) {
-        const today = new Date().toISOString().split('T')[0];
-        dispatch(A.SETTING_SET, { key: 'lastFatigueHintDate', value: today });
-        showToast(
-          'In deinen letzten 3 Einheiten hast du \'Erschöpft\' gewählt – plane eine Erholungswoche ein.',
-          'warn', 5000
-        );
-      }
-    }
-
-    // 3.1: Positive feedback – 3 consecutive sessionRating=3
-    const lastMotHint = st.settings?.lastMotivationHintDate;
-    const daysSinceMotHint = lastMotHint ? Math.floor((Date.now() - new Date(lastMotHint)) / 86_400_000) : Infinity;
-    if (daysSinceMotHint >= 7) {
-      const sortedMot  = [...st.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
-      const doneDaysMot = sortedMot.flatMap(w => w.days.filter(d => d.markedDone));
-      const last3mot   = doneDaysMot.slice(-3);
-      if (last3mot.length === 3 && last3mot.every(d => d.sessionRating === 3)) {
-        const todayStr = new Date().toISOString().split('T')[0];
-        dispatch(A.SETTING_SET, { key: 'lastMotivationHintDate', value: todayStr });
-        showToast(
-          "Die letzten 3 Einheiten hast du mit 'Stark' bewertet – mach weiter so! 💪",
-          'ok', 5000
-        );
-      }
+    // Fire APP_GEÖFFNET – evaluates E-01, E-04, K-02 and shows immediate toasts
+    const triggered = fireTrigger('APP_GEÖFFNET', {});
+    for (const ins of triggered) {
+      if (ins.immediate) showToast(ins.message, ins.type === 'warning' ? 'warn' : 'ok', 5000);
     }
   }, 2000);
 }

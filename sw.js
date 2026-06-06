@@ -18,7 +18,7 @@
  *   asset conflicts.
  */
 
-const CACHE_VERSION  = 'train-v2';
+const CACHE_VERSION  = 'train-v3';
 const FONT_CACHE     = 'train-fonts-v1';
 
 /**
@@ -35,7 +35,10 @@ const PRECACHE_URLS = [
   './icons.js',
   './styles.css',
   './registerSW.js',
-  './manifest.json'
+  './manifest.json',
+  './insightEngine.js',
+  './triggerEngine.js',
+  './recommendationEngine.js',
 ];
 
 

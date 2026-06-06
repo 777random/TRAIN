@@ -125,6 +125,7 @@ function buildDefaultState() {
     customTemplate: clone(FACTORY_TEMPLATE),
     templates: [],            // { id, name, days[] }[]  – named templates (v9)
     prs: {},                  // { [exerciseName]: { maxWeight, maxVolume, maxEstimated1RM, date } }
+    insights: [],             // Insight[] – populated by triggerEngine, transient coaching feedback
     settings: {
       swipe:              true,
       drag:               true,
@@ -148,6 +149,7 @@ const _MAX_UNDO  = 20;
 // Actions that are pure navigation or external events — not worth undoing.
 const _NO_UNDO = new Set([
   'UNDO', 'WEEK_NAVIGATE', 'STATE_IMPORT', 'SESSION_START', 'SESSION_STOP',
+  'INSIGHTS_SET',
 ]);
 
 /** Returns true when there is at least one undo snapshot available. */
@@ -479,6 +481,8 @@ export const A = Object.freeze({
   STATE_IMPORT:        'STATE_IMPORT',        // { imported: StateObject }
   // Undo
   UNDO:                'UNDO',               // {}
+  // Insights (triggerEngine)
+  INSIGHTS_SET:        'INSIGHTS_SET',        // { insights: Insight[] }
   // Templates (v9)
   TEMPLATE_ADD:        'TEMPLATE_ADD',        // { name, days? }
   TEMPLATE_UPDATE:     'TEMPLATE_UPDATE',     // { id, name?, days? }
@@ -948,6 +952,12 @@ function reduce(state, action) {
     case A.WEEK_REMOVE_REST_DAY: {
       const wk = _currentWeek(); if (!wk) break;
       wk.restDays = (wk.restDays ?? []).filter(r => r.date !== p.date);
+      break;
+    }
+
+    // ── Insights ──────────────────────────────────────────────────────────────
+    case A.INSIGHTS_SET: {
+      state.insights = p.insights ?? [];
       break;
     }
 
