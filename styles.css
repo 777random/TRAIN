@@ -740,7 +740,43 @@ exercise { position: unset; }
 .hm-cell { aspect-ratio: 1; border-radius: 3px; background: var(--c-surface2); }
 .hm-cell--1 { background: rgba(200,255,0,.25); }
 .hm-cell--2 { background: rgba(200,255,0,.55); }
-.hm-cell--3 { background: rgba(200,255,0,.85); }
+.hm-cell--3    { background: rgba(200,255,0,.85); }
+.hm-cell--rest { background: #3a3a3a; }
+
+/* ── PR (3.1) ──────────────────────────────────────────────── */
+.set-done-btn.is-pr { color: #FFD700; border-color: rgba(255,215,0,.4); }
+.set-done-btn.is-pr svg { color: #FFD700; }
+.pr-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--c-border); font-size: 13px; }
+.pr-row:last-child { border-bottom: none; }
+.pr-name { flex: 1; }
+.pr-val  { font-family: var(--font-display); font-size: 16px; color: var(--c-accent); }
+.pr-date { font-size: 10px; color: var(--c-text-3); }
+
+/* ── RPE button group (3.8) ────────────────────────────────── */
+.set-cell--rpe  { overflow: hidden; }
+.rpe-btns       { display: flex; overflow-x: auto; gap: 4px; padding-bottom: 2px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+.rpe-btns::-webkit-scrollbar { display: none; }
+.rpe-btn {
+  flex-shrink: 0; min-width: 32px; height: 28px;
+  background: var(--c-surface2); border: 1px solid var(--c-border);
+  border-radius: var(--r-sm); font-size: 11px; color: var(--c-text-3);
+  cursor: pointer; transition: background var(--t-fast), color var(--t-fast);
+}
+.rpe-btn.is-selected { background: var(--c-accent); color: #000; border-color: var(--c-accent); font-weight: 700; }
+.rpe-btn:hover:not(.is-selected) { border-color: var(--c-border-hi); color: var(--c-text); }
+.rpe-static { font-size: 13px; color: var(--c-text-3); padding: 4px 0; display: block; }
+
+/* ── Session rating / fatigue (3.5) ────────────────────────── */
+.session-rating { display: flex; align-items: center; gap: var(--sp-3); margin: var(--sp-3) 0; }
+.session-rating__lbl { font-size: 11px; color: var(--c-text-3); }
+.session-rating__btn {
+  font-size: 24px; background: none; border: 2px solid transparent;
+  border-radius: var(--r-md); padding: 4px 8px; cursor: pointer;
+  transition: border-color var(--t-fast), transform var(--t-fast);
+}
+.session-rating__btn.is-selected { border-color: var(--c-accent); transform: scale(1.1); }
+.session-rating__btn:hover { transform: scale(1.05); }
+
 .streak-row { display: flex; gap: var(--sp-3); margin-bottom: var(--sp-4); }
 .streak-card { flex: 1; background: var(--c-surface2); border-radius: var(--r-md); padding: var(--sp-3); text-align: center; }
 .streak-num { font-family: var(--font-display); font-size: 32px; color: var(--c-accent); line-height: 1; }
@@ -1265,4 +1301,44 @@ details[open] > .deload-details__summary::before { content: '▾ '; }
 .deload-details__body {
   padding: var(--sp-2) 0;
 }
+
+/* ══════════════════════════════════════════════════════════════
+   KATEGORIE 3 – NEUE FEATURES
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── Superset (3.10) ───────────────────────────────────────── */
+.exercise.is-superset { border-left: 3px solid var(--c-accent); padding-left: 8px; }
+.ss-badge {
+  display: inline-block; font-size: 9px; font-weight: 700;
+  letter-spacing: .1em; background: var(--c-accent); color: #000;
+  border-radius: var(--r-full); padding: 1px 6px; margin-bottom: 4px;
+}
+
+/* ── 1RM hint (3.7) ────────────────────────────────────────── */
+.orm-hint {
+  font-size: 10px; color: var(--c-text-3); letter-spacing: .05em;
+  margin-top: 2px; margin-bottom: 4px;
+}
+
+/* ── Exercise tags (3.12) ──────────────────────────────────── */
+.exercise-tags-row  { align-items: flex-start; }
+.tag-chips          { display: flex; flex-wrap: wrap; gap: 4px; }
+.tag-chip {
+  font-size: 11px; background: var(--c-surface2); border: 1px solid var(--c-border);
+  border-radius: var(--r-full); padding: 3px 8px; cursor: pointer;
+  color: var(--c-text-3); transition: background var(--t-fast), color var(--t-fast);
+}
+.tag-chip.is-selected { background: rgba(200,255,0,.15); border-color: var(--c-accent); color: var(--c-accent); }
+.tag-chip:hover:not(.is-selected) { border-color: var(--c-border-hi); color: var(--c-text); }
+
+/* ── Muscle group bar chart (3.13) ─────────────────────────── */
+.mg-bar-row   { display: flex; align-items: center; gap: var(--sp-2); margin-bottom: 6px; }
+.mg-bar-label { width: 80px; font-size: 11px; flex-shrink: 0; }
+.mg-bar-wrap  { flex: 1; height: 8px; background: var(--c-surface2); border-radius: var(--r-full); overflow: hidden; }
+.mg-bar       { height: 100%; background: var(--c-accent); border-radius: var(--r-full); transition: width .3s; }
+.mg-bar-val   { width: 24px; text-align: right; font-size: 11px; color: var(--c-text-3); }
+
+/* ── Named templates list (3.4) ────────────────────────────── */
+.tpl-list-item { display: flex; justify-content: space-between; align-items: center; padding: var(--sp-2) var(--sp-4); border-bottom: 1px solid var(--c-border); }
+.tpl-list-item:last-child { border-bottom: none; }
 

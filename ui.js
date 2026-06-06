@@ -59,6 +59,42 @@ let _root        = null;
 let _toast       = null;
 let _storageWarn = null;
 
+// ─── Exercise tags (3.12) ────────────────────────────────────────────────────
+const _EXERCISE_TAGS = [
+  'Brust', 'Rücken', 'Schultern', 'Bizeps', 'Trizeps', 'Beine', 'Po', 'Bauch',
+  'Ganzkörper', 'Langhantel', 'Kurzhantel', 'Kettlebell', 'Maschine', 'Körpergewicht',
+  'Drücken', 'Ziehen', 'Kniebeugen', 'Hinge', 'Carry',
+];
+
+// ─── Standard exercise list (3.2) ────────────────────────────────────────────
+const _STANDARD_EXERCISES = [
+  // Compound lower
+  'Kniebeuge','Frontkniebeuge','Beinpresse','Rumänisches Kreuzheben','Kreuzheben','Sumo Kreuzheben',
+  'Bulgarische Kniebeuge','Ausfallschritte','Beinbeuger','Beinstrecker','Wadenheben','Hip Thrust',
+  // Compound upper push
+  'Bankdrücken','Schrägbankdrücken','Schrägbankdrücken tief','Schulterdrücken','Kurzhanteldrücken',
+  'Dips','Liegestütz','Militärpress','Push Press','Landmine Press',
+  // Compound upper pull
+  'Klimmzüge','Latziehen','Rudern','Kabelrudern','T-Bar Rudern','Pendlay Row',
+  // Isolation push
+  'Trizepsdrücken','Trizepsdips','Skull Crushers','Seitheben','Frontheben','Butterfly',
+  'Flys Kabel','KH Flys',
+  // Isolation pull
+  'Bizepscurls','Hammercurls','Konzentrationscurls','Kabelbizeps','Face Pulls',
+  'Reverse Flys','KH Rudern','KH Shrugs',
+  // Core
+  'Plank','Crunch','Situps','Beinheben','Russian Twists','Ab-Wheel','Cable Crunches',
+  'Pallof Press','Hollow Hold',
+  // Kettlebell & functional
+  'KB Swings','KB Snatch','KB Clean','KB Press','KB Turkish Get-Up','KB Goblet Squat',
+  'KB Windmill','KB Carry',
+  // Plyometric / conditioning
+  'Box Jumps','Broad Jumps','Burpees','Kettlebell Swings','Battle Ropes',
+  // Machine
+  'Chest Press Maschine','Shoulder Press Maschine','Rudern Maschine','Lat Maschine',
+  'Hack Squat','Smith Maschine Kniebeuge',
+].sort();
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /** Escape HTML special chars for safe innerHTML injection. */
@@ -486,14 +522,20 @@ function renderDayBody(wk, di, state) {
     ${prevBanner}
     <div data-ex-list="${di}">${exHtml}</div>
     ${!locked ? `
+    <datalist id="ex-list-${di}">
+      ${_STANDARD_EXERCISES.map(n => `<option value="${h(n)}">`).join('')}
+    </datalist>
     <div class="add-exercise-row">
       <input
         class="add-exercise-input"
         id="add-ex-input-${di}"
         type="text"
+        list="ex-list-${di}"
         placeholder="Übung hinzufügen …"
         aria-label="Name der neuen Übung"
         maxlength="80"
+        data-di="${di}"
+        autocomplete="off"
       />
       <button
         class="btn btn--accent btn--sm"
@@ -510,6 +552,24 @@ function renderDayBody(wk, di, state) {
       ${lockBtnIcon}
       ${done ? 'Gesperrt – Tippen zum Entsperren' : 'Abgeschlossen & sperren'}
     </button>
+
+    <!-- Fatigue indicator (3.5): shown after locking -->
+    ${done ? `
+    <div class="session-rating" role="group" aria-label="Wie war die Einheit?">
+      <span class="session-rating__lbl">Wie war die Einheit?</span>
+      ${[
+        { val: 1, icon: '😴', label: 'Erschöpft' },
+        { val: 2, icon: '😊', label: 'Gut' },
+        { val: 3, icon: '💪', label: 'Stark' },
+      ].map(r => `
+      <button
+        class="session-rating__btn${day.sessionRating === r.val ? ' is-selected' : ''}"
+        data-action="set-session-rating" data-di="${di}" data-val="${r.val}"
+        aria-pressed="${day.sessionRating === r.val}"
+        aria-label="${r.label}"
+      >${r.icon}</button>`).join('')}
+    </div>` : ''}
+
     ${renderInfoBlock('cooldown', '🧘 Cooldown', day.cooldown, di, locked)}
   `;
 }
@@ -617,6 +677,16 @@ function renderExercise(wk, di, ei, state) {
         ${ex.showPlates ? '<span class="pause-row__label" style="color:var(--c-text-3);font-size:10px">Langhantel 20 kg Basis</span>' : ''}
       </div>` : ''}
       ${!locked ? `
+      <div class="weight-plan-row" role="group" aria-label="Superset">
+        <span class="pause-row__label">Superset:</span>
+        <button
+          type="button"
+          class="weight-step-btn${ex.supersetId ? ' is-selected' : ''}"
+          data-action="toggle-superset" data-di="${di}" data-ei="${ei}"
+          aria-pressed="${!!ex.supersetId}"
+        >${ex.supersetId ? 'An (SS)' : 'Aus'}</button>
+      </div>` : ''}
+      ${!locked ? `
       <div class="weight-plan-row" role="group" aria-label="Zielvorgaben">
         <span class="pause-row__label">Ziel:</span>
         <input
@@ -639,10 +709,26 @@ function renderExercise(wk, di, ei, state) {
           aria-label="Ziel Wiederholungen"
         />
       </div>` : ''}
+      <!-- Tags (3.12) -->
+      <div class="weight-plan-row exercise-tags-row" role="group" aria-label="Tags">
+        <span class="pause-row__label">Tags:</span>
+        <div class="tag-chips">
+          ${_EXERCISE_TAGS.map(tag => {
+            const active = (ex.tags ?? []).includes(tag);
+            return `<button
+              type="button"
+              class="tag-chip${active ? ' is-selected' : ''}"
+              data-action="toggle-ex-tag" data-di="${di}" data-ei="${ei}" data-tag="${h(tag)}"
+              aria-pressed="${active}"
+            >${h(tag)}</button>`;
+          }).join('')}
+        </div>
+      </div>
     </div>` : '';
 
   return `
-<div class="exercise${ex._showCfg ? ' is-cfg-open' : ''}" data-di="${di}" data-ei="${ei}" draggable="${drag}">
+<div class="exercise${ex._showCfg ? ' is-cfg-open' : ''}${ex.supersetId ? ' is-superset' : ''}" data-di="${di}" data-ei="${ei}" draggable="${drag}">
+  ${ex.supersetId ? '<div class="ss-badge">SS</div>' : ''}
   <div class="sticky-sentinel" aria-hidden="true" style="height:1px;pointer-events:none;"></div>
 
   <div class="exercise__name-sticky">
@@ -696,6 +782,17 @@ function renderExercise(wk, di, ei, state) {
     aria-label="Notiz zu ${h(ex.name)}"
     maxlength="120"
   />
+
+  <!-- 1RM estimator hint (3.7) -->
+  ${(() => {
+    const best1RM = ex.sets
+      .filter(s => s.status === 'success' && (s.reps ?? 0) > 0 && (s.reps ?? 0) <= 10 && (s.weight ?? 0) > 0)
+      .map(s => s.weight * (1 + s.reps / 30))
+      .reduce((max, v) => Math.max(max, v), 0);
+    return best1RM > 0
+      ? `<div class="orm-hint" aria-label="Geschätztes 1RM">~${best1RM.toFixed(1)} kg 1RM (Epley)</div>`
+      : '';
+  })()}
 
   <!-- Soll-Ist badge (2.5) -->
   ${(ex.targetSets && ex.targetReps) ? `
@@ -779,8 +876,17 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl) {
     st = s.done ? 'success' : 'pending';
   }
   const doneClass = st === 'success' ? ' is-done' : st === 'fail' ? ' is-fail' : '';
-  const doneIcon  = st === 'success' ? ic.check() : st === 'fail' ? ic.xMark() : '';
   const stLabel   = st === 'success' ? 'erfolgreich' : st === 'fail' ? 'nicht geschafft' : 'offen';
+
+  // PR indicator (3.1): trophy when this set's weight matches the current all-time PR
+  const prs   = getState().prs ?? {};
+  const exPR  = prs[ex.name];
+  const isPR  = st === 'success' && exPR && (s.weight ?? 0) > 0 && s.weight >= exPR.maxWeight;
+  const doneIcon = isPR
+    ? ic.trophy()
+    : st === 'success' ? ic.check()
+    : st === 'fail'    ? ic.xMark()
+    : '';
 
   return `
 <div class="set-row" role="listitem" data-di="${di}" data-ei="${ei}" data-si="${si}">
@@ -808,31 +914,37 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl) {
     ${metricCellFooter}
   </div>
 
-  <div class="set-cell">
-    <input class="rpe-input" type="number" inputmode="numeric"
-      min="1" max="10" value="${s.rpe ?? ''}" placeholder="–"
-      ${locked ? 'disabled' : ''}
-      data-action="set-rpe" data-di="${di}" data-ei="${ei}" data-si="${si}"
-      aria-label="Satz ${si + 1} RPE"
-    />
-    ${!locked && si < ex.sets.length - 1 ? `
-    <div class="set-cell__footer">
-      <span class="prev-hint" aria-hidden="true">${prevSet?.rpe ? prevSet.rpe : ''}</span>
-      <button type="button" class="btn-autofill"
-        data-action="autofill-rpe" data-di="${di}" data-ei="${ei}" data-si="${si}"
-        aria-label="RPE von Satz ${si + 1} auf nächsten Satz übernehmen"
-      >${ic.autofillDown()}</button>
-    </div>` : `<span class="prev-hint" aria-hidden="true">${prevSet?.rpe ? prevSet.rpe : ''}</span>`}
+  <!-- RPE scrollable buttons (3.8) -->
+  <div class="set-cell set-cell--rpe">
+    ${locked
+      ? `<span class="rpe-static">${s.rpe ?? '–'}</span>`
+      : `<div class="rpe-btns" role="group" aria-label="Satz ${si + 1} RPE">
+          ${['–', 6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10].map(v => {
+            const isNone = v === '–';
+            const cur    = s.rpe ?? null;
+            const isSel  = isNone ? cur === null : cur === v;
+            return `<button type="button"
+              class="rpe-btn${isSel ? ' is-selected' : ''}"
+              data-action="set-rpe-val"
+              data-di="${di}" data-ei="${ei}" data-si="${si}"
+              data-val="${isNone ? '' : v}"
+              aria-pressed="${isSel}"
+              aria-label="RPE ${v}"
+            >${v}</button>`;
+          }).join('')}
+        </div>
+        <span class="prev-hint" aria-hidden="true">${prevSet?.rpe ? prevSet.rpe : ''}</span>`
+    }
   </div>
 
   <div class="set-done-wrap">
     <button
-      class="set-done-btn${doneClass}"
+      class="set-done-btn${doneClass}${isPR ? ' is-pr' : ''}"
       ${locked ? 'disabled' : ''}
       data-action="toggle-done" data-di="${di}" data-ei="${ei}" data-si="${si}"
-      aria-label="Satz ${si + 1}: ${stLabel}. Tippen für nächsten Status (offen → erfolgreich → nicht geschafft)."
+      aria-label="Satz ${si + 1}: ${stLabel}${isPR ? ' – Bestleistung!' : ''}. Tippen für nächsten Status (offen → erfolgreich → nicht geschafft)."
     >${doneIcon}</button>
-    <span class="prev-hint" aria-hidden="true"></span>
+    <span class="prev-hint" aria-hidden="true">${isPR ? '🏆' : ''}</span>
   </div>
 
   <button
@@ -1222,7 +1334,53 @@ function renderAnalysisTab(state) {
     </div>
   </div>
 
-  ${weekCards}`;
+  ${weekCards}
+
+  ${(() => {
+    const prs = state.prs ?? {};
+    const entries = Object.entries(prs).sort((a, b) => b[1].maxWeight - a[1].maxWeight);
+    if (!entries.length) return '';
+    return `<div class="chart-card">
+      <div class="chart-card__title">${ic.trophy()} Bestleistungen</div>
+      ${entries.map(([name, pr]) => `
+      <div class="pr-row">
+        <span class="pr-name">${h(name)}</span>
+        <span class="pr-val">${pr.maxWeight} kg</span>
+        ${pr.date ? `<span class="pr-date">${pr.date}</span>` : ''}
+      </div>`).join('')}
+    </div>`;
+  })()}
+
+  ${(() => {
+    // Muscle group analysis (3.13): only shown when tags exist
+    const curWk = state.weeks[state.curIdx];
+    if (!curWk) return '';
+    const tagCounts = {};
+    for (const day of curWk.days) {
+      for (const ex of day.exercises) {
+        const tags = ex.tags ?? [];
+        const sets = ex.sets.filter(s => s.status === 'success').length;
+        if (sets === 0 || !tags.length) continue;
+        for (const tag of tags) {
+          tagCounts[tag] = (tagCounts[tag] ?? 0) + sets;
+        }
+      }
+    }
+    const entries = Object.entries(tagCounts).sort((a, b) => b[1] - a[1]);
+    if (!entries.length) return '';
+    const maxVal = entries[0][1];
+    return `<div class="chart-card">
+      <div class="chart-card__title">${ic.muscleGroup()} Muskelgruppen (Sätze ✓)</div>
+      ${entries.map(([tag, count]) => `
+      <div class="mg-bar-row">
+        <span class="mg-bar-label">${h(tag)}</span>
+        <div class="mg-bar-wrap">
+          <div class="mg-bar" style="width:${Math.round(count/maxVal*100)}%"></div>
+        </div>
+        <span class="mg-bar-val">${count}</span>
+      </div>`).join('')}
+    </div>`;
+  })()}`;
 
   requestAnimationFrame(() => {
     drawLineChart('chart-vol', wkLabels, vols, '#C8FF00');
@@ -1277,12 +1435,17 @@ function _drawHeatmap(state) {
     .sort((a, b) => a.startDate.localeCompare(b.startDate))
     .slice(-12)
     .forEach(wk => {
-      const done = wk.days.filter(d => !!d.markedDone).length;
-      const cell = document.createElement('div');
-      cell.className = 'hm-cell' + (done === 0 ? '' : ` hm-cell--${Math.min(done, 3)}`);
+      const done     = wk.days.filter(d => !!d.markedDone).length;
+      const hasRest  = (wk.restDays ?? []).length > 0;
+      const cell     = document.createElement('div');
+      // Rest day = dark gray, training days use accent intensity (3.3)
+      cell.className = hasRest && done === 0
+        ? 'hm-cell hm-cell--rest'
+        : 'hm-cell' + (done === 0 ? '' : ` hm-cell--${Math.min(done, 3)}`);
+      const label = hasRest ? `${wkLabel(wk.startDate)}: Ruhetag` : `${wkLabel(wk.startDate)}: ${done}/${wk.days.length} Tage`;
       cell.setAttribute('role', 'gridcell');
-      cell.setAttribute('aria-label', `${wkLabel(wk.startDate)}: ${done}/3 Tage`);
-      cell.title = `${wkLabel(wk.startDate)}: ${done}/3 Tage`;
+      cell.setAttribute('aria-label', label);
+      cell.title = label;
       hm.appendChild(cell);
     });
 }
@@ -1486,10 +1649,10 @@ function renderSettingsTab(state) {
 
   <!-- Template -->
   <div class="settings-section">
-    <div class="settings-section__title">Vorlage</div>
+    <div class="settings-section__title">Vorlagen (3.4)</div>
     <div class="settings-row settings-row--clickable" data-action="open-tpl">
       <div>
-        <div class="settings-row__label">📋 Template bearbeiten</div>
+        <div class="settings-row__label">📋 Standard-Template bearbeiten</div>
         <div class="settings-row__desc">Vorlage für neue Wochen anpassen</div>
       </div>
       <div class="settings-row__action">${ic.chevronRight()}</div>
@@ -1497,10 +1660,26 @@ function renderSettingsTab(state) {
     <div class="settings-row settings-row--clickable" data-action="reset-to-tpl">
       <div>
         <div class="settings-row__label">🔄 Woche zurücksetzen</div>
-        <div class="settings-row__desc">Aktuelle Woche mit Custom-Template überschreiben</div>
+        <div class="settings-row__desc">Aktuelle Woche mit Standard-Template überschreiben</div>
       </div>
       <div class="settings-row__action">${ic.chevronRight()}</div>
     </div>
+    <div class="settings-row settings-row--clickable" data-action="save-named-template">
+      <div>
+        <div class="settings-row__label">${ic.plus()} Aktuelle Woche als Vorlage speichern</div>
+        <div class="settings-row__desc">Benannte Vorlage aus der aktuellen Woche erstellen</div>
+      </div>
+      <div class="settings-row__action">${ic.chevronRight()}</div>
+    </div>
+    ${(state.templates ?? []).length > 0 ? `
+    <div class="settings-row__label" style="padding:8px 16px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--c-text-3)">Gespeicherte Vorlagen</div>
+    ${state.templates.map((t, i) => `
+    <div class="settings-row" style="display:flex;justify-content:space-between;align-items:center">
+      <span class="settings-row__label">${h(t.name ?? `Vorlage ${i+1}`)}</span>
+      <button class="btn btn--ghost btn--sm" data-action="delete-named-template" data-tpl-id="${t.id}"
+        aria-label="Vorlage '${h(t.name ?? '')}' löschen"
+      >${ic.trash()}</button>
+    </div>`).join('')}` : ''}
     <div class="settings-row settings-row--clickable" data-action="reset-factory">
       <div>
         <div class="settings-row__label" style="color:var(--c-danger)">↺ Original wiederherstellen</div>
@@ -1659,6 +1838,15 @@ function _handleClick(e) {
       _showBodyInsights = !_showBodyInsights;
       scheduleRender();
       break;
+
+    // ── Session rating / fatigue indicator (3.5) ───────────────────────────
+    case 'set-session-rating': {
+      const cur = getState().weeks[getState().curIdx]?.days?.[+el.dataset.di]?.sessionRating;
+      const val = +el.dataset.val;
+      // Toggle off if clicking the already-selected rating
+      dispatch(A.DAY_SET_FIELD, { di: +el.dataset.di, field: 'sessionRating', value: cur === val ? null : val });
+      break;
+    }
 
     case 'overview-open-day': {
       _overviewMode  = false;
@@ -1823,6 +2011,28 @@ function _handleClick(e) {
       break;
     }
 
+    case 'toggle-superset': {
+      const _exSS = getState().weeks[getState().curIdx]?.days[+di]?.exercises[+ei];
+      if (_exSS) {
+        const newId = _exSS.supersetId ? null : Date.now();
+        dispatch(A.EX_UPDATE, { di: +di, ei: +ei, field: 'supersetId', value: newId });
+      }
+      break;
+    }
+
+    // Exercise tags (3.12)
+    case 'toggle-ex-tag': {
+      const _exTag = getState().weeks[getState().curIdx]?.days[+di]?.exercises[+ei];
+      if (_exTag) {
+        const tag  = el.dataset.tag;
+        const tags = Array.isArray(_exTag.tags) ? [..._exTag.tags] : [];
+        const idx  = tags.indexOf(tag);
+        if (idx >= 0) tags.splice(idx, 1); else tags.push(tag);
+        dispatch(A.EX_UPDATE, { di: +di, ei: +ei, field: 'tags', value: tags });
+      }
+      break;
+    }
+
     case 'set-metric': {
       const m = el.dataset.metric;
       if (m === 'reps' || m === 'sec' || m === 'm') {
@@ -1878,9 +2088,14 @@ function _handleClick(e) {
     case 'add-set':
       dispatch(A.SET_ADD, { di: +di, ei: +ei }); break;
 
+    // RPE button group (3.8)
+    case 'set-rpe-val': {
+      const rpeVal = el.dataset.val === '' ? null : +el.dataset.val;
+      dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'rpe', value: rpeVal });
+      break;
+    }
+
     case 'autofill-rpe': {
-      const _rpeInp = document.querySelector(`[data-action="set-rpe"][data-di="${di}"][data-ei="${ei}"][data-si="${si}"]`);
-      if (_rpeInp) dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'rpe', value: _rpeInp.value });
       dispatch(A.SET_AUTOFILL_RPE, { di: +di, ei: +ei, si: +si });
       showToast('RPE auf nächsten Satz übernommen', 'ok');
       break;
@@ -1939,6 +2154,26 @@ function _handleClick(e) {
         showToast('Original-Template wiederhergestellt ✓', 'ok');
       }
       break;
+
+    // Named templates (3.4)
+    case 'save-named-template': {
+      const name = prompt('Name für diese Vorlage:');
+      if (!name?.trim()) break;
+      const wk = getState().weeks[getState().curIdx];
+      if (!wk) break;
+      dispatch(A.TEMPLATE_ADD, { name: name.trim(), days: wk.days });
+      showToast(`Vorlage "${name.trim()}" gespeichert ✓`, 'ok');
+      break;
+    }
+
+    case 'delete-named-template': {
+      const id = +el.dataset.tplId;
+      if (confirm('Vorlage löschen?')) {
+        dispatch(A.TEMPLATE_DELETE, { id });
+        showToast('Vorlage gelöscht', 'info');
+      }
+      break;
+    }
 
     case 'export-json':
       exportJSON();
@@ -2467,4 +2702,17 @@ export function mountApp(root) {
   });
 
   scheduleRender();
+
+  // Auto-backup reminder (3.11): toast if >30 days since last backup
+  setTimeout(() => {
+    const last = getState().settings?.lastBackupDate;
+    if (!last) {
+      showToast('Tipp: Erstelle regelmäßig ein JSON-Backup (Einstellungen → Daten).', 'warn');
+    } else {
+      const daysSince = Math.floor((Date.now() - new Date(last)) / 86_400_000);
+      if (daysSince > 30) {
+        showToast(`Letztes Backup vor ${daysSince} Tagen – jetzt sichern!`, 'warn');
+      }
+    }
+  }, 2000);
 }

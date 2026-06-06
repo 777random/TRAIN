@@ -22,8 +22,22 @@ function today() {
 // ─── JSON Backup ──────────────────────────────────────────────────────────────
 
 export function exportJSON() {
-  const blob = new Blob([JSON.stringify(getState(), null, 2)], { type: 'application/json;charset=utf-8' });
-  triggerDownload(blob, `TRAIN_Backup_${today()}.json`);
+  const json     = JSON.stringify(getState(), null, 2);
+  const filename = `TRAIN_Backup_${today()}.json`;
+  const blob     = new Blob([json], { type: 'application/json;charset=utf-8' });
+
+  // Native share (3.9): use navigator.share() when available, fallback to download
+  if (navigator.share && navigator.canShare) {
+    const file = new File([blob], filename, { type: 'application/json' });
+    if (navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file], title: 'TRAIN Backup' })
+        .then(() => dispatch(A.SETTING_SET, { key: 'lastBackupDate', value: today() }))
+        .catch(() => triggerDownload(blob, filename));
+      return;
+    }
+  }
+  triggerDownload(blob, filename);
+  dispatch(A.SETTING_SET, { key: 'lastBackupDate', value: today() });
 }
 
 export function importJSON(file) {
