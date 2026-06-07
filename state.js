@@ -567,6 +567,16 @@ function reduce(state, action) {
       }
 
       _resetClonedDays(days);
+
+      // Vom Nutzer akzeptierte KI-Gewichtsempfehlungen auf alle Sätze anwenden
+      if (p.weightRecs) {
+        for (const day of days)
+          for (const ex of day.exercises) {
+            const w = p.weightRecs[ex.name];
+            if (w != null) ex.sets.forEach(s => { s.weight = w; });
+          }
+      }
+
       state.weeks.push({
         id: Date.now(), startDate: p.startDate, note: p.note ?? '',
         mode: 'standard', days, sessionLog: [], bodyData: {}, restDays: [],

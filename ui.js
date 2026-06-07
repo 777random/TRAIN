@@ -24,6 +24,7 @@ import {
 } from './backup.js';
 import * as ic from './icons.js';
 import { fireTrigger } from './triggerEngine.js';
+import { getWeightRecommendation } from './weightRecommendation.js';
 
 // ─── Module-level UI state (transient, never persisted) ──────────────────────
 
@@ -62,6 +63,9 @@ let _stickyObserver = null;
 
 /** Toast hide timer. */
 let _toastTimer = null;
+
+/** Vom Nutzer akzeptierte KI-Gewichtsempfehlungen für die nächste Wochenerstellung. */
+const _pendingWeightRecs = new Map();
 
 /** Swipe tracking. */
 let _swipeStartX = null;
@@ -1989,6 +1993,18 @@ function _handleClick(e) {
       showToast('Woche als Standard-Vorlage gespeichert ✓', 'ok');
       break;
 
+    // ── KI-Gewichtsempfehlung übernehmen (Modal-Chip) ─────────────────────
+    case 'toggle-weight-rec': {
+      const recName   = el.dataset.name;
+      const recWeight = parseFloat(el.dataset.weight);
+      if (!_pendingWeightRecs.has(recName)) {
+        _pendingWeightRecs.set(recName, recWeight);
+        el.classList.add('is-adopted');
+        el.setAttribute('aria-pressed', 'true');
+      }
+      break;
+    }
+
     // ── Export options (previously role=button without data-action) ────────
     case 'export-current':
       exportCSV('current');
@@ -2558,6 +2574,41 @@ function _prepNewWeekModal() {
       </div>`).join('')}
   </div>` : '';
 
+  // KI-Gewichtsempfehlungen (basierend auf RPE + Erfolgsquote)
+  _pendingWeightRecs.clear();
+  const aiRecs = [];
+  if (curWk) {
+    const calcWeeks = state.weeks
+      .filter(w => w.mode !== 'deload' && w !== curWk)
+      .filter(w => w.days.some(d => d.exercises.some(ex => ex.sets.some(s => s.status === 'success'))));
+    if (calcWeeks.length >= 2) {
+      const seen = new Set();
+      for (const day of curWk.days) {
+        for (const ex of day.exercises) {
+          if (seen.has(ex.name)) continue;
+          seen.add(ex.name);
+          const rec = getWeightRecommendation(ex.name, calcWeeks);
+          if (rec) aiRecs.push({ name: ex.name, rec });
+        }
+      }
+    }
+  }
+
+  const aiRecHtml = aiRecs.length > 0 ? `
+  <div class="nw-weight-recs">
+    <div class="nw-weight-recs__title">💡 KI-Empfehlung</div>
+    ${aiRecs.map(r => `
+    <button type="button" class="nw-weight-rec-chip"
+      data-action="toggle-weight-rec"
+      data-name="${h(r.name)}"
+      data-weight="${r.rec.recommendedWeight}"
+      aria-label="Empfehlung für ${h(r.name)} übernehmen">
+      <span class="nw-rec-name">${h(r.name)}</span>
+      <span class="nw-rec-kg">${r.rec.recommendedWeight} kg</span>
+      <span class="nw-rec-reason">${h(r.rec.reason)}</span>
+    </button>`).join('')}
+  </div>` : '';
+
   // Named templates from state.templates[]
   const templates = state.templates ?? [];
   const templateOptions = templates.length > 0
@@ -2584,7 +2635,8 @@ function _prepNewWeekModal() {
     <label class="form-label" for="nw-template-select">Vorlage</label>
     <select class="form-input" id="nw-template-select">${templateOptions}</select>
   </div>
-  ${suggestHtml}`;
+  ${suggestHtml}
+  ${aiRecHtml}`;
 
   // Show/hide template select based on checkbox
   const cb     = body.querySelector('#nw-copy-prev');
@@ -2599,8 +2651,12 @@ function _createWeek() {
   const note     = document.getElementById('new-week-note')?.value ?? '';
   const copyPrev = document.getElementById('nw-copy-prev')?.checked ?? true;
   if (!date) { showToast('Bitte Datum wählen', 'warn'); return; }
-  const source = copyPrev ? 'prev' : 'template';
-  dispatch(A.WEEK_CREATE, { startDate: date, note, source });
+  const source     = copyPrev ? 'prev' : 'template';
+  const weightRecs = _pendingWeightRecs.size > 0
+    ? Object.fromEntries(_pendingWeightRecs)
+    : undefined;
+  _pendingWeightRecs.clear();
+  dispatch(A.WEEK_CREATE, { startDate: date, note, source, weightRecs });
   closeModal('modal-new-week');
   showToast(source === 'template' ? 'Neue Woche aus Vorlage erstellt ✓' : 'Neue Woche aus Vorwoche erstellt ✓', 'ok');
   const triggered = fireTrigger('NEUE_WOCHE_ERSTELLT', {});

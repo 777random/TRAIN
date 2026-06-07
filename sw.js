@@ -39,6 +39,7 @@ const PRECACHE_URLS = [
   './insightEngine.js',
   './triggerEngine.js',
   './recommendationEngine.js',
+  './weightRecommendation.js',
 ];
 
 

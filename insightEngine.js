@@ -11,6 +11,8 @@
  * immediate: true → ui.js also shows a toast for this insight
  */
 
+import { getWeightRecommendation } from './weightRecommendation.js';
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function getSortedWeeks(state) {
@@ -866,6 +868,91 @@ export const INSIGHTS = [
         message: `Nach einer schwachen Vorwoche (${Math.round(prevRate*100)}%) hast du diese Woche ${Math.round(curRate*100)}% erreicht – starke Reaktion.`,
         recommendation: null,
       };
+    },
+  },
+
+  // ── A-01: Best weight increase recommendation (top exercise) ─────────────
+  {
+    id: 'A-01', priority: 3, type: 'progression',
+    trigger: ['NEUE_WOCHE_ERSTELLT'],
+    evaluate(state) {
+      const curWk = state.weeks[state.curIdx];
+      if (!curWk) return null;
+      const calcWeeks = state.weeks
+        .filter(w => w.mode !== 'deload' && w !== curWk)
+        .filter(w => w.days.some(d => d.exercises.some(ex => ex.sets.some(s => s.status === 'success'))));
+      if (calcWeeks.length < 2) return null;
+      const exNames = [...new Set(curWk.days.flatMap(d => d.exercises.map(ex => ex.name)))];
+      const candidates = [];
+      for (const name of exNames) {
+        const rec = getWeightRecommendation(name, calcWeeks);
+        if (rec && rec.delta > 0) candidates.push({ name, rec });
+      }
+      candidates.sort((a, b) => b.rec.delta - a.rec.delta);
+      const top = candidates[0];
+      if (!top) return null;
+      return {
+        id: 'A-01', type: 'progression', priority: 3,
+        title: 'Gewichtssteigerung empfohlen',
+        message: `${top.name}: Nächste Woche ${top.rec.recommendedWeight} kg — ${top.rec.reason}`,
+        recommendation: 'Tipp beim Erstellen der Woche übernehmen.',
+      };
+    },
+  },
+
+  // ── A-01b: Second-best weight increase recommendation ─────────────────────
+  {
+    id: 'A-01b', priority: 4, type: 'progression',
+    trigger: ['NEUE_WOCHE_ERSTELLT'],
+    evaluate(state) {
+      const curWk = state.weeks[state.curIdx];
+      if (!curWk) return null;
+      const calcWeeks = state.weeks
+        .filter(w => w.mode !== 'deload' && w !== curWk)
+        .filter(w => w.days.some(d => d.exercises.some(ex => ex.sets.some(s => s.status === 'success'))));
+      if (calcWeeks.length < 2) return null;
+      const exNames = [...new Set(curWk.days.flatMap(d => d.exercises.map(ex => ex.name)))];
+      const candidates = [];
+      for (const name of exNames) {
+        const rec = getWeightRecommendation(name, calcWeeks);
+        if (rec && rec.delta > 0) candidates.push({ name, rec });
+      }
+      candidates.sort((a, b) => b.rec.delta - a.rec.delta);
+      const second = candidates[1];
+      if (!second) return null;
+      return {
+        id: 'A-01b', type: 'progression', priority: 4,
+        title: 'Gewichtssteigerung empfohlen',
+        message: `${second.name}: Nächste Woche ${second.rec.recommendedWeight} kg — ${second.rec.reason}`,
+        recommendation: 'Tipp beim Erstellen der Woche übernehmen.',
+      };
+    },
+  },
+
+  // ── A-02: Hold-weight recommendation (recovery type, max 1) ───────────────
+  {
+    id: 'A-02', priority: 8, type: 'recovery',
+    trigger: ['NEUE_WOCHE_ERSTELLT'],
+    evaluate(state) {
+      const curWk = state.weeks[state.curIdx];
+      if (!curWk) return null;
+      const calcWeeks = state.weeks
+        .filter(w => w.mode !== 'deload' && w !== curWk)
+        .filter(w => w.days.some(d => d.exercises.some(ex => ex.sets.some(s => s.status === 'success'))));
+      if (calcWeeks.length < 2) return null;
+      const exNames = [...new Set(curWk.days.flatMap(d => d.exercises.map(ex => ex.name)))];
+      for (const name of exNames) {
+        const rec = getWeightRecommendation(name, calcWeeks);
+        if (rec && rec.delta === 0) {
+          return {
+            id: 'A-02', type: 'recovery', priority: 8,
+            title: 'Gewicht halten',
+            message: `${name}: Gewicht halten bei ${rec.lastWeight} kg — ${rec.reason}`,
+            recommendation: null,
+          };
+        }
+      }
+      return null;
     },
   },
 ];
