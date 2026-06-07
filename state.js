@@ -24,7 +24,7 @@
 
 export const STORAGE_KEY        = 'train_v6';
 export const STORAGE_KEY_SHADOW = 'train_v6_shadow';
-export const SCHEMA_VERSION     = 9;
+export const SCHEMA_VERSION     = 10;
 
 // 4.1: Canonical tag taxonomy
 export const AVAILABLE_TAGS = {
@@ -339,6 +339,24 @@ function migrate(raw) {
     };
   }
 
+  // v9 → v10: remove targetSets from all exercises (replaced by ex.sets.length)
+  if ((raw.meta?.schemaVersion ?? 0) < 10) {
+    (raw.weeks ?? []).forEach(wk =>
+      (wk.days ?? []).forEach(day =>
+        (day.exercises ?? []).forEach(ex => { delete ex.targetSets; })
+      )
+    );
+    (raw.customTemplate ?? []).forEach(day =>
+      (day.exercises ?? []).forEach(ex => { delete ex.targetSets; })
+    );
+    raw.meta = {
+      ...raw.meta,
+      schemaVersion: 10,
+      savedAt:   raw.meta?.savedAt   ?? null,
+      createdAt: raw.meta?.createdAt ?? new Date().toISOString(),
+    };
+  }
+
   return raw;
 }
 
@@ -455,7 +473,7 @@ export const A = Object.freeze({
   EX_TOGGLE_CFG:       'EX_TOGGLE_CFG',       // { di, ei }
   EX_INC_WEIGHT:       'EX_INC_WEIGHT',       // { di, ei, amount } – erhöht alle Sätze sofort
   EX_SET_STEP:         'EX_SET_STEP',         // { di, ei, step }  – speichert Steigerungsrate
-  EX_SET_TARGETS:      'EX_SET_TARGETS',      // { di, ei, targetSets, targetReps }
+  EX_SET_TARGETS:      'EX_SET_TARGETS',      // { di, ei, targetReps }
   EX_SET_METRIC:       'EX_SET_METRIC',       // { di, ei, metric: 'reps'|'sec'|'m' }
   // Set
   SET_ADD:             'SET_ADD',             // { di, ei }
@@ -720,7 +738,6 @@ function reduce(state, action) {
     }
     case A.EX_SET_TARGETS: {
       const ex = _currentWeek()?.days[p.di]?.exercises[p.ei]; if (!ex) break;
-      if (p.targetSets !== undefined) ex.targetSets = Math.max(1, Math.min(10, +p.targetSets || 0));
       if (p.targetReps !== undefined) ex.targetReps = Math.max(1, Math.min(100, +p.targetReps || 0));
       break;
     }

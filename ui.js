@@ -25,6 +25,7 @@ import {
 import * as ic from './icons.js';
 import { fireTrigger } from './triggerEngine.js';
 import { getWeightRecommendation } from './weightRecommendation.js';
+import { renderProgressChart }    from './progressChart.js';
 
 // ─── Module-level UI state (transient, never persisted) ──────────────────────
 
@@ -66,6 +67,9 @@ let _toastTimer = null;
 
 /** Vom Nutzer akzeptierte KI-Gewichtsempfehlungen für die nächste Wochenerstellung. */
 const _pendingWeightRecs = new Map();
+
+/** Übungen mit offenem Fortschritts-Chart im Training: Set von "${di}-${ei}" Keys. */
+const _exChartOpen = new Set();
 
 /** Swipe tracking. */
 let _swipeStartX = null;
@@ -336,6 +340,7 @@ function renderDayList(state) {
   if (_lastRenderedCurIdx !== null && _lastRenderedCurIdx !== state.curIdx && wk.days.length > 0) {
     _activeDayIdx = _getDefaultDayIndex(wk);
     _overviewMode = false;
+    _exChartOpen.clear();
   }
   _lastRenderedCurIdx = state.curIdx;
 
@@ -440,6 +445,8 @@ function renderDayList(state) {
   }
 
   container.innerHTML = tabsHtml + contentHtml;
+
+  _insertOpenCharts(state);
 
   requestAnimationFrame(() => {
     const tabsRow = container.querySelector('.day-tab-bar');
@@ -829,6 +836,13 @@ function renderExercise(wk, di, ei, state) {
     >＋${step}kg</button>` : ''}
 
     <button
+      class="btn-icon btn-icon--chart${_exChartOpen.has(`${di}-${ei}`) ? ' is-active' : ''}"
+      data-action="toggle-ex-chart" data-di="${di}" data-ei="${ei}"
+      aria-label="Fortschritts-Chart anzeigen"
+      aria-expanded="${_exChartOpen.has(`${di}-${ei}`)}"
+    >📈</button>
+
+    <button
       class="btn-icon${ex.nextWeekPlan ? ' is-planned' : ''}"
       data-action="toggle-cfg" data-di="${di}" data-ei="${ei}"
       aria-label="Pausenzeit einstellen"
@@ -844,6 +858,8 @@ function renderExercise(wk, di, ei, state) {
   </div>
 
   ${cfgRow}
+
+  <div class="ex-chart-wrap" data-chart-di="${di}" data-chart-ei="${ei}"></div>
 
   <input
     class="exercise__note"
@@ -1283,10 +1299,10 @@ function renderAnalysisTab(state) {
 
     // Target fulfillment (2.5)
     let avgFulfill = null;
-    const withTargets = wk.days.flatMap(d => d.exercises.filter(ex => ex.targetSets && ex.targetReps));
+    const withTargets = wk.days.flatMap(d => d.exercises.filter(ex => ex.targetReps));
     if (withTargets.length > 0) {
       const rates = withTargets.map(ex => {
-        const target   = (ex.targetSets ?? 0) * (ex.targetReps ?? 0);
+        const target   = ex.sets.length * (ex.targetReps ?? 0);
         const achieved = ex.sets.filter(s => s.status === 'success').reduce((sum, s) => sum + (s.reps ?? 0), 0);
         return target > 0 ? Math.min(achieved / target, 1) : 0;
       });
@@ -1365,7 +1381,7 @@ function renderAnalysisTab(state) {
     <select class="chart-select" id="chart-ex-select" aria-label="Übung für Progressionskurve wählen">
       ${allExNames.map(n => `<option value="${h(n)}">${h(n)}</option>`).join('')}
     </select>
-    <div class="chart-wrap"><canvas id="chart-ex" aria-label="Gewichtsprogression Diagramm" role="img"></canvas></div>
+    <div class="chart-wrap" id="chart-ex-wrap"></div>
   </div>
 
   <div class="chart-card">
@@ -1453,24 +1469,76 @@ function _calcStreak(state) {
   return { cur, best };
 }
 
-function _updateExChart(state) {
-  const sel = document.getElementById('chart-ex-select');
-  if (!sel) return;
-  const name = sel.value;
-  const labels = [], data = [];
-  [...state.weeks]
+/** Baut offene Fortschritts-Charts nach jedem re-render der Day-Liste neu auf. */
+function _insertOpenCharts(state) {
+  if (_exChartOpen.size === 0) return;
+  const wk = state.weeks[state.curIdx];
+  if (!wk) return;
+  const calcWeeks = [...state.weeks]
+    .filter(w => w.mode !== 'deload')
     .sort((a, b) => a.startDate.localeCompare(b.startDate))
-    .forEach(wk => {
-      wk.days.forEach(d => {
-        d.exercises.forEach(ex => {
-          if (ex.name === name && ex.sets.length) {
-            labels.push(wkLabel(wk.startDate).split('·')[0].trim());
-            data.push(Math.max(0, ...ex.sets.map(s => s.weight)));
-          }
-        });
-      });
+    .slice(-16);
+  _exChartOpen.forEach(key => {
+    const [di, ei] = key.split('-').map(Number);
+    const ex = wk.days[di]?.exercises[ei];
+    if (!ex) return;
+    const wrap = document.querySelector(`[data-chart-di="${di}"][data-chart-ei="${ei}"]`);
+    if (!wrap) return;
+    const svg = renderProgressChart(ex.name, calcWeeks, { compact: true });
+    if (svg) {
+      wrap.innerHTML = svg;
+      _attachChartTooltips(wrap);
+    }
+  });
+}
+
+/** Tooltip-Handler für data-tip-Kreise im SVG-Chart. */
+function _attachChartTooltips(container) {
+  let tip = document.getElementById('_train-chart-tip');
+  if (!tip) {
+    tip = document.createElement('div');
+    tip.id = '_train-chart-tip';
+    tip.style.cssText = 'position:fixed;background:#1C1C1F;color:#F0F0F0;border:1px solid #2E2E35;border-radius:6px;padding:5px 10px;font-size:12px;font-family:DM Sans,sans-serif;pointer-events:none;opacity:0;transition:opacity .15s;z-index:9000;white-space:nowrap';
+    document.body.appendChild(tip);
+  }
+  container.querySelectorAll('[data-tip]').forEach(el => {
+    el.addEventListener('mouseenter', e => {
+      tip.textContent = el.dataset.tip;
+      tip.style.opacity = '1';
+      tip.style.left = (e.clientX + 10) + 'px';
+      tip.style.top  = (e.clientY - 36) + 'px';
     });
-  drawLineChart('chart-ex', labels, data, '#4FC3F7');
+    el.addEventListener('mousemove', e => {
+      tip.style.left = (e.clientX + 10) + 'px';
+      tip.style.top  = (e.clientY - 36) + 'px';
+    });
+    el.addEventListener('mouseleave', () => { tip.style.opacity = '0'; });
+    el.addEventListener('click', e => {
+      tip.textContent = el.dataset.tip;
+      tip.style.opacity = '1';
+      tip.style.left = (e.clientX + 10) + 'px';
+      tip.style.top  = (e.clientY - 36) + 'px';
+      setTimeout(() => { tip.style.opacity = '0'; }, 2500);
+    });
+  });
+}
+
+function _updateExChart(state) {
+  const sel  = document.getElementById('chart-ex-select');
+  const wrap = document.getElementById('chart-ex-wrap');
+  if (!sel || !wrap) return;
+  const name = sel.value;
+  const calcWeeks = [...state.weeks]
+    .filter(w => w.mode !== 'deload')
+    .sort((a, b) => a.startDate.localeCompare(b.startDate))
+    .slice(-16);
+  const svg = renderProgressChart(name, calcWeeks, { compact: false });
+  if (svg) {
+    wrap.innerHTML = svg;
+    _attachChartTooltips(wrap);
+  } else {
+    wrap.innerHTML = '<p style="font-size:13px;color:var(--c-text-3);padding:12px 0">Noch zu wenig Daten — ab 2 Trainingswochen sichtbar.</p>';
+  }
 }
 
 function _drawHeatmap(state) {
@@ -2121,6 +2189,33 @@ function _handleClick(e) {
     case 'toggle-cfg':
       dispatch(A.EX_TOGGLE_CFG, { di: +di, ei: +ei }); break;
 
+    case 'toggle-ex-chart': {
+      const chartKey = `${di}-${ei}`;
+      const wrap = document.querySelector(`[data-chart-di="${di}"][data-chart-ei="${ei}"]`);
+      if (_exChartOpen.has(chartKey)) {
+        _exChartOpen.delete(chartKey);
+        el.classList.remove('is-active');
+        el.setAttribute('aria-expanded', 'false');
+        if (wrap) wrap.innerHTML = '';
+      } else {
+        _exChartOpen.add(chartKey);
+        el.classList.add('is-active');
+        el.setAttribute('aria-expanded', 'true');
+        if (wrap) {
+          const wk = getState().weeks[getState().curIdx];
+          const calcWeeks = [...getState().weeks]
+            .filter(w => w.mode !== 'deload')
+            .sort((a, b) => a.startDate.localeCompare(b.startDate))
+            .slice(-16);
+          const exName = wk?.days[+di]?.exercises[+ei]?.name;
+          const svg = exName ? renderProgressChart(exName, calcWeeks, { compact: true }) : null;
+          if (svg) { wrap.innerHTML = svg; _attachChartTooltips(wrap); }
+          else wrap.innerHTML = '<p style="font-size:12px;color:var(--c-text-3);padding:8px 0">Noch zu wenig Daten — ab 2 Trainingswochen sichtbar.</p>';
+        }
+      }
+      break;
+    }
+
     case 'set-pause':
       dispatch(A.EX_UPDATE, { di: +di, ei: +ei, field: 'pauseSec', value: +sec }); break;
 
@@ -2551,9 +2646,9 @@ function _prepNewWeekModal() {
   if (curWk) {
     for (const day of curWk.days) {
       for (const ex of day.exercises) {
-        if (!ex.targetSets || !ex.targetReps) continue;
+        if (!ex.targetReps) continue;
         const successSets = ex.sets.filter(s => s.status === 'success');
-        const allMetTarget = successSets.length >= ex.targetSets
+        const allMetTarget = successSets.length >= ex.sets.length
           && successSets.every(s => (s.reps ?? 0) >= ex.targetReps);
         if (allMetTarget && successSets.length > 0) {
           const maxW = Math.max(...successSets.map(s => s.weight ?? 0));

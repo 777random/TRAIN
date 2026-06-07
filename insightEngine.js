@@ -127,9 +127,9 @@ export const INSIGHTS = [
       const wk = state.weeks[state.curIdx];
       if (!wk) return null;
       const ex = wk.days[di]?.exercises[ei];
-      if (!ex || !ex.targetSets || ex.targetSets <= 1) return null;
+      if (!ex || ex.sets.length <= 1) return null;
       const done = ex.sets.filter(s => s.status === 'success').length;
-      if (done !== ex.targetSets - 1) return null;
+      if (done !== ex.sets.length - 1) return null;
       return {
         id: 'Z-01', type: 'goal', priority: 3, immediate: true,
         title: 'Fast am Ziel',
@@ -472,8 +472,8 @@ export const INSIGHTS = [
         const allHit = last5.every(wk => {
           for (const d of wk.days)
             for (const ex of d.exercises)
-              if (ex.name === name && ex.targetSets)
-                return ex.sets.filter(s => s.status === 'success').length >= ex.targetSets;
+              if (ex.name === name)
+                return ex.sets.filter(s => s.status === 'success').length >= ex.sets.length;
           return false;
         });
         if (!allHit) continue;
@@ -482,12 +482,12 @@ export const INSIGHTS = [
         const wk = last5[4];
         for (const d of wk.days)
           for (const ex of d.exercises)
-            if (ex.name === name && ex.targetSets && ex.targetReps)
+            if (ex.name === name && ex.targetReps)
               return {
                 id: 'S-05', type: 'stagnation', priority: 11,
                 title: 'Ziel erreicht – nächster Schritt?',
-                message: `${name}: Du erreichst dein Ziel von ${ex.targetSets}×${ex.targetReps} konstant – bereit für mehr?`,
-                recommendation: `Erhöhe das Ziel auf ${ex.targetSets}×${(ex.targetReps ?? 0) + 2} oder füge ein zusätzliches Set hinzu.`,
+                message: `${name}: Du erreichst dein Ziel von ${ex.sets.length}×${ex.targetReps} konstant – bereit für mehr?`,
+                recommendation: `Erhöhe das Ziel auf ${ex.sets.length}×${(ex.targetReps ?? 0) + 2} oder füge ein zusätzliches Set hinzu.`,
               };
       }
       return null;
@@ -643,8 +643,8 @@ export const INSIGHTS = [
         const rates = last3.map(wk => {
           for (const d of wk.days)
             for (const ex of d.exercises)
-              if (ex.name === name && ex.targetSets && ex.targetReps) {
-                const target   = ex.targetSets * ex.targetReps;
+              if (ex.name === name && ex.targetReps) {
+                const target   = ex.sets.length * ex.targetReps;
                 const achieved = ex.sets.filter(s => s.status === 'success').reduce((s, set) => s + (set.reps ?? 0), 0);
                 return target > 0 ? achieved / target : null;
               }
@@ -654,12 +654,12 @@ export const INSIGHTS = [
         const wk = last3[2];
         for (const d of wk.days)
           for (const ex of d.exercises)
-            if (ex.name === name && ex.targetSets)
+            if (ex.name === name)
               return {
                 id: 'Z-02', type: 'goal', priority: 6,
                 title: 'Ziel konstant übererfüllt',
                 message: `Du übertriffst dein ${name}-Ziel seit 3 Wochen – vielleicht Zeit das Ziel anzuheben?`,
-                recommendation: `Erhöhe das Ziel auf ${ex.targetSets + 1} Sätze oder steigere das Gewicht.`,
+                recommendation: `Füge einen weiteren Satz hinzu oder erhöhe das Gewicht.`,
               };
       }
       return null;
@@ -679,8 +679,8 @@ export const INSIGHTS = [
         const rates = last4.map(wk => {
           for (const d of wk.days)
             for (const ex of d.exercises)
-              if (ex.name === name && ex.targetSets && ex.targetReps) {
-                const target   = ex.targetSets * ex.targetReps;
+              if (ex.name === name && ex.targetReps) {
+                const target   = ex.sets.length * ex.targetReps;
                 const achieved = ex.sets.filter(s => s.status === 'success').reduce((s, set) => s + (set.reps ?? 0), 0);
                 return target > 0 ? achieved / target : null;
               }
@@ -691,13 +691,13 @@ export const INSIGHTS = [
         const wk  = last4[3];
         for (const d of wk.days)
           for (const ex of d.exercises)
-            if (ex.name === name && ex.targetSets && ex.targetReps) {
+            if (ex.name === name && ex.targetReps) {
               const realistisch = Math.round(ex.targetReps * avg / 100 * 1.1);
               return {
                 id: 'Z-03', type: 'goal', priority: 12,
                 title: 'Ziel außer Reichweite',
-                message: `Dein Ziel bei ${name} (${ex.targetSets}×${ex.targetReps}) liegt seit 4 Wochen außer Reichweite – du erreichst im Schnitt ${avg}%.`,
-                recommendation: `Setze das Ziel auf ${ex.targetSets}×${realistisch} – das liegt 10% über deinem aktuellen Durchschnitt.`,
+                message: `Dein Ziel bei ${name} (${ex.sets.length}×${ex.targetReps}) liegt seit 4 Wochen außer Reichweite – du erreichst im Schnitt ${avg}%.`,
+                recommendation: `Setze das Ziel auf ${ex.sets.length}×${realistisch} – das liegt 10% über deinem aktuellen Durchschnitt.`,
               };
             }
       }
