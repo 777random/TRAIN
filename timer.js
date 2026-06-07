@@ -95,15 +95,14 @@ function _fmt(totalSeconds) {
 function _tickClock() {
   if (!_sessStart || !_clockEl) return;
   const elapsed = Math.floor((Date.now() - _sessStart) / 1000);
-  _clockEl.textContent = _fmt(elapsed);
+  _clockEl.textContent = '● ' + _fmt(elapsed);
   _sessRAF = requestAnimationFrame(_tickClock);
 }
 
 function _startSession() {
   if (_sessStart !== null) return;
   _sessStart = Date.now();
-  _clockEl?.classList?.add('timer-clock--running');
-  _clockEl?.setAttribute?.('aria-label', 'Session-Timer läuft – Tippen zum Stoppen');
+  _clockEl?.classList?.add('toolbar-timer--running');
   _sessRAF = requestAnimationFrame(_tickClock);
 }
 
@@ -115,9 +114,8 @@ function _stopSession() {
   cancelAnimationFrame(_sessRAF);
   _sessStart = null;
   if (_clockEl) {
-    if (typeof _clockEl.textContent !== 'undefined') _clockEl.textContent = '00:00';
-    _clockEl.classList?.remove('timer-clock--running');
-    _clockEl.setAttribute?.('aria-label', 'Session-Timer – Tippen zum Starten');
+    _clockEl.textContent = '00:00';
+    _clockEl.classList?.remove('toolbar-timer--running');
   }
 }
 
@@ -216,7 +214,7 @@ function _onStateChange(state) {
     _sessStart = null;
     if (_clockEl) {
       _clockEl.textContent = '00:00';
-      _clockEl.classList.remove('timer-clock--running');
+      _clockEl.classList.remove('toolbar-timer--running');
     }
     _dismissPause();
   }
@@ -351,33 +349,25 @@ function _buildOverlayDOM() {
 function _injectStyles() {
   const style = document.createElement('style');
   style.textContent = `
-  /* ── Session clock in toolbar ─────────────────────────── */
-  .timer-clock {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
+  /* ── Session timer in toolbar ────────────────────────── */
+  .toolbar-timer {
     font-family: var(--font-display);
-    font-size: 18px;
-    letter-spacing: .08em;
+    font-size: 16px;
+    letter-spacing: .06em;
     color: var(--c-text-3);
-    background: none;
-    border: 1px solid transparent;
-    border-radius: var(--r-md);
+    cursor: pointer;
     padding: 0 var(--sp-2);
     min-height: var(--touch);
-    cursor: pointer;
-    transition: color var(--t-fast), border-color var(--t-fast);
+    display: inline-flex;
+    align-items: center;
     line-height: 1;
     white-space: nowrap;
+    transition: color var(--t-fast);
+    user-select: none;
   }
-  .timer-clock svg { width: 16px; height: 16px; flex-shrink: 0; }
-  .timer-clock:hover {
-    color: var(--c-text-2);
-    border-color: var(--c-border);
-  }
-  .timer-clock--running {
+  .toolbar-timer:hover { color: var(--c-text-2); }
+  .toolbar-timer--running {
     color: var(--c-accent);
-    border-color: color-mix(in srgb, var(--c-accent) 30%, transparent);
     animation: timer-pulse 2s ease-in-out infinite;
   }
   @keyframes timer-pulse {
@@ -537,41 +527,26 @@ function _bindOverlayEvents(overlay) {
 
 function _attachClockToToolbar() {
   const tryAttach = () => {
-    const toolbar = document.querySelector('.toolbar');
-    if (!toolbar || document.getElementById('session-clock')) return false;
-
-    const clockBtn = document.createElement('button');
-    clockBtn.id        = 'session-clock';
-    clockBtn.className = 'timer-clock';
-    clockBtn.setAttribute('aria-label', 'Session-Timer – Tippen zum Starten');
-    clockBtn.setAttribute('aria-live', 'off');
-    clockBtn.innerHTML = `
-      <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"
-        fill="none" stroke="currentColor" stroke-width="2"
-        stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="10"/>
-        <polyline points="12 6 12 12 16 14"/>
-      </svg>
-      <span>00:00</span>
-    `;
-    clockBtn.addEventListener('click', _manualToggle);
-
-    // Insert before the first toolbar__btn (after the spacer, before ＋)
-    const firstBtn = toolbar.querySelector('.toolbar__btn');
-    toolbar.insertBefore(clockBtn, firstBtn);
-
-    _clockEl = clockBtn.querySelector('span');
-    return true;
+    const el = document.getElementById('toolbar-session-timer');
+    if (!el || el === _clockEl) return;
+    el.removeEventListener('click', _manualToggle);
+    el.addEventListener('click', _manualToggle);
+    _clockEl = el;
+    // Restore visual state after re-render
+    if (_sessStart !== null) {
+      el.classList.add('toolbar-timer--running');
+      el.textContent = '● ' + _fmt(Math.floor((Date.now() - _sessStart) / 1000));
+    } else {
+      el.textContent = '00:00';
+      el.classList.remove('toolbar-timer--running');
+    }
   };
 
-  if (!tryAttach()) {
-    const observer = new MutationObserver(() => {
-      if (tryAttach()) observer.disconnect();
-    });
-    observer.observe(document.getElementById('app') ?? document.body, {
-      childList: true, subtree: true,
-    });
-  }
+  tryAttach();
+  const observer = new MutationObserver(tryAttach);
+  observer.observe(document.getElementById('app') ?? document.body, {
+    childList: true, subtree: true,
+  });
 }
 
 // ─── Wire training interactions from ui.js ────────────────────────────────────

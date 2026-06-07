@@ -54,6 +54,9 @@ let _rpePopoverKey = null;
 /** Tracks whether the first-day auto-open has already happened. */
 let _autoOpened = false;
 
+/** Last rendered week index – used to detect week navigation. */
+let _lastRenderedCurIdx = null;
+
 /** IntersectionObserver instance for sticky-header detection. */
 let _stickyObserver = null;
 
@@ -279,6 +282,12 @@ function _bindDrag(container) {
   });
 }
 
+// ─── Default day index helper ─────────────────────────────────────────────────
+function _getDefaultDayIndex(wk) {
+  const first = wk.days.findIndex(d => !d.markedDone);
+  return first >= 0 ? first : wk.days.length - 1;
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // RENDER FUNCTIONS
 // ════════════════════════════════════════════════════════════════════════════
@@ -319,10 +328,17 @@ function renderDayList(state) {
 
   const isDl = wk.mode === 'deload';
 
-  // 1.1: Auto-open first day on initial load (prevents black screen)
-  if (!_autoOpened && _activeDayIdx === null && !_overviewMode && wk.days.length > 0) {
+  // Week navigation: reset to first non-completed day
+  if (_lastRenderedCurIdx !== null && _lastRenderedCurIdx !== state.curIdx && wk.days.length > 0) {
+    _activeDayIdx = _getDefaultDayIndex(wk);
+    _overviewMode = false;
+  }
+  _lastRenderedCurIdx = state.curIdx;
+
+  // Initial load: auto-open first non-completed day
+  if (!_autoOpened && wk.days.length > 0) {
     _autoOpened = true;
-    _activeDayIdx = 0;
+    _activeDayIdx = _getDefaultDayIndex(wk);
   }
 
   // ── Progress bar for active day ───────────────────────────────────────────
@@ -350,6 +366,7 @@ function renderDayList(state) {
         ${ic.zap()}&thinsp;Deload</button>
     </div>
     <span class="toolbar__spacer"></span>
+    <span id="toolbar-session-timer" class="toolbar-timer" role="timer" aria-label="Session-Timer">00:00</span>
     <button class="toolbar__btn" id="btn-undo" data-action="undo"
       aria-label="Rückgängig machen"${!canUndo() ? ' disabled' : ''}>${ic.undo()}</button>
     <button class="toolbar__btn toolbar__btn--accent" data-action="open-new-week"
@@ -643,6 +660,25 @@ function renderExercise(wk, di, ei, state) {
 
   const step = ex.weightStep ?? 2.5;
   const metric = ex.metric === 'sec' || ex.metric === 'm' ? ex.metric : 'reps';
+
+  // Vorschlag: Ø erfolgreiche Wiederholungen der gleichen Übung aus der Vorwoche
+  let _suggestionHtml = '';
+  if (!locked && state.curIdx > 0) {
+    const prevWk = state.weeks[state.curIdx - 1];
+    if (prevWk) {
+      for (const d of prevWk.days) {
+        const pe = d.exercises.find(e => e.name === ex.name);
+        if (pe) {
+          const scs = pe.sets.filter(s => s.status === 'success' && s.reps != null && s.reps > 0);
+          if (scs.length > 0) {
+            const avg = Math.round(scs.reduce((sum, s) => sum + s.reps, 0) / scs.length);
+            _suggestionHtml = `<span class="target-suggestion">Vorschlag: ${avg} (Ø letzte Woche)</span><button type="button" class="btn-adopt-target" data-action="adopt-target-reps" data-di="${di}" data-ei="${ei}" data-value="${avg}">Übernehmen</button>`;
+          }
+          break;
+        }
+      }
+    }
+  }
   const metricHdr = metric === 'sec' ? 'Sek' : metric === 'm' ? 'm' : 'Wdh';
 
   // --- Das neue, cleane Zahnrad-Menü ---
@@ -725,25 +761,21 @@ function renderExercise(wk, di, ei, state) {
       ${!locked ? `
       <div class="weight-plan-row" role="group" aria-label="Zielvorgaben">
         <span class="pause-row__label">Ziel:</span>
+        <span class="pause-row__label">${ex.sets.length}&times;</span>
         <input
           class="target-input"
-          type="number" inputmode="numeric" min="1" max="10"
-          value="${ex.targetSets ?? ''}"
-          placeholder="Sätze"
-          data-action="set-targets" data-field="targetSets"
-          data-di="${di}" data-ei="${ei}"
-          aria-label="Ziel Sätze"
-        />
-        <span class="pause-row__label">×</span>
-        <input
-          class="target-input"
-          type="number" inputmode="numeric" min="1" max="100"
+          type="number"
+          inputmode="${metric === 'm' ? 'decimal' : 'numeric'}"
+          min="1" max="999"
+          step="${metric === 'sec' || metric === 'm' ? '5' : '1'}"
           value="${ex.targetReps ?? ''}"
-          placeholder="Wdh"
+          placeholder="${metric === 'sec' ? 'z.B. 30' : metric === 'm' ? 'z.B. 20' : 'z.B. 10'}"
           data-action="set-targets" data-field="targetReps"
           data-di="${di}" data-ei="${ei}"
-          aria-label="Ziel Wiederholungen"
+          aria-label="Ziel ${metric === 'sec' ? 'Sekunden' : metric === 'm' ? 'Meter' : 'Wiederholungen'}"
         />
+        <span class="pause-row__label">${metricHdr}</span>
+        ${_suggestionHtml}
       </div>` : ''}
       <!-- Tags (3.12) -->
       <div class="weight-plan-row exercise-tags-row" role="group" aria-label="Tags">
@@ -841,17 +873,19 @@ function renderExercise(wk, di, ei, state) {
 
   <!-- Soll-Ist + Fulfillment combined row (2.4): always visible, no toggle -->
   ${(() => {
-    if (!ex.targetSets || !ex.targetReps) return '';
-    const target   = ex.targetSets * ex.targetReps;
+    if (!ex.targetReps) return '';
+    const nSets    = ex.sets.length;
+    const target   = nSets * ex.targetReps;
     const achieved = ex.sets.filter(s => s.status === 'success').reduce((sum, s) => sum + (s.reps ?? 0), 0);
     const pct      = target > 0 ? Math.min(Math.round(achieved / target * 100), 100) : 0;
     const color    = pct >= 100 ? 'var(--c-ok)' : pct >= 80 ? 'var(--c-warn)' : 'var(--c-danger)';
+    const unit     = metric === 'sec' ? 'Sek' : metric === 'm' ? 'm' : 'Wdh';
     return `
     <div class="fulfill-meter" aria-label="Zielerfüllung ${pct}%">
       <div class="fulfill-meter__bar-wrap">
         <div class="fulfill-meter__bar" style="width:${pct}%;background:${color}"></div>
       </div>
-      <span class="fulfill-meter__label" style="color:${color}">Ziel: ${ex.targetSets}×${ex.targetReps} | Ist: ${achieved}/${target} Wdh</span>
+      <span class="fulfill-meter__label" style="color:${color}">Ziel: ${nSets}×${ex.targetReps} | Ist: ${achieved}/${target} ${unit}</span>
     </div>`;
   })()}
 
@@ -2154,7 +2188,16 @@ function _handleClick(e) {
       }
       break;
     }
-      
+
+    case 'adopt-target-reps': {
+      dispatch(A.EX_SET_TARGETS, {
+        di: +el.dataset.di,
+        ei: +el.dataset.ei,
+        targetReps: +el.dataset.value,
+      });
+      break;
+    }
+
     case 'move-ex-down': {
       const maxEi = getState().weeks[getState().curIdx].days[+di].exercises.length - 1;
       const toEi = +ei + 1;

@@ -220,4 +220,5 @@ export function exportCSV(scope = 'all') {
     ? wkLabel(weeks[0]?.startDate ?? '').replace(/\s\/\s/g, '-').replace(/\s/g, '')
     : 'Alle_Wochen';
   triggerDownload(blob, `TRAIN_Export_${tag}_${today()}.csv`);
+  dispatch(A.SETTING_SET, { key: 'lastBackupDate', value: today() });
 }

@@ -1184,6 +1184,29 @@ label > svg {
 .target-input:focus { border-color: var(--c-accent); }
 .target-input::placeholder { color: var(--c-text-3); font-size: 11px; }
 
+/* ── Ziel-Vorschlag (Ø letzte Woche) ────────────────────────── */
+.target-suggestion {
+  font-size: 11px;
+  color: var(--c-text-3);
+  white-space: nowrap;
+}
+.btn-adopt-target {
+  font-size: 11px;
+  padding: 2px 8px;
+  height: 22px;
+  background: none;
+  border: 1px solid var(--c-accent);
+  border-radius: var(--r-full);
+  color: var(--c-accent);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--t-fast), color var(--t-fast);
+}
+.btn-adopt-target:hover {
+  background: var(--c-accent);
+  color: #000;
+}
+
 /* ── Satz-Notiz ─────────────────────────────────────────────── */
 .set-note-btn {
   background: none;
