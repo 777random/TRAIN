@@ -18,7 +18,7 @@
  *   asset conflicts.
  */
 
-const CACHE_VERSION  = 'train-v3';
+const CACHE_VERSION  = 'train-v4';
 const FONT_CACHE     = 'train-fonts-v1';
 
 /**
@@ -40,6 +40,7 @@ const PRECACHE_URLS = [
   './triggerEngine.js',
   './recommendationEngine.js',
   './weightRecommendation.js',
+  './progressChart.js',
 ];
 
 

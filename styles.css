@@ -746,8 +746,17 @@ exercise { position: unset; }
   border-radius: var(--r-lg); padding: var(--sp-4); margin-bottom: var(--sp-3);
 }
 .chart-card__title { font-family: var(--font-display); font-size: 17px; letter-spacing: .08em; margin-bottom: var(--sp-3); }
-.chart-wrap { position: relative; height: 130px; }
+.chart-wrap { position: relative; min-height: 60px; }
 .chart-wrap canvas { width: 100% !important; }
+#chart-ex-wrap svg { display: block; }
+
+/* Fortschritts-Chart im Training (kompakt, unter Übungsname) */
+.ex-chart-wrap { margin: 4px 0 8px; padding: 0 4px; }
+.ex-chart-wrap svg { display: block; }
+
+/* 📈-Button im Übungskopf */
+.btn-icon--chart { font-size: 14px; opacity: 0.55; transition: opacity .15s; }
+.btn-icon--chart:hover, .btn-icon--chart.is-active { opacity: 1; }
 .heatmap { display: grid; grid-template-columns: repeat(12,1fr); gap: 3px; margin-top: var(--sp-2); }
 .hm-cell { aspect-ratio: 1; border-radius: 3px; background: var(--c-surface2); }
 .hm-cell--1 { background: rgba(200,255,0,.25); }
