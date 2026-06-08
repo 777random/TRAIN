@@ -62,6 +62,9 @@ let _lastConfirmTap = {};
 /** Key of the exercise with the open substitute-name form: `${di}-${ei}` or null. */
 let _subFormOpenKey = null;
 
+/** Key of the exercise whose ⋮ context menu is open: `${di}-${ei}` or null. */
+let _exMenuOpenKey = null;
+
 /** Tracks whether the first-day auto-open has already happened. */
 let _autoOpened = false;
 
@@ -777,14 +780,14 @@ function renderExercise(wk, di, ei, state) {
       <div class="weight-plan-row" role="group" aria-label="Satz-Typ">
         <span class="pause-row__label">Typ:</span>
         <div class="weight-step-opts">
-          ${[['straight','Straight'],['pyramid','Pyramide']].map(([val, lbl]) => `
+          ${[['straight','Straight'],['manual','Manuell']].map(([val, lbl]) => `
             <button type="button"
-              class="weight-step-btn${(ex.setType ?? 'pyramid') === val ? ' is-selected' : ''}"
+              class="weight-step-btn${(ex.setType ?? 'straight') === val ? ' is-selected' : ''}"
               data-action="set-settype" data-di="${di}" data-ei="${ei}" data-val="${val}"
-              aria-pressed="${(ex.setType ?? 'pyramid') === val}"
+              aria-pressed="${(ex.setType ?? 'straight') === val}"
             >${lbl}</button>`).join('')}
         </div>
-        ${(ex.setType ?? 'pyramid') === 'straight'
+        ${(ex.setType ?? 'straight') === 'straight'
           ? '<span class="pause-row__label" style="color:var(--c-text-3);font-size:10px">Gewicht wird automatisch auf alle Sätze kopiert</span>'
           : ''}
       </div>` : ''}
@@ -852,12 +855,6 @@ function renderExercise(wk, di, ei, state) {
   <div class="sticky-sentinel" aria-hidden="true" style="height:1px;pointer-events:none;"></div>
 
   <div class="exercise__name-sticky">
-    ${!locked ? `
-    <div class="exercise__order-btns">
-      <button class="exercise__order-btn" data-action="move-ex-up" data-di="${di}" data-ei="${ei}" aria-label="Nach oben" ${ei === 0 ? 'disabled' : ''}>▲</button>
-      <button class="exercise__order-btn" data-action="move-ex-down" data-di="${di}" data-ei="${ei}" aria-label="Nach unten" ${ei === wk.days[di].exercises.length - 1 ? 'disabled' : ''}>▼</button>
-    </div>` : ''}
-    
     <input
       class="exercise__name-input"
       type="text"
@@ -868,13 +865,6 @@ function renderExercise(wk, di, ei, state) {
       maxlength="80"
     />
 
-    ${!locked ? `
-    <button
-      class="btn-inc-weight-sticky"
-      data-action="inc-weight" data-di="${di}" data-ei="${ei}"
-      aria-label="Gewicht um ${step} kg erhöhen"
-    >＋${step}kg</button>` : ''}
-
     <button
       class="btn-fav${isFav ? ' is-fav' : ''}"
       data-action="toggle-fav"
@@ -883,33 +873,30 @@ function renderExercise(wk, di, ei, state) {
       aria-pressed="${isFav}"
     >${isFav ? '⭐' : '☆'}</button>
 
-    ${!locked ? `<button
-      class="btn-sub${ex.substituteFor ? ' is-sub' : ''}"
-      data-action="${ex.substituteFor ? 'reset-sub' : 'open-sub-form'}"
-      data-di="${di}" data-ei="${ei}"
-      aria-label="${ex.substituteFor ? 'Substitution zurücksetzen' : 'Heute andere Übung machen'}"
-    >↔ ${ex.substituteFor ? 'Zurücksetzen' : 'Heute anders'}</button>` : ''}
-
-    <button
-      class="btn-icon btn-icon--chart${_exChartOpen.has(`${di}-${ei}`) ? ' is-active' : ''}"
-      data-action="toggle-ex-chart" data-di="${di}" data-ei="${ei}"
-      aria-label="Fortschritts-Chart anzeigen"
-      aria-expanded="${_exChartOpen.has(`${di}-${ei}`)}"
-    >📈</button>
-
-    <button
-      class="btn-icon${ex.nextWeekPlan ? ' is-planned' : ''}"
-      data-action="toggle-cfg" data-di="${di}" data-ei="${ei}"
-      aria-label="Pausenzeit einstellen"
-      aria-expanded="${!!ex._showCfg}"
-    >${ic.settings()}</button>
-    
-    ${!locked ? `
-    <button
-      class="exercise__remove-btn"
-      data-action="remove-ex" data-di="${di}" data-ei="${ei}"
-      aria-label="Übung '${h(ex.name)}' entfernen"
-    >${ic.trash()}</button>` : ''}
+    <div class="ex-menu-wrap">
+      <button
+        class="ex-menu-btn${ex.nextWeekPlan ? ' is-planned' : ''}"
+        data-action="toggle-ex-menu" data-di="${di}" data-ei="${ei}"
+        aria-label="Übungsmenü öffnen"
+        aria-expanded="${_exMenuOpenKey === `${di}-${ei}`}"
+      >⋮</button>
+      ${_exMenuOpenKey === `${di}-${ei}` ? `
+      <div class="ex-menu-dropdown" role="menu">
+        ${!locked ? `
+        <button class="ex-menu-item" role="menuitem" data-action="move-ex-up" data-di="${di}" data-ei="${ei}" ${ei === 0 ? 'disabled' : ''}>▲ Nach oben</button>
+        <button class="ex-menu-item" role="menuitem" data-action="move-ex-down" data-di="${di}" data-ei="${ei}" ${ei === wk.days[di].exercises.length - 1 ? 'disabled' : ''}>▼ Nach unten</button>
+        <button class="ex-menu-item" role="menuitem" data-action="inc-weight" data-di="${di}" data-ei="${ei}">＋${step} kg planen</button>
+        ` : ''}
+        <button class="ex-menu-item" role="menuitem" data-action="toggle-ex-chart" data-di="${di}" data-ei="${ei}">📈 Fortschritt</button>
+        <button class="ex-menu-item${ex.nextWeekPlan ? ' is-planned' : ''}" role="menuitem" data-action="toggle-cfg" data-di="${di}" data-ei="${ei}">⚙️ Einstellungen</button>
+        ${!locked ? `
+        ${ex.substituteFor
+          ? `<button class="ex-menu-item" role="menuitem" data-action="reset-sub" data-di="${di}" data-ei="${ei}">↩ Substitution zurücksetzen</button>`
+          : `<button class="ex-menu-item" role="menuitem" data-action="open-sub-form" data-di="${di}" data-ei="${ei}">↔ Heute anders</button>`}
+        <button class="ex-menu-item ex-menu-item--danger" role="menuitem" data-action="remove-ex" data-di="${di}" data-ei="${ei}">🗑️ Übung löschen</button>
+        ` : ''}
+      </div>` : ''}
+    </div>
   </div>
 
   ${subBannerHtml}
@@ -1746,7 +1733,7 @@ function renderSettingsTab(state) {
   <div class="settings-section">
     ${tog('swipe', 'Swipe-Navigation', 'Wischen zum Wochenwechsel')}
     ${tog('drag',  'Drag & Drop',      'Übungen per Griff verschieben')}
-    ${tog('vibrationEnabled', 'Vibration nach Pause', 'Nicht verfügbar auf iOS')}
+    ${tog('vibrationEnabled', 'Vibration nach Pause', 'Funktioniert nur auf Android — iOS unterstützt Vibration in PWAs technisch nicht.')}
     ${tog('rpeEnabled', 'RPE anzeigen', 'Rate of Perceived Exertion — Anstrengungsgrad pro Satz')}
   </div>
 
@@ -2070,6 +2057,12 @@ function _handleClick(e) {
     scheduleRender();
   }
 
+  // Close exercise ⋮ menu when clicking outside the toggle button
+  if (_exMenuOpenKey !== null && !e.target.closest('[data-action="toggle-ex-menu"]')) {
+    _exMenuOpenKey = null;
+    scheduleRender();
+  }
+
   // ── 1. Day tab button ────────────────────────────────────────────────────
   const hdr = e.target.closest('.day-tab');
   if (hdr) {
@@ -2377,6 +2370,13 @@ function _handleClick(e) {
       }
       break;
 
+    case 'toggle-ex-menu': {
+      const _menuKey = `${di}-${ei}`;
+      _exMenuOpenKey = _exMenuOpenKey === _menuKey ? null : _menuKey;
+      scheduleRender();
+      break;
+    }
+
     case 'open-sub-form':
       _subFormOpenKey = `${di}-${ei}`;
       scheduleRender();
@@ -2433,7 +2433,7 @@ function _handleClick(e) {
 
     case 'set-settype': {
       const _val = el.dataset.val;
-      if (_val === 'straight' || _val === 'pyramid') {
+      if (_val === 'straight' || _val === 'manual') {
         dispatch(A.EX_UPDATE, { di: +di, ei: +ei, field: 'setType', value: _val });
       }
       break;
@@ -2930,10 +2930,20 @@ function _prepNewWeekModal() {
     }
   }
 
-  const aiRecHtml = aiRecs.length > 0 ? `
+  // Favoriten zuerst, dann delta absteigend; max. 5 Chips
+  const _favSet = new Set(state.favoriteExercises ?? []);
+  aiRecs.sort((a, b) => {
+    const af = _favSet.has(a.name) ? 0 : 1;
+    const bf = _favSet.has(b.name) ? 0 : 1;
+    if (af !== bf) return af - bf;
+    return b.rec.delta - a.rec.delta;
+  });
+  const _displayRecs = aiRecs.slice(0, 5);
+
+  const aiRecHtml = _displayRecs.length > 0 ? `
   <div class="nw-weight-recs">
     <div class="nw-weight-recs__title">💡 KI-Empfehlung</div>
-    ${aiRecs.map(r => `
+    ${_displayRecs.map(r => `
     <button type="button" class="nw-weight-rec-chip"
       data-action="toggle-weight-rec"
       data-name="${h(r.name)}"
