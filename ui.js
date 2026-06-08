@@ -26,6 +26,8 @@ import * as ic from './icons.js';
 import { fireTrigger } from './triggerEngine.js';
 import { getWeightRecommendation } from './weightRecommendation.js';
 import { renderProgressChart }    from './progressChart.js';
+import { buildWeekReview }        from './weekReview.js';
+import { showWeekReviewModal, renderWeekReviewHtml } from './weekReviewModal.js';
 
 // ─── Module-level UI state (transient, never persisted) ──────────────────────
 
@@ -1442,6 +1444,25 @@ function renderAnalysisTab(state) {
         <span class="mg-bar-val">${count}</span>
       </div>`).join('')}
     </div>`;
+  })()}
+
+  ${(() => {
+    const reviewableWeeks = [...sorted]
+      .filter(w => w.days.some(d => d.markedDone))
+      .reverse();
+    if (!reviewableWeeks.length) return '';
+    const opts = reviewableWeeks.map((wk, i) => {
+      const d   = new Date(wk.startDate + 'T12:00:00');
+      const jan = new Date(d.getFullYear(), 0, 1);
+      const kw  = Math.ceil(((d - jan) / 86_400_000 + jan.getDay() + 1) / 7);
+      const lbl = `KW ${String(kw).padStart(2,'0')} · ${d.getFullYear()}${wk.note ? ' · ' + wk.note : ''}`;
+      return `<option value="${i}">${h(lbl)}</option>`;
+    }).join('');
+    return `<div class="chart-card" id="week-review-card">
+      <div class="chart-card__title">📋 Wochenrückblick</div>
+      <select class="chart-select" id="week-review-select" aria-label="Woche für Rückblick auswählen">${opts}</select>
+      <div id="week-review-inline" style="margin-top:var(--sp-3)"></div>
+    </div>`;
   })()}`;
 
   requestAnimationFrame(() => {
@@ -1451,7 +1472,25 @@ function renderAnalysisTab(state) {
     document.getElementById('chart-ex-select')?.addEventListener('change', () => {
       _updateExChart(getState());
     });
+    _updateInlineReview(getState());
+    document.getElementById('week-review-select')?.addEventListener('change', () => {
+      _updateInlineReview(getState());
+    });
   });
+}
+
+function _updateInlineReview(state) {
+  const sel  = document.getElementById('week-review-select');
+  const wrap = document.getElementById('week-review-inline');
+  if (!sel || !wrap) return;
+  const reviewable = [...state.weeks]
+    .sort((a, b) => a.startDate.localeCompare(b.startDate))
+    .filter(w => w.days.some(d => d.markedDone))
+    .reverse();
+  const wk = reviewable[+sel.value];
+  if (!wk) { wrap.innerHTML = ''; return; }
+  const review = buildWeekReview(wk, state.weeks);
+  wrap.innerHTML = renderWeekReviewHtml(review);
 }
 
 function _calcStreak(state) {
@@ -2031,9 +2070,20 @@ function _handleClick(e) {
     case 'mode-dl':
       dispatch(A.WEEK_SET_MODE, { mode: 'deload' }); break;
 
-    case 'open-new-week':
-      _prepNewWeekModal();
-      openModal('modal-new-week'); break;
+    case 'open-new-week': {
+      const _st = getState();
+      const _sortedWks = [..._st.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
+      const _lastWk = _sortedWks[_sortedWks.length - 1];
+      const _hasCompleted = _lastWk?.days.some(d => d.markedDone);
+      if (_hasCompleted) {
+        const _review = buildWeekReview(_lastWk, _st.weeks);
+        showWeekReviewModal(_review, () => { _prepNewWeekModal(); openModal('modal-new-week'); });
+      } else {
+        _prepNewWeekModal();
+        openModal('modal-new-week');
+      }
+      break;
+    }
 
     case 'copy-prev':
       if (!confirm('Aktuelle Woche mit der Vorwoche überschreiben?\nAlle aktuellen Einträge gehen verloren.')) break;
