@@ -18,7 +18,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./styles.css?v=38">
+  <link rel="stylesheet" href="./styles.css?v=39">
 
     <script>
     window.addEventListener('touchmove', function() {}, {passive: false});
@@ -59,6 +59,27 @@
 
   <div id="app" aria-live="polite"></div>
 
+  <script>
+    function _showSplashError(msg) {
+      const ring = document.getElementById('splash__ring');
+      if (ring) ring.style.display = 'none';
+      const el = document.getElementById('splash');
+      if (!el) return;
+      const d = document.createElement('div');
+      d.style.cssText = 'font-family:monospace;font-size:11px;color:#ff6b6b;max-width:80vw;text-align:center;white-space:pre-wrap;letter-spacing:0;margin-top:12px';
+      d.textContent = msg;
+      el.appendChild(d);
+    }
+    window.addEventListener('unhandledrejection', e => {
+      _showSplashError('Modul-Fehler:\n' + (e.reason?.message ?? String(e.reason)));
+    });
+    window.addEventListener('error', e => {
+      if (!document.getElementById('app')?.classList.contains('is-ready')) {
+        _showSplashError('JS-Fehler:\n' + e.message);
+      }
+    });
+  </script>
+
   <script type="module">
     import { loadState, getState, dispatch, subscribe, A } from './state.js';
     import { exportJSON, importJSON, exportCSV }           from './backup.js';
@@ -66,20 +87,25 @@
     import { mountTimer }                                  from './timer.js';
     import { registerServiceWorker, onStorageError, onSwUpdateReady } from './registerSW.js';
 
-    const restored = loadState();
-    if (!restored) {
-      console.info('[TRAIN] No saved state – starting with default week.');
+    try {
+      const restored = loadState();
+      if (!restored) {
+        console.info('[TRAIN] No saved state – starting with default week.');
+      }
+
+      const appRoot = document.getElementById('app');
+      mountApp(appRoot);
+
+      mountTimer();
+
+      appRoot.classList.add('is-ready');
+      const splash = document.getElementById('splash');
+      splash.classList.add('is-hidden');
+      splash.addEventListener('transitionend', () => splash.remove(), { once: true });
+    } catch (err) {
+      console.error('[TRAIN] Boot error:', err);
+      window._showSplashError?.('Fehler beim Laden:\n' + (err?.message ?? String(err)));
     }
-
-    const appRoot = document.getElementById('app');
-    mountApp(appRoot);
-
-    mountTimer();
-
-    appRoot.classList.add('is-ready');
-    const splash = document.getElementById('splash');
-    splash.classList.add('is-hidden');
-    splash.addEventListener('transitionend', () => splash.remove(), { once: true });
 
     registerServiceWorker();
 
