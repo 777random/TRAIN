@@ -43,6 +43,7 @@ const PRECACHE_URLS = [
   './progressChart.js',
   './weekReview.js',
   './weekReviewModal.js',
+  './plateauDetector.js',
 ];
 
 

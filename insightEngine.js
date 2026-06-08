@@ -12,6 +12,7 @@
  */
 
 import { getWeightRecommendation } from './weightRecommendation.js';
+import { detectPlateaus } from './plateauDetector.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -961,6 +962,23 @@ export const INSIGHTS = [
         }
       }
       return null;
+    },
+  },
+
+  // ── S-06: Plateau detection with contextual strategy ─────────────────────
+  {
+    id: 'S-06', priority: 6, type: 'stagnation',
+    trigger: ['WOCHE_ABGESCHLOSSEN', 'APP_GEÖFFNET'],
+    evaluate(state) {
+      const plateaus = detectPlateaus(state.weeks, state.favoriteExercises ?? []);
+      if (!plateaus.length) return null;
+      const p = plateaus[0];
+      return {
+        id: 'S-06', type: 'stagnation', priority: 6,
+        title: 'Plateau erkannt',
+        message: p.insightText,
+        recommendation: p.actionText,
+      };
     },
   },
 ];

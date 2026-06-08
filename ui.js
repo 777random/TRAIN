@@ -28,6 +28,7 @@ import { getWeightRecommendation } from './weightRecommendation.js';
 import { renderProgressChart }    from './progressChart.js';
 import { buildWeekReview }        from './weekReview.js';
 import { showWeekReviewModal, renderWeekReviewHtml } from './weekReviewModal.js';
+import { detectPlateaus }         from './plateauDetector.js';
 
 // ─── Module-level UI state (transient, never persisted) ──────────────────────
 
@@ -1498,7 +1499,8 @@ function _updateInlineReview(state) {
     .reverse();
   const wk = reviewable[+sel.value];
   if (!wk) { wrap.innerHTML = ''; return; }
-  const review = buildWeekReview(wk, state.weeks, state.favoriteExercises ?? []);
+  const plateaus = detectPlateaus(state.weeks, state.favoriteExercises ?? []);
+  const review = buildWeekReview(wk, state.weeks, state.favoriteExercises ?? [], plateaus);
   wrap.innerHTML = renderWeekReviewHtml(review);
 }
 
@@ -2101,7 +2103,8 @@ function _handleClick(e) {
       const _lastWk = _sortedWks[_sortedWks.length - 1];
       const _hasCompleted = _lastWk?.days.some(d => d.markedDone);
       if (_hasCompleted) {
-        const _review = buildWeekReview(_lastWk, _st.weeks, _st.favoriteExercises ?? []);
+        const _plateaus = detectPlateaus(_st.weeks, _st.favoriteExercises ?? []);
+        const _review = buildWeekReview(_lastWk, _st.weeks, _st.favoriteExercises ?? [], _plateaus);
         showWeekReviewModal(_review, () => { _prepNewWeekModal(); openModal('modal-new-week'); });
       } else {
         _prepNewWeekModal();
