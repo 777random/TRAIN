@@ -29,7 +29,7 @@ export const SCHEMA_VERSION     = 10;
 // 4.1: Canonical tag taxonomy
 export const AVAILABLE_TAGS = {
   muskelgruppen:   ['Brust','Rücken','Latissimus','Trapez','Unterer Rücken','Beine','Quadrizeps','Beinbizeps','Gluteus','Waden','Bauch','Schulter','Vordere Schulter','Seitliche Schulter','Hintere Schulter','Bizeps','Trizeps','Unterarme'],
-  trainingsziel:   ['Hypertrophie','Maximalkraft','Schnellkraft','Athletik','Mobilität'],
+  trainingsziel:   ['Hypertrophie','Maximalkraft','Schnellkraft','Athletik','Mobilität','Stabilität','Rotation'],
   uebungsstil:     ['Langhantel','Kurzhantel','Kabelzug','Maschine','Kettlebell','Eigengewicht'],
   bewegungsmuster: ['Push','Pull','Hinge','Squat','Carry'],
   kontext:         ['Wettkampf','Reha','Home-Workout'],
@@ -363,6 +363,11 @@ function migrate(raw) {
   // Always-apply defaults for settings added after SCHEMA_VERSION 10
   if (raw.settings.vibrationEnabled === undefined) raw.settings.vibrationEnabled = true;
   if (raw.settings.rpeEnabled       === undefined) raw.settings.rpeEnabled       = true;
+
+  // Backward compat: rename legacy setType 'pyramid' → 'manual'
+  const _normSetType = ex => { if (ex.setType === 'pyramid') ex.setType = 'manual'; };
+  (raw.weeks ?? []).forEach(wk => (wk.days ?? []).forEach(day => (day.exercises ?? []).forEach(_normSetType)));
+  (raw.customTemplate ?? []).forEach(day => (day.exercises ?? []).forEach(_normSetType));
 
   return raw;
 }
