@@ -135,7 +135,7 @@ export function detectPlateaus(allWeeks, favoriteExercises = []) {
     for (let i = exWeeks.length - 4; i >= 0; i--) {
       const olderMax  = _exMaxWeight(exWeeks[i], exName);
       const olderRate = _exSuccessRate(exWeeks[i], exName);
-      if (olderMax <= maxWLast && olderRate >= 0.8) plateauWeeks++;
+      if (Math.abs(olderMax - maxWLast) < 0.1 && olderRate >= 0.8) plateauWeeks++;
       else break;
     }
 
