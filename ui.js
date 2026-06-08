@@ -1864,7 +1864,7 @@ function renderSettingsTab(state) {
         <button class="btn btn--ghost btn--sm" data-action="remove-fav" data-name="${h(name)}"
           aria-label="Favorit '${h(name)}' entfernen">✕</button>
       </div>`).join('');
-    })())}
+    })()}
   </div>
 
   <!-- Tags verwalten (4.1) -->
