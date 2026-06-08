@@ -698,8 +698,16 @@ function reduce(state, action) {
     }
     case A.DAY_TOGGLE_COMPLETE: {
       const day = _currentWeek()?.days[p.di]; if (!day) break;
-      day.markedDone = !day.markedDone;
-      day.locked     = day.markedDone;
+      const becomingDone = !day.markedDone;
+      if (becomingDone) {
+        for (const ex of day.exercises ?? []) {
+          for (const s of ex.sets ?? []) {
+            if (s.status === 'pending') { s.status = 'fail'; s.done = false; }
+          }
+        }
+      }
+      day.markedDone = becomingDone;
+      day.locked     = becomingDone;
       break;
     }
     case A.DAY_SET_FIELD: {
