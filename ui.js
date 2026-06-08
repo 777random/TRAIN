@@ -56,8 +56,8 @@ let _showCustomDeload = false;
 /** Key of currently open RPE popover: `${di}-${ei}-${si}` or null. */
 let _rpePopoverKey = null;
 
-/** Tracks last-tap timestamp per exercise for double-click detection: `${di}-${ei}` → ms. */
-let _lastConfirmTap = {};
+/** Key of exercise whose confirm button is flashing green: `${di}-${ei}` or null. */
+let _confirmFlashKey = null;
 
 /** Key of the exercise with the open substitute-name form: `${di}-${ei}` or null. */
 let _subFormOpenKey = null;
@@ -570,31 +570,48 @@ function renderDayBody(wk, di, state) {
   const lockBtnLabel = done ? 'Tag entsperren' : 'Tag als abgeschlossen markieren und sperren';
   const lockBtnIcon  = done ? ic.unlock() : ic.lock();
 
-  // Session note (2.4): collapsed under warmup, icon shows state
-  const noteVal    = day.sessionNote ?? '';
-  const noteHasVal = noteVal.trim().length > 0;
-  const noteBlock  = `
-  <div class="session-note-block">
-    <button
-      class="session-note-toggle${noteHasVal ? ' has-note' : ''}"
-      onclick="this.nextElementSibling.classList.toggle('is-open')"
-      aria-expanded="false"
-      aria-label="Trainingsnotiz"
-    >📝 <span>${noteHasVal ? 'Notiz' : 'Trainingsnotiz hinzufügen'}</span></button>
-    <div class="session-note-body">
-      <textarea
-        class="session-note-input"
-        rows="3"
-        placeholder="Was war heute besonders? (Technik, Schmerzen, Fokus …)"
-        data-action="day-field" data-di="${di}" data-field="sessionNote"
-        aria-label="Trainingsnotiz"
-        ${locked ? 'disabled' : ''}
-      >${h(noteVal)}</textarea>
-    </div>
-  </div>`;
+  const noteVal = day.sessionNote ?? '';
+  // Trainingsnotiz — prominent info-block (users see it immediately)
+  const noteBlock = `
+<div class="info-block info-block--note">
+  <span class="info-block__label">📝 Trainingsnotiz</span>
+  <textarea
+    rows="3"
+    ${locked ? 'disabled' : ''}
+    data-action="day-field"
+    data-di="${di}"
+    data-field="sessionNote"
+    aria-label="Trainingsnotiz"
+    placeholder="Was war heute besonders? (Technik, Schmerzen, Fokus …)"
+  >${h(noteVal)}</textarea>
+</div>`;
+
+  // Aufwärmen — compact collapsed button (secondary prominence)
+  const warmupVal = day.warmup ?? '';
+  const warmupHasVal = warmupVal.trim().length > 0;
+  const warmupBlock = `
+<div class="session-note-block">
+  <button
+    class="session-note-toggle${warmupHasVal ? ' has-note' : ''}"
+    onclick="this.nextElementSibling.classList.toggle('is-open')"
+    aria-expanded="false"
+    aria-label="Aufwärmen"
+  >🔥 <span>${warmupHasVal ? 'Aufwärmen' : 'Aufwärmen hinzufügen'}</span></button>
+  <div class="session-note-body">
+    <textarea
+      class="session-note-input"
+      rows="2"
+      ${locked ? 'disabled' : ''}
+      data-action="day-field"
+      data-di="${di}"
+      data-field="warmup"
+      aria-label="Aufwärmen"
+    >${h(warmupVal)}</textarea>
+  </div>
+</div>`;
 
   return `
-    ${renderInfoBlock('warmup', '🔥 Aufwärmen', day.warmup, di, locked)}
+    ${warmupBlock}
     ${noteBlock}
     ${prevBanner}
     <div data-ex-list="${di}">${exHtml}</div>
@@ -866,6 +883,19 @@ function renderExercise(wk, di, ei, state) {
     />
 
     <button
+      class="btn-icon btn-icon--chart${_exChartOpen.has(`${di}-${ei}`) ? ' is-active' : ''}"
+      data-action="toggle-ex-chart" data-di="${di}" data-ei="${ei}"
+      aria-label="Fortschritts-Chart"
+      aria-expanded="${_exChartOpen.has(`${di}-${ei}`)}"
+    >📈</button>
+
+    ${!locked ? `<button
+      class="btn-icon btn-icon--kg${ex.nextWeekPlan ? ' is-planned' : ''}"
+      data-action="inc-weight" data-di="${di}" data-ei="${ei}"
+      aria-label="${ex.nextWeekPlan ? `+${ex.nextWeekPlan} kg geplant` : 'Gewicht für nächste Woche planen'}"
+    >+kg</button>` : ''}
+
+    <button
       class="btn-fav${isFav ? ' is-fav' : ''}"
       data-action="toggle-fav"
       data-name="${h(ex.name)}"
@@ -875,7 +905,7 @@ function renderExercise(wk, di, ei, state) {
 
     <div class="ex-menu-wrap">
       <button
-        class="ex-menu-btn${ex.nextWeekPlan ? ' is-planned' : ''}"
+        class="ex-menu-btn"
         data-action="toggle-ex-menu" data-di="${di}" data-ei="${ei}"
         aria-label="Übungsmenü öffnen"
         aria-expanded="${_exMenuOpenKey === `${di}-${ei}`}"
@@ -885,9 +915,7 @@ function renderExercise(wk, di, ei, state) {
         ${!locked ? `
         <button class="ex-menu-item" role="menuitem" data-action="move-ex-up" data-di="${di}" data-ei="${ei}" ${ei === 0 ? 'disabled' : ''}>▲ Nach oben</button>
         <button class="ex-menu-item" role="menuitem" data-action="move-ex-down" data-di="${di}" data-ei="${ei}" ${ei === wk.days[di].exercises.length - 1 ? 'disabled' : ''}>▼ Nach unten</button>
-        <button class="ex-menu-item" role="menuitem" data-action="inc-weight" data-di="${di}" data-ei="${ei}">＋${step} kg planen</button>
         ` : ''}
-        <button class="ex-menu-item" role="menuitem" data-action="toggle-ex-chart" data-di="${di}" data-ei="${ei}">📈 Fortschritt</button>
         <button class="ex-menu-item${ex.nextWeekPlan ? ' is-planned' : ''}" role="menuitem" data-action="toggle-cfg" data-di="${di}" data-ei="${ei}">⚙️ Einstellungen</button>
         ${!locked ? `
         ${ex.substituteFor
@@ -939,7 +967,7 @@ function renderExercise(wk, di, ei, state) {
   ${!locked ? (() => {
     const allDone = ex.sets.length > 0 && ex.sets.every(s => s.status !== 'pending');
     return `<button
-      class="confirm-set-btn${allDone ? ' is-done' : ''}"
+      class="confirm-set-btn${allDone ? ' is-done' : ''}${_confirmFlashKey === `${di}-${ei}` ? ' is-flashing' : ''}"
       ${allDone ? 'disabled' : ''}
       data-action="confirm-set" data-di="${di}" data-ei="${ei}"
       aria-label="Nächsten Satz bestätigen"
@@ -2063,6 +2091,11 @@ function _handleClick(e) {
     scheduleRender();
   }
 
+  // Close confirm-set no-target popup on outside tap
+  document.querySelectorAll('.confirm-set-no-target').forEach(el => {
+    if (!el.contains(e.target)) { clearTimeout(el._timer); el.remove(); }
+  });
+
   // ── 1. Day tab button ────────────────────────────────────────────────────
   const hdr = e.target.closest('.day-tab');
   if (hdr) {
@@ -2537,54 +2570,54 @@ function _handleClick(e) {
     }
 
     case 'confirm-set': {
-      const now = Date.now();
-      const tapKey = `${di}-${ei}`;
-      const last = _lastConfirmTap[tapKey] || 0;
-      if (now - last < 400) {
-        _lastConfirmTap[tapKey] = 0;
-        const _cst  = getState();
-        const _cwk  = _cst.weeks[_cst.curIdx];
-        const _cex  = _cwk?.days[+di]?.exercises[+ei];
-        if (!_cex) break;
-        const _csi  = _cex.sets.findIndex(s => s.status === 'pending');
-        if (_csi === -1) break;
-        const _cs   = _cex.sets[_csi];
-        const hasWeight = _cs.weight != null && parseFloat(_cs.weight) > 0;
-        const hasTarget = !!_cex.targetReps;
-        if (hasTarget && hasWeight) {
-          const _wInp = document.querySelector(`[data-action="set-weight"][data-di="${di}"][data-ei="${ei}"][data-si="${_csi}"]`);
-          if (_wInp) dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: _csi, field: 'weight', value: _wInp.value });
-          dispatch(A.CONFIRM_SET, { di: +di, ei: +ei, si: _csi, reps: _cex.targetReps });
-          const _aft = getState();
-          const _aftSet = _aft.weeks[_aft.curIdx]?.days[+di]?.exercises[+ei]?.sets[_csi];
-          if (_aftSet?.status === 'success') {
-            const triggered = fireTrigger('SATZ_ABGEHAKT', { di: +di, ei: +ei, si: _csi });
-            for (const ins of triggered) {
-              if (ins.immediate) showToast(ins.message, ins.type === 'warning' ? 'warn' : 'ok', ins.id === 'P-05' ? 4000 : 3000);
-            }
-          }
-          const _aftEx = getState().weeks[getState().curIdx]?.days[+di]?.exercises[+ei];
-          const isLastSet = _csi === (_aftEx?.sets?.length ?? 0) - 1;
-          if (!isLastSet) {
-            window.dispatchEvent(new CustomEvent('train:set-done', { detail: { pauseSec: _cex.pauseSec ?? 90 } }));
-          }
-          const nextPending = (_aftEx?.sets ?? []).findIndex(s => s.status === 'pending');
-          if (nextPending !== -1) {
-            const nextRow = document.querySelector(`[data-action="toggle-done"][data-di="${di}"][data-ei="${ei}"][data-si="${nextPending}"]`)
-              ?.closest('.set-row');
-            nextRow?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }
-        } else {
-          const row = document.querySelector(`[data-action="toggle-done"][data-di="${di}"][data-ei="${ei}"][data-si="${_csi}"]`)
-            ?.closest('.set-row');
-          if (row) {
-            row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            row.classList.add('set-row--flash');
-            setTimeout(() => row.classList.remove('set-row--flash'), 700);
-          }
+      const _cst = getState();
+      const _cwk = _cst.weeks[_cst.curIdx];
+      const _cex = _cwk?.days[+di]?.exercises[+ei];
+      if (!_cex) break;
+      const _csi = _cex.sets.findIndex(s => s.status === 'pending');
+      if (_csi === -1) break;
+
+      if (!_cex.targetReps) {
+        // No target defined — show explanatory popup near the button
+        document.querySelectorAll('.confirm-set-no-target').forEach(el => { clearTimeout(el._timer); el.remove(); });
+        const _btn = e.target.closest('[data-action="confirm-set"]');
+        if (_btn) {
+          const _popup = document.createElement('div');
+          _popup.className = 'confirm-set-no-target';
+          _popup.textContent = 'Kein Zielwert definiert. Trage zuerst eine Ziel-Wdh ein (⚙️ Übungseinstellungen) um diese Funktion zu nutzen.';
+          _btn.insertAdjacentElement('afterend', _popup);
+          _popup._timer = setTimeout(() => _popup.remove(), 3000);
         }
-      } else {
-        _lastConfirmTap[tapKey] = now;
+        break;
+      }
+
+      // Has targetReps — confirm the next pending set
+      const _wInp = document.querySelector(`[data-action="set-weight"][data-di="${di}"][data-ei="${ei}"][data-si="${_csi}"]`);
+      if (_wInp) dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: _csi, field: 'weight', value: _wInp.value });
+
+      // Set flash key before dispatch so the re-render includes the class
+      _confirmFlashKey = `${di}-${ei}`;
+      dispatch(A.CONFIRM_SET, { di: +di, ei: +ei, si: _csi, reps: _cex.targetReps });
+      setTimeout(() => { _confirmFlashKey = null; scheduleRender(); }, 350);
+
+      const _aft = getState();
+      const _aftSet = _aft.weeks[_aft.curIdx]?.days[+di]?.exercises[+ei]?.sets[_csi];
+      if (_aftSet?.status === 'success') {
+        const triggered = fireTrigger('SATZ_ABGEHAKT', { di: +di, ei: +ei, si: _csi });
+        for (const ins of triggered) {
+          if (ins.immediate) showToast(ins.message, ins.type === 'warning' ? 'warn' : 'ok', ins.id === 'P-05' ? 4000 : 3000);
+        }
+      }
+      const _aftEx = getState().weeks[getState().curIdx]?.days[+di]?.exercises[+ei];
+      const isLastSet = _csi === (_aftEx?.sets?.length ?? 0) - 1;
+      if (!isLastSet) {
+        window.dispatchEvent(new CustomEvent('train:set-done', { detail: { pauseSec: _cex.pauseSec ?? 90 } }));
+      }
+      const nextPending = (_aftEx?.sets ?? []).findIndex(s => s.status === 'pending');
+      if (nextPending !== -1) {
+        const nextRow = document.querySelector(`[data-action="toggle-done"][data-di="${di}"][data-ei="${ei}"][data-si="${nextPending}"]`)
+          ?.closest('.set-row');
+        nextRow?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
       break;
     }

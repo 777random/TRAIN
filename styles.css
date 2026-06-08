@@ -344,6 +344,8 @@ button, input, select, textarea { font: inherit; }
 }
 .info-block--warmup .info-block__label   { color: var(--c-accent); }
 .info-block--cooldown .info-block__label { color: var(--c-text-3); }
+.info-block--note .info-block__label     { color: var(--c-accent); }
+.info-block--note textarea               { min-height: 56px; }
 .info-block textarea {
   width: 100%; background: none; border: none;
   color: var(--c-text-2); font-size: 12px; line-height: 1.65;
@@ -668,6 +670,16 @@ exercise { position: unset; }
 .confirm-set-btn.is-done, .confirm-set-btn:disabled {
   background: var(--c-surface2); color: var(--c-text-3); cursor: not-allowed; opacity: 1;
 }
+@keyframes confirm-pulse {
+  0%   { background: #22c55e; }
+  100% { background: #1A73E8; }
+}
+.confirm-set-btn.is-flashing { animation: confirm-pulse 350ms ease-out forwards; }
+.confirm-set-no-target {
+  background: var(--c-surface2); border: 1px solid var(--c-border-hi);
+  border-radius: var(--r-md); color: var(--c-text-2); font-size: 12px;
+  line-height: 1.5; padding: var(--sp-2) var(--sp-3); margin-top: 4px;
+}
 @keyframes set-row-flash {
   0%   { background: rgba(251,191,36,.35); }
   100% { background: transparent; }
@@ -846,6 +858,11 @@ exercise { position: unset; }
 /* 📈-Button im Übungskopf */
 .btn-icon--chart { font-size: 14px; opacity: 0.55; transition: opacity .15s; }
 .btn-icon--chart:hover, .btn-icon--chart.is-active { opacity: 1; }
+
+/* +kg-Button im Übungskopf */
+.btn-icon--kg { font-size: 11px; font-weight: 700; letter-spacing: -0.02em; opacity: 0.6; }
+.btn-icon--kg:hover { opacity: 1; }
+.btn-icon--kg.is-planned { color: var(--c-accent); opacity: 1; }
 
 /* ⭐-Favorit-Button */
 .btn-fav {
