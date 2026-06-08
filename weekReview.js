@@ -59,7 +59,7 @@ function _findPR(week, prevWeeks) {
   const text = best.prev > 0
     ? `${best.name} ${best.weight} kg (+${best.weight - best.prev} kg)`
     : `${best.name} ${best.weight} kg`;
-  return { type: 'pr', label: 'Neuer PR', text };
+  return { type: 'pr', label: 'Neuer PR', text, exName: best.name };
 }
 
 function _findBestGain(week, prevWeek) {
@@ -72,7 +72,7 @@ function _findBestGain(week, prevWeek) {
     if (prev > 0 && delta > bestDelta) { bestDelta = delta; best = { name, delta }; }
   });
   if (!best) return null;
-  return { type: 'gain', label: 'Stärkste Steigerung', text: `${best.name} +${best.delta} kg ggü. Vorwoche` };
+  return { type: 'gain', label: 'Stärkste Steigerung', text: `${best.name} +${best.delta} kg ggü. Vorwoche`, exName: best.name };
 }
 
 function _calcStreak(sortedWeeks, week) {
@@ -97,6 +97,7 @@ function _findFailHighlight(week) {
   return {
     type: 'fails', label: 'Fehlgeschlagene Sätze',
     text: `${worstName}: ${worstCount} ${worstCount === 1 ? 'fehlgeschlagener Satz' : 'fehlgeschlagene Sätze'}`,
+    exName: worstName,
   };
 }
 
@@ -110,7 +111,7 @@ function _findFatigueHighlight(week) {
       if (avg >= 8.5 && avg > worstRpe) { worstRpe = avg; worst = { name: ex.name, rpe: Math.round(avg * 10) / 10 }; }
     }
   if (!worst) return null;
-  return { type: 'fatigue', label: 'Hohe Belastung', text: `${worst.name}: Ø RPE ${worst.rpe}` };
+  return { type: 'fatigue', label: 'Hohe Belastung', text: `${worst.name}: Ø RPE ${worst.rpe}`, exName: worst.name };
 }
 
 function _buildRecommendations(highlights, lowlights, completedDays, plannedDays, isDeload) {
@@ -158,11 +159,12 @@ function _buildRecommendations(highlights, lowlights, completedDays, plannedDays
 /**
  * Berechnet einen strukturierten Wochenrückblick.
  *
- * @param {Object} week      Die zu reviewende Woche
- * @param {Array}  allWeeks  Alle Wochen (für PR-Vergleich und Streak)
+ * @param {Object} week               Die zu reviewende Woche
+ * @param {Array}  allWeeks           Alle Wochen (für PR-Vergleich und Streak)
+ * @param {Array}  [favoriteExercises=[]]  Favorisierte Übungsnamen
  * @returns {{ summary, highlights, lowlights, recommendations, isDeload, week }}
  */
-export function buildWeekReview(week, allWeeks) {
+export function buildWeekReview(week, allWeeks, favoriteExercises = []) {
   const isDeload = week.mode === 'deload';
   const sorted   = [...allWeeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
   const weekIdx  = sorted.findIndex(w => w === week || w.startDate === week.startDate);
@@ -209,6 +211,13 @@ export function buildWeekReview(week, allWeeks) {
   if (lowlights.length < 2) {
     const fatigueH = _findFatigueHighlight(week);
     if (fatigueH) lowlights.push(fatigueH);
+  }
+
+  // ── Favoriten zuerst in highlights + lowlights ───────────────────────────────
+  if (favoriteExercises.length > 0) {
+    const _fav = name => favoriteExercises.includes(name) ? 0 : 1;
+    highlights.sort((a, b) => _fav(a.exName) - _fav(b.exName));
+    lowlights.sort((a, b)  => _fav(a.exName) - _fav(b.exName));
   }
 
   // ── Recommendations ───────────────────────────────────────────────────────────

@@ -658,6 +658,7 @@ function renderInfoBlock(type, label, value, di, disabled) {
 // ─── Exercise ─────────────────────────────────────────────────────────────────
 function renderExercise(wk, di, ei, state) {
   const ex     = wk.days[di].exercises[ei];
+  const isFav  = (state.favoriteExercises ?? []).includes(ex.name);
   const locked = !!wk.days[di].locked;
   const isDl   = wk.mode === 'deload';
   const drag   = state.settings.drag && !locked;
@@ -836,6 +837,14 @@ function renderExercise(wk, di, ei, state) {
       data-action="inc-weight" data-di="${di}" data-ei="${ei}"
       aria-label="Gewicht um ${step} kg erhöhen"
     >＋${step}kg</button>` : ''}
+
+    <button
+      class="btn-fav${isFav ? ' is-fav' : ''}"
+      data-action="toggle-fav"
+      data-name="${h(ex.name)}"
+      aria-label="${isFav ? 'Favorit entfernen' : 'Als Favorit markieren'}"
+      aria-pressed="${isFav}"
+    >${isFav ? '⭐' : '☆'}</button>
 
     <button
       class="btn-icon btn-icon--chart${_exChartOpen.has(`${di}-${ei}`) ? ' is-active' : ''}"
@@ -1489,7 +1498,7 @@ function _updateInlineReview(state) {
     .reverse();
   const wk = reviewable[+sel.value];
   if (!wk) { wrap.innerHTML = ''; return; }
-  const review = buildWeekReview(wk, state.weeks);
+  const review = buildWeekReview(wk, state.weeks, state.favoriteExercises ?? []);
   wrap.innerHTML = renderWeekReviewHtml(review);
 }
 
@@ -1842,6 +1851,22 @@ function renderSettingsTab(state) {
     </div>
   </div>
 
+  <!-- Favoriten -->
+  <div class="settings-section">
+    <div class="settings-section__title">⭐ Meine Favoriten</div>
+    <div class="settings-row__desc" style="padding:0 0 var(--sp-2)">Bis zu 5 Übungen — Empfehlungen fokussieren sich darauf.</div>
+    ${(() => {
+      const favs = state.favoriteExercises ?? [];
+      if (!favs.length) return '<p class="settings-row__desc" style="padding:var(--sp-2) 0">Noch keine Favoriten — tippe ☆ bei einer Übung.</p>';
+      return favs.map(name => `
+      <div class="settings-row" style="justify-content:space-between">
+        <span class="settings-row__label">⭐ ${h(name)}</span>
+        <button class="btn btn--ghost btn--sm" data-action="remove-fav" data-name="${h(name)}"
+          aria-label="Favorit '${h(name)}' entfernen">✕</button>
+      </div>`).join('');
+    })())}
+  </div>
+
   <!-- Tags verwalten (4.1) -->
   <div class="settings-section">
     <div class="settings-section__title">Tags verwalten</div>
@@ -2076,7 +2101,7 @@ function _handleClick(e) {
       const _lastWk = _sortedWks[_sortedWks.length - 1];
       const _hasCompleted = _lastWk?.days.some(d => d.markedDone);
       if (_hasCompleted) {
-        const _review = buildWeekReview(_lastWk, _st.weeks);
+        const _review = buildWeekReview(_lastWk, _st.weeks, _st.favoriteExercises ?? []);
         showWeekReviewModal(_review, () => { _prepNewWeekModal(); openModal('modal-new-week'); });
       } else {
         _prepNewWeekModal();
@@ -2263,6 +2288,22 @@ function _handleClick(e) {
           else wrap.innerHTML = '<p style="font-size:12px;color:var(--c-text-3);padding:8px 0">Noch zu wenig Daten — ab 2 Trainingswochen sichtbar.</p>';
         }
       }
+      break;
+    }
+
+    case 'toggle-fav': {
+      const favName = el.dataset.name;
+      const curFavs = getState().favoriteExercises ?? [];
+      if (!curFavs.includes(favName) && curFavs.length >= 5) {
+        showToast('Max. 5 Favoriten möglich. Entferne zuerst einen anderen.', 'warn');
+        break;
+      }
+      dispatch(A.TOGGLE_FAVORITE, { name: favName });
+      break;
+    }
+
+    case 'remove-fav': {
+      dispatch(A.TOGGLE_FAVORITE, { name: el.dataset.name });
       break;
     }
 

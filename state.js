@@ -126,6 +126,7 @@ function buildDefaultState() {
     templates: [],            // { id, name, days[] }[]  – named templates (v9)
     prs: {},                  // { [exerciseName]: { maxWeight, maxVolume, maxEstimated1RM, date } }
     insights: [],             // Insight[] – populated by triggerEngine, transient coaching feedback
+    favoriteExercises: [],    // String[] – Übungsnamen, max 5
     settings: {
       swipe:              true,
       drag:               true,
@@ -375,6 +376,7 @@ export function loadState() {
       const parsed = JSON.parse(raw);
       if (!Array.isArray(parsed?.weeks)) continue;
       STATE = migrate(parsed);
+      if (!Array.isArray(STATE.favoriteExercises)) STATE.favoriteExercises = [];
       // Defensive bounds check
       if (!STATE.weeks.length)             _appendDefaultWeek();
       if (STATE.curIdx >= STATE.weeks.length) STATE.curIdx = STATE.weeks.length - 1;
@@ -508,6 +510,8 @@ export const A = Object.freeze({
   // Rest days (v9)
   WEEK_ADD_REST_DAY:   'WEEK_ADD_REST_DAY',  // { date, note? }
   WEEK_REMOVE_REST_DAY:'WEEK_REMOVE_REST_DAY',// { date }
+  // Favorites
+  TOGGLE_FAVORITE:     'TOGGLE_FAVORITE',     // { name: string }
 });
 
 // ─── Reducer ──────────────────────────────────────────────────────────────────
@@ -985,6 +989,19 @@ function reduce(state, action) {
     // ── Insights ──────────────────────────────────────────────────────────────
     case A.INSIGHTS_SET: {
       state.insights = p.insights ?? [];
+      break;
+    }
+
+    // ── Favorites ─────────────────────────────────────────────────────────────
+    case A.TOGGLE_FAVORITE: {
+      const favs = state.favoriteExercises ?? [];
+      const idx  = favs.indexOf(p.name);
+      if (idx >= 0) {
+        state.favoriteExercises = favs.filter((_, i) => i !== idx);
+      } else if (favs.length < 5) {
+        state.favoriteExercises = [...favs, p.name];
+      }
+      // If already 5 favorites: no-op — UI shows toast before dispatching
       break;
     }
 

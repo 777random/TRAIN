@@ -882,7 +882,10 @@ export const INSIGHTS = [
         .filter(w => w.mode !== 'deload' && w !== curWk)
         .filter(w => w.days.some(d => d.exercises.some(ex => ex.sets.some(s => s.status === 'success'))));
       if (calcWeeks.length < 2) return null;
-      const exNames = [...new Set(curWk.days.flatMap(d => d.exercises.map(ex => ex.name)))];
+      const allExNames = [...new Set(curWk.days.flatMap(d => d.exercises.map(ex => ex.name)))];
+      const favs = state.favoriteExercises ?? [];
+      const exNames = favs.length > 0 ? allExNames.filter(n => favs.includes(n)) : allExNames;
+      if (!exNames.length) return null;
       const candidates = [];
       for (const name of exNames) {
         const rec = getWeightRecommendation(name, calcWeeks);
@@ -911,9 +914,12 @@ export const INSIGHTS = [
         .filter(w => w.mode !== 'deload' && w !== curWk)
         .filter(w => w.days.some(d => d.exercises.some(ex => ex.sets.some(s => s.status === 'success'))));
       if (calcWeeks.length < 2) return null;
-      const exNames = [...new Set(curWk.days.flatMap(d => d.exercises.map(ex => ex.name)))];
+      const allExNames2 = [...new Set(curWk.days.flatMap(d => d.exercises.map(ex => ex.name)))];
+      const favs2 = state.favoriteExercises ?? [];
+      const exNames2 = favs2.length > 0 ? allExNames2.filter(n => favs2.includes(n)) : allExNames2;
+      if (!exNames2.length) return null;
       const candidates = [];
-      for (const name of exNames) {
+      for (const name of exNames2) {
         const rec = getWeightRecommendation(name, calcWeeks);
         if (rec && rec.delta > 0) candidates.push({ name, rec });
       }
@@ -940,7 +946,9 @@ export const INSIGHTS = [
         .filter(w => w.mode !== 'deload' && w !== curWk)
         .filter(w => w.days.some(d => d.exercises.some(ex => ex.sets.some(s => s.status === 'success'))));
       if (calcWeeks.length < 2) return null;
-      const exNames = [...new Set(curWk.days.flatMap(d => d.exercises.map(ex => ex.name)))];
+      const allExNames3 = [...new Set(curWk.days.flatMap(d => d.exercises.map(ex => ex.name)))];
+      const favs3 = state.favoriteExercises ?? [];
+      const exNames = favs3.length > 0 ? allExNames3.filter(n => favs3.includes(n)) : allExNames3;
       for (const name of exNames) {
         const rec = getWeightRecommendation(name, calcWeeks);
         if (rec && rec.delta === 0) {

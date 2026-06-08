@@ -757,6 +757,17 @@ exercise { position: unset; }
 /* 📈-Button im Übungskopf */
 .btn-icon--chart { font-size: 14px; opacity: 0.55; transition: opacity .15s; }
 .btn-icon--chart:hover, .btn-icon--chart.is-active { opacity: 1; }
+
+/* ⭐-Favorit-Button */
+.btn-fav {
+  background: none; border: none; padding: 2px 4px; margin: 0;
+  font-size: 15px; line-height: 1; cursor: pointer;
+  color: var(--c-text-3); opacity: 0.55;
+  transition: opacity var(--t-fast);
+  flex-shrink: 0;
+}
+.btn-fav:hover { opacity: 1; }
+.btn-fav.is-fav { opacity: 1; }
 .heatmap { display: grid; grid-template-columns: repeat(12,1fr); gap: 3px; margin-top: var(--sp-2); }
 .hm-cell { aspect-ratio: 1; border-radius: 3px; background: var(--c-surface2); }
 .hm-cell--1 { background: rgba(200,255,0,.25); }
