@@ -485,6 +485,7 @@ export const A = Object.freeze({
   EX_MOVE:             'EX_MOVE',             // { di, fromEi, toEi }
   EX_TOGGLE_CFG:       'EX_TOGGLE_CFG',       // { di, ei }
   EX_INC_WEIGHT:       'EX_INC_WEIGHT',       // { di, ei, amount } – erhöht alle Sätze sofort
+  EX_SET_NEXT_WEEK_PLAN:'EX_SET_NEXT_WEEK_PLAN',// { di, ei, value }  – setzt nextWeekPlan direkt
   EX_SET_STEP:         'EX_SET_STEP',         // { di, ei, step }  – speichert Steigerungsrate
   EX_SET_TARGETS:      'EX_SET_TARGETS',      // { di, ei, targetReps }
   EX_SET_METRIC:       'EX_SET_METRIC',       // { di, ei, metric: 'reps'|'sec'|'m' }
@@ -766,6 +767,11 @@ function reduce(state, action) {
         // Ansonsten addieren wir den Schritt zur Planung
         ex.nextWeekPlan = (ex.nextWeekPlan || 0) + step;
       }
+      break;
+    }
+    case A.EX_SET_NEXT_WEEK_PLAN: {
+      const ex = _currentWeek()?.days[p.di]?.exercises[p.ei]; if (!ex) break;
+      ex.nextWeekPlan = p.value ?? 0;
       break;
     }
     case A.EX_SET_TARGETS: {
