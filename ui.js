@@ -65,6 +65,15 @@ let _subFormOpenKey = null;
 /** Key of the exercise whose ⋮ context menu is open: `${di}-${ei}` or null. */
 let _exMenuOpenKey = null;
 
+/** Key of the exercise whose settings panel (cfgRow) is open: `${di}-${ei}` or null. */
+let _cfgOpenKey = null;
+
+/** Key of the exercise whose +kg picker popover is open: `${di}-${ei}` or null. */
+let _kgPickerKey = null;
+
+/** Last-tap timestamp per exercise for +kg double-tap detection: `${di}-${ei}` → ms. */
+let _kgPickerLastTap = {};
+
 /** Tracks whether the first-day auto-open has already happened. */
 let _autoOpened = false;
 
@@ -586,15 +595,14 @@ function renderDayBody(wk, di, state) {
   >${h(noteVal)}</textarea>
 </div>`;
 
-  // Aufwärmen — compact collapsed button (secondary prominence)
+  // Aufwärmen — compact collapsed button with ▼/▲ indicator
   const warmupVal = day.warmup ?? '';
   const warmupHasVal = warmupVal.trim().length > 0;
   const warmupBlock = `
 <div class="session-note-block">
   <button
     class="session-note-toggle${warmupHasVal ? ' has-note' : ''}"
-    onclick="this.nextElementSibling.classList.toggle('is-open')"
-    aria-expanded="false"
+    onclick="this.nextElementSibling.classList.toggle('is-open'); this.classList.toggle('is-expanded')"
     aria-label="Aufwärmen"
   >🔥 <span>${warmupHasVal ? 'Aufwärmen' : 'Aufwärmen hinzufügen'}</span></button>
   <div class="session-note-body">
@@ -610,33 +618,35 @@ function renderDayBody(wk, di, state) {
   </div>
 </div>`;
 
+  // Cooldown — compact collapsed button with ▼/▲ indicator
+  const cooldownVal = day.cooldown ?? '';
+  const cooldownHasVal = cooldownVal.trim().length > 0;
+  const cooldownBlock = `
+<div class="session-note-block">
+  <button
+    class="session-note-toggle${cooldownHasVal ? ' has-note' : ''}"
+    onclick="this.nextElementSibling.classList.toggle('is-open'); this.classList.toggle('is-expanded')"
+    aria-label="Cooldown"
+  >🧘 <span>${cooldownHasVal ? 'Cooldown' : 'Cooldown hinzufügen'}</span></button>
+  <div class="session-note-body">
+    <textarea
+      class="session-note-input"
+      rows="2"
+      ${locked ? 'disabled' : ''}
+      data-action="day-field"
+      data-di="${di}"
+      data-field="cooldown"
+      aria-label="Cooldown"
+    >${h(cooldownVal)}</textarea>
+  </div>
+</div>`;
+
   return `
-    ${warmupBlock}
     ${noteBlock}
+    ${warmupBlock}
     ${prevBanner}
     <div data-ex-list="${di}">${exHtml}</div>
-    ${!locked ? `
-    <datalist id="ex-list-${di}">
-      ${_STANDARD_EXERCISES.map(n => `<option value="${h(n)}">`).join('')}
-    </datalist>
-    <div class="add-exercise-row">
-      <input
-        class="add-exercise-input"
-        id="add-ex-input-${di}"
-        type="text"
-        list="ex-list-${di}"
-        placeholder="Übung hinzufügen …"
-        aria-label="Name der neuen Übung"
-        maxlength="80"
-        data-di="${di}"
-        autocomplete="off"
-      />
-      <button
-        class="btn btn--accent btn--sm"
-        data-action="add-ex" data-di="${di}"
-        aria-label="Übung hinzufügen"
-      >${ic.plus()}${ic.srOnly('Hinzufügen')}</button>
-    </div>` : ''}
+    ${cooldownBlock}
     <button
       class="complete-btn${done ? ' is-done' : ''}"
       data-action="toggle-complete" data-di="${di}"
@@ -664,7 +674,28 @@ function renderDayBody(wk, di, state) {
       >${r.icon}</button>`).join('')}
     </div>` : ''}
 
-    ${renderInfoBlock('cooldown', '🧘 Cooldown', day.cooldown, di, locked)}
+    ${!locked ? `
+    <datalist id="ex-list-${di}">
+      ${_STANDARD_EXERCISES.map(n => `<option value="${h(n)}">`).join('')}
+    </datalist>
+    <div class="add-exercise-row">
+      <input
+        class="add-exercise-input"
+        id="add-ex-input-${di}"
+        type="text"
+        list="ex-list-${di}"
+        placeholder="Übung hinzufügen …"
+        aria-label="Name der neuen Übung"
+        maxlength="80"
+        data-di="${di}"
+        autocomplete="off"
+      />
+      <button
+        class="btn btn--accent btn--sm"
+        data-action="add-ex" data-di="${di}"
+        aria-label="Übung hinzufügen"
+      >${ic.plus()}${ic.srOnly('Hinzufügen')}</button>
+    </div>` : ''}
   `;
 }
 
@@ -889,11 +920,21 @@ function renderExercise(wk, di, ei, state) {
       aria-expanded="${_exChartOpen.has(`${di}-${ei}`)}"
     >📈</button>
 
-    ${!locked ? `<button
-      class="btn-icon btn-icon--kg${ex.nextWeekPlan ? ' is-planned' : ''}"
-      data-action="inc-weight" data-di="${di}" data-ei="${ei}"
-      aria-label="${ex.nextWeekPlan ? `+${ex.nextWeekPlan} kg geplant` : 'Gewicht für nächste Woche planen'}"
-    >+kg</button>` : ''}
+    ${!locked ? `
+    <div class="ex-kg-wrap">
+      <button
+        class="btn-icon btn-icon--kg${ex.nextWeekPlan ? ' is-planned' : ''}"
+        data-action="inc-weight" data-di="${di}" data-ei="${ei}"
+        aria-label="${ex.nextWeekPlan ? `+${ex.nextWeekPlan} kg geplant — doppeltippen zum Ändern` : 'Doppeltippen zum Planen'}"
+      >+${ex.nextWeekPlan || 0}</button>
+      ${_kgPickerKey === `${di}-${ei}` ? `
+      <div class="ex-kg-picker" role="group" aria-label="Steigerung für nächste Woche">
+        ${[0, 1.25, 2.5, 5, 7.5, 10].map(v =>
+          `<button class="ex-kg-picker-btn${ex.nextWeekPlan === v ? ' is-selected' : ''}"
+            data-action="kg-picker-select" data-di="${di}" data-ei="${ei}" data-value="${v}"
+          >${v === 0 ? '0' : '+' + v}</button>`).join('')}
+      </div>` : ''}
+    </div>` : ''}
 
     <button
       class="btn-fav${isFav ? ' is-fav' : ''}"
@@ -2091,6 +2132,24 @@ function _handleClick(e) {
     scheduleRender();
   }
 
+  // Close exercise settings panel on outside tap
+  if (_cfgOpenKey !== null) {
+    const _inSettings = !!e.target.closest('.exercise__settings');
+    const [_ckdi, _ckei] = _cfgOpenKey.split('-');
+    const _onSameCfg = !!e.target.closest(`[data-action="toggle-cfg"][data-di="${_ckdi}"][data-ei="${_ckei}"]`);
+    if (!_inSettings && !_onSameCfg) {
+      const _cdi = +_ckdi, _cei = +_ckei;
+      _cfgOpenKey = null;
+      dispatch(A.EX_TOGGLE_CFG, { di: _cdi, ei: _cei });
+    }
+  }
+
+  // Close +kg picker on outside tap
+  if (_kgPickerKey !== null && !e.target.closest('.ex-kg-wrap')) {
+    _kgPickerKey = null;
+    scheduleRender();
+  }
+
   // Close confirm-set no-target popup on outside tap
   document.querySelectorAll('.confirm-set-no-target').forEach(el => {
     if (!el.contains(e.target)) { clearTimeout(el._timer); el.remove(); }
@@ -2348,8 +2407,12 @@ function _handleClick(e) {
     }
 
     // ── Exercise ───────────────────────────────────────────────────────────
-    case 'toggle-cfg':
-      dispatch(A.EX_TOGGLE_CFG, { di: +di, ei: +ei }); break;
+    case 'toggle-cfg': {
+      dispatch(A.EX_TOGGLE_CFG, { di: +di, ei: +ei });
+      const _cfgEx = getState().weeks[getState().curIdx]?.days[+di]?.exercises[+ei];
+      _cfgOpenKey = _cfgEx?._showCfg ? `${di}-${ei}` : null;
+      break;
+    }
 
     case 'toggle-ex-chart': {
       const chartKey = `${di}-${ei}`;
@@ -2447,14 +2510,30 @@ function _handleClick(e) {
     }
       
     case 'inc-weight': {
-      dispatch(A.EX_INC_WEIGHT, { di: +di, ei: +ei });
-      const ex = getState().weeks[getState().curIdx].days[di].exercises[ei];
-      
-      if (ex.nextWeekPlan === 0) {
-        showToast(`Planung für nächste Woche zurückgesetzt`, 'ok');
+      // Double-tap opens the kg picker; single tap does nothing (value visible on button)
+      const _tapKey = `${di}-${ei}`;
+      const _now = Date.now();
+      const _last = _kgPickerLastTap[_tapKey] || 0;
+      if (_now - _last < 400) {
+        _kgPickerLastTap[_tapKey] = 0;
+        _kgPickerKey = _kgPickerKey === _tapKey ? null : _tapKey;
+        scheduleRender();
       } else {
-        showToast(`+${ex.nextWeekPlan} kg für nächste Woche geplant!`, 'ok');
+        _kgPickerLastTap[_tapKey] = _now;
       }
+      break;
+    }
+
+    case 'kg-picker-select': {
+      const _pkVal = parseFloat(el.dataset.value);
+      dispatch(A.EX_SET_NEXT_WEEK_PLAN, { di: +di, ei: +ei, value: _pkVal });
+      if (_pkVal === 0) {
+        showToast('Planung für nächste Woche zurückgesetzt', 'ok');
+      } else {
+        showToast(`+${_pkVal} kg für nächste Woche geplant!`, 'ok');
+      }
+      _kgPickerKey = null;
+      scheduleRender();
       break;
     }
 
@@ -2903,7 +2982,8 @@ function _handleKeydown(e) {
 
 // ─── Day tab toggle ───────────────────────────────────────────────────────────
 function _toggleAccordion(di) {
-  _activeDayIdx = _activeDayIdx === di ? null : di;
+  if (_activeDayIdx === di) return; // already the only open day — keep it open
+  _activeDayIdx = di;
   scheduleRender();
 }
 

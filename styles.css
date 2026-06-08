@@ -359,9 +359,11 @@ button, input, select, textarea { font: inherit; }
 .session-note-toggle  {
   display: flex; align-items: center; gap: 6px;
   font-size: 12px; color: var(--c-text-3); background: none; border: none;
-  cursor: pointer; padding: 4px 0; min-height: var(--touch);
+  cursor: pointer; padding: 4px 0; min-height: var(--touch); width: 100%;
 }
 .session-note-toggle.has-note { color: var(--c-accent); }
+.session-note-toggle::after { content: '▼'; font-size: 9px; margin-left: auto; opacity: 0.5; }
+.session-note-toggle.is-expanded::after { content: '▲'; }
 .session-note-body    { display: none; }
 .session-note-body.is-open { display: block; }
 .session-note-input   {
@@ -863,6 +865,24 @@ exercise { position: unset; }
 .btn-icon--kg { font-size: 11px; font-weight: 700; letter-spacing: -0.02em; opacity: 0.6; }
 .btn-icon--kg:hover { opacity: 1; }
 .btn-icon--kg.is-planned { color: var(--c-accent); opacity: 1; }
+
+/* +kg Picker Popover */
+.ex-kg-wrap { position: relative; flex-shrink: 0; }
+.ex-kg-picker {
+  position: absolute; right: 0; top: calc(100% + 4px); z-index: 200;
+  background: var(--c-surface2); border: 1px solid var(--c-border-hi);
+  border-radius: var(--r-md); box-shadow: var(--shadow-md);
+  display: flex; gap: 4px; padding: 6px; white-space: nowrap;
+}
+.ex-kg-picker-btn {
+  min-width: 36px; height: 32px; padding: 0 6px;
+  border: 1px solid var(--c-border); border-radius: var(--r-sm);
+  background: var(--c-surface); color: var(--c-text-2);
+  font-size: 12px; font-weight: 600; cursor: pointer;
+  transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast);
+}
+.ex-kg-picker-btn:hover { background: var(--c-surface2); color: var(--c-text); border-color: var(--c-accent); }
+.ex-kg-picker-btn.is-selected { background: var(--c-accent); color: #000; border-color: var(--c-accent); }
 
 /* ⭐-Favorit-Button */
 .btn-fav {
