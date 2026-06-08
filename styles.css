@@ -657,6 +657,23 @@ exercise { position: unset; }
 .fulfill-meter__bar      { height: 100%; border-radius: var(--r-full); transition: width .3s; }
 .fulfill-meter__label    { font-size: 10px; white-space: nowrap; }
 
+.confirm-set-btn {
+  display: block; width: 100%; background: #1A73E8; color: #fff;
+  border: none; border-radius: var(--r-sm); padding: var(--sp-2) var(--sp-3);
+  font-size: 14px; font-weight: 600; cursor: pointer; margin: var(--sp-2) 0;
+  min-height: 40px; transition: opacity var(--t-fast);
+}
+.confirm-set-btn:hover { opacity: .88; }
+.confirm-set-btn:active { opacity: .75; }
+.confirm-set-btn.is-done, .confirm-set-btn:disabled {
+  background: var(--c-surface2); color: var(--c-text-3); cursor: not-allowed; opacity: 1;
+}
+@keyframes set-row-flash {
+  0%   { background: rgba(251,191,36,.35); }
+  100% { background: transparent; }
+}
+.set-row--flash { animation: set-row-flash .6s ease-out forwards; }
+
 .add-set-btn {
   display: flex; align-items: center; gap: var(--sp-1);
   border: 1px dashed var(--c-border); background: none; color: var(--c-text-3);

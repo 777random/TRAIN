@@ -56,6 +56,9 @@ let _showCustomDeload = false;
 /** Key of currently open RPE popover: `${di}-${ei}-${si}` or null. */
 let _rpePopoverKey = null;
 
+/** Tracks last-tap timestamp per exercise for double-click detection: `${di}-${ei}` → ms. */
+let _lastConfirmTap = {};
+
 /** Tracks whether the first-day auto-open has already happened. */
 let _autoOpened = false;
 
@@ -903,6 +906,16 @@ function renderExercise(wk, di, ei, state) {
   <div data-set-list="${di}-${ei}" role="list" aria-label="Sätze von ${h(ex.name)}">
     ${setsHtml}
   </div>
+
+  ${!locked ? (() => {
+    const allDone = ex.sets.length > 0 && ex.sets.every(s => s.status !== 'pending');
+    return `<button
+      class="confirm-set-btn${allDone ? ' is-done' : ''}"
+      ${allDone ? 'disabled' : ''}
+      data-action="confirm-set" data-di="${di}" data-ei="${ei}"
+      aria-label="Nächsten Satz bestätigen"
+    >✓ Satz bestätigen</button>`;
+  })() : ''}
 
   <!-- Soll-Ist + Fulfillment combined row (2.4): always visible, no toggle -->
   ${(() => {
@@ -2454,6 +2467,59 @@ function _handleClick(e) {
             if (ins.immediate) showToast(ins.message, ins.type === 'warning' ? 'warn' : 'ok', ins.id === 'P-05' ? 4000 : 3000);
           }
         }
+      }
+      break;
+    }
+
+    case 'confirm-set': {
+      const now = Date.now();
+      const tapKey = `${di}-${ei}`;
+      const last = _lastConfirmTap[tapKey] || 0;
+      if (now - last < 400) {
+        _lastConfirmTap[tapKey] = 0;
+        const _cst  = getState();
+        const _cwk  = _cst.weeks[_cst.curIdx];
+        const _cex  = _cwk?.days[+di]?.exercises[+ei];
+        if (!_cex) break;
+        const _csi  = _cex.sets.findIndex(s => s.status === 'pending');
+        if (_csi === -1) break;
+        const _cs   = _cex.sets[_csi];
+        const hasWeight = _cs.weight != null && parseFloat(_cs.weight) > 0;
+        const hasTarget = !!_cex.targetReps;
+        if (hasTarget && hasWeight) {
+          const _wInp = document.querySelector(`[data-action="set-weight"][data-di="${di}"][data-ei="${ei}"][data-si="${_csi}"]`);
+          if (_wInp) dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: _csi, field: 'weight', value: _wInp.value });
+          dispatch(A.CONFIRM_SET, { di: +di, ei: +ei, si: _csi, reps: _cex.targetReps });
+          const _aft = getState();
+          const _aftSet = _aft.weeks[_aft.curIdx]?.days[+di]?.exercises[+ei]?.sets[_csi];
+          if (_aftSet?.status === 'success') {
+            const triggered = fireTrigger('SATZ_ABGEHAKT', { di: +di, ei: +ei, si: _csi });
+            for (const ins of triggered) {
+              if (ins.immediate) showToast(ins.message, ins.type === 'warning' ? 'warn' : 'ok', ins.id === 'P-05' ? 4000 : 3000);
+            }
+          }
+          const _aftEx = getState().weeks[getState().curIdx]?.days[+di]?.exercises[+ei];
+          const isLastSet = _csi === (_aftEx?.sets?.length ?? 0) - 1;
+          if (!isLastSet) {
+            window.dispatchEvent(new CustomEvent('train:set-done', { detail: { pauseSec: _cex.pauseSec ?? 90 } }));
+          }
+          const nextPending = (_aftEx?.sets ?? []).findIndex(s => s.status === 'pending');
+          if (nextPending !== -1) {
+            const nextRow = document.querySelector(`[data-action="toggle-done"][data-di="${di}"][data-ei="${ei}"][data-si="${nextPending}"]`)
+              ?.closest('.set-row');
+            nextRow?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        } else {
+          const row = document.querySelector(`[data-action="toggle-done"][data-di="${di}"][data-ei="${ei}"][data-si="${_csi}"]`)
+            ?.closest('.set-row');
+          if (row) {
+            row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            row.classList.add('set-row--flash');
+            setTimeout(() => row.classList.remove('set-row--flash'), 700);
+          }
+        }
+      } else {
+        _lastConfirmTap[tapKey] = now;
       }
       break;
     }

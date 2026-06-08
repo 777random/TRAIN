@@ -490,6 +490,7 @@ export const A = Object.freeze({
   SET_TOGGLE_DONE:     'SET_TOGGLE_DONE',     // { di, ei, si }
   SET_AUTOFILL_DOWN:   'SET_AUTOFILL_DOWN',   // { di, ei, si } — weight (all) + reps (next)
   SET_AUTOFILL_RPE:    'SET_AUTOFILL_RPE',    // { di, ei, si } — rpe → next set only
+  CONFIRM_SET:         'CONFIRM_SET',          // { di, ei, si, reps } — quick-confirm next pending set
   // Session log
   SESSION_START:       'SESSION_START',       // {}  – writes start timestamp into STATE (not persisted as log entry until stop)
   SESSION_STOP:        'SESSION_STOP',        // { duration, time }
@@ -849,6 +850,33 @@ function reduce(state, action) {
       if (si < 0 || si >= sets.length - 1) break;
       const src = sets[si]; if (!src || src.rpe == null) break;
       sets[si + 1].rpe = src.rpe;
+      break;
+    }
+    case A.CONFIRM_SET: {
+      const wk = _currentWeek(); if (!wk) break;
+      const s = wk.days[p.di]?.exercises[p.ei]?.sets[p.si];
+      if (!s || s.status === 'success') break;
+      if (p.reps != null) s.reps = p.reps;
+      s.status = 'success';
+      s.done   = true;
+      if (wk.mode !== 'deload') {
+        const ex     = wk.days[p.di]?.exercises[p.ei];
+        const weight = parseFloat(s.weight) || 0;
+        const reps   = parseFloat(s.reps)   || 0;
+        if (ex && weight > 0 && reps > 0) {
+          const volume = weight * reps;
+          const est1RM = reps <= 10 ? weight * (1 + reps / 30) : 0;
+          const name   = ex.name;
+          if (!state.prs) state.prs = {};
+          const prev    = state.prs[name] ?? { maxWeight: 0, maxVolume: 0, maxEstimated1RM: 0, date: null };
+          const newMaxW = Math.max(prev.maxWeight,       weight);
+          const newMaxV = Math.max(prev.maxVolume,       volume);
+          const newMaxE = Math.max(prev.maxEstimated1RM, est1RM);
+          if (newMaxW > prev.maxWeight || newMaxV > prev.maxVolume || newMaxE > prev.maxEstimated1RM) {
+            state.prs[name] = { maxWeight: newMaxW, maxVolume: newMaxV, maxEstimated1RM: newMaxE, date: new Date().toISOString().split('T')[0] };
+          }
+        }
+      }
       break;
     }
 
