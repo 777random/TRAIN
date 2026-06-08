@@ -553,10 +553,11 @@ function reduce(state, action) {
   // Snapshot before every undoable mutation
   if (!_NO_UNDO.has(type)) {
     _undoStack.push(clone({
-      curIdx:         state.curIdx,
-      weeks:          state.weeks,
-      customTemplate: state.customTemplate,
-      settings:       state.settings,
+      curIdx:            state.curIdx,
+      weeks:             state.weeks,
+      customTemplate:    state.customTemplate,
+      settings:          state.settings,
+      favoriteExercises: state.favoriteExercises ?? [],
     }));
     if (_undoStack.length > _MAX_UNDO) _undoStack.shift();
   }
@@ -941,10 +942,11 @@ function reduce(state, action) {
     case A.UNDO: {
       const prev = _undoStack.pop();
       if (!prev) return; // nothing to undo — skip persist+notify
-      state.curIdx         = prev.curIdx;
-      state.weeks          = prev.weeks;
-      state.customTemplate = prev.customTemplate;
-      state.settings       = prev.settings;
+      state.curIdx            = prev.curIdx;
+      state.weeks             = prev.weeks;
+      state.customTemplate    = prev.customTemplate;
+      state.settings          = prev.settings;
+      state.favoriteExercises = prev.favoriteExercises ?? [];
       break;
     }
 
