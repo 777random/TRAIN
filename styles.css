@@ -43,7 +43,7 @@
   --t-normal: 220ms var(--ease);
 
   --touch: 44px;
-  --nav-h: 52px;
+  --nav-h: 44px;
   --day-h: 58px;
   --tabs-h: 108px; /* fallback; overridden dynamically after first render */
 }
@@ -717,6 +717,44 @@ exercise { position: unset; }
 }
 .sub-name-input:focus { outline: none; border-color: var(--c-accent); }
 .sub-form__btns { display: flex; gap: var(--sp-2); }
+
+/* ── Exercise ⋮ context menu ─────────────────────────────────────────── */
+.ex-menu-wrap { position: relative; flex-shrink: 0; }
+.ex-menu-btn {
+  width: 36px; height: 36px;
+  border: none; background: none;
+  color: var(--c-text-3); font-size: 20px; line-height: 1;
+  border-radius: var(--r-sm); cursor: pointer; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  transition: color var(--t-fast), background var(--t-fast);
+}
+.ex-menu-btn:hover { color: var(--c-text); background: var(--c-surface2); }
+.ex-menu-btn.is-planned { color: var(--c-accent); }
+.ex-menu-dropdown {
+  position: absolute; right: 0; top: calc(100% + 2px);
+  z-index: 200;
+  background: var(--c-surface2);
+  border: 1px solid var(--c-border-hi);
+  border-radius: var(--r-md);
+  min-width: 200px;
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+.ex-menu-item {
+  display: flex; align-items: center; gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  min-height: 44px; width: 100%;
+  font-size: 13px; color: var(--c-text-2);
+  cursor: pointer; background: none; border: none;
+  text-align: left;
+  transition: background var(--t-fast), color var(--t-fast);
+}
+.ex-menu-item + .ex-menu-item { border-top: 1px solid var(--c-border); }
+.ex-menu-item:hover { background: var(--c-surface); color: var(--c-text); }
+.ex-menu-item.is-planned { color: var(--c-accent); }
+.ex-menu-item--danger { color: var(--c-danger); }
+.ex-menu-item--danger:hover { background: rgba(255,68,68,.1); color: var(--c-danger); }
+.ex-menu-item:disabled { opacity: .4; cursor: not-allowed; }
 
 .add-exercise-row { display: flex; gap: var(--sp-2); margin-top: var(--sp-3); align-items: center; }
 .add-exercise-input {
