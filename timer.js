@@ -150,6 +150,10 @@ function _tickPause() {
     _pauseEnd = null;
     _hidePauseOverlay();
     _releaseWakeLock();
+    const _st = getState();
+    if (_st.settings.vibrationEnabled && navigator.vibrate) {
+      navigator.vibrate([200, 100, 200]);
+    }
     _showGoPopup();
     return;
   }

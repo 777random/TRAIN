@@ -90,7 +90,7 @@ function _buildTexts(exName, plateauWeeks, strategy) {
  * @param {Array}  [favoriteExercises=[]]  Exercise name strings.
  * @returns {Array} Up to 3 plateau objects, favorites first then longest stagnation.
  */
-export function detectPlateaus(allWeeks, favoriteExercises = []) {
+export function detectPlateaus(allWeeks, favoriteExercises = [], rpeEnabled = true) {
   const favs = favoriteExercises ?? [];
   const sortedNonDeload = [...allWeeks]
     .filter(w => w.mode !== 'deload')
@@ -145,7 +145,7 @@ export function detectPlateaus(allWeeks, favoriteExercises = []) {
     const trainingDays = mostRecentWk.days.filter(d => d.markedDone).length;
 
     let strategy;
-    if (avgRpe >= 8.5 || trainingDays >= 4) {
+    if ((rpeEnabled && avgRpe >= 8.5) || trainingDays >= 4) {
       strategy = 'deload';
     } else if (_hasSharedMuscleGroupDay(allWeeks, exName)) {
       strategy = 'variation';

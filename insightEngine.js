@@ -281,6 +281,7 @@ export const INSIGHTS = [
     id: 'P-03', priority: 11, type: 'progression',
     trigger: ['WOCHE_ABGESCHLOSSEN'],
     evaluate(state) {
+      if (!(state.settings?.rpeEnabled ?? true)) return null;
       const sorted = getSortedWeeks(state).filter(w => w.mode !== 'deload');
       if (sorted.length < 3) return null;
       const exNames = [...new Set(sorted.flatMap(w => w.days.flatMap(d => d.exercises.map(e => e.name))))];
@@ -383,6 +384,7 @@ export const INSIGHTS = [
     id: 'S-02', priority: 14, type: 'stagnation',
     trigger: ['WOCHE_ABGESCHLOSSEN'],
     evaluate(state) {
+      if (!(state.settings?.rpeEnabled ?? true)) return null;
       const sorted = getSortedWeeks(state).filter(w => w.mode !== 'deload');
       if (sorted.length < 3) return null;
       const last3 = sorted.slice(-3);
@@ -523,6 +525,7 @@ export const INSIGHTS = [
     id: 'E-03', priority: 17, type: 'recovery',
     trigger: ['WOCHE_ABGESCHLOSSEN'],
     evaluate(state) {
+      if (!(state.settings?.rpeEnabled ?? true)) return null;
       const sorted = getSortedWeeks(state);
       if (sorted.length < 3) return null;
       const deloadIdx = [...sorted.keys()].reverse().find(i => sorted[i].mode === 'deload');
@@ -970,7 +973,8 @@ export const INSIGHTS = [
     id: 'S-06', priority: 6, type: 'stagnation',
     trigger: ['WOCHE_ABGESCHLOSSEN', 'APP_GEÖFFNET'],
     evaluate(state) {
-      const plateaus = detectPlateaus(state.weeks, state.favoriteExercises ?? []);
+      const rpeEnabled = state.settings?.rpeEnabled ?? true;
+      const plateaus = detectPlateaus(state.weeks, state.favoriteExercises ?? [], rpeEnabled);
       if (!plateaus.length) return null;
       const p = plateaus[0];
       return {

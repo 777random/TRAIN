@@ -138,6 +138,8 @@ function buildDefaultState() {
       barbellWeight:      20,
       lastBackupDate:     null,
       activeTags:         ALL_TAGS_FLAT,  // 4.1: defaults to all tags enabled
+      vibrationEnabled:   true,
+      rpeEnabled:         true,
     },
   };
 }
@@ -357,6 +359,10 @@ function migrate(raw) {
       createdAt: raw.meta?.createdAt ?? new Date().toISOString(),
     };
   }
+
+  // Always-apply defaults for settings added after SCHEMA_VERSION 10
+  if (raw.settings.vibrationEnabled === undefined) raw.settings.vibrationEnabled = true;
+  if (raw.settings.rpeEnabled       === undefined) raw.settings.rpeEnabled       = true;
 
   return raw;
 }

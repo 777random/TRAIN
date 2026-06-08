@@ -669,8 +669,9 @@ function renderExercise(wk, di, ei, state) {
     ? state.weeks[state.curIdx - 1]?.days?.[di]?.exercises?.[ei] ?? null
     : null;
 
+  const rpeEnabled = state.settings?.rpeEnabled ?? true;
   const setsHtml = ex.sets.map((s, si) =>
-    renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl)
+    renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled)
   ).join('');
 
   const step = ex.weightStep ?? 2.5;
@@ -896,7 +897,7 @@ function renderExercise(wk, di, ei, state) {
   })()}
 
   <div class="set-header" aria-hidden="true">
-    <span>#</span><span>kg</span><span>${metricHdr}</span><span>RPE</span><span>✓</span><span></span>
+    <span>#</span><span>kg</span><span>${metricHdr}</span><span>${rpeEnabled ? 'RPE' : ''}</span><span>✓</span><span></span>
   </div>
 
   <div data-set-list="${di}-${ei}" role="list" aria-label="Sätze von ${h(ex.name)}">
@@ -930,7 +931,7 @@ function renderExercise(wk, di, ei, state) {
 </div>`;
 }
 // ─── Set row ─────────────────────────────────────────────────────────────────
-function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl) {
+function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true) {
   const prevSet    = prevEx?.sets?.[si] ?? null;
   const dlFactor   = getState().settings?.deloadFactor ?? 0.75;
   const dispW      = isDl ? Math.round(s.weight * dlFactor * 2) / 2 : s.weight;
@@ -1012,7 +1013,7 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl) {
 
   <!-- RPE popover trigger (2.2) -->
   <div class="set-cell set-cell--rpe">
-    ${locked
+    ${!rpeEnabled ? '' : locked
       ? `<span class="rpe-static">${s.rpe ?? '–'}</span>`
       : (() => {
           const cur    = s.rpe ?? null;
@@ -1690,6 +1691,8 @@ function renderSettingsTab(state) {
   <div class="settings-section">
     ${tog('swipe', 'Swipe-Navigation', 'Wischen zum Wochenwechsel')}
     ${tog('drag',  'Drag & Drop',      'Übungen per Griff verschieben')}
+    ${tog('vibrationEnabled', 'Vibration nach Pause', 'Nicht verfügbar auf iOS')}
+    ${tog('rpeEnabled', 'RPE anzeigen', 'Rate of Perceived Exertion — Anstrengungsgrad pro Satz')}
   </div>
 
   <!-- Körper & BMI -->
