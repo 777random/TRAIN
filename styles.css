@@ -684,6 +684,40 @@ exercise { position: unset; }
 .add-set-btn svg { width: 14px; height: 14px; }
 .add-set-btn:hover { border-color: var(--c-accent); color: var(--c-accent); }
 
+/* ── Spontaner Übungswechsel ─────────────────────────────────────────── */
+.btn-sub {
+  font-size: 11px; padding: 0 var(--sp-2); height: 26px;
+  border: 1px solid var(--c-border); border-radius: var(--r-sm);
+  background: none; color: var(--c-text-3); cursor: pointer;
+  white-space: nowrap; flex-shrink: 0;
+  transition: color var(--t-fast), border-color var(--t-fast);
+}
+.btn-sub:hover { color: var(--c-text-2); border-color: var(--c-text-3); }
+.btn-sub.is-sub { color: #f59e0b; border-color: #f59e0b; }
+.sub-banner {
+  font-size: 12px; color: #92400e;
+  background: rgba(251,191,36,.13);
+  border-left: 3px solid #f59e0b;
+  padding: 4px var(--sp-3);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  margin: var(--sp-1) 0 var(--sp-2);
+}
+.sub-form {
+  display: flex; flex-direction: column; gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--c-surface2); border-radius: var(--r-sm);
+  margin: var(--sp-1) 0 var(--sp-2);
+}
+.sub-form__label { font-size: 12px; color: var(--c-text-2); }
+.sub-name-input {
+  background: var(--c-surface); border: 1px solid var(--c-border);
+  border-radius: var(--r-sm); color: var(--c-text);
+  font-size: 14px; padding: var(--sp-1) var(--sp-2); width: 100%;
+  font-family: var(--font-body);
+}
+.sub-name-input:focus { outline: none; border-color: var(--c-accent); }
+.sub-form__btns { display: flex; gap: var(--sp-2); }
+
 .add-exercise-row { display: flex; gap: var(--sp-2); margin-top: var(--sp-3); align-items: center; }
 .add-exercise-input {
   flex: 1; background: var(--c-surface2); border: 1px solid var(--c-border);

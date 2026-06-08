@@ -98,9 +98,15 @@ export function detectPlateaus(allWeeks, favoriteExercises = [], rpeEnabled = tr
 
   if (sortedNonDeload.length < 3) return [];
 
+  const substituteNames = new Set(
+    sortedNonDeload.flatMap(w =>
+      w.days.flatMap(d => d.exercises.filter(ex => ex.substituteFor).map(ex => ex.name))
+    )
+  );
+
   const exNames = [...new Set(
     sortedNonDeload.flatMap(w => w.days.flatMap(d => d.exercises.map(e => e.name)))
-  )];
+  )].filter(name => !substituteNames.has(name));
 
   const plateaus = [];
 

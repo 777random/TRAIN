@@ -491,6 +491,7 @@ export const A = Object.freeze({
   SET_AUTOFILL_DOWN:   'SET_AUTOFILL_DOWN',   // { di, ei, si } — weight (all) + reps (next)
   SET_AUTOFILL_RPE:    'SET_AUTOFILL_RPE',    // { di, ei, si } — rpe → next set only
   CONFIRM_SET:         'CONFIRM_SET',          // { di, ei, si, reps } — quick-confirm next pending set
+  EX_SET_SUBSTITUTE:   'EX_SET_SUBSTITUTE',   // { di, ei, substituteFor: string|null }
   // Session log
   SESSION_START:       'SESSION_START',       // {}  – writes start timestamp into STATE (not persisted as log entry until stop)
   SESSION_STOP:        'SESSION_STOP',        // { duration, time }
@@ -531,6 +532,8 @@ function _resetClonedDays(days) {
     day.sessionRating = null;
     (day.exercises ?? []).forEach(ex => {
       if (ex._showCfg) ex._showCfg = false;
+      if (ex.substituteFor) ex.name = ex.substituteFor;
+      ex.substituteFor = null;
       (ex.sets ?? []).forEach(s => {
         s.status = 'pending';
         s.done   = false;
@@ -626,10 +629,14 @@ function reduce(state, action) {
       const d = clone(state.weeks[state.curIdx - 1].days);
       d.forEach(day => {
         day.markedDone = false; day.locked = false;
-        day.exercises.forEach(ex => ex.sets.forEach(s => {
-          s.status = 'pending';
-          s.done = false;
-        }));
+        day.exercises.forEach(ex => {
+          if (ex.substituteFor) ex.name = ex.substituteFor;
+          ex.substituteFor = null;
+          ex.sets.forEach(s => {
+            s.status = 'pending';
+            s.done = false;
+          });
+        });
       });
       state.weeks[state.curIdx].days = d;
       break;
@@ -762,6 +769,11 @@ function reduce(state, action) {
       const ex = _currentWeek()?.days[p.di]?.exercises[p.ei]; if (!ex) break;
       const m = p.metric;
       if (m === 'reps' || m === 'sec' || m === 'm') ex.metric = m;
+      break;
+    }
+    case A.EX_SET_SUBSTITUTE: {
+      const ex = _currentWeek()?.days[p.di]?.exercises[p.ei]; if (!ex) break;
+      ex.substituteFor = p.substituteFor ?? null;
       break;
     }
 

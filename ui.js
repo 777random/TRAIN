@@ -59,6 +59,9 @@ let _rpePopoverKey = null;
 /** Tracks last-tap timestamp per exercise for double-click detection: `${di}-${ei}` → ms. */
 let _lastConfirmTap = {};
 
+/** Key of the exercise with the open substitute-name form: `${di}-${ei}` or null. */
+let _subFormOpenKey = null;
+
 /** Tracks whether the first-day auto-open has already happened. */
 let _autoOpened = false;
 
@@ -347,6 +350,7 @@ function renderDayList(state) {
     _activeDayIdx = _getDefaultDayIndex(wk);
     _overviewMode = false;
     _exChartOpen.clear();
+    _subFormOpenKey = null;
   }
   _lastRenderedCurIdx = state.curIdx;
 
@@ -700,6 +704,34 @@ function renderExercise(wk, di, ei, state) {
   }
   const metricHdr = metric === 'sec' ? 'Sek' : metric === 'm' ? 'm' : 'Wdh';
 
+  // ── Substitut-Banner + Inline-Formular ──────────────────────────────────────
+  const subBannerHtml = ex.substituteFor
+    ? `<div class="sub-banner" role="status" aria-label="Substitution aktiv">↔ Heute: ${h(ex.name)} (statt ${h(ex.substituteFor)})</div>`
+    : '';
+
+  const _subKey = `${di}-${ei}`;
+  const subFormHtml = _subFormOpenKey === _subKey
+    ? `<div class="sub-form">
+    <span class="sub-form__label">Ursprüngliche Übung:</span>
+    <input
+      class="sub-name-input"
+      type="text"
+      list="sub-list-${di}-${ei}"
+      placeholder="z.B. Klimmzüge …"
+      data-di="${di}" data-ei="${ei}"
+      autocomplete="off"
+      autofocus
+    />
+    <datalist id="sub-list-${di}-${ei}">
+      ${_STANDARD_EXERCISES.map(n => `<option value="${h(n)}">`).join('')}
+    </datalist>
+    <div class="sub-form__btns">
+      <button class="btn btn--accent btn--sm" data-action="confirm-sub" data-di="${di}" data-ei="${ei}">Bestätigen</button>
+      <button class="btn btn--ghost btn--sm" data-action="close-sub-form" data-di="${di}" data-ei="${ei}">Abbrechen</button>
+    </div>
+  </div>`
+    : '';
+
   // --- Das neue, cleane Zahnrad-Menü ---
   const cfgRow = ex._showCfg ? `
     <div class="exercise__settings">
@@ -851,6 +883,13 @@ function renderExercise(wk, di, ei, state) {
       aria-pressed="${isFav}"
     >${isFav ? '⭐' : '☆'}</button>
 
+    ${!locked ? `<button
+      class="btn-sub${ex.substituteFor ? ' is-sub' : ''}"
+      data-action="${ex.substituteFor ? 'reset-sub' : 'open-sub-form'}"
+      data-di="${di}" data-ei="${ei}"
+      aria-label="${ex.substituteFor ? 'Substitution zurücksetzen' : 'Heute andere Übung machen'}"
+    >↔ ${ex.substituteFor ? 'Zurücksetzen' : 'Heute anders'}</button>` : ''}
+
     <button
       class="btn-icon btn-icon--chart${_exChartOpen.has(`${di}-${ei}`) ? ' is-active' : ''}"
       data-action="toggle-ex-chart" data-di="${di}" data-ei="${ei}"
@@ -872,6 +911,9 @@ function renderExercise(wk, di, ei, state) {
       aria-label="Übung '${h(ex.name)}' entfernen"
     >${ic.trash()}</button>` : ''}
   </div>
+
+  ${subBannerHtml}
+  ${subFormHtml}
 
   ${cfgRow}
 
@@ -2335,6 +2377,29 @@ function _handleClick(e) {
       }
       break;
 
+    case 'open-sub-form':
+      _subFormOpenKey = `${di}-${ei}`;
+      scheduleRender();
+      break;
+
+    case 'close-sub-form':
+      _subFormOpenKey = null;
+      scheduleRender();
+      break;
+
+    case 'confirm-sub': {
+      const _subInp = document.querySelector(`.sub-name-input[data-di="${di}"][data-ei="${ei}"]`);
+      const _subName = _subInp?.value.trim();
+      if (!_subName) { _subInp?.focus(); break; }
+      dispatch(A.EX_SET_SUBSTITUTE, { di: +di, ei: +ei, substituteFor: _subName });
+      _subFormOpenKey = null;
+      break;
+    }
+
+    case 'reset-sub':
+      dispatch(A.EX_SET_SUBSTITUTE, { di: +di, ei: +ei, substituteFor: null });
+      break;
+
         case 'move-ex-up': {
       const toEi = +ei - 1;
       if (toEi >= 0) {
@@ -2747,6 +2812,18 @@ function _handleKeydown(e) {
     const action = inp.dataset.action;
     const { di, ei, si } = inp.dataset;
 
+    // Substitute-name input → confirm substitution
+    if (inp.classList.contains('sub-name-input')) {
+      const name = inp.value.trim();
+      if (name) {
+        dispatch(A.EX_SET_SUBSTITUTE, { di: +inp.dataset.di, ei: +inp.dataset.ei, substituteFor: name });
+        _subFormOpenKey = null;
+      } else {
+        inp.focus();
+      }
+      return;
+    }
+
     // Add-exercise input → add the exercise
     if (inp.classList.contains('add-exercise-input')) {
       const name = inp.value.trim();
@@ -2844,6 +2921,7 @@ function _prepNewWeekModal() {
       for (const day of curWk.days) {
         for (const ex of day.exercises) {
           if (seen.has(ex.name)) continue;
+          if (ex.substituteFor) continue;
           seen.add(ex.name);
           const rec = getWeightRecommendation(ex.name, calcWeeks);
           if (rec) aiRecs.push({ name: ex.name, rec });
