@@ -32,7 +32,7 @@ export function exportJSON() {
     if (navigator.canShare({ files: [file] })) {
       navigator.share({ files: [file], title: 'TRAIN Backup' })
         .then(() => dispatch(A.SETTING_SET, { key: 'lastBackupDate', value: today() }))
-        .catch(() => triggerDownload(blob, filename));
+        .catch(() => { triggerDownload(blob, filename); dispatch(A.SETTING_SET, { key: 'lastBackupDate', value: today() }); });
       return;
     }
   }
