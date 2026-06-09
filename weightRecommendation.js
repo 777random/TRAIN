@@ -64,36 +64,53 @@ export function getWeightRecommendation(exerciseName, weeks, plateStep = 2.5) {
 
   // Entscheidungsregeln (Priorität: schlechteste Bedingung zuerst)
   let delta = 0, reason = '';
+  const reasons = [];
+  const srPct = Math.round(successRate * 100);
 
   if (successRate < 0.5) {
     delta  = 0;
     reason = 'Viele fehlgeschlagene Sätze — Technik oder Volumen prüfen';
+    reasons.push({ icon: '⚠', text: `Erfolgsquote nur ${srPct}%`, isRpe: false });
+    if (avgRpe !== null) reasons.push({ icon: '⚠', text: `Ø RPE ${avgRpe.toFixed(1)}`, isRpe: true });
   } else if (avgRpe !== null && avgRpe >= 9) {
     delta  = 0;
     reason = 'Letzte Einheit war intensiv, Gewicht halten';
+    reasons.push({ icon: '⚠', text: `Ø RPE ${avgRpe.toFixed(1)} — zu intensiv`, isRpe: true });
+    reasons.push({ icon: 'ℹ', text: `Erfolgsquote ${srPct}%`, isRpe: false });
   } else if (successRate < 0.7) {
     delta  = 0;
     reason = 'Letzte Einheit war intensiv, Gewicht halten';
+    reasons.push({ icon: '⚠', text: `Erfolgsquote ${srPct}%`, isRpe: false });
+    if (avgRpe !== null) reasons.push({ icon: 'ℹ', text: `Ø RPE ${avgRpe.toFixed(1)}`, isRpe: true });
   } else if (avgRpe !== null && avgRpe <= 7 && successRate >= 0.9) {
     delta  = 2.5;
     reason = 'RPE war niedrig, Steigerung möglich';
+    reasons.push({ icon: '✓', text: `Ø RPE ${avgRpe.toFixed(1)} — Luft nach oben`, isRpe: true });
+    reasons.push({ icon: '✓', text: `Erfolgsquote ${srPct}%`, isRpe: false });
   } else if (avgRpe !== null && avgRpe >= 7.5 && avgRpe <= 8.5 && successRate >= 0.8) {
     delta  = 1.25;
     reason = 'Gute Form, kleine Steigerung';
+    reasons.push({ icon: '✓', text: `Ø RPE ${avgRpe.toFixed(1)} — gute Form`, isRpe: true });
+    reasons.push({ icon: '✓', text: `Erfolgsquote ${srPct}%`, isRpe: false });
   } else if (avgRpe === null && successRate >= 0.9) {
     delta  = 2.5;
     reason = 'Hohe Erfolgsquote, Steigerung möglich';
+    reasons.push({ icon: '✓', text: `Erfolgsquote ${srPct}%`, isRpe: false });
   } else if (avgRpe === null && successRate >= 0.8) {
     delta  = 1.25;
     reason = 'Gute Erfolgsquote, kleine Steigerung';
+    reasons.push({ icon: '✓', text: `Erfolgsquote ${srPct}%`, isRpe: false });
   } else {
     delta  = 0;
     reason = 'Letzte Einheit war intensiv, Gewicht halten';
+    if (avgRpe !== null) reasons.push({ icon: '⚠', text: `Ø RPE ${avgRpe.toFixed(1)}`, isRpe: true });
+    reasons.push({ icon: '⚠', text: `Erfolgsquote ${srPct}%`, isRpe: false });
   }
 
   return {
     recommendedWeight: roundToPlate(lastWeight + delta, plateStep),
     reason,
+    reasons,
     delta,
     lastWeight,
   };
