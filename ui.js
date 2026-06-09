@@ -565,14 +565,17 @@ function renderDayBody(wk, di, state) {
   if (state.curIdx > 0) {
     const prevDay = state.weeks[state.curIdx - 1]?.days?.[di];
     if (prevDay) {
-      // 2.1: completion % + streak instead of kg volume
-      const totalSets   = prevDay.exercises.reduce((s, ex) => s + ex.sets.length, 0);
-      const doneSets    = prevDay.exercises.reduce((s, ex) => s + ex.sets.filter(st => st.status === 'success').length, 0);
-      const pct         = totalSets > 0 ? Math.round(doneSets / totalSets * 100) : 0;
+      let _pbSucc = 0, _pbFail = 0;
+      prevDay.exercises.forEach(ex => ex.sets.forEach(s => {
+        if (s.status === 'success') _pbSucc++;
+        else if (s.status === 'fail') _pbFail++;
+      }));
+      const _pbTotal    = _pbSucc + _pbFail;
+      const _pbScore    = _pbTotal > 0 ? Math.round(_pbSucc / _pbTotal * 100) : 0;
       const streak      = _calcStreak(state);
       const streakPart  = streak.cur >= 2 ? `&nbsp;&nbsp;🔥 ${streak.cur} Wochen` : '';
       prevBanner = `<div class="prev-banner" role="status">
-        ${ic.barChart()}<span>Vorwoche: ${pct}% abgeschlossen (${doneSets}/${totalSets} Sätze)${streakPart}</span>
+        ${ic.barChart()}<span>Vorwoche: ${_pbScore}% · ${_pbSucc}/${_pbTotal} Sätze ✓${streakPart}</span>
       </div>`;
     }
   }
@@ -1414,6 +1417,19 @@ function _trueVol(week) {
         sss + (st.weight ?? 0) * (st.reps ?? 0), 0), 0), 0);
 }
 
+// ─── Weekly Success Score: success / (success + fail), pending excluded ───────
+function _weekSuccessScore(week) {
+  let succ = 0, fail = 0;
+  for (const d of week.days)
+    for (const ex of d.exercises)
+      for (const s of ex.sets) {
+        if (s.status === 'success') succ++;
+        else if (s.status === 'fail') fail++;
+      }
+  const total = succ + fail;
+  return { succ, fail, total, pct: total > 0 ? Math.round(succ / total * 100) : 0 };
+}
+
 
 // ─── Analysis tab ─────────────────────────────────────────────────────────────
 function renderAnalysisTab(state) {
@@ -1426,6 +1442,8 @@ function renderAnalysisTab(state) {
   // Tatsächliches Volumen: nur success-Sätze (2.1)
   const vols     = last8.map(_trueVol);
   const wkLabels = last8.map(w => wkLabel(w.startDate).split('·')[0].trim());
+  const _scoreList = state.weeks.map(w => _weekSuccessScore(w)).filter(s => s.total > 0).map(s => s.pct);
+  const avgScore = _scoreList.length > 0 ? Math.round(_scoreList.reduce((a, b) => a + b, 0) / _scoreList.length) : null;
 
   const allExNames = [...new Set(
     state.weeks.flatMap(w => w.days.flatMap(d => d.exercises.map(e => e.name)))
@@ -1438,6 +1456,9 @@ function renderAnalysisTab(state) {
     const don  = wk.days.reduce((s, d) => s + d.exercises.reduce((ss, ex) => ss + ex.sets.filter(st => st.status === 'success').length, 0), 0);
     const vol  = _trueVol(wk);
     const pct  = tot > 0 ? Math.round(don / tot * 100) : 0;
+    const _wss = _weekSuccessScore(wk);
+    const score      = _wss.total > 0 ? _wss.pct : pct;
+    const scoreColor = score >= 90 ? 'var(--c-ok)' : score >= 70 ? 'var(--c-warn)' : 'var(--c-danger)';
     const dd   = wk.days.filter(d => !!d.markedDone).length;
     const isDl = wk.mode === 'deload';
     const prev = arr[wi + 1];
@@ -1488,16 +1509,16 @@ function renderAnalysisTab(state) {
           <div class="pw-card__date">${wkRange(wk.startDate)}${wk.note ? ' · ' + h(wk.note) : ''}</div>
           ${dayDurations ? `<div class="pw-day-durs">${dayDurations}</div>` : ''}
         </div>
-        <div class="pw-card__pct" style="color:${pct===100?'var(--c-ok)':'var(--c-text)'}">${pct}%</div>
+        <div class="pw-card__pct" style="color:${scoreColor}">${score}%</div>
       </div>
       <div class="pw-card__stats">
         <div><div class="pw-stat__num" style="color:${isDl?'var(--c-deload)':'var(--c-accent)'}">${dd}/${wk.days.length}</div><div class="pw-stat__lbl">Tage</div></div>
-        <div><div class="pw-stat__num">${don}</div><div class="pw-stat__lbl">Sätze ✓</div></div>
-        <div><div class="pw-stat__num">${vol >= 1000 ? (vol/1000).toFixed(1)+'t' : vol+'kg'}</div><div class="pw-stat__lbl">Tats. Vol.${vd}</div></div>
+        <div><div class="pw-stat__num">${_wss.total > 0 ? `${don}/${_wss.total}` : don}</div><div class="pw-stat__lbl">Sätze ✓</div></div>
+        <div><div class="pw-stat__num" style="font-size:11px;color:var(--c-text-2)">${vol >= 1000 ? (vol/1000).toFixed(1)+'t' : vol+'kg'}</div><div class="pw-stat__lbl">Vol.${vd}</div></div>
         ${avgDur ? `<div><div class="pw-stat__num">${avgDur}'</div><div class="pw-stat__lbl">Ø Dauer</div></div>` : ''}
         ${avgFulfill !== null ? `<div><div class="pw-stat__num" style="color:${avgFulfill>=100?'var(--c-ok)':avgFulfill>=80?'var(--c-warn)':'var(--c-danger)'}">${avgFulfill}%</div><div class="pw-stat__lbl">Ziel-Erf.</div></div>` : ''}
       </div>
-      <div class="progress-bar-wrap"><div class="progress-bar" style="width:${pct}%"></div></div>
+      <div class="progress-bar-wrap"><div class="progress-bar" style="width:${score}%"></div></div>
     </div>`;
   }).join('');
 
@@ -1526,6 +1547,7 @@ function renderAnalysisTab(state) {
     <div class="streak-card"><div class="streak-num">${streak.cur}</div><div class="streak-lbl">Streak</div></div>
     <div class="streak-card"><div class="streak-num">${streak.best}</div><div class="streak-lbl">Best</div></div>
     <div class="streak-card"><div class="streak-num">${state.weeks.length}</div><div class="streak-lbl">Wochen</div></div>
+    ${avgScore !== null ? `<div class="streak-card"><div class="streak-num" style="color:${avgScore>=90?'var(--c-ok)':avgScore>=70?'var(--c-warn)':'var(--c-danger)'}">${avgScore}%</div><div class="streak-lbl">Ø Erfolg</div></div>` : ''}
     ${avgMin != null ? `<div class="streak-card"><div class="streak-num">${fmtMin(avgMin)}</div><div class="streak-lbl">Ø Session</div></div>` : ''}
     ${totalMin != null ? `<div class="streak-card"><div class="streak-num">${fmtMin(totalMin)}</div><div class="streak-lbl">Gesamt</div></div>` : ''}
     ${state.weeks.length >= 2 ? `
@@ -3138,20 +3160,30 @@ function _prepNewWeekModal() {
   });
   const _displayRecs = aiRecs.slice(0, 5);
 
+  const _rpeEnabled = state.settings?.rpeEnabled ?? true;
   const aiRecHtml = _displayRecs.length > 0 ? `
   <div class="nw-weight-recs">
     <div class="nw-weight-recs__title">💡 KI-Empfehlung</div>
-    ${_displayRecs.map(r => `
+    ${_displayRecs.map(r => {
+      const _filtReasons = (r.rec.reasons ?? []).filter(rs => !rs.isRpe || _rpeEnabled).slice(0, 2);
+      const _action = r.rec.delta > 0
+        ? `💡 +${r.rec.delta} kg empfohlen`
+        : `💡 Gewicht halten (${r.rec.recommendedWeight} kg)`;
+      return `
     <button type="button" class="nw-weight-rec-chip"
       data-action="toggle-weight-rec"
       data-name="${h(r.name)}"
       data-weight="${r.rec.recommendedWeight}"
       data-delta="${r.rec.delta}"
       aria-label="Empfehlung für ${h(r.name)} übernehmen">
-      <span class="nw-rec-name">${h(r.name)}</span>
-      <span class="nw-rec-kg">${r.rec.recommendedWeight} kg</span>
-      <span class="nw-rec-reason">${h(r.rec.reason)}</span>
-    </button>`).join('')}
+      <div class="nw-rec-top">
+        <span class="nw-rec-name">${h(r.name)}</span>
+        <span class="nw-rec-action">${_action}</span>
+      </div>
+      ${_filtReasons.length > 0 ? `<div class="nw-rec-reasons">${_filtReasons.map(rs => `<div class="nw-rec-reason-row">${rs.icon} ${h(rs.text)}</div>`).join('')}</div>` : ''}
+      <div class="nw-rec-tap">→ Tap zum Bestätigen</div>
+    </button>`;
+    }).join('')}
   </div>` : '';
 
   // Named templates from state.templates[]
