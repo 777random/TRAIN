@@ -4,15 +4,21 @@
  * Pure function, keine Seiteneffekte, keine Importe.
  */
 
+/** Rounds weight to the nearest plate step (e.g. 2.5 kg or 1.25 kg). */
+export function roundToPlate(weight, step = 2.5) {
+  return Math.round(weight / step) * step;
+}
+
 /**
  * Berechnet eine Gewichtsempfehlung für eine Übung basierend auf den letzten
  * nicht-Deload-Wochen.
  *
  * @param {string} exerciseName
- * @param {Array}  weeks  – Wochen-Array (nur Nicht-Deload-Wochen übergeben)
+ * @param {Array}  weeks      – Wochen-Array (nur Nicht-Deload-Wochen übergeben)
+ * @param {number} plateStep  – Rundungsschritt in kg (aus settings.plateStep)
  * @returns {{ recommendedWeight: number, reason: string, delta: number, lastWeight: number } | null}
  */
-export function getWeightRecommendation(exerciseName, weeks) {
+export function getWeightRecommendation(exerciseName, weeks, plateStep = 2.5) {
   if (weeks.length < 2) return null;
 
   // Sätze pro Woche für diese Übung sammeln (success + fail getrennt)
@@ -86,7 +92,7 @@ export function getWeightRecommendation(exerciseName, weeks) {
   }
 
   return {
-    recommendedWeight: Math.round((lastWeight + delta) * 100) / 100,
+    recommendedWeight: roundToPlate(lastWeight + delta, plateStep),
     reason,
     delta,
     lastWeight,

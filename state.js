@@ -136,6 +136,7 @@ function buildDefaultState() {
       deloadFactor:       0.75,
       deloadFactorCustom: null,
       barbellWeight:      20,
+      plateStep:          2.5,
       lastBackupDate:     null,
       activeTags:         ALL_TAGS_FLAT,  // 4.1: defaults to all tags enabled
       vibrationEnabled:   true,
@@ -313,6 +314,7 @@ function migrate(raw) {
     if (s.deloadFactor       === undefined) s.deloadFactor       = 0.75;
     if (s.deloadFactorCustom === undefined) s.deloadFactorCustom = null;
     if (s.barbellWeight      === undefined) s.barbellWeight      = 20;
+    if (s.plateStep          === undefined) s.plateStep          = 2.5;
     if (s.lastBackupDate     === undefined) s.lastBackupDate     = null;
     raw.settings = s;
 

@@ -74,6 +74,9 @@ let _kgPickerKey = null;
 /** Last-tap timestamp per exercise for +kg double-tap detection: `${di}-${ei}` → ms. */
 let _kgPickerLastTap = {};
 
+/** Set of `${di}-${ei}` keys whose Vorwoche mini-tables are expanded. */
+const _prevGridOpen = new Set();
+
 /** Tracks whether the first-day auto-open has already happened. */
 let _autoOpened = false;
 
@@ -360,6 +363,7 @@ function renderDayList(state) {
     _activeDayIdx = _getDefaultDayIndex(wk);
     _overviewMode = false;
     _exChartOpen.clear();
+    _prevGridOpen.clear();
     _subFormOpenKey = null;
   }
   _lastRenderedCurIdx = state.curIdx;
@@ -720,10 +724,17 @@ function renderExercise(wk, di, ei, state) {
   const isDl   = wk.mode === 'deload';
   const drag   = state.settings.drag && !locked;
 
-  // Diese wichtige Logik hatte ich vorher komplett übersehen!
-  const prevEx = state.curIdx > 0
-    ? state.weeks[state.curIdx - 1]?.days?.[di]?.exercises?.[ei] ?? null
-    : null;
+  const _lookupName = ex.substituteFor || ex.name;
+  let prevEx = null;
+  for (let _wi = state.curIdx - 1; _wi >= 0; _wi--) {
+    const _w = state.weeks[_wi];
+    if (_w.mode === 'deload') continue;
+    for (const _d of (_w.days ?? [])) {
+      const _pe = (_d.exercises ?? []).find(_e => _e.name === _lookupName);
+      if (_pe) { prevEx = _pe; break; }
+    }
+    if (prevEx) break;
+  }
 
   const rpeEnabled = state.settings?.rpeEnabled ?? true;
   const setsHtml = ex.sets.map((s, si) =>
@@ -1009,6 +1020,34 @@ function renderExercise(wk, di, ei, state) {
     ${setsHtml}
   </div>
 
+  ${prevEx ? (() => {
+    const _pgKey  = `${di}-${ei}`;
+    const _pgOpen = _prevGridOpen.has(_pgKey);
+    return `<div class="prev-grid-wrap">
+      <button
+        class="prev-grid-toggle${_pgOpen ? ' is-open' : ''}"
+        data-action="toggle-prev-grid" data-di="${di}" data-ei="${ei}"
+        aria-expanded="${_pgOpen}"
+        aria-controls="prev-grid-${di}-${ei}"
+      >📋 Vorwoche</button>
+      ${_pgOpen ? `<div class="prev-grid" id="prev-grid-${di}-${ei}" role="table" aria-label="Vorwoche Sätze">
+        <div class="prev-grid-row prev-grid-header" role="row">
+          <span role="columnheader">#</span>
+          <span role="columnheader">kg</span>
+          <span role="columnheader">Wdh</span>
+          <span role="columnheader">✓</span>
+        </div>
+        ${(prevEx.sets ?? []).map((ps, psi) => `
+          <div class="prev-grid-row" role="row">
+            <span role="cell">${psi + 1}</span>
+            <span role="cell">${ps.weight ?? '–'}</span>
+            <span role="cell">${ps.reps ?? '–'}</span>
+            <span role="cell" class="${ps.status === 'success' ? 'prev-grid-ok' : ps.status === 'fail' ? 'prev-grid-fail' : ''}">${ps.status === 'success' ? '✓' : ps.status === 'fail' ? '✗' : '–'}</span>
+          </div>`).join('')}
+      </div>` : ''}
+    </div>`;
+  })() : ''}
+
   ${!locked ? (() => {
     const allDone = ex.sets.length > 0 && ex.sets.every(s => s.status !== 'pending');
     return `<button
@@ -1109,16 +1148,17 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
       min="0" step="0.5" value="${dispW}"
       ${locked ? 'disabled' : ''}
       data-action="set-weight" data-di="${di}" data-ei="${ei}" data-si="${si}"
+      placeholder="${prevSet ? prevSet.weight : ''}"
       aria-label="Satz ${si + 1} Gewicht in kg"
     />
     ${isPR ? `<span class="pr-badge" aria-label="Bestleistung!">${ic.trophy()}</span>` : ''}
-    <span class="prev-hint" aria-hidden="true">${prevSet ? prevSet.weight + ' kg' : ''}</span>
+    <span class="prev-hint" aria-hidden="true">${prevSet ? `↑ ${prevSet.weight}kg × ${prevSet.reps ?? '–'}` : ''}</span>
     ${ex.showPlates && dispW > 0 ? (() => { const pl = calcPlates(dispW); return pl ? `<span class="plate-hint" aria-hidden="true" title="Scheiben je Seite">▪ ${pl}</span>` : ''; })() : ''}
   </div>
 
   <div class="set-cell">
     <input class="num-input" type="number" inputmode="${repMode}"
-      min="0" step="${repStep}" placeholder="${repPh}" value="${s.reps}"
+      min="0" step="${repStep}" placeholder="${prevSet && prevSet.reps != null ? prevSet.reps : repPh}" value="${s.reps}"
       ${locked ? 'disabled' : ''}
       data-action="set-reps" data-di="${di}" data-ei="${ei}" data-si="${si}"
       aria-label="${repAria}"
@@ -1833,6 +1873,20 @@ function renderSettingsTab(state) {
         aria-label="Stangengewicht in kg"
       />
     </div>
+    <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:var(--sp-2)">
+      <div>
+        <div class="settings-row__label">Kleinstmögliche Steigerung</div>
+        <div class="settings-row__desc">Rundung für KI-Gewichtsempfehlungen</div>
+      </div>
+      <div class="weight-step-opts">
+        ${[1.25, 2.5].map(ps => `
+          <button type="button"
+            class="weight-step-btn${(s.plateStep ?? 2.5) === ps ? ' is-selected' : ''}"
+            data-action="set-plate-step" data-step="${ps}"
+            aria-pressed="${(s.plateStep ?? 2.5) === ps}"
+          >${String(ps).replace('.', ',')} kg</button>`).join('')}
+      </div>
+    </div>
   </div>
 
   <!-- Deload -->
@@ -2425,6 +2479,14 @@ function _handleClick(e) {
       break;
     }
 
+    case 'toggle-prev-grid': {
+      const _pgKey = `${di}-${ei}`;
+      if (_prevGridOpen.has(_pgKey)) _prevGridOpen.delete(_pgKey);
+      else _prevGridOpen.add(_pgKey);
+      scheduleRender();
+      break;
+    }
+
     case 'toggle-ex-chart': {
       const chartKey = `${di}-${ei}`;
       const wrap = document.querySelector(`[data-chart-di="${di}"][data-chart-ei="${ei}"]`);
@@ -2895,6 +2957,11 @@ function _handleChange(e) {
       dispatch(A.SETTING_SET, { key: 'barbellWeight', value: Number.isFinite(bw) && bw > 0 ? bw : 20 });
       break;
     }
+    case 'set-plate-step': {
+      const ps = parseFloat(el.dataset.step);
+      dispatch(A.SETTING_SET, { key: 'plateStep', value: Number.isFinite(ps) ? ps : 2.5 });
+      break;
+    }
     case 'set-deload-factor-value': {
       const pct = parseFloat(el.value);
       if (Number.isFinite(pct) && pct >= 1 && pct <= 99) {
@@ -3054,7 +3121,7 @@ function _prepNewWeekModal() {
           if (seen.has(ex.name)) continue;
           if (ex.substituteFor) continue;
           seen.add(ex.name);
-          const rec = getWeightRecommendation(ex.name, calcWeeks);
+          const rec = getWeightRecommendation(ex.name, calcWeeks, state.settings?.plateStep ?? 2.5);
           if (rec) aiRecs.push({ name: ex.name, rec });
         }
       }
