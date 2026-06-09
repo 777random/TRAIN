@@ -189,21 +189,19 @@ button, input, select, textarea { font: inherit; }
   display: flex; gap: var(--sp-2); align-items: center;
   padding-bottom: var(--sp-2);
 }
-.mode-pill {
-  display: flex; background: var(--c-surface);
+/* B1: Compact deload toggle (replaces two-button mode-pill) */
+.deload-toggle {
+  height: 30px; padding: 0 var(--sp-3);
   border: 1px solid var(--c-border); border-radius: var(--r-full);
-  padding: 3px; gap: 2px; flex-shrink: 0;
+  background: var(--c-surface); color: var(--c-text-3);
+  font-size: 12px; font-weight: 600; cursor: pointer;
+  display: flex; align-items: center; gap: 2px;
+  transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast);
+  flex-shrink: 0; white-space: nowrap;
 }
-.mode-pill__btn {
-  min-height: 36px; padding: 0 var(--sp-3);
-  border: none; border-radius: var(--r-full); background: none;
-  color: var(--c-text-3); font-size: 12px; font-weight: 600;
-  cursor: pointer; white-space: nowrap;
-  transition: background var(--t-fast), color var(--t-fast);
-}
-.mode-pill__btn:hover { color: var(--c-text-2); }
-.mode-pill__btn--std.is-active { background: var(--c-accent); color: #000; }
-.mode-pill__btn--dl.is-active  { background: var(--c-deload); color: #000; }
+.deload-toggle svg { width: 12px; height: 12px; }
+.deload-toggle:hover { color: var(--c-text-2); border-color: var(--c-border-hi); }
+.deload-toggle.is-active { background: var(--c-deload); color: #000; border-color: transparent; }
 
 .toolbar__spacer { flex: 1; }
 .toolbar__btn {
@@ -796,8 +794,7 @@ exercise { position: unset; }
 .ex-menu-btn:hover { color: var(--c-text); background: var(--c-surface2); }
 .ex-menu-btn.is-planned { color: var(--c-accent); }
 .ex-menu-dropdown {
-  position: absolute; right: 0; top: calc(100% + 2px);
-  z-index: 200;
+  position: fixed; z-index: 400;
   background: var(--c-surface2);
   border: 1px solid var(--c-border-hi);
   border-radius: var(--r-md);
@@ -921,10 +918,11 @@ exercise { position: unset; }
 /* +kg Picker Popover */
 .ex-kg-wrap { position: relative; flex-shrink: 0; }
 .ex-kg-picker {
-  position: absolute; right: 0; top: calc(100% + 4px); z-index: 200;
+  position: absolute; right: 0; top: calc(100% + 4px); z-index: 300;
   background: var(--c-surface2); border: 1px solid var(--c-border-hi);
   border-radius: var(--r-md); box-shadow: var(--shadow-md);
-  display: flex; gap: 4px; padding: 6px; white-space: nowrap;
+  display: flex; gap: 4px; padding: 6px; flex-wrap: wrap; white-space: nowrap;
+  max-width: calc(100vw - 16px);
 }
 .ex-kg-picker-btn {
   min-width: 36px; height: 32px; padding: 0 6px;
@@ -933,8 +931,11 @@ exercise { position: unset; }
   font-size: 12px; font-weight: 600; cursor: pointer;
   transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast);
 }
+.ex-kg-picker-btn--other { color: var(--c-text-3); font-style: italic; }
 .ex-kg-picker-btn:hover { background: var(--c-surface2); color: var(--c-text); border-color: var(--c-accent); }
 .ex-kg-picker-btn.is-selected { background: var(--c-accent); color: #000; border-color: var(--c-accent); }
+.ex-kg-picker-custom { display: flex; gap: 4px; align-items: center; width: 100%; }
+.ex-kg-picker-custom .num-input { width: 70px; height: 32px; font-size: 13px; }
 
 /* ⭐-Favorit-Button */
 .btn-fav {
@@ -1010,7 +1011,18 @@ exercise { position: unset; }
 .pw-card {
   background: var(--c-surface); border: 1px solid var(--c-border);
   border-radius: var(--r-lg); padding: var(--sp-3) var(--sp-4); margin-bottom: var(--sp-2);
+  position: relative;
 }
+.pw-card__delete {
+  position: absolute; top: var(--sp-2); right: var(--sp-2);
+  width: 28px; height: 28px;
+  border: none; background: none; color: var(--c-text-3);
+  border-radius: var(--r-sm); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: color var(--t-fast), background var(--t-fast);
+}
+.pw-card__delete svg { width: 14px; height: 14px; }
+.pw-card__delete:hover { color: var(--c-danger); background: color-mix(in srgb, var(--c-danger) 10%, transparent); }
 .pw-card--deload { border-color: var(--c-deload-bd); background: var(--c-deload-bg); }
 .pw-card__top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: var(--sp-2); }
 .pw-card__title { font-family: var(--font-display); font-size: 19px; letter-spacing: .1em; }
@@ -1489,7 +1501,6 @@ label > svg {
   border-radius: var(--r-md);
   color: var(--c-text-3);
   cursor: pointer;
-  margin-left: auto;
   flex-shrink: 0;
   transition: color var(--t-fast), border-color var(--t-fast), background var(--t-fast);
 }
@@ -1700,4 +1711,17 @@ details[open] > .deload-details__summary::before { content: '▾ '; }
 /* Continue button */
 .wr-continue { margin-top: var(--sp-5); }
 .wr-continue__btn { width: 100%; }
+
+/* ── Backup reminder banner (C2) ──────────────────────────── */
+.backup-reminder {
+  position: fixed; bottom: calc(var(--sp-5) + env(safe-area-inset-bottom));
+  left: 50%; transform: translateX(-50%);
+  background: var(--c-surface2); border: 1px solid var(--c-border-hi);
+  border-radius: var(--r-lg); box-shadow: var(--shadow-md);
+  padding: var(--sp-3) var(--sp-4);
+  display: flex; flex-direction: column; gap: var(--sp-2);
+  max-width: min(380px, calc(100vw - 32px)); z-index: 800;
+  font-size: 14px; color: var(--c-text-2);
+}
+.backup-reminder__btns { display: flex; gap: var(--sp-2); justify-content: flex-end; }
 

@@ -64,8 +64,8 @@ document.addEventListener('visibilitychange', () => {
 
 // ─── Module state ─────────────────────────────────────────────────────────────
 
-let _sessStart    = null;   // Date.now() when session started, null if stopped
-let _sessRAF      = null;   // requestAnimationFrame handle for clock display
+let _sessInterval = null;   // setInterval handle for clock display (display-only)
+let _clockDi      = null;   // active day index (which day's sessionStartTs we're watching)
 let _pauseEnd     = null;   // Date.now() + pauseMs when pause started
 let _pauseRAF     = null;   // rAF handle for pause countdown
 let _pauseSec     = 90;     // current pause duration in seconds
@@ -90,39 +90,70 @@ function _fmt(totalSeconds) {
   return `${_pad(m)}:${_pad(s)}`;
 }
 
-// ─── Session clock ────────────────────────────────────────────────────────────
+// ─── Session clock (timestamp-based, D1) ─────────────────────────────────────
 
-function _tickClock() {
-  if (!_sessStart || !_clockEl) return;
-  const elapsed = Math.floor((Date.now() - _sessStart) / 1000);
-  _clockEl.textContent = '● ' + _fmt(elapsed);
-  _sessRAF = requestAnimationFrame(_tickClock);
+function _getActiveDay() {
+  const st  = getState();
+  const wk  = st.weeks[st.curIdx];
+  if (!wk) return null;
+  if (_clockDi !== null && wk.days[_clockDi]) return wk.days[_clockDi];
+  // Fallback: first day with a running session (started but not ended)
+  return wk.days.find(d => d.sessionStartTs && !d.sessionEndTs) ?? null;
 }
 
-function _startSession() {
-  if (_sessStart !== null) return;
-  _sessStart = Date.now();
-  _clockEl?.classList?.add('toolbar-timer--running');
-  _sessRAF = requestAnimationFrame(_tickClock);
+function _updateClockDisplay() {
+  if (!_clockEl) return;
+  const day = _getActiveDay();
+  if (!day?.sessionStartTs || day.sessionEndTs) {
+    // No active session
+    if (_sessInterval) { clearInterval(_sessInterval); _sessInterval = null; }
+    _clockEl.textContent = '00:00';
+    _clockEl.classList.remove('toolbar-timer--running');
+    return;
+  }
+  const maxMs   = (getState().settings?.maxSessionMs ?? 10800000);
+  const elapsed = Math.min(Date.now() - day.sessionStartTs, maxMs);
+  const seconds = Math.floor(elapsed / 1000);
+  _clockEl.textContent = '● ' + _fmt(seconds);
+  _clockEl.classList.add('toolbar-timer--running');
+  // Auto-stop display when max reached
+  if (elapsed >= maxMs && _sessInterval) {
+    clearInterval(_sessInterval);
+    _sessInterval = null;
+  }
+}
+
+function _ensureSessionStart(di) {
+  const st  = getState();
+  const wk  = st.weeks[st.curIdx];
+  const day = wk?.days[di];
+  if (!day || day.sessionStartTs || day.markedDone) return;
+  _clockDi = di;
+  dispatch(A.SESSION_START, { di, ts: Date.now() });
+  if (!_sessInterval) {
+    _sessInterval = setInterval(_updateClockDisplay, 1000);
+  }
+  _updateClockDisplay();
 }
 
 function _stopSession() {
-  if (_sessStart === null) return;
-  const duration = Math.round((Date.now() - _sessStart) / 1000);
+  const day = _getActiveDay();
+  if (!day?.sessionStartTs || day.sessionEndTs) return;
+  const duration = Math.round((Date.now() - day.sessionStartTs) / 1000);
   const time     = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
   dispatch(A.SESSION_STOP, { duration, time });
-  cancelAnimationFrame(_sessRAF);
-  _sessStart = null;
+  if (_sessInterval) { clearInterval(_sessInterval); _sessInterval = null; }
   if (_clockEl) {
     _clockEl.textContent = '00:00';
-    _clockEl.classList?.remove('toolbar-timer--running');
+    _clockEl.classList.remove('toolbar-timer--running');
   }
 }
 
 /** Called when user taps the clock element in the toolbar. */
 function _manualToggle() {
-  if (_sessStart !== null) _stopSession();
-  else _startSession();
+  const day = _getActiveDay();
+  if (day?.sessionStartTs && !day.sessionEndTs) _stopSession();
+  else if (_clockDi !== null) _ensureSessionStart(_clockDi);
 }
 
 // ─── Pause timer ──────────────────────────────────────────────────────────────
@@ -213,16 +244,27 @@ function _showGoPopup() {
 let _prevCurIdx = null;
 function _onStateChange(state) {
   if (_prevCurIdx !== null && _prevCurIdx !== state.curIdx) {
-    // Week changed – stop any running session (don't log it, it belongs to old week)
-    cancelAnimationFrame(_sessRAF);
-    _sessStart = null;
+    // Week changed – clear local tracking; do NOT stop the old session
+    // (it stays in state for that week, timer just stops ticking here)
+    if (_sessInterval) { clearInterval(_sessInterval); _sessInterval = null; }
+    _clockDi = null;
     if (_clockEl) {
       _clockEl.textContent = '00:00';
       _clockEl.classList.remove('toolbar-timer--running');
     }
     _dismissPause();
+    // Check if the new week already has a running session to resume
+    const wk  = state.weeks[state.curIdx];
+    const day = wk?.days.find(d => d.sessionStartTs && !d.sessionEndTs);
+    if (day) {
+      _clockDi = wk.days.indexOf(day);
+      _sessInterval = setInterval(_updateClockDisplay, 1000);
+      _updateClockDisplay();
+    }
   }
   _prevCurIdx = state.curIdx;
+  // Keep display in sync when day is locked (session ended via DAY_TOGGLE_COMPLETE)
+  _updateClockDisplay();
 }
 
 // ─── Custom event listeners wired from ui.js ──────────────────────────────────
@@ -233,26 +275,31 @@ function _onStateChange(state) {
 function _bindCustomEvents() {
   // Fired by ui.js when user marks a set as done
   window.addEventListener('train:set-done', e => {
-    _startSession();
-    const { pauseSec } = e.detail ?? {};
+    const { pauseSec, di } = e.detail ?? {};
+    if (di !== undefined) _ensureSessionStart(di);
     if (typeof pauseSec === 'number' && pauseSec > 0) {
       _startPause(pauseSec);
     }
   });
 
   // Fired by ui.js on any set input (weight/reps/rpe change)
-  window.addEventListener('train:set-input', () => {
-    _startSession();
+  window.addEventListener('train:set-input', e => {
+    const { di } = e.detail ?? {};
+    if (di !== undefined) _ensureSessionStart(di);
   });
 
   // Fired by ui.js when user clicks inside the warmup textarea
-  window.addEventListener('train:warmup-click', () => {
-    _startSession();
+  window.addEventListener('train:warmup-click', e => {
+    const { di } = e.detail ?? {};
+    if (di !== undefined) _ensureSessionStart(di);
   });
 
   // Fired by ui.js when the "Abgeschlossen & sperren" button is tapped
   window.addEventListener('train:day-complete', () => {
-    _stopSession();
+    // Session is ended by DAY_TOGGLE_COMPLETE writing sessionEndTs
+    // We just stop the interval display here
+    if (_sessInterval) { clearInterval(_sessInterval); _sessInterval = null; }
+    _updateClockDisplay();
   });
 
   // Fired from index.html when SW has an update ready – show a toast via ui.js
@@ -538,14 +585,15 @@ function _attachClockToToolbar() {
     el.removeEventListener('click', _manualToggle);
     el.addEventListener('click', _manualToggle);
     _clockEl = el;
-    // Restore visual state after re-render
-    if (_sessStart !== null) {
-      el.classList.add('toolbar-timer--running');
-      el.textContent = '● ' + _fmt(Math.floor((Date.now() - _sessStart) / 1000));
-    } else {
-      el.textContent = '00:00';
-      el.classList.remove('toolbar-timer--running');
+    // Restore visual state from persisted state (survives app-close/reopen)
+    const st  = getState();
+    const wk  = st.weeks[st.curIdx];
+    const day = wk?.days.find(d => d.sessionStartTs && !d.sessionEndTs);
+    if (day) {
+      _clockDi = wk.days.indexOf(day);
+      if (!_sessInterval) _sessInterval = setInterval(_updateClockDisplay, 1000);
     }
+    _updateClockDisplay();
   };
 
   tryAttach();
@@ -572,16 +620,11 @@ function _bindAppInteractions() {
     // Set done button
     const doneBtn = e.target.closest('[data-action="toggle-done"]');
     if (doneBtn) {
-      // Read the exercise's pauseSec from state
       const state = getState();
       const di  = +doneBtn.dataset.di;
       const ei  = +doneBtn.dataset.ei;
       const ex  = state.weeks[state.curIdx]?.days?.[di]?.exercises?.[ei];
-      const set = ex?.sets?.[+doneBtn.dataset.si];
-      // Only start pause when marking as done (not un-done).
-      // The click handler in ui.js already dispatched SET_TOGGLE_DONE,
-      // so we read the NEW state (set.done flipped).
-      // Use a microtask so state is already updated:
+      _ensureSessionStart(di);
       queueMicrotask(() => {
         const newState  = getState();
         const newEx     = newState.weeks[newState.curIdx]?.days?.[di]?.exercises?.[ei];
@@ -589,7 +632,7 @@ function _bindAppInteractions() {
         const isLastSet = +doneBtn.dataset.si === (newEx?.sets?.length ?? 0) - 1;
         if (newSet?.done && !isLastSet) {
           window.dispatchEvent(new CustomEvent('train:set-done', {
-            detail: { pauseSec: ex?.pauseSec ?? 90 },
+            detail: { pauseSec: ex?.pauseSec ?? 90, di },
           }));
         }
       });
@@ -598,13 +641,13 @@ function _bindAppInteractions() {
     // Warmup textarea – start session on first click
     const warmupArea = e.target.closest('[data-field="warmup"]');
     if (warmupArea) {
-      window.dispatchEvent(new CustomEvent('train:warmup-click'));
+      const di = +(warmupArea.dataset?.di ?? 0);
+      window.dispatchEvent(new CustomEvent('train:warmup-click', { detail: { di } }));
     }
 
     // Day complete button – stop session
     const completeBtn = e.target.closest('[data-action="toggle-complete"]');
     if (completeBtn) {
-      // Only stop if marking as done (check new state via microtask)
       queueMicrotask(() => {
         const di  = +completeBtn.dataset.di;
         const day = getState().weeks[getState().curIdx]?.days?.[di];
@@ -619,12 +662,9 @@ function _bindAppInteractions() {
   app.addEventListener('input', e => {
     const inputEl = e.target;
     const action  = inputEl.dataset.action;
-    if (
-      action === 'set-weight' ||
-      action === 'set-reps'   ||
-      action === 'set-rpe'
-    ) {
-      window.dispatchEvent(new CustomEvent('train:set-input'));
+    if (action === 'set-weight' || action === 'set-reps' || action === 'set-rpe') {
+      const di = +(inputEl.dataset.di ?? 0);
+      window.dispatchEvent(new CustomEvent('train:set-input', { detail: { di } }));
     }
   });
 }
@@ -665,14 +705,15 @@ export function mountTimer() {
 
   // 8. Return control API for tests / external use
   return {
-    startSession:  _startSession,
     stopSession:   _stopSession,
     startPause:    _startPause,
     dismissPause:  _dismissPause,
-    /** Returns elapsed session seconds, or null if not running. */
-    getElapsed: () => _sessStart !== null
-      ? Math.floor((Date.now() - _sessStart) / 1000)
-      : null,
+    /** Returns elapsed session seconds for the active day, or null if no session. */
+    getElapsed: () => {
+      const day = _getActiveDay();
+      if (!day?.sessionStartTs || day.sessionEndTs) return null;
+      return Math.floor((Date.now() - day.sessionStartTs) / 1000);
+    },
     /** Returns remaining pause seconds, or null if no pause running. */
     getPauseRemaining: () => _pauseEnd !== null
       ? Math.max(0, Math.ceil((_pauseEnd - Date.now()) / 1000))

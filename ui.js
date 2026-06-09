@@ -71,6 +71,9 @@ let _cfgOpenKey = null;
 /** Key of the exercise whose +kg picker popover is open: `${di}-${ei}` or null. */
 let _kgPickerKey = null;
 
+/** When true, the custom value input is visible inside the kg picker. */
+let _kgPickerCustom = false;
+
 /** Last-tap timestamp per exercise for +kg double-tap detection: `${di}-${ei}` → ms. */
 let _kgPickerLastTap = {};
 
@@ -79,6 +82,9 @@ const _prevGridOpen = new Set();
 
 /** Tracks whether the first-day auto-open has already happened. */
 let _autoOpened = false;
+
+/** Week index staged for deletion via the confirm modal. */
+let _deleteWeekIdx = null;
 
 /** Last rendered week index – used to detect week navigation. */
 let _lastRenderedCurIdx = null;
@@ -249,7 +255,10 @@ function _initStickyObserver() {
 function _initSwipe(container) {
   container.addEventListener('touchstart', e => {
     if (!getState().settings.swipe) return;
-    _swipeStartX = e.touches[0].clientX;
+    const x = e.touches[0].clientX;
+    // Ignore swipes starting within 20px of either edge (iOS back/forward gesture zone)
+    if (x < 20 || x > window.innerWidth - 20) return;
+    _swipeStartX = x;
     _swipeStartY = e.touches[0].clientY;
   }, { passive: true });
 
@@ -260,6 +269,12 @@ function _initSwipe(container) {
     if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.2) {
       dispatch(A.WEEK_NAVIGATE, { delta: dx < 0 ? 1 : -1 });
     }
+    _swipeStartX = null;
+    _swipeStartY = null;
+  }, { passive: true });
+
+  // Cancel tracking if browser cancels the touch (e.g. system gesture)
+  container.addEventListener('touchcancel', () => {
     _swipeStartX = null;
     _swipeStartY = null;
   }, { passive: true });
@@ -365,6 +380,7 @@ function renderDayList(state) {
     _exChartOpen.clear();
     _prevGridOpen.clear();
     _subFormOpenKey = null;
+    _scrollToFirstPending(_activeDayIdx);
   }
   _lastRenderedCurIdx = state.curIdx;
 
@@ -372,6 +388,7 @@ function renderDayList(state) {
   if (!_autoOpened && wk.days.length > 0) {
     _autoOpened = true;
     _activeDayIdx = _getDefaultDayIndex(wk);
+    _scrollToFirstPending(_activeDayIdx);
   }
 
   // ── Progress bar for active day ───────────────────────────────────────────
@@ -391,13 +408,12 @@ function renderDayList(state) {
   // ── Unified sticky bar: toolbar row + day pills + progress bar ───────────
   const tabsHtml = `<div class="day-tab-bar" role="tablist" aria-label="Trainingstage">
   <div class="day-tab-bar__toolbar" role="toolbar" aria-label="Wochenaktionen">
-    <div class="mode-pill" role="group" aria-label="Trainingsmodus">
-      <button class="mode-pill__btn mode-pill__btn--std${!isDl ? ' is-active' : ''}"
-        id="mode-std" data-action="mode-std" aria-pressed="${!isDl}">Standard</button>
-      <button class="mode-pill__btn mode-pill__btn--dl${isDl ? ' is-active' : ''}"
-        id="mode-dl" data-action="mode-dl" aria-pressed="${isDl}">
-        ${ic.zap()}&thinsp;Deload</button>
-    </div>
+    <button
+      class="deload-toggle${isDl ? ' is-active' : ''}"
+      data-action="${isDl ? 'mode-std' : 'mode-dl'}"
+      aria-pressed="${isDl}"
+      aria-label="${isDl ? 'Deload-Modus beenden' : 'Deload-Modus aktivieren'}"
+    >${ic.zap()}&thinsp;Deload</button>
     <span class="toolbar__spacer"></span>
     <span id="toolbar-session-timer" class="toolbar-timer" role="timer" aria-label="Session-Timer">00:00</span>
     <button class="toolbar__btn" id="btn-undo" data-action="undo"
@@ -406,6 +422,13 @@ function renderDayList(state) {
       aria-label="Neue Trainingswoche erstellen">${ic.plus()}</button>
   </div>
   <div class="day-tab-pills${wk.days.length >= 4 ? ' is-scrollable' : ''}">
+    <button
+      class="day-overview-toggle${_overviewMode ? ' is-active' : ''}"
+      data-action="toggle-overview"
+      aria-label="${_overviewMode ? 'Einzelansicht' : 'Übersicht'}"
+      aria-pressed="${_overviewMode}"
+      title="${_overviewMode ? 'Einzelansicht' : 'Alle Tage anzeigen'}"
+    >${ic.columns()}</button>
     ${wk.days.map((day, di) => {
       const done   = !!day.markedDone;
       const locked = !!day.locked;
@@ -421,13 +444,6 @@ function renderDayList(state) {
         aria-label="${h(day.title)} – ${done_s}/${total} Sätze"
       >${h(day.title)}</button>`;
     }).join('')}
-    <button
-      class="day-overview-toggle${_overviewMode ? ' is-active' : ''}"
-      data-action="toggle-overview"
-      aria-label="${_overviewMode ? 'Einzelansicht' : 'Übersicht'}"
-      aria-pressed="${_overviewMode}"
-      title="${_overviewMode ? 'Einzelansicht' : 'Alle Tage anzeigen'}"
-    >${ic.columns()}</button>
   </div>
   ${progressHtml}
 </div>`;
@@ -647,9 +663,9 @@ function renderDayBody(wk, di, state) {
 </div>`;
 
   return `
+    ${prevBanner}
     ${noteBlock}
     ${warmupBlock}
-    ${prevBanner}
     <div data-ex-list="${di}">${exHtml}</div>
     ${cooldownBlock}
     <button
@@ -947,10 +963,23 @@ function renderExercise(wk, di, ei, state) {
       >+${ex.nextWeekPlan || 0}${ex.nextWeekPlanConfirmed ? ' ✓' : ''}</button>
       ${_kgPickerKey === `${di}-${ei}` ? `
       <div class="ex-kg-picker" role="group" aria-label="Steigerung für nächste Woche">
-        ${[0, 1.25, 2.5, 5, 7.5, 10, 15, 20].map(v =>
+        ${[0, 1.25, 2, 2.5, 5, 7.5, 10, 15, 20].map(v =>
           `<button class="ex-kg-picker-btn${ex.nextWeekPlan === v ? ' is-selected' : ''}"
             data-action="kg-picker-select" data-di="${di}" data-ei="${ei}" data-value="${v}"
           >${v === 0 ? '0' : '+' + v}</button>`).join('')}
+        ${_kgPickerCustom ? `
+        <div class="ex-kg-picker-custom">
+          <input type="number" inputmode="decimal" min="0" step="0.25"
+            id="kg-picker-custom-input"
+            class="num-input"
+            placeholder="kg"
+            data-action="kg-picker-custom-input" data-di="${di}" data-ei="${ei}"
+            aria-label="Eigener Steigerungswert"
+            autofocus
+          />
+          <button class="ex-kg-picker-btn" data-action="kg-picker-custom-confirm" data-di="${di}" data-ei="${ei}">OK</button>
+        </div>` : `
+        <button class="ex-kg-picker-btn ex-kg-picker-btn--other" data-action="kg-picker-show-custom" data-di="${di}" data-ei="${ei}">Anderer Wert</button>`}
       </div>` : ''}
     </div>` : ''}
 
@@ -972,6 +1001,9 @@ function renderExercise(wk, di, ei, state) {
       ${_exMenuOpenKey === `${di}-${ei}` ? `
       <div class="ex-menu-dropdown" role="menu">
         ${!locked ? `
+        <button class="ex-menu-item" role="menuitem" data-action="menu-open-kg-picker" data-di="${di}" data-ei="${ei}">
+          📈 Steigerung: ${ex.nextWeekPlan ? `+${ex.nextWeekPlan} kg` : 'planen'}
+        </button>
         <button class="ex-menu-item" role="menuitem" data-action="move-ex-up" data-di="${di}" data-ei="${ei}" ${ei === 0 ? 'disabled' : ''}>▲ Nach oben</button>
         <button class="ex-menu-item" role="menuitem" data-action="move-ex-down" data-di="${di}" data-ei="${ei}" ${ei === wk.days[di].exercises.length - 1 ? 'disabled' : ''}>▼ Nach unten</button>
         ` : ''}
@@ -1052,7 +1084,8 @@ function renderExercise(wk, di, ei, state) {
   })() : ''}
 
   ${!locked ? (() => {
-    const allDone = ex.sets.length > 0 && ex.sets.every(s => s.status !== 'pending');
+    const _normSt = s => (s.status === 'success' || s.status === 'fail') ? s.status : (s.done ? 'success' : 'pending');
+    const allDone = ex.sets.length > 0 && ex.sets.every(s => _normSt(s) !== 'pending');
     return `<button
       class="confirm-set-btn${allDone ? ' is-done' : ''}${_confirmFlashKey === `${di}-${ei}` ? ' is-flashing' : ''}"
       ${allDone ? 'disabled' : ''}
@@ -1136,7 +1169,10 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
   // PR indicator (3.1): trophy when this set's weight matches the current all-time PR
   const prs   = getState().prs ?? {};
   const exPR  = prs[ex.name];
-  const isPR  = st === 'success' && exPR && (s.weight ?? 0) > 0 && s.weight >= exPR.maxWeight;
+  const isPR  = st === 'success' && exPR && (s.weight ?? 0) > 0 && (
+    s.weight > exPR.maxWeight ||
+    (s.weight === exPR.maxWeight && (s.reps ?? 0) > (exPR.maxRepsAtMaxWeight ?? 0))
+  );
   const doneIcon = st === 'success' ? ic.check()
                : st === 'fail'    ? ic.xMark()
                : '';
@@ -1151,7 +1187,7 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
       min="0" step="0.5" value="${dispW}"
       ${locked ? 'disabled' : ''}
       data-action="set-weight" data-di="${di}" data-ei="${ei}" data-si="${si}"
-      placeholder="${prevSet ? prevSet.weight : ''}"
+      placeholder=""
       aria-label="Satz ${si + 1} Gewicht in kg"
     />
     ${isPR ? `<span class="pr-badge" aria-label="Bestleistung!">${ic.trophy()}</span>` : ''}
@@ -1161,7 +1197,7 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
 
   <div class="set-cell">
     <input class="num-input" type="number" inputmode="${repMode}"
-      min="0" step="${repStep}" placeholder="${prevSet && prevSet.reps != null ? prevSet.reps : repPh}" value="${s.reps}"
+      min="0" step="${repStep}" placeholder="${ex.targetReps ?? ''}" value="${s.reps}"
       ${locked ? 'disabled' : ''}
       data-action="set-reps" data-di="${di}" data-ei="${ei}" data-si="${si}"
       aria-label="${repAria}"
@@ -1452,6 +1488,7 @@ function renderAnalysisTab(state) {
   const insights = state.insights ?? [];
 
   const weekCards = [...sorted].reverse().map((wk, wi, arr) => {
+    const _realWkIdx = state.weeks.findIndex(w => w.id === wk.id);
     const tot  = wk.days.reduce((s, d) => s + d.exercises.reduce((ss, ex) => ss + ex.sets.length, 0), 0);
     const don  = wk.days.reduce((s, d) => s + d.exercises.reduce((ss, ex) => ss + ex.sets.filter(st => st.status === 'success').length, 0), 0);
     const vol  = _trueVol(wk);
@@ -1519,6 +1556,7 @@ function renderAnalysisTab(state) {
         ${avgFulfill !== null ? `<div><div class="pw-stat__num" style="color:${avgFulfill>=100?'var(--c-ok)':avgFulfill>=80?'var(--c-warn)':'var(--c-danger)'}">${avgFulfill}%</div><div class="pw-stat__lbl">Ziel-Erf.</div></div>` : ''}
       </div>
       <div class="progress-bar-wrap"><div class="progress-bar" style="width:${score}%"></div></div>
+      ${state.weeks.length > 1 ? `<button class="pw-card__delete" data-action="open-delete-week" data-week-idx="${_realWkIdx}" aria-label="Woche löschen">${ic.trash()}</button>` : ''}
     </div>`;
   }).join('');
 
@@ -2226,7 +2264,8 @@ function _handleClick(e) {
 
   // Close +kg picker on outside tap
   if (_kgPickerKey !== null && !e.target.closest('.ex-kg-wrap')) {
-    _kgPickerKey = null;
+    _kgPickerKey    = null;
+    _kgPickerCustom = false;
     scheduleRender();
   }
 
@@ -2344,8 +2383,12 @@ function _handleClick(e) {
     case 'open-export':
       openModal('modal-export'); break;
 
-    case 'open-delete-week':
-      openModal('modal-delete-week'); break;
+    case 'open-delete-week': {
+      const _wIdx = el.dataset.weekIdx !== undefined ? +el.dataset.weekIdx : getState().curIdx;
+      _deleteWeekIdx = _wIdx;
+      openModal('modal-delete-week');
+      break;
+    }
 
     case 'create-week':
     case 'create-week-prev':
@@ -2353,7 +2396,8 @@ function _handleClick(e) {
       _createWeek(); break;
 
     case 'confirm-delete-week':
-      dispatch(A.WEEK_DELETE, {});
+      dispatch(A.WEEK_DELETE, { weekIdx: _deleteWeekIdx ?? undefined });
+      _deleteWeekIdx = null;
       closeModal('modal-delete-week');
       showToast('Woche gelöscht', 'info'); break;
 
@@ -2449,6 +2493,12 @@ function _handleClick(e) {
         const triggered = fireTrigger(trigger, { di: +di });
         for (const ins of triggered) {
           if (ins.immediate) showToast(ins.message, ins.type === 'warning' ? 'warn' : 'ok', 5000);
+        }
+        // Increment backup reminder counter when full week is done
+        if (allDone) {
+          const newCnt = (afterStC.settings.weeksSinceLastBackupReminder ?? 0) + 1;
+          dispatch(A.SETTING_SET, { key: 'weeksSinceLastBackupReminder', value: newCnt });
+          if (newCnt >= 4) setTimeout(_showBackupReminderToast, 800);
         }
       }
       break;
@@ -2611,7 +2661,8 @@ function _handleClick(e) {
       if (_now - _last < 400) {
         // Double-tap → open picker, cancel pending single-tap
         _kgPickerLastTap[_tapKey] = 0;
-        _kgPickerKey = _kgPickerKey === _tapKey ? null : _tapKey;
+        _kgPickerKey    = _kgPickerKey === _tapKey ? null : _tapKey;
+        _kgPickerCustom = false;
         scheduleRender();
       } else {
         // First tap — wait to confirm it's not a double-tap
@@ -2635,7 +2686,36 @@ function _handleClick(e) {
       } else {
         showToast(`+${_pkVal} kg nächste Woche bestätigt ✓`, 'ok');
       }
-      _kgPickerKey = null;
+      _kgPickerKey    = null;
+      _kgPickerCustom = false;
+      scheduleRender();
+      break;
+    }
+
+    case 'kg-picker-show-custom': {
+      _kgPickerCustom = true;
+      scheduleRender();
+      setTimeout(() => document.getElementById('kg-picker-custom-input')?.focus(), 50);
+      break;
+    }
+
+    case 'kg-picker-custom-confirm': {
+      const _customInput = document.getElementById('kg-picker-custom-input');
+      const _customVal   = parseFloat(_customInput?.value);
+      if (Number.isFinite(_customVal) && _customVal >= 0) {
+        dispatch(A.EX_SET_NEXT_WEEK_PLAN, { di: +di, ei: +ei, value: _customVal });
+        showToast(`+${_customVal} kg nächste Woche bestätigt ✓`, 'ok');
+      }
+      _kgPickerKey    = null;
+      _kgPickerCustom = false;
+      scheduleRender();
+      break;
+    }
+
+    case 'menu-open-kg-picker': {
+      _kgPickerKey    = `${di}-${ei}`;
+      _kgPickerCustom = false;
+      _exMenuOpenKey  = null;
       scheduleRender();
       break;
     }
@@ -2756,7 +2836,10 @@ function _handleClick(e) {
       const _cwk = _cst.weeks[_cst.curIdx];
       const _cex = _cwk?.days[+di]?.exercises[+ei];
       if (!_cex) break;
-      const _csi = _cex.sets.findIndex(s => s.status === 'pending');
+      const _csi = _cex.sets.findIndex(s => {
+        const st = s.status;
+        return st === 'pending' || (st !== 'success' && st !== 'fail' && !s.done);
+      });
       if (_csi === -1) break;
 
       if (!_cex.targetReps) {
@@ -2793,7 +2876,7 @@ function _handleClick(e) {
       const _aftEx = getState().weeks[getState().curIdx]?.days[+di]?.exercises[+ei];
       const isLastSet = _csi === (_aftEx?.sets?.length ?? 0) - 1;
       if (!isLastSet) {
-        window.dispatchEvent(new CustomEvent('train:set-done', { detail: { pauseSec: _cex.pauseSec ?? 90 } }));
+        window.dispatchEvent(new CustomEvent('train:set-done', { detail: { pauseSec: _cex.pauseSec ?? 90, di: +di } }));
       }
       const nextPending = (_aftEx?.sets ?? []).findIndex(s => s.status === 'pending');
       if (nextPending !== -1) {
@@ -3088,11 +3171,29 @@ function _handleKeydown(e) {
   }
 }
 
+// ─── Auto-scroll to first pending exercise ───────────────────────────────────
+function _scrollToFirstPending(di) {
+  requestAnimationFrame(() => {
+    const state = getState();
+    const wk    = state.weeks[state.curIdx];
+    const day   = wk?.days[di ?? _activeDayIdx];
+    if (!day) return;
+    const exIdx = day.exercises.findIndex(ex =>
+      ex.sets.some(s => (s.status === 'pending') || (s.status !== 'success' && s.status !== 'fail' && !s.done))
+    );
+    if (exIdx === -1) return;
+    const dii = di ?? _activeDayIdx;
+    const target = document.querySelector(`[data-di="${dii}"][data-ei="${exIdx}"].exercise`);
+    target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+}
+
 // ─── Day tab toggle ───────────────────────────────────────────────────────────
 function _toggleAccordion(di) {
   if (_activeDayIdx === di) return; // already the only open day — keep it open
   _activeDayIdx = di;
   scheduleRender();
+  _scrollToFirstPending(di);
 }
 
 // ─── New week modal (2.3) ─────────────────────────────────────────────────────
@@ -3314,6 +3415,20 @@ function _bindTabSwitcher() {
 
 let _renderScheduled = false;
 
+// Reposition fixed floating elements (⋮ dropdown, +kg picker) after render
+function _positionFloating() {
+  if (_exMenuOpenKey) {
+    const [dii, eii] = _exMenuOpenKey.split('-');
+    const btn = document.querySelector(`[data-action="toggle-ex-menu"][data-di="${dii}"][data-ei="${eii}"]`);
+    const dropdown = btn?.closest('.ex-menu-wrap')?.querySelector('.ex-menu-dropdown');
+    if (btn && dropdown) {
+      const r = btn.getBoundingClientRect();
+      dropdown.style.top   = `${r.bottom + 2}px`;
+      dropdown.style.right = `${window.innerWidth - r.right}px`;
+    }
+  }
+}
+
 function scheduleRender() {
   if (_renderScheduled) return;
   _renderScheduled = true;
@@ -3325,6 +3440,7 @@ function scheduleRender() {
     if (_activeTab === 'body')     renderBodyTab(state);
     if (_activeTab === 'analysis') renderAnalysisTab(state);
     if (_activeTab === 'settings') renderSettingsTab(state);
+    _positionFloating();
   });
 }
 
@@ -3414,7 +3530,7 @@ function _buildScaffold(root) {
   <div class="modal">
     <h2 class="modal__title" id="modal-dw-title">Woche löschen?</h2>
     <p style="color:var(--c-text-2);font-size:14px;margin-bottom:var(--sp-2)">
-      Alle Trainingsdaten dieser Woche werden unwiderruflich gelöscht.</p>
+      Alle Trainingsdaten dieser Woche werden <strong>unwiderruflich gelöscht</strong>. Rückgängig ist nicht möglich.</p>
     <div class="modal__actions">
       <button class="btn btn--ghost" data-action="close-modal">Abbrechen</button>
       <button class="btn btn--danger" data-action="confirm-delete-week">
@@ -3511,6 +3627,15 @@ export function mountApp(root) {
   _bindTabSwitcher();
   _initSwipe(root);
 
+  // Close floating menus/pickers when user scrolls the day panel
+  root.addEventListener('scroll', () => {
+    if (_exMenuOpenKey || _kgPickerKey) {
+      _exMenuOpenKey = null;
+      _kgPickerKey   = null;
+      scheduleRender();
+    }
+  }, { passive: true, capture: true });
+
   subscribe(scheduleRender);
 
   window.addEventListener('train:storage-error', () => {
@@ -3519,21 +3644,40 @@ export function mountApp(root) {
 
   scheduleRender();
 
-  // Auto-backup reminder: toast if >30 days since last backup
+  // Fire APP_GEÖFFNET and show 4-week backup reminder if due
   setTimeout(() => {
-    const st   = getState();
-    const last = st.settings?.lastBackupDate;
-    if (!last) {
-      showToast('Tipp: Erstelle regelmäßig ein JSON-Backup (Einstellungen → Daten).', 'warn');
-    } else {
-      const daysSince = Math.floor((Date.now() - new Date(last)) / 86_400_000);
-      if (daysSince > 30) showToast(`Letztes Backup vor ${daysSince} Tagen – jetzt sichern!`, 'warn');
-    }
-
-    // Fire APP_GEÖFFNET – evaluates E-01, E-04, K-02 and shows immediate toasts
     const triggered = fireTrigger('APP_GEÖFFNET', {});
     for (const ins of triggered) {
       if (ins.immediate) showToast(ins.message, ins.type === 'warning' ? 'warn' : 'ok', 5000);
     }
+
+    const st = getState();
+    if ((st.settings.weeksSinceLastBackupReminder ?? 0) >= 4) {
+      _showBackupReminderToast();
+    }
   }, 2000);
+}
+
+function _showBackupReminderToast() {
+  const existing = document.getElementById('backup-reminder-toast');
+  if (existing) return;
+  const div = document.createElement('div');
+  div.id = 'backup-reminder-toast';
+  div.className = 'backup-reminder';
+  div.innerHTML = `<span>Zeit für ein Backup! (4 Wochen seit letzter Erinnerung)</span>
+    <div class="backup-reminder__btns">
+      <button id="backup-now-btn" class="btn btn--accent btn--sm">Jetzt exportieren</button>
+      <button id="backup-later-btn" class="btn btn--ghost btn--sm">Später</button>
+    </div>`;
+  document.body.appendChild(div);
+  document.getElementById('backup-now-btn')?.addEventListener('click', () => {
+    exportJSON();
+    dispatch(A.SETTING_SET, { key: 'weeksSinceLastBackupReminder', value: 0 });
+    div.remove();
+    showToast('JSON-Backup heruntergeladen.', 'ok');
+  });
+  document.getElementById('backup-later-btn')?.addEventListener('click', () => {
+    dispatch(A.SETTING_SET, { key: 'weeksSinceLastBackupReminder', value: 0 });
+    div.remove();
+  });
 }

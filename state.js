@@ -24,7 +24,7 @@
 
 export const STORAGE_KEY        = 'train_v6';
 export const STORAGE_KEY_SHADOW = 'train_v6_shadow';
-export const SCHEMA_VERSION     = 11;
+export const SCHEMA_VERSION     = 12;
 
 // 4.1: Canonical tag taxonomy
 export const AVAILABLE_TAGS = {
@@ -42,7 +42,7 @@ export const ALL_TAGS_FLAT = Object.values(AVAILABLE_TAGS).flat();
 
 /** Creates a fresh set entry. */
 export function mkSet(weight = 0, reps = 10) {
-  return { weight, reps, rpe: null, done: false, note: '' };
+  return { weight, reps, rpe: null, status: 'pending', done: false, note: '' };
 }
 
 /** Deep-clone anything JSON-serialisable. */
@@ -137,10 +137,12 @@ function buildDefaultState() {
       deloadFactorCustom: null,
       barbellWeight:      20,
       plateStep:          2.5,
-      lastBackupDate:     null,
-      activeTags:         ALL_TAGS_FLAT,  // 4.1: defaults to all tags enabled
-      vibrationEnabled:   true,
-      rpeEnabled:         true,
+      lastBackupDate:                 null,
+      activeTags:                     ALL_TAGS_FLAT,
+      vibrationEnabled:               true,
+      rpeEnabled:                     true,
+      weeksSinceLastBackupReminder:   0,
+      maxSessionMs:                   10800000, // 3h default
     },
   };
 }
@@ -377,9 +379,29 @@ function migrate(raw) {
     };
   }
 
-  // Always-apply defaults for settings added after SCHEMA_VERSION 10
-  if (raw.settings.vibrationEnabled === undefined) raw.settings.vibrationEnabled = true;
-  if (raw.settings.rpeEnabled       === undefined) raw.settings.rpeEnabled       = true;
+  // v11 → v12: add sessionStartTs/sessionEndTs to all days + backup reminder counter
+  if ((raw.meta?.schemaVersion ?? 0) < 12) {
+    (raw.weeks ?? []).forEach(wk =>
+      (wk.days ?? []).forEach(day => {
+        if (day.sessionStartTs === undefined) day.sessionStartTs = null;
+        if (day.sessionEndTs   === undefined) day.sessionEndTs   = null;
+      })
+    );
+    if (raw.settings.weeksSinceLastBackupReminder === undefined) raw.settings.weeksSinceLastBackupReminder = 0;
+    if (raw.settings.maxSessionMs                 === undefined) raw.settings.maxSessionMs                 = 10800000;
+    raw.meta = {
+      ...raw.meta,
+      schemaVersion: 12,
+      savedAt:   raw.meta?.savedAt   ?? null,
+      createdAt: raw.meta?.createdAt ?? new Date().toISOString(),
+    };
+  }
+
+  // Always-apply defaults for settings added in later versions
+  if (raw.settings.vibrationEnabled               === undefined) raw.settings.vibrationEnabled               = true;
+  if (raw.settings.rpeEnabled                     === undefined) raw.settings.rpeEnabled                     = true;
+  if (raw.settings.weeksSinceLastBackupReminder   === undefined) raw.settings.weeksSinceLastBackupReminder   = 0;
+  if (raw.settings.maxSessionMs                   === undefined) raw.settings.maxSessionMs                   = 10800000;
 
   // Backward compat: rename legacy setType 'pyramid' → 'manual'
   const _normSetType = ex => { if (ex.setType === 'pyramid') ex.setType = 'manual'; };
@@ -485,7 +507,7 @@ export const A = Object.freeze({
   WEEK_NAVIGATE:       'WEEK_NAVIGATE',       // { delta: ±1 }
   // Week CRUD
   WEEK_CREATE:         'WEEK_CREATE',         // { startDate, note, source?: 'prev'|'template' }
-  WEEK_DELETE:         'WEEK_DELETE',         // {}
+  WEEK_DELETE:         'WEEK_DELETE',         // { weekIdx?: number }  — omit to delete curIdx
   WEEK_COPY_PREV:      'WEEK_COPY_PREV',      // {}
   WEEK_SET_MODE:       'WEEK_SET_MODE',       // { mode: 'standard'|'deload' }
   WEEK_SET_NOTE:       'WEEK_SET_NOTE',       // { note }
@@ -517,7 +539,7 @@ export const A = Object.freeze({
   CONFIRM_SET:         'CONFIRM_SET',          // { di, ei, si, reps } — quick-confirm next pending set
   EX_SET_SUBSTITUTE:   'EX_SET_SUBSTITUTE',   // { di, ei, substituteFor: string|null }
   // Session log
-  SESSION_START:       'SESSION_START',       // {}  – writes start timestamp into STATE (not persisted as log entry until stop)
+  SESSION_START:       'SESSION_START',       // { di, ts }  – persists day.sessionStartTs
   SESSION_STOP:        'SESSION_STOP',        // { duration, time }
   // Body data
   BODY_SET_FIELD:      'BODY_SET_FIELD',      // { field, value }
@@ -550,10 +572,12 @@ export const A = Object.freeze({
 
 function _resetClonedDays(days) {
   days.forEach(day => {
-    day.locked        = false;
-    day.markedDone    = false;
-    day.sessionNote   = '';
-    day.sessionRating = null;
+    day.locked          = false;
+    day.markedDone      = false;
+    day.sessionNote     = '';
+    day.sessionRating   = null;
+    day.sessionStartTs  = null;
+    day.sessionEndTs    = null;
     (day.exercises ?? []).forEach(ex => {
       if (ex._showCfg) ex._showCfg = false;
       if (ex.substituteFor) ex.name = ex.substituteFor;
@@ -635,7 +659,10 @@ function reduce(state, action) {
     }
     case A.WEEK_DELETE: {
       if (state.weeks.length <= 1) break;
-      state.weeks.splice(state.curIdx, 1);
+      const _delIdx = (p.weekIdx !== undefined && p.weekIdx >= 0 && p.weekIdx < state.weeks.length)
+        ? p.weekIdx
+        : state.curIdx;
+      state.weeks.splice(_delIdx, 1);
       if (state.curIdx >= state.weeks.length) state.curIdx = state.weeks.length - 1;
       break;
     }
@@ -673,14 +700,16 @@ function reduce(state, action) {
       const labels = ['A','B','C','D','E','F','G'];
       const label  = labels[wk.days.length] ?? String(wk.days.length + 1);
       wk.days.push({
-        id:         Date.now(),
-        title:      `Tag ${label}`,
-        subtitle:   '',
-        warmup:     '',
-        cooldown:   '',
-        locked:     false,
-        markedDone: false,
-        exercises:  [],
+        id:             Date.now(),
+        title:          `Tag ${label}`,
+        subtitle:       '',
+        warmup:         '',
+        cooldown:       '',
+        locked:         false,
+        markedDone:     false,
+        sessionStartTs: null,
+        sessionEndTs:   null,
+        exercises:      [],
       });
       break;
     }
@@ -720,6 +749,9 @@ function reduce(state, action) {
             if (s.status === 'pending') { s.status = 'fail'; s.done = false; }
           }
         }
+        day.sessionEndTs = Date.now();
+      } else {
+        day.sessionEndTs = null;
       }
       day.markedDone = becomingDone;
       day.locked     = becomingDone;
@@ -863,12 +895,13 @@ function reduce(state, action) {
           const est1RM       = reps <= 10 ? weight * (1 + reps / 30) : 0;
           const name         = ex.name;
           if (!state.prs) state.prs = {};
-          const prev         = state.prs[name] ?? { maxWeight: 0, maxVolume: 0, maxEstimated1RM: 0, date: null };
+          const prev         = state.prs[name] ?? { maxWeight: 0, maxVolume: 0, maxEstimated1RM: 0, maxRepsAtMaxWeight: 0, date: null };
           const newMaxW      = Math.max(prev.maxWeight,      weight);
           const newMaxV      = Math.max(prev.maxVolume,      volume);
           const newMaxE      = Math.max(prev.maxEstimated1RM, est1RM);
+          const newMaxRMW    = weight > prev.maxWeight ? reps : (weight === prev.maxWeight ? Math.max(prev.maxRepsAtMaxWeight ?? 0, reps) : prev.maxRepsAtMaxWeight ?? 0);
           if (newMaxW > prev.maxWeight || newMaxV > prev.maxVolume || newMaxE > prev.maxEstimated1RM) {
-            state.prs[name] = { maxWeight: newMaxW, maxVolume: newMaxV, maxEstimated1RM: newMaxE, date: new Date().toISOString().split('T')[0] };
+            state.prs[name] = { maxWeight: newMaxW, maxVolume: newMaxV, maxEstimated1RM: newMaxE, maxRepsAtMaxWeight: newMaxRMW, date: new Date().toISOString().split('T')[0] };
           }
         }
       }
@@ -910,23 +943,30 @@ function reduce(state, action) {
         const weight = parseFloat(s.weight) || 0;
         const reps   = parseFloat(s.reps)   || 0;
         if (ex && weight > 0 && reps > 0) {
-          const volume = weight * reps;
-          const est1RM = reps <= 10 ? weight * (1 + reps / 30) : 0;
-          const name   = ex.name;
+          const volume   = weight * reps;
+          const est1RM   = reps <= 10 ? weight * (1 + reps / 30) : 0;
+          const name     = ex.name;
           if (!state.prs) state.prs = {};
-          const prev    = state.prs[name] ?? { maxWeight: 0, maxVolume: 0, maxEstimated1RM: 0, date: null };
-          const newMaxW = Math.max(prev.maxWeight,       weight);
-          const newMaxV = Math.max(prev.maxVolume,       volume);
-          const newMaxE = Math.max(prev.maxEstimated1RM, est1RM);
+          const prev     = state.prs[name] ?? { maxWeight: 0, maxVolume: 0, maxEstimated1RM: 0, maxRepsAtMaxWeight: 0, date: null };
+          const newMaxW  = Math.max(prev.maxWeight,       weight);
+          const newMaxV  = Math.max(prev.maxVolume,       volume);
+          const newMaxE  = Math.max(prev.maxEstimated1RM, est1RM);
+          const newMaxRMW = weight > prev.maxWeight ? reps : (weight === prev.maxWeight ? Math.max(prev.maxRepsAtMaxWeight ?? 0, reps) : prev.maxRepsAtMaxWeight ?? 0);
           if (newMaxW > prev.maxWeight || newMaxV > prev.maxVolume || newMaxE > prev.maxEstimated1RM) {
-            state.prs[name] = { maxWeight: newMaxW, maxVolume: newMaxV, maxEstimated1RM: newMaxE, date: new Date().toISOString().split('T')[0] };
+            state.prs[name] = { maxWeight: newMaxW, maxVolume: newMaxV, maxEstimated1RM: newMaxE, maxRepsAtMaxWeight: newMaxRMW, date: new Date().toISOString().split('T')[0] };
           }
         }
       }
       break;
     }
 
-    // ── Session log ───────────────────────────────────────────────────────────
+    // ── Session timestamps ────────────────────────────────────────────────────
+    case A.SESSION_START: {
+      const wk = _currentWeek(); if (!wk) break;
+      const day = wk.days[p.di]; if (!day) break;
+      if (!day.sessionStartTs) day.sessionStartTs = p.ts ?? Date.now();
+      break;
+    }
     case A.SESSION_STOP: {
       const wk = _currentWeek(); if (!wk) break;
       if (!wk.sessionLog) wk.sessionLog = [];
