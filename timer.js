@@ -396,6 +396,7 @@ function _injectStyles() {
     opacity: 0;
     transform: translateY(8px) scale(.96);
     pointer-events: none;
+    min-width: 220px;
     transition:
       opacity 200ms var(--ease),
       transform 200ms var(--ease);
@@ -440,8 +441,9 @@ function _injectStyles() {
     gap: 1px;
     font-size: 12px;
     color: var(--c-text-2);
-    min-width: 0;
+    min-width: 120px;
   }
+  .pause-overlay__label span { white-space: nowrap; }
   .pause-overlay__label strong {
     font-size: 14px;
     color: var(--c-text);

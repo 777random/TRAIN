@@ -24,7 +24,7 @@
 
 export const STORAGE_KEY        = 'train_v6';
 export const STORAGE_KEY_SHADOW = 'train_v6_shadow';
-export const SCHEMA_VERSION     = 10;
+export const SCHEMA_VERSION     = 11;
 
 // 4.1: Canonical tag taxonomy
 export const AVAILABLE_TAGS = {
@@ -360,6 +360,21 @@ function migrate(raw) {
     };
   }
 
+  // v10 → v11: add nextWeekPlanConfirmed to all exercises
+  if ((raw.meta?.schemaVersion ?? 0) < 11) {
+    const _addConfirmed = ex => { if (ex.nextWeekPlanConfirmed === undefined) ex.nextWeekPlanConfirmed = false; };
+    (raw.weeks ?? []).forEach(wk =>
+      (wk.days ?? []).forEach(day => (day.exercises ?? []).forEach(_addConfirmed))
+    );
+    (raw.customTemplate ?? []).forEach(day => (day.exercises ?? []).forEach(_addConfirmed));
+    raw.meta = {
+      ...raw.meta,
+      schemaVersion: 11,
+      savedAt:   raw.meta?.savedAt   ?? null,
+      createdAt: raw.meta?.createdAt ?? new Date().toISOString(),
+    };
+  }
+
   // Always-apply defaults for settings added after SCHEMA_VERSION 10
   if (raw.settings.vibrationEnabled === undefined) raw.settings.vibrationEnabled = true;
   if (raw.settings.rpeEnabled       === undefined) raw.settings.rpeEnabled       = true;
@@ -485,7 +500,8 @@ export const A = Object.freeze({
   EX_MOVE:             'EX_MOVE',             // { di, fromEi, toEi }
   EX_TOGGLE_CFG:       'EX_TOGGLE_CFG',       // { di, ei }
   EX_INC_WEIGHT:       'EX_INC_WEIGHT',       // { di, ei, amount } – erhöht alle Sätze sofort
-  EX_SET_NEXT_WEEK_PLAN:'EX_SET_NEXT_WEEK_PLAN',// { di, ei, value }  – setzt nextWeekPlan direkt
+  EX_SET_NEXT_WEEK_PLAN:'EX_SET_NEXT_WEEK_PLAN',// { di, ei, value }  – setzt nextWeekPlan + confirmed=true
+  EX_TOGGLE_NEXT_WEEK_CONFIRMED: 'EX_TOGGLE_NEXT_WEEK_CONFIRMED', // { di, ei } – toggelt confirmed
   EX_SET_STEP:         'EX_SET_STEP',         // { di, ei, step }  – speichert Steigerungsrate
   EX_SET_TARGETS:      'EX_SET_TARGETS',      // { di, ei, targetReps }
   EX_SET_METRIC:       'EX_SET_METRIC',       // { di, ei, metric: 'reps'|'sec'|'m' }
@@ -554,11 +570,11 @@ function _applyPlannedProgression(days) {
   days.forEach(day => {
     (day.exercises ?? []).forEach(ex => {
       const plan = ex.nextWeekPlan || 0;
-      if (plan) {
+      if (plan && ex.nextWeekPlanConfirmed) {
         (ex.sets ?? []).forEach(s => { s.weight = (parseFloat(s.weight) || 0) + plan; });
       }
-      // Plan is meant for "next week" only; once applied, clear it.
       ex.nextWeekPlan = 0;
+      ex.nextWeekPlanConfirmed = false;
     });
   });
 }
@@ -602,19 +618,10 @@ function reduce(state, action) {
         // Explicit restart: load global template as-is (no auto-progression mapping)
         days = clone(state.customTemplate ?? FACTORY_TEMPLATE);
         // Make sure templates never carry "planned" UI state forward
-        days.forEach(d => (d.exercises ?? []).forEach(ex => { ex.nextWeekPlan = 0; ex._showCfg = false; }));
+        days.forEach(d => (d.exercises ?? []).forEach(ex => { ex.nextWeekPlan = 0; ex.nextWeekPlanConfirmed = false; ex._showCfg = false; }));
       }
 
       _resetClonedDays(days);
-
-      // Vom Nutzer akzeptierte KI-Gewichtsempfehlungen auf alle Sätze anwenden
-      if (p.weightRecs) {
-        for (const day of days)
-          for (const ex of day.exercises) {
-            const w = p.weightRecs[ex.name];
-            if (w != null) ex.sets.forEach(s => { s.weight = w; });
-          }
-      }
 
       state.weeks.push({
         id: Date.now(), startDate: p.startDate, note: p.note ?? '',
@@ -772,6 +779,12 @@ function reduce(state, action) {
     case A.EX_SET_NEXT_WEEK_PLAN: {
       const ex = _currentWeek()?.days[p.di]?.exercises[p.ei]; if (!ex) break;
       ex.nextWeekPlan = p.value ?? 0;
+      ex.nextWeekPlanConfirmed = true;
+      break;
+    }
+    case A.EX_TOGGLE_NEXT_WEEK_CONFIRMED: {
+      const ex = _currentWeek()?.days[p.di]?.exercises[p.ei]; if (!ex) break;
+      ex.nextWeekPlanConfirmed = !ex.nextWeekPlanConfirmed;
       break;
     }
     case A.EX_SET_TARGETS: {
@@ -948,6 +961,7 @@ function reduce(state, action) {
       const days = clone(state.customTemplate ?? FACTORY_TEMPLATE);
       days.forEach(d => (d.exercises ?? []).forEach(ex => {
         ex.nextWeekPlan = 0;
+        ex.nextWeekPlanConfirmed = false;
         ex._showCfg = false;
         (ex.sets ?? []).forEach(s => {
           s.status = 'pending';
@@ -993,6 +1007,7 @@ function reduce(state, action) {
         (day.exercises ?? []).forEach(ex => {
           ex._showCfg = false;
           ex.nextWeekPlan = 0;
+          ex.nextWeekPlanConfirmed = false;
           (ex.sets ?? []).forEach(s => {
             s.status = 'pending';
             s.done = false;

@@ -86,8 +86,6 @@ let _stickyObserver = null;
 /** Toast hide timer. */
 let _toastTimer = null;
 
-/** Vom Nutzer akzeptierte KI-Gewichtsempfehlungen für die nächste Wochenerstellung. */
-const _pendingWeightRecs = new Map();
 
 /** Übungen mit offenem Fortschritts-Chart im Training: Set von "${di}-${ei}" Keys. */
 const _exChartOpen = new Set();
@@ -923,13 +921,19 @@ function renderExercise(wk, di, ei, state) {
     ${!locked ? `
     <div class="ex-kg-wrap">
       <button
-        class="btn-icon btn-icon--kg${ex.nextWeekPlan ? ' is-planned' : ''}"
+        class="btn-icon btn-icon--kg${ex.nextWeekPlan ? ' is-planned' : ''}${ex.nextWeekPlanConfirmed ? ' is-confirmed' : ''}"
         data-action="inc-weight" data-di="${di}" data-ei="${ei}"
-        aria-label="${ex.nextWeekPlan ? `+${ex.nextWeekPlan} kg geplant — doppeltippen zum Ändern` : 'Doppeltippen zum Planen'}"
-      >+${ex.nextWeekPlan || 0}</button>
+        aria-label="${
+          ex.nextWeekPlanConfirmed
+            ? `+${ex.nextWeekPlan} kg bestätigt — tippen zum Aufheben, doppeltippen zum Ändern`
+            : ex.nextWeekPlan
+              ? `+${ex.nextWeekPlan} kg geplant — tippen zum Bestätigen, doppeltippen zum Ändern`
+              : 'Tippen zum Bestätigen, doppeltippen zum Planen'
+        }"
+      >+${ex.nextWeekPlan || 0}${ex.nextWeekPlanConfirmed ? ' ✓' : ''}</button>
       ${_kgPickerKey === `${di}-${ei}` ? `
       <div class="ex-kg-picker" role="group" aria-label="Steigerung für nächste Woche">
-        ${[0, 1.25, 2.5, 5, 7.5, 10].map(v =>
+        ${[0, 1.25, 2.5, 5, 7.5, 10, 15, 20].map(v =>
           `<button class="ex-kg-picker-btn${ex.nextWeekPlan === v ? ' is-selected' : ''}"
             data-action="kg-picker-select" data-di="${di}" data-ei="${ei}" data-value="${v}"
           >${v === 0 ? '0' : '+' + v}</button>`).join('')}
@@ -2284,13 +2288,20 @@ function _handleClick(e) {
 
     // ── KI-Gewichtsempfehlung übernehmen (Modal-Chip) ─────────────────────
     case 'toggle-weight-rec': {
-      const recName   = el.dataset.name;
-      const recWeight = parseFloat(el.dataset.weight);
-      if (!_pendingWeightRecs.has(recName)) {
-        _pendingWeightRecs.set(recName, recWeight);
-        el.classList.add('is-adopted');
-        el.setAttribute('aria-pressed', 'true');
-      }
+      const recName  = el.dataset.name;
+      const recDelta = parseFloat(el.dataset.delta ?? '0');
+      const _recSt   = getState();
+      const _recWk   = _recSt.weeks[_recSt.curIdx];
+      if (!_recWk) break;
+      (_recWk.days ?? []).forEach((day, _rdi) => {
+        (day.exercises ?? []).forEach((ex, _rei) => {
+          if (ex.name === recName) {
+            dispatch(A.EX_SET_NEXT_WEEK_PLAN, { di: _rdi, ei: _rei, value: recDelta });
+          }
+        });
+      });
+      el.classList.add('is-adopted');
+      el.setAttribute('aria-pressed', 'true');
       break;
     }
 
@@ -2510,16 +2521,24 @@ function _handleClick(e) {
     }
       
     case 'inc-weight': {
-      // Double-tap opens the kg picker; single tap does nothing (value visible on button)
       const _tapKey = `${di}-${ei}`;
       const _now = Date.now();
       const _last = _kgPickerLastTap[_tapKey] || 0;
       if (_now - _last < 400) {
+        // Double-tap → open picker, cancel pending single-tap
         _kgPickerLastTap[_tapKey] = 0;
         _kgPickerKey = _kgPickerKey === _tapKey ? null : _tapKey;
         scheduleRender();
       } else {
+        // First tap — wait to confirm it's not a double-tap
         _kgPickerLastTap[_tapKey] = _now;
+        setTimeout(() => {
+          if (_kgPickerLastTap[_tapKey] === _now) {
+            // Single-tap confirmed — toggle nextWeekPlanConfirmed
+            _kgPickerLastTap[_tapKey] = 0;
+            dispatch(A.EX_TOGGLE_NEXT_WEEK_CONFIRMED, { di: +di, ei: +ei });
+          }
+        }, 400);
       }
       break;
     }
@@ -2528,9 +2547,9 @@ function _handleClick(e) {
       const _pkVal = parseFloat(el.dataset.value);
       dispatch(A.EX_SET_NEXT_WEEK_PLAN, { di: +di, ei: +ei, value: _pkVal });
       if (_pkVal === 0) {
-        showToast('Planung für nächste Woche zurückgesetzt', 'ok');
+        showToast('Keine Steigerung nächste Woche (bestätigt)', 'ok');
       } else {
-        showToast(`+${_pkVal} kg für nächste Woche geplant!`, 'ok');
+        showToast(`+${_pkVal} kg nächste Woche bestätigt ✓`, 'ok');
       }
       _kgPickerKey = null;
       scheduleRender();
@@ -3023,7 +3042,6 @@ function _prepNewWeekModal() {
   </div>` : '';
 
   // KI-Gewichtsempfehlungen (basierend auf RPE + Erfolgsquote)
-  _pendingWeightRecs.clear();
   const aiRecs = [];
   if (curWk) {
     const calcWeeks = state.weeks
@@ -3061,6 +3079,7 @@ function _prepNewWeekModal() {
       data-action="toggle-weight-rec"
       data-name="${h(r.name)}"
       data-weight="${r.rec.recommendedWeight}"
+      data-delta="${r.rec.delta}"
       aria-label="Empfehlung für ${h(r.name)} übernehmen">
       <span class="nw-rec-name">${h(r.name)}</span>
       <span class="nw-rec-kg">${r.rec.recommendedWeight} kg</span>
@@ -3110,12 +3129,8 @@ function _createWeek() {
   const note     = document.getElementById('new-week-note')?.value ?? '';
   const copyPrev = document.getElementById('nw-copy-prev')?.checked ?? true;
   if (!date) { showToast('Bitte Datum wählen', 'warn'); return; }
-  const source     = copyPrev ? 'prev' : 'template';
-  const weightRecs = _pendingWeightRecs.size > 0
-    ? Object.fromEntries(_pendingWeightRecs)
-    : undefined;
-  _pendingWeightRecs.clear();
-  dispatch(A.WEEK_CREATE, { startDate: date, note, source, weightRecs });
+  const source = copyPrev ? 'prev' : 'template';
+  dispatch(A.WEEK_CREATE, { startDate: date, note, source });
   closeModal('modal-new-week');
   showToast(source === 'template' ? 'Neue Woche aus Vorlage erstellt ✓' : 'Neue Woche aus Vorwoche erstellt ✓', 'ok');
   const triggered = fireTrigger('NEUE_WOCHE_ERSTELLT', {});
