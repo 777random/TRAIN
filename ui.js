@@ -17,7 +17,7 @@
  */
 
 import {
-  getState, dispatch, subscribe, A, canUndo, AVAILABLE_TAGS, ALL_TAGS_FLAT,
+  getState, dispatch, subscribe, A, canUndo, AVAILABLE_TAGS, ALL_TAGS_FLAT, BADGE_THRESHOLDS,
 } from './state.js';
 import {
   exportJSON, importJSON, exportCSV,
@@ -1154,19 +1154,21 @@ function renderExercise(wk, di, ei, state) {
   <!-- Soll-Ist + Fulfillment combined row (2.4): always visible, no toggle -->
   ${(() => {
     if (!ex.targetReps) return '';
-    const nSets    = ex.sets.length;
-    const target   = nSets * ex.targetReps;
-    const achieved = ex.sets.filter(s => s.status === 'success').reduce((sum, s) => sum + (s.reps ?? 0), 0);
-    const pct      = target > 0 ? Math.min(Math.round(achieved / target * 100), 100) : 0;
-    const color    = pct >= 100 ? 'var(--c-ok)' : pct >= 80 ? 'var(--c-warn)' : 'var(--c-danger)';
-    const unit     = metric === 'sec' ? 'Sek' : metric === 'm' ? 'm' : 'Wdh';
+    const nSets     = ex.sets.length;
+    const target    = nSets * ex.targetReps;
+    const achieved  = ex.sets.filter(s => s.status === 'success').reduce((sum, s) => sum + (s.reps ?? 0), 0);
+    const actualPct = target > 0 ? Math.round(achieved / target * 100) : 0;
+    const pct       = Math.min(actualPct, 100);
+    const color     = pct >= 100 ? 'var(--c-ok)' : pct >= 80 ? 'var(--c-warn)' : 'var(--c-danger)';
+    const unit      = metric === 'sec' ? 'Sek' : metric === 'm' ? 'm' : 'Wdh';
     return `
-    <div class="fulfill-meter" aria-label="Zielerfüllung ${pct}%">
+    <div class="fulfill-meter" aria-label="Zielerfüllung ${actualPct}%">
       <div class="fulfill-meter__bar-wrap">
         <div class="fulfill-meter__bar" style="width:${pct}%;background:${color}"></div>
       </div>
       <span class="fulfill-meter__label" style="color:${color}">Ziel: ${nSets}×${ex.targetReps} | Ist: ${achieved}/${target} ${unit}</span>
-    </div>`;
+    </div>
+    ${actualPct > 0 ? `<div class="effort-pct" style="color:${actualPct > 100 ? 'var(--c-accent)' : 'var(--c-text-3)'}">${actualPct > 100 ? '↑ ' : ''}${actualPct}% Ziel</div>` : ''}`;
   })()}
 
   ${!locked ? `
@@ -1230,6 +1232,8 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
     s.weight > exPR.maxWeight ||
     (s.weight === exPR.maxWeight && (s.reps ?? 0) > (exPR.maxRepsAtMaxWeight ?? 0))
   );
+  const effortScore   = (st === 'success' && ex.targetReps) ? Math.round((s.reps ?? 0) / ex.targetReps * 100) : null;
+  const isEffortGoal  = effortScore !== null && effortScore >= 100;
   const doneIcon = st === 'success' ? ic.check()
                : st === 'fail'    ? ic.xMark()
                : '';
@@ -1247,7 +1251,8 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
       placeholder=""
       aria-label="Satz ${si + 1} Gewicht in kg"
     />
-    ${isPR ? `<span class="pr-badge" aria-label="Bestleistung!">${ic.trophy()}</span>` : ''}
+    ${isPR ? `<span class="pr-badge" aria-label="Bestleistung! ${s.weight} kg">${ic.trophy()} ${s.weight} kg</span>` : ''}
+    ${isEffortGoal ? `<span class="pr-badge pr-badge--goal" aria-label="${effortScore}% Zielerfüllung">✓ ${effortScore}% Ziel</span>` : ''}
     <span class="prev-hint" aria-hidden="true">${prevSet ? `↑ ${prevSet.weight}kg × ${prevSet.reps ?? '–'}` : ''}</span>
     ${ex.showPlates && dispW > 0 ? (() => { const pl = calcPlates(dispW); return pl ? `<span class="plate-hint" aria-hidden="true" title="Scheiben je Seite">▪ ${pl}</span>` : ''; })() : ''}
   </div>
@@ -1587,7 +1592,7 @@ function renderAnalysisTab(state) {
       const rates = withTargets.map(ex => {
         const target   = ex.sets.length * (ex.targetReps ?? 0);
         const achieved = ex.sets.filter(s => s.status === 'success').reduce((sum, s) => sum + (s.reps ?? 0), 0);
-        return target > 0 ? Math.min(achieved / target, 1) : 0;
+        return target > 0 ? achieved / target : 0;
       });
       avgFulfill = Math.round(rates.reduce((a, b) => a + b, 0) / rates.length * 100);
     }
@@ -1610,9 +1615,9 @@ function renderAnalysisTab(state) {
         <div><div class="pw-stat__num">${_wss.total > 0 ? `${don}/${_wss.total}` : don}</div><div class="pw-stat__lbl">Sätze ✓</div></div>
         <div><div class="pw-stat__num" style="font-size:11px;color:var(--c-text-2)">${vol >= 1000 ? (vol/1000).toFixed(1)+'t' : vol+'kg'}</div><div class="pw-stat__lbl">Vol.${vd}</div></div>
         ${avgDur ? `<div><div class="pw-stat__num">${avgDur}'</div><div class="pw-stat__lbl">Ø Dauer</div></div>` : ''}
-        ${avgFulfill !== null ? `<div><div class="pw-stat__num" style="color:${avgFulfill>=100?'var(--c-ok)':avgFulfill>=80?'var(--c-warn)':'var(--c-danger)'}">${avgFulfill}%</div><div class="pw-stat__lbl">Ziel-Erf.</div></div>` : ''}
       </div>
       <div class="progress-bar-wrap"><div class="progress-bar" style="width:${score}%"></div></div>
+      ${avgFulfill !== null ? `<div class="pw-card__effort">Ø Zielerfüllung: <strong style="color:${avgFulfill>=100?'var(--c-ok)':avgFulfill>=80?'var(--c-warn)':'var(--c-danger)'}">${avgFulfill}%</strong></div>` : ''}
       ${state.weeks.length > 1 ? `<button class="pw-card__delete" data-action="open-delete-week" data-week-idx="${_realWkIdx}" aria-label="Woche löschen">${ic.trash()}</button>` : ''}
     </div>`;
   }).join('');
@@ -1631,6 +1636,7 @@ function renderAnalysisTab(state) {
     : '';
 
   container.innerHTML = `
+  ${_renderStreakChain(state)}
   ${(() => {
     // 3.1: Ø Session + Gesamt time from sessionLog
     const allLogs  = state.weeks.flatMap(w => w.sessionLog ?? []);
@@ -1698,6 +1704,8 @@ function renderAnalysisTab(state) {
     </div>`;
   })()}
 
+  ${_renderBadgeGallery(state)}
+
   ${(() => {
     // Muscle group analysis (3.13): only shown when tags exist
     const curWk = state.weeks[state.curIdx];
@@ -1752,6 +1760,7 @@ function renderAnalysisTab(state) {
     drawLineChart('chart-vol', wkLabels, vols, '#C8FF00');
     _updateExChart(state);
     _drawHeatmap(state);
+    _attachStreakChainTooltips();
     document.getElementById('chart-ex-select')?.addEventListener('change', () => {
       _updateExChart(getState());
     });
@@ -1790,6 +1799,68 @@ function _calcStreak(state) {
     else break;
   }
   return { cur, best };
+}
+
+function _renderStreakChain(state) {
+  const sorted = [...state.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
+  const last8  = sorted.slice(-8);
+  if (last8.length < 2) return '';
+  const R = 6, GAP = 32, PAD = 12;
+  const W = PAD * 2 + (last8.length - 1) * GAP;
+  const H = 28;
+  const cy = H / 2;
+  const dots = last8.map((wk, i) => {
+    const cx    = PAD + i * GAP;
+    const score = _weekSuccessScore(wk);
+    const done  = score.total > 0 && score.pct >= 50;
+    const ss    = score.total > 0 ? score.pct : 0;
+    const wkNum = (() => {
+      const d = new Date(wk.startDate);
+      const jan1 = new Date(d.getFullYear(), 0, 1);
+      return Math.ceil(((d - jan1) / 86400000 + jan1.getDay() + 1) / 7);
+    })();
+    return { cx, done, ss, wkNum, startDate: wk.startDate };
+  });
+  const lines = dots.slice(0, -1).map((d, i) => {
+    const next  = dots[i + 1];
+    const color = d.done && next.done ? '#C8FF00' : '#2E2E35';
+    const dash  = d.done && next.done ? '' : 'stroke-dasharray="4 3"';
+    return `<line x1="${d.cx}" y1="${cy}" x2="${next.cx}" y2="${cy}" stroke="${color}" stroke-width="2" ${dash}/>`;
+  });
+  const circles = dots.map(d => {
+    const fill   = d.done ? '#C8FF00' : '#1A1A2E';
+    const stroke = d.done ? '#C8FF00' : '#2E2E35';
+    const tip    = `KW ${d.wkNum} · ${d.ss}% Erfolg`;
+    return `<circle cx="${d.cx}" cy="${cy}" r="${R}" fill="${fill}" stroke="${stroke}" stroke-width="2" data-streak-tip="${tip}" style="cursor:pointer"/>`;
+  });
+  return `<div class="streak-chain-wrap">
+    <svg class="streak-chain" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
+      ${lines.join('')}
+      ${circles.join('')}
+    </svg>
+    <div id="streak-chain-tooltip" style="display:none;position:absolute;background:#1A1A2E;border:1px solid #2E2E35;color:#E0E0E8;font-size:11px;padding:4px 8px;border-radius:6px;pointer-events:none;z-index:50;white-space:nowrap"></div>
+  </div>`;
+}
+
+function _attachStreakChainTooltips() {
+  const wrap    = document.querySelector('.streak-chain-wrap');
+  const tooltip = document.getElementById('streak-chain-tooltip');
+  if (!wrap || !tooltip) return;
+  const show = (e) => {
+    const t = e.target.closest('[data-streak-tip]');
+    if (!t) return;
+    const rect    = t.getBoundingClientRect();
+    const wrapR   = wrap.getBoundingClientRect();
+    tooltip.textContent = t.dataset.streakTip;
+    tooltip.style.display = 'block';
+    tooltip.style.left = `${rect.left - wrapR.left + rect.width / 2 - tooltip.offsetWidth / 2}px`;
+    tooltip.style.top  = `${rect.top - wrapR.top - tooltip.offsetHeight - 6}px`;
+  };
+  const hide = () => { tooltip.style.display = 'none'; };
+  wrap.addEventListener('mouseover', show);
+  wrap.addEventListener('mouseout',  hide);
+  wrap.addEventListener('touchstart', e => { show(e.touches[0] ?? e); }, { passive: true });
+  wrap.addEventListener('touchend',   hide, { passive: true });
 }
 
 /** Baut offene Fortschritts-Charts nach jedem re-render der Day-Liste neu auf. */
@@ -3770,6 +3841,12 @@ export function mountApp(root) {
     _storageWarn?.classList.add('is-visible');
   });
 
+  window.addEventListener('train:badge-earned', e => {
+    (e.detail ?? []).forEach((badge, i) => {
+      setTimeout(() => _showBadgeOverlay(badge), i * 5500);
+    });
+  });
+
   scheduleRender();
 
   // Fire APP_GEÖFFNET and show 4-week backup reminder if due
@@ -3805,6 +3882,17 @@ function _getDayCompletionStats(di) {
     }
   }
   const pct = totalSets > 0 ? Math.round(successSets / totalSets * 100) : 0;
+  let effortAchieved = 0, effortTarget = 0;
+  for (const ex of day.exercises ?? []) {
+    if (!ex.targetReps) continue;
+    for (const s of ex.sets ?? []) {
+      if (s.status === 'success') {
+        effortAchieved += s.reps ?? 0;
+        effortTarget   += ex.targetReps;
+      }
+    }
+  }
+  const effortPct = effortTarget > 0 ? Math.round(effortAchieved / effortTarget * 100) : null;
   const quotes = [
     'Kein Fortschritt ohne Konsequenz.',
     'Du hast heute gewonnen.',
@@ -3817,7 +3905,7 @@ function _getDayCompletionStats(di) {
     'Du kommst wieder. Das macht den Unterschied.',
     'Erholung ist Teil des Plans.',
   ];
-  return { successSets, totalSets, prCount, pct, quote: quotes[Math.floor(Math.random() * quotes.length)] };
+  return { successSets, totalSets, prCount, pct, effortPct, quote: quotes[Math.floor(Math.random() * quotes.length)] };
 }
 
 function _finishCompletion(di, rating, sleepHours, energyLevel) {
@@ -3921,7 +4009,7 @@ function _showDayCompletionModal(di) {
 }
 
 function _showCompletionScreen(stats) {
-  const { successSets, totalSets, prCount, pct, quote } = stats;
+  const { successSets, totalSets, prCount, pct, effortPct, quote } = stats;
   document.getElementById('day-completion-screen')?.remove();
   const el = document.createElement('div');
   el.id        = 'day-completion-screen';
@@ -3932,12 +4020,64 @@ function _showCompletionScreen(stats) {
       <div class="day-completion-screen__pct">${pct}%</div>
       <div class="day-completion-screen__sets">${successSets}/${totalSets} Sätze erfolgreich</div>
       ${prCount > 0 ? `<div class="day-completion-screen__pr">🏆 ${prCount} neues PR${prCount > 1 ? 's' : ''}!</div>` : ''}
+      ${effortPct !== null ? `<div class="day-completion-screen__effort">🎯 ${effortPct}% Zielerfüllung</div>` : ''}
       <div class="day-completion-screen__quote">"${quote}"</div>
     </div>`;
   document.body.appendChild(el);
   const dismiss = () => { clearTimeout(timer); el.remove(); };
   const timer   = setTimeout(dismiss, 4000);
   el.addEventListener('click', dismiss, { once: true });
+}
+
+function _showBadgeOverlay(badge) {
+  const existing = document.getElementById('badge-earned-overlay');
+  if (existing) existing.remove();
+  const el = document.createElement('div');
+  el.id        = 'badge-earned-overlay';
+  el.className = 'badge-earned-overlay';
+  el.innerHTML = `
+    <div class="badge-earned-overlay__inner">
+      <div class="badge-earned-overlay__header">Abzeichen freigeschaltet!</div>
+      <img class="badge-earned-overlay__img" src="./badges/${badge.id}.svg" alt="${badge.title}">
+      <div class="badge-earned-overlay__title">${badge.title}</div>
+      <div class="badge-earned-overlay__sub">nach ${badge.weeks} Wochen Streak</div>
+    </div>`;
+  document.body.appendChild(el);
+  const dismiss = () => { clearTimeout(timer); el.remove(); };
+  const timer   = setTimeout(dismiss, 5000);
+  el.addEventListener('click', dismiss, { once: true });
+}
+
+function _renderBadgeGallery(state) {
+  const badges  = state.badges ?? [];
+  const streak  = (() => {
+    const sorted = [...state.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
+    let cur = 0;
+    for (let i = sorted.length - 1; i >= 0; i--) {
+      if (sorted[i].days.some(d => !!d.markedDone)) cur++;
+      else break;
+    }
+    return cur;
+  })();
+  const items = BADGE_THRESHOLDS.map(thr => {
+    const earned = badges.find(b => b.id === thr.id);
+    if (earned) {
+      const dateStr = new Date(earned.unlockedAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' });
+      return `<div class="badge-item badge-item--earned">
+        <img class="badge-item__img" src="./badges/${thr.id}.svg" alt="${thr.title}">
+        <div class="badge-item__title">${thr.title}</div>
+        <div class="badge-item__sub badge-item__date">${dateStr}</div>
+      </div>`;
+    }
+    const weeksLeft = thr.weeks - streak;
+    return `<div class="badge-item">
+      <img class="badge-item__img" src="./badges/${thr.id}.svg" alt="${thr.title}" style="filter:grayscale(1);opacity:.35">
+      <div class="badge-item__title">${thr.title}</div>
+      <div class="badge-item__sub">noch ${weeksLeft} Wo.</div>
+    </div>`;
+  });
+  return `<div class="section-label" style="margin-top:var(--sp-5)">Abzeichen</div>
+    <div class="badge-gallery">${items.join('')}</div>`;
 }
 
 function _showBackupReminderToast() {
