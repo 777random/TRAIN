@@ -3724,7 +3724,8 @@ function _bindTabSwitcher() {
 // FULL RENDER (called by subscriber on every state change)
 // ════════════════════════════════════════════════════════════════════════════
 
-let _renderScheduled = false;
+let _renderScheduled  = false;
+let _onboardingActive = false; // true while onboarding overlay is mounted
 
 // Reposition fixed floating elements (⋮ dropdown, +kg picker) after render
 function _positionFloating() {
@@ -3745,6 +3746,7 @@ function scheduleRender() {
   _renderScheduled = true;
   requestAnimationFrame(() => {
     _renderScheduled = false;
+    if (_onboardingActive) return;
     const state = getState();
     renderWeekHeader(state);
     renderDayList(state);
@@ -4223,6 +4225,7 @@ function _showOnboarding() {
   console.log('[TRAIN] _showOnboarding called — weeks:', st.weeks.length, 'onboardingDone:', st.onboardingDone);
   if (st.weeks.length > 0 || st.onboardingDone === true) return;
   if (document.getElementById('onboarding')) return; // already mounted
+  _onboardingActive = true;
 
   let _step   = 1;
   let _selTpl = null;
@@ -4328,6 +4331,7 @@ function _showOnboarding() {
   }
 
   function _finish() {
+    _onboardingActive = false;
     dispatch(A.ONBOARDING_DONE, {});
     el.remove();
   }
