@@ -494,7 +494,11 @@ function renderDayList(state) {
   const container = document.getElementById('days-container');
   if (!container) return;
   const wk = state.weeks[state.curIdx];
-  if (!wk) { container.innerHTML = ''; return; }
+  if (!wk) {
+    container.innerHTML = '';
+    _showOnboarding();
+    return;
+  }
 
   const isDl = wk.mode === 'deload';
 
@@ -4216,7 +4220,9 @@ function _showBackupReminderToast() {
 
 function _showOnboarding() {
   const st = getState();
+  console.log('[TRAIN] _showOnboarding called — weeks:', st.weeks.length, 'onboardingDone:', st.onboardingDone);
   if (st.weeks.length > 0 || st.onboardingDone === true) return;
+  if (document.getElementById('onboarding')) return; // already mounted
 
   let _step   = 1;
   let _selTpl = null;

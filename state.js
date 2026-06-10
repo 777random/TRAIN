@@ -512,6 +512,7 @@ export function loadState() {
   }
 
   // Nothing recoverable – start fresh; onboarding will create the first week
+  console.log('[TRAIN] loadState: fresh start — no saved data');
   STATE = buildDefaultState();
   persistState();
   return false;
