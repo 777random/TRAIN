@@ -1864,6 +1864,7 @@ details[open] > .deload-details__summary::before { content: '▾ '; }
   text-align: center;
 }
 .badge-item__img { width: 52px; height: 52px; border-radius: 50%; }
+.badge-img { width: 80px; height: 80px; object-fit: contain; border-radius: 50%; }
 .badge-item__title { font-size: 10px; font-weight: 600; color: var(--c-text-2); line-height: 1.2; }
 .badge-item__sub { font-size: 9px; color: var(--c-text-3); line-height: 1.2; }
 .badge-item--earned .badge-item__title { color: var(--c-accent); }

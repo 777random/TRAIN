@@ -30,10 +30,10 @@ export const BADGE_THRESHOLDS = [
   { id: 'badge_4',   weeks: 4,   title: 'Erster Schritt' },
   { id: 'badge_8',   weeks: 8,   title: 'Fundament'      },
   { id: 'badge_12',  weeks: 12,  title: 'Quartal'        },
-  { id: 'badge_20',  weeks: 20,  title: 'Eisen'          },
   { id: 'badge_26',  weeks: 26,  title: 'Halbjahr'       },
   { id: 'badge_52',  weeks: 52,  title: 'Jahreskraft'    },
-  { id: 'badge_100', weeks: 100, title: 'Jahrhundert'    },
+  { id: 'badge_104', weeks: 104, title: '2 Jahre'        },
+  { id: 'badge_260', weeks: 260, title: '5 Jahre'        },
 ];
 
 // 4.1: Canonical tag taxonomy

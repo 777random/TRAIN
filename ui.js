@@ -4038,7 +4038,7 @@ function _showBadgeOverlay(badge) {
   el.innerHTML = `
     <div class="badge-earned-overlay__inner">
       <div class="badge-earned-overlay__header">Abzeichen freigeschaltet!</div>
-      <img class="badge-earned-overlay__img" src="./badges/${badge.id}.svg" alt="${badge.title}">
+      <img src="./badges/${badge.id}.png" alt="${badge.title}" class="badge-img" width="160" height="160">
       <div class="badge-earned-overlay__title">${badge.title}</div>
       <div class="badge-earned-overlay__sub">nach ${badge.weeks} Wochen Streak</div>
     </div>`;
@@ -4064,14 +4064,14 @@ function _renderBadgeGallery(state) {
     if (earned) {
       const dateStr = new Date(earned.unlockedAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' });
       return `<div class="badge-item badge-item--earned">
-        <img class="badge-item__img" src="./badges/${thr.id}.svg" alt="${thr.title}">
+        <img src="./badges/${thr.id}.png" alt="${thr.title}" class="badge-img" width="80" height="80">
         <div class="badge-item__title">${thr.title}</div>
         <div class="badge-item__sub badge-item__date">${dateStr}</div>
       </div>`;
     }
     const weeksLeft = thr.weeks - streak;
     return `<div class="badge-item">
-      <img class="badge-item__img" src="./badges/${thr.id}.svg" alt="${thr.title}" style="filter:grayscale(1);opacity:.35">
+      <img src="./badges/${thr.id}.png" alt="${thr.title}" class="badge-img" width="80" height="80" style="filter:grayscale(100%) opacity(0.3)">
       <div class="badge-item__title">${thr.title}</div>
       <div class="badge-item__sub">noch ${weeksLeft} Wo.</div>
     </div>`;
