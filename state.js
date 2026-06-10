@@ -24,7 +24,17 @@
 
 export const STORAGE_KEY        = 'train_v6';
 export const STORAGE_KEY_SHADOW = 'train_v6_shadow';
-export const SCHEMA_VERSION     = 14;
+export const SCHEMA_VERSION     = 15;
+
+export const BADGE_THRESHOLDS = [
+  { id: 'badge_4',   weeks: 4,   title: 'Erster Schritt' },
+  { id: 'badge_8',   weeks: 8,   title: 'Fundament'      },
+  { id: 'badge_12',  weeks: 12,  title: 'Quartal'        },
+  { id: 'badge_20',  weeks: 20,  title: 'Eisen'          },
+  { id: 'badge_26',  weeks: 26,  title: 'Halbjahr'       },
+  { id: 'badge_52',  weeks: 52,  title: 'Jahreskraft'    },
+  { id: 'badge_100', weeks: 100, title: 'Jahrhundert'    },
+];
 
 // 4.1: Canonical tag taxonomy
 export const AVAILABLE_TAGS = {
@@ -127,6 +137,7 @@ function buildDefaultState() {
     prs: {},                  // { [exerciseName]: { maxWeight, maxVolume, maxEstimated1RM, date } }
     insights: [],             // Insight[] – populated by triggerEngine, transient coaching feedback
     favoriteExercises: [],    // String[] – Übungsnamen, max 5
+    badges: [],               // { id, unlockedAt }[] – earned badges
     settings: {
       swipe:              true,
       drag:               true,
@@ -244,6 +255,33 @@ function _normalizeAllExerciseMetrics(raw) {
   (raw.customTemplate ?? []).forEach(day => {
     (day.exercises ?? []).forEach(_normalizeExerciseMetric);
   });
+}
+
+function _calcCurrentStreak(weeks) {
+  const sorted = [...weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
+  let cur = 0;
+  for (let i = sorted.length - 1; i >= 0; i--) {
+    if (sorted[i].days.some(d => !!d.markedDone)) cur++;
+    else break;
+  }
+  return cur;
+}
+
+function _checkAndGrantBadges(state) {
+  const streak  = _calcCurrentStreak(state.weeks);
+  const now     = new Date().toISOString();
+  const newOnes = [];
+  for (const thr of BADGE_THRESHOLDS) {
+    if (streak >= thr.weeks && !state.badges.some(b => b.id === thr.id)) {
+      state.badges.push({ id: thr.id, unlockedAt: now });
+      newOnes.push({ ...thr, unlockedAt: now });
+    }
+  }
+  if (newOnes.length > 0) {
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('train:badge-earned', { detail: newOnes }));
+    }, 0);
+  }
 }
 
 /**
@@ -416,6 +454,19 @@ function migrate(raw) {
     raw.meta = { ...raw.meta, schemaVersion: 14 };
   }
 
+  // v14 → v15: add badges array, retroactively grant earned badges
+  if ((raw.meta?.schemaVersion ?? 0) < 15) {
+    if (!Array.isArray(raw.badges)) raw.badges = [];
+    const streak = _calcCurrentStreak(raw.weeks ?? []);
+    const now    = new Date().toISOString();
+    for (const thr of BADGE_THRESHOLDS) {
+      if (streak >= thr.weeks && !raw.badges.some(b => b.id === thr.id)) {
+        raw.badges.push({ id: thr.id, unlockedAt: now });
+      }
+    }
+    raw.meta = { ...raw.meta, schemaVersion: 15 };
+  }
+
   // Always-apply defaults for settings added in later versions
   if (raw.settings.vibrationEnabled               === undefined) raw.settings.vibrationEnabled               = true;
   if (raw.settings.rpeEnabled                     === undefined) raw.settings.rpeEnabled                     = true;
@@ -446,6 +497,7 @@ export function loadState() {
       if (!Array.isArray(parsed?.weeks)) continue;
       STATE = migrate(parsed);
       if (!Array.isArray(STATE.favoriteExercises)) STATE.favoriteExercises = [];
+      if (!Array.isArray(STATE.badges))            STATE.badges = [];
       // Defensive bounds check
       if (!STATE.weeks.length)             _appendDefaultWeek();
       if (STATE.curIdx >= STATE.weeks.length) STATE.curIdx = STATE.weeks.length - 1;
@@ -681,6 +733,7 @@ function reduce(state, action) {
       });
       state.weeks.sort((a, b) => a.startDate.localeCompare(b.startDate));
       state.curIdx = state.weeks.findIndex(w => w.startDate === p.startDate);
+      _checkAndGrantBadges(state);
       break;
     }
     case A.WEEK_DELETE: {
@@ -785,6 +838,7 @@ function reduce(state, action) {
       }
       day.markedDone = becomingDone;
       day.locked     = becomingDone;
+      if (becomingDone) _checkAndGrantBadges(state);
       break;
     }
     case A.DAY_SET_FIELD: {
@@ -1067,8 +1121,9 @@ function reduce(state, action) {
       const imported = migrate(p.imported);
       if (!Array.isArray(imported?.weeks)) break;
       Object.assign(state, imported);
-      if (!state.prs)       state.prs       = {};
-      if (!state.templates) state.templates = [];
+      if (!state.prs)                        state.prs       = {};
+      if (!state.templates)                  state.templates = [];
+      if (!Array.isArray(state.badges))      state.badges    = [];
       if (!state.weeks.length) _appendDefaultWeek();
       if (state.curIdx >= state.weeks.length) state.curIdx = state.weeks.length - 1;
       break;
