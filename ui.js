@@ -4233,6 +4233,20 @@ function _showOnboarding() {
   const el = document.createElement('div');
   el.id = 'onboarding';
   el.className = 'onboarding';
+  el.style.cssText = [
+    'position:fixed!important',
+    'top:0!important',
+    'left:0!important',
+    'width:100vw!important',
+    'height:100vh!important',
+    'z-index:9999!important',
+    'background:#0d0d0d!important',
+    'display:flex!important',
+    'flex-direction:column!important',
+    'align-items:center!important',
+    'justify-content:center!important',
+    'overflow-y:auto!important',
+  ].join(';');
   document.body.appendChild(el);
 
   const _isInstalled = () =>
