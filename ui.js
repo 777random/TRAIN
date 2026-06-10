@@ -158,6 +158,115 @@ const _STANDARD_EXERCISES = [
   'Hack Squat','Smith Maschine Kniebeuge',
 ].sort();
 
+const _ONBOARDING_TEMPLATES = [
+  {
+    icon: '💪', title: 'Krafttraining Einsteiger',
+    meta: 'Ganzkörper · 3×/Woche · ~45 Min', sub: 'Langhantel & Maschinen',
+    weekTitle: 'Ganzkörper — Woche 1',
+    days: [
+      {
+        title: 'Tag A — Ganzkörper A',
+        warmup:   '5 Min Gelenkmobilisation + leichte Aufwärmsätze (50% Gewicht)',
+        cooldown: '5 Min statisches Dehnen: Brust, Rücken, Oberschenkel',
+        exercises: [
+          { name: 'Kniebeuge',    n: 3, tr: 8,  ps: 90,  m: 'reps'    },
+          { name: 'Bankdrücken',  n: 3, tr: 8,  ps: 90,  m: 'reps'    },
+          { name: 'Latziehen',    n: 3, tr: 8,  ps: 90,  m: 'reps'    },
+          { name: 'Militärpress', n: 3, tr: 10, ps: 60,  m: 'reps'    },
+          { name: 'Plank',        n: 3, tr: 30, ps: 60,  m: 'sec' },
+        ],
+      },
+      {
+        title: 'Tag B — Ganzkörper B',
+        warmup:   '5 Min Gelenkmobilisation + leichte Aufwärmsätze',
+        cooldown: '5 Min statisches Dehnen',
+        exercises: [
+          { name: 'Kreuzheben',        n: 3, tr: 6,  ps: 120, m: 'reps' },
+          { name: 'Schrägbankdrücken', n: 3, tr: 10, ps: 90,  m: 'reps' },
+          { name: 'Rudern',            n: 3, tr: 10, ps: 90,  m: 'reps' },
+          { name: 'Beinpresse',        n: 3, tr: 12, ps: 90,  m: 'reps' },
+          { name: 'Bizepscurls',       n: 2, tr: 12, ps: 60,  m: 'reps' },
+        ],
+      },
+    ],
+  },
+  {
+    icon: '🏋', title: 'Krafttraining Fortgeschritten',
+    meta: 'Push/Pull/Legs · 3–6×/Woche', sub: 'Mehr Volumen & Intensität',
+    weekTitle: 'Push Pull Legs — Woche 1',
+    days: [
+      {
+        title: 'Tag Push — Brust, Schultern, Trizeps',
+        warmup:   '5 Min Schulter-Mobilisation + Aufwärmsätze Bankdrücken',
+        cooldown: '5 Min Brust + Schultern dehnen',
+        exercises: [
+          { name: 'Bankdrücken',       n: 4, tr: 6,  ps: 120, m: 'reps' },
+          { name: 'Militärpress',      n: 3, tr: 8,  ps: 90,  m: 'reps' },
+          { name: 'Schrägbankdrücken', n: 3, tr: 10, ps: 90,  m: 'reps' },
+          { name: 'Seitheben',         n: 3, tr: 15, ps: 60,  m: 'reps' },
+          { name: 'Trizepsdrücken',    n: 3, tr: 12, ps: 60,  m: 'reps' },
+        ],
+      },
+      {
+        title: 'Tag Pull — Rücken, Bizeps',
+        warmup:   '5 Min Schulterblatt-Aktivierung + Aufwärmsätze Klimmzüge',
+        cooldown: '5 Min Rücken + Bizeps dehnen',
+        exercises: [
+          { name: 'Klimmzüge',   n: 4, tr: 6,  ps: 120, m: 'reps' },
+          { name: 'Rudern',      n: 4, tr: 8,  ps: 90,  m: 'reps' },
+          { name: 'Face Pulls',  n: 3, tr: 15, ps: 60,  m: 'reps' },
+          { name: 'Hammercurls', n: 3, tr: 12, ps: 60,  m: 'reps' },
+          { name: 'Bizepscurls', n: 2, tr: 12, ps: 60,  m: 'reps' },
+        ],
+      },
+      {
+        title: 'Tag Legs — Beine, Core',
+        warmup:   '5 Min Hüft-Mobilisation + Aufwärmsätze Kniebeuge',
+        cooldown: '5 Min Beine + Hüfte dehnen',
+        exercises: [
+          { name: 'Kniebeuge',              n: 4, tr: 6,  ps: 120, m: 'reps' },
+          { name: 'Rumänisches Kreuzheben', n: 3, tr: 10, ps: 90,  m: 'reps' },
+          { name: 'Beinpresse',             n: 3, tr: 12, ps: 90,  m: 'reps' },
+          { name: 'Beinbeuger',             n: 3, tr: 12, ps: 60,  m: 'reps' },
+          { name: 'Wadenheben',             n: 3, tr: 15, ps: 60,  m: 'reps' },
+          { name: 'Ab-Wheel',               n: 3, tr: 10, ps: 60,  m: 'reps' },
+        ],
+      },
+    ],
+  },
+  {
+    icon: '🤸', title: 'Körpergewicht',
+    meta: 'Ganzkörper · 3×/Woche · ~45 Min', sub: 'Kein Equipment nötig',
+    weekTitle: 'Körpergewicht — Woche 1',
+    days: [
+      {
+        title: 'Tag A — Push + Legs',
+        warmup:   '5 Min Gelenkmobilisation: Schultern, Hüfte, Knöchel',
+        cooldown: '5 Min statisches Dehnen: Brust, Hüfte',
+        exercises: [
+          { name: 'Liegestütz',      n: 3, tr: 10, ps: 60, m: 'reps'    },
+          { name: 'Kniebeuge',       n: 3, tr: 15, ps: 60, m: 'reps'    },
+          { name: 'Dips',            n: 3, tr: 10, ps: 60, m: 'reps'    },
+          { name: 'Ausfallschritte', n: 3, tr: 12, ps: 60, m: 'reps'    },
+          { name: 'Plank',           n: 3, tr: 30, ps: 45, m: 'sec' },
+        ],
+      },
+      {
+        title: 'Tag B — Pull + Core',
+        warmup:   '5 Min Schulterblatt-Mobilisation',
+        cooldown: '5 Min Rücken + Hüftbeuger dehnen',
+        exercises: [
+          { name: 'Klimmzüge',      n: 3, tr: 6,  ps: 90, m: 'reps'    },
+          { name: 'Beinheben',      n: 3, tr: 12, ps: 60, m: 'reps'    },
+          { name: 'Hip Thrust',     n: 3, tr: 15, ps: 60, m: 'reps'    },
+          { name: 'Russian Twists', n: 3, tr: 20, ps: 45, m: 'reps'    },
+          { name: 'Hollow Hold',    n: 3, tr: 20, ps: 45, m: 'sec' },
+        ],
+      },
+    ],
+  },
+];
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /** Escape HTML special chars for safe innerHTML injection. */
@@ -3848,6 +3957,7 @@ export function mountApp(root) {
   });
 
   scheduleRender();
+  _showOnboarding();
 
   // Fire APP_GEÖFFNET and show 4-week backup reminder if due
   setTimeout(() => {
@@ -4102,4 +4212,119 @@ function _showBackupReminderToast() {
     dispatch(A.SETTING_SET, { key: 'weeksSinceLastBackupReminder', value: 0 });
     div.remove();
   });
+}
+
+function _showOnboarding() {
+  const st = getState();
+  if (st.weeks.length > 0 || st.onboardingDone === true) return;
+
+  let _step   = 1;
+  let _selTpl = null;
+
+  const el = document.createElement('div');
+  el.id = 'onboarding';
+  el.className = 'onboarding';
+  document.body.appendChild(el);
+
+  const _isInstalled = () =>
+    navigator.standalone === true ||
+    window.matchMedia('(display-mode: standalone)').matches;
+
+  const _dots = () => [1, 2, 3]
+    .map(i => `<span class="ob-dot${i === _step ? ' ob-dot--active' : ''}"></span>`)
+    .join('');
+
+  function _render() {
+    if (_step === 1) {
+      el.innerHTML = `
+        <div class="ob-screen">
+          <div class="ob-indicator">${_dots()}</div>
+          <div class="ob-logo">T</div>
+          <h1 class="ob-title">Willkommen bei TRAIN</h1>
+          <p class="ob-sub">Dein persönlicher Trainingspartner.</p>
+          <button class="btn btn--accent ob-btn" data-ob="next">Weiter →</button>
+        </div>`;
+    } else if (_step === 2) {
+      const cards = _ONBOARDING_TEMPLATES.map((t, i) => `
+        <div class="ob-tpl-card${_selTpl === i ? ' is-selected' : ''}" data-ob="select" data-tpl="${i}">
+          <span class="ob-tpl-icon">${t.icon}</span>
+          <div class="ob-tpl-info">
+            <div class="ob-tpl-title">${t.title}</div>
+            <div class="ob-tpl-meta">${t.meta}</div>
+            <div class="ob-tpl-sub">${t.sub}</div>
+          </div>
+        </div>`).join('');
+      el.innerHTML = `
+        <div class="ob-screen">
+          <div class="ob-indicator">${_dots()}</div>
+          <h2 class="ob-title ob-title--sm">Womit möchtest du starten?</h2>
+          <div class="ob-tpl-list">${cards}</div>
+          <button class="btn btn--accent ob-btn" data-ob="load"${_selTpl === null ? ' disabled' : ''}>Vorlage laden →</button>
+          <button class="btn btn--ghost ob-btn ob-btn--sm" data-ob="skip">Ohne Vorlage starten</button>
+        </div>`;
+    } else {
+      const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+      const hint  = isIos
+        ? 'Tippe auf das Teilen-Symbol <strong>⎙</strong> und wähle <strong>„Zum Home-Bildschirm"</strong>, um TRAIN zu installieren. Nur so bleiben deine Daten dauerhaft gespeichert.'
+        : 'Tippe auf das Menü <strong>⋮</strong> und wähle <strong>„App installieren"</strong> oder <strong>„Zum Startbildschirm hinzufügen"</strong>.';
+      el.innerHTML = `
+        <div class="ob-screen">
+          <div class="ob-indicator">${_dots()}</div>
+          <div class="ob-logo" style="font-size:56px">📲</div>
+          <h2 class="ob-title ob-title--sm">Für zuverlässige Datenspeicherung</h2>
+          <p class="ob-sub">${hint}</p>
+          <button class="btn btn--accent ob-btn" data-ob="done">Verstanden</button>
+        </div>`;
+    }
+  }
+
+  el.addEventListener('click', e => {
+    const btn = e.target.closest('[data-ob]');
+    if (!btn) return;
+    switch (btn.dataset.ob) {
+      case 'next':   _step = 2; _render(); break;
+      case 'select': _selTpl = +btn.dataset.tpl; _render(); break;
+      case 'load':   if (_selTpl !== null) _applyTpl(_selTpl); _advance(); break;
+      case 'skip':   _advance(); break;
+      case 'done':   _finish(); break;
+    }
+  });
+
+  function _advance() {
+    if (_isInstalled()) { _finish(); return; }
+    _step = 3;
+    _render();
+  }
+
+  function _applyTpl(idx) {
+    const tpl = _ONBOARDING_TEMPLATES[idx];
+    const d   = new Date();
+    const dow = d.getDay();
+    d.setDate(d.getDate() + (dow === 0 ? -6 : 1 - dow));
+    const startDate = d.toISOString().slice(0, 10);
+    const days = tpl.days.map((ds, di) => ({
+      id: Date.now() + di,
+      title: ds.title, subtitle: '',
+      warmup: ds.warmup, cooldown: ds.cooldown,
+      locked: false, markedDone: false,
+      exercises: ds.exercises.map(ex => ({
+        name: ex.name, note: '', pauseSec: ex.ps, metric: ex.m,
+        sets: Array.from({ length: ex.n }, () => ({
+          weight: 0, reps: ex.tr, rpe: null, status: 'pending', done: false, note: '',
+        })),
+        weightStep: 2.5, nextWeekPlan: 0, nextWeekPlanConfirmed: false,
+        targetSets: ex.n, targetReps: ex.tr,
+        _showCfg: false, setType: 'standard',
+        tags: [], showPlates: false, progressionType: 'weight', substituteFor: null,
+      })),
+    }));
+    dispatch(A.ONBOARDING_WEEK_CREATE, { startDate, days, note: tpl.weekTitle });
+  }
+
+  function _finish() {
+    dispatch(A.ONBOARDING_DONE, {});
+    el.remove();
+  }
+
+  _render();
 }

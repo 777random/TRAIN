@@ -138,6 +138,7 @@ function buildDefaultState() {
     insights: [],             // Insight[] – populated by triggerEngine, transient coaching feedback
     favoriteExercises: [],    // String[] – Übungsnamen, max 5
     badges: [],               // { id, unlockedAt }[] – earned badges
+    onboardingDone: false,    // true after first-run flow completed
     settings: {
       swipe:              true,
       drag:               true,
@@ -166,7 +167,7 @@ const _MAX_UNDO  = 20;
 // Actions that are pure navigation or external events — not worth undoing.
 const _NO_UNDO = new Set([
   'UNDO', 'WEEK_NAVIGATE', 'STATE_IMPORT', 'SESSION_START', 'SESSION_STOP',
-  'INSIGHTS_SET',
+  'INSIGHTS_SET', 'ONBOARDING_DONE',
 ]);
 
 /** Returns true when there is at least one undo snapshot available. */
@@ -498,8 +499,9 @@ export function loadState() {
       STATE = migrate(parsed);
       if (!Array.isArray(STATE.favoriteExercises)) STATE.favoriteExercises = [];
       if (!Array.isArray(STATE.badges))            STATE.badges = [];
-      // Defensive bounds check
-      if (!STATE.weeks.length)             _appendDefaultWeek();
+      if (STATE.onboardingDone === undefined)       STATE.onboardingDone = false;
+      // Defensive bounds check — only restore missing week when onboarding is already done
+      if (!STATE.weeks.length && STATE.onboardingDone) _appendDefaultWeek();
       if (STATE.curIdx >= STATE.weeks.length) STATE.curIdx = STATE.weeks.length - 1;
       if (STATE.curIdx < 0)                   STATE.curIdx = 0;
       persistState(); // re-write so both keys are in sync
@@ -509,9 +511,8 @@ export function loadState() {
     }
   }
 
-  // Nothing recoverable – start fresh
+  // Nothing recoverable – start fresh; onboarding will create the first week
   STATE = buildDefaultState();
-  _appendDefaultWeek();
   persistState();
   return false;
 }
@@ -637,7 +638,10 @@ export const A = Object.freeze({
   WEEK_ADD_REST_DAY:   'WEEK_ADD_REST_DAY',  // { date, note? }
   WEEK_REMOVE_REST_DAY:'WEEK_REMOVE_REST_DAY',// { date }
   // Favorites
-  TOGGLE_FAVORITE:     'TOGGLE_FAVORITE',     // { name: string }
+  TOGGLE_FAVORITE:          'TOGGLE_FAVORITE',          // { name: string }
+  // Onboarding
+  ONBOARDING_WEEK_CREATE:   'ONBOARDING_WEEK_CREATE',   // { startDate, days[], note? }
+  ONBOARDING_DONE:          'ONBOARDING_DONE',          // {}
 });
 
 // ─── Reducer ──────────────────────────────────────────────────────────────────
@@ -1218,6 +1222,26 @@ function reduce(state, action) {
         state.favoriteExercises = [...favs, p.name];
       }
       // If already 5 favorites: no-op — UI shows toast before dispatching
+      break;
+    }
+
+    // ── Onboarding ────────────────────────────────────────────────────────────
+    case A.ONBOARDING_WEEK_CREATE: {
+      if (!p.startDate || !Array.isArray(p.days)) break;
+      if (state.weeks.find(w => w.startDate === p.startDate)) break;
+      state.weeks.push({
+        id: Date.now(), startDate: p.startDate, note: p.note ?? '',
+        mode: 'standard', days: p.days, sessionLog: [], bodyData: {}, restDays: [],
+      });
+      state.weeks.sort((a, b) => a.startDate.localeCompare(b.startDate));
+      state.curIdx = state.weeks.findIndex(w => w.startDate === p.startDate);
+      _checkAndGrantBadges(state);
+      break;
+    }
+
+    case A.ONBOARDING_DONE: {
+      state.onboardingDone = true;
+      if (state.weeks.length === 0) _appendDefaultWeek();
       break;
     }
 
