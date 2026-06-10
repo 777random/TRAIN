@@ -92,6 +92,11 @@ let _deleteWeekIdx = null;
 /** Day index that triggered the completion modal flow. */
 let _completionModalDi = null;
 
+/** Key of the confirmed set showing RPE nudge: `${di}-${ei}-${si}` or null. */
+let _rpeNudgeKey = null;
+/** Auto-dismiss timer for the RPE nudge. */
+let _rpeNudgeTimer = null;
+
 /** Last rendered week index – used to detect week navigation. */
 let _lastRenderedCurIdx = null;
 
@@ -1097,12 +1102,25 @@ function renderExercise(wk, di, ei, state) {
   ${!locked ? (() => {
     const _normSt = s => (s.status === 'success' || s.status === 'fail') ? s.status : (s.done ? 'success' : 'pending');
     const allDone = ex.sets.length > 0 && ex.sets.every(s => _normSt(s) !== 'pending');
-    return `<button
-      class="confirm-set-btn${allDone ? ' is-done' : ''}${_confirmFlashKey === `${di}-${ei}` ? ' is-flashing' : ''}"
-      ${allDone ? 'disabled' : ''}
-      data-action="confirm-set" data-di="${di}" data-ei="${ei}"
-      aria-label="Nächsten Satz bestätigen"
-    >✓ Satz bestätigen</button>`;
+    const _nudgePrefix = `${di}-${ei}-`;
+    const _nudgeSi = (_rpeNudgeKey?.startsWith(_nudgePrefix)) ? +_rpeNudgeKey.split('-')[2] : null;
+    return `<div class="confirm-set-wrap">
+      <button
+        class="confirm-set-btn${allDone ? ' is-done' : ''}${_confirmFlashKey === `${di}-${ei}` ? ' is-flashing' : ''}"
+        ${allDone ? 'disabled' : ''}
+        data-action="confirm-set" data-di="${di}" data-ei="${ei}"
+        aria-label="Nächsten Satz bestätigen"
+      >✓ Satz bestätigen</button>
+      ${_nudgeSi != null ? `
+      <div class="rpe-nudge" role="group" aria-label="RPE eingeben">
+        <span class="rpe-nudge__label">Wie anstrengend?</span>
+        ${[7,8,9,10].map(v => `
+          <button class="rpe-nudge__btn"
+            data-action="rpe-nudge-select"
+            data-di="${di}" data-ei="${ei}" data-si="${_nudgeSi}" data-rpe="${v}"
+          >${v}</button>`).join('')}
+      </div>` : ''}
+    </div>`;
   })() : ''}
 
   <!-- Soll-Ist + Fulfillment combined row (2.4): always visible, no toggle -->
@@ -2273,6 +2291,14 @@ function _handleClick(e) {
     }
   }
 
+  // Dismiss RPE nudge on outside tap
+  if (_rpeNudgeKey !== null && !e.target.closest('.rpe-nudge') && !e.target.closest('[data-action="confirm-set"]')) {
+    clearTimeout(_rpeNudgeTimer);
+    _rpeNudgeKey  = null;
+    _rpeNudgeTimer = null;
+    scheduleRender();
+  }
+
   // Close +kg picker on outside tap
   if (_kgPickerKey !== null && !e.target.closest('.ex-kg-wrap')) {
     _kgPickerKey    = null;
@@ -2883,6 +2909,13 @@ function _handleClick(e) {
         for (const ins of triggered) {
           if (ins.immediate) showToast(ins.message, ins.type === 'warning' ? 'warn' : 'ok', ins.id === 'P-05' ? 4000 : 3000);
         }
+        // RPE nudge — only if rpeEnabled
+        if (_aft.settings?.rpeEnabled !== false && _aftSet.rpe == null) {
+          clearTimeout(_rpeNudgeTimer);
+          _rpeNudgeKey  = `${di}-${ei}-${_csi}`;
+          scheduleRender();
+          _rpeNudgeTimer = setTimeout(() => { _rpeNudgeKey = null; _rpeNudgeTimer = null; scheduleRender(); }, 4000);
+        }
       }
       const _aftEx = getState().weeks[getState().curIdx]?.days[+di]?.exercises[+ei];
       const isLastSet = _csi === (_aftEx?.sets?.length ?? 0) - 1;
@@ -2916,6 +2949,15 @@ function _handleClick(e) {
       const rpeVal = el.dataset.val === '' ? null : +el.dataset.val;
       dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'rpe', value: rpeVal });
       _rpePopoverKey = null;
+      break;
+    }
+
+    case 'rpe-nudge-select': {
+      clearTimeout(_rpeNudgeTimer);
+      dispatch(A.SET_RPE, { di: +di, ei: +ei, si: +si, rpe: +el.dataset.rpe });
+      _rpeNudgeKey   = null;
+      _rpeNudgeTimer = null;
+      scheduleRender();
       break;
     }
 

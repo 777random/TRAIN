@@ -548,6 +548,7 @@ export const A = Object.freeze({
   SET_AUTOFILL_DOWN:   'SET_AUTOFILL_DOWN',   // { di, ei, si } — weight (all) + reps (next)
   SET_AUTOFILL_RPE:    'SET_AUTOFILL_RPE',    // { di, ei, si } — rpe → next set only
   CONFIRM_SET:         'CONFIRM_SET',          // { di, ei, si, reps } — quick-confirm next pending set
+  SET_RPE:             'SET_RPE',             // { di, ei, si, rpe: number }
   EX_SET_SUBSTITUTE:   'EX_SET_SUBSTITUTE',   // { di, ei, substituteFor: string|null }
   // Session log
   SESSION_START:       'SESSION_START',       // { di, ts }  – persists day.sessionStartTs
@@ -974,6 +975,12 @@ function reduce(state, action) {
           }
         }
       }
+      break;
+    }
+
+    case A.SET_RPE: {
+      const s = _currentWeek()?.days[p.di]?.exercises[p.ei]?.sets[p.si]; if (!s) break;
+      s.rpe = p.rpe;
       break;
     }
 

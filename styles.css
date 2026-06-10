@@ -1712,6 +1712,25 @@ details[open] > .deload-details__summary::before { content: '▾ '; }
 .wr-continue { margin-top: var(--sp-5); }
 .wr-continue__btn { width: 100%; }
 
+/* ── RPE Nudge (Sprint 5) ─────────────────────────────────── */
+.confirm-set-wrap { position: relative; }
+.rpe-nudge {
+  position: absolute; bottom: calc(100% + 6px); left: 0; right: 0;
+  background: var(--c-surface2); border: 1px solid var(--c-border-hi);
+  border-radius: var(--r-md); padding: var(--sp-2) var(--sp-3);
+  display: flex; align-items: center; gap: var(--sp-2);
+  box-shadow: var(--shadow-md); z-index: 200;
+  flex-wrap: wrap;
+}
+.rpe-nudge__label { font-size: 12px; color: var(--c-text-3); flex-shrink: 0; }
+.rpe-nudge__btn {
+  min-width: 36px; height: 36px; border-radius: var(--r-sm);
+  background: var(--c-surface); border: 1px solid var(--c-border);
+  color: var(--c-text); font-size: 14px; font-weight: 600;
+  cursor: pointer; transition: background var(--t-fast), border-color var(--t-fast);
+}
+.rpe-nudge__btn:hover { background: var(--c-accent); border-color: var(--c-accent); color: #000; }
+
 /* ── Exercise settings two-level panel (Sprint 4) ─────────── */
 .cfg-adv-toggle {
   background: none; border: none;
