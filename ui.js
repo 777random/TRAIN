@@ -77,6 +77,11 @@ let _kgPickerCustom = false;
 /** Last-tap timestamp per exercise for +kg double-tap detection: `${di}-${ei}` → ms. */
 let _kgPickerLastTap = {};
 
+/** Key of the exercise whose +Wdh reps picker is open: `${di}-${ei}` or null. */
+let _repsPickerKey = null;
+/** Last-tap timestamp for +Wdh double-tap detection: `${di}-${ei}` → ms. */
+let _repsPickerLastTap = {};
+
 /** Set of `${di}-${ei}` keys whose Vorwoche mini-tables are expanded. */
 const _prevGridOpen = new Set();
 
@@ -866,6 +871,22 @@ function renderExercise(wk, di, ei, state) {
             >${label}</button>`).join('')}
         </div>
       </div>` : ''}
+      ${!locked ? `
+      <div class="weight-plan-row" role="group" aria-label="Steigerungsart">
+        <span class="pause-row__label">Steigerung:</span>
+        <div class="weight-step-opts">
+          <button type="button"
+            class="weight-step-btn${(ex.progressionType ?? 'weight') === 'weight' ? ' is-selected' : ''}"
+            data-action="set-progression-type" data-di="${di}" data-ei="${ei}" data-val="weight"
+            aria-pressed="${(ex.progressionType ?? 'weight') === 'weight'}"
+          >Gewicht ↑</button>
+          <button type="button"
+            class="weight-step-btn${(ex.progressionType ?? 'weight') === 'reps' ? ' is-selected' : ''}"
+            data-action="set-progression-type" data-di="${di}" data-ei="${ei}" data-val="reps"
+            aria-pressed="${(ex.progressionType ?? 'weight') === 'reps'}"
+          >Wdh ↑</button>
+        </div>
+      </div>` : ''}
       <!-- Erweitert-Toggle -->
       <button class="cfg-adv-toggle${isAdvOpen ? ' is-open' : ''}"
         data-action="toggle-cfg-adv" data-di="${di}" data-ei="${ei}"
@@ -964,20 +985,20 @@ function renderExercise(wk, di, ei, state) {
       aria-expanded="${_exChartOpen.has(`${di}-${ei}`)}"
     >📈</button>
 
-    ${!locked ? `
+    ${!locked ? (() => {
+      const _isReps = (ex.progressionType ?? 'weight') === 'reps';
+      const _planVal = ex.nextWeekPlan || (_isReps ? 1 : 0);
+      const _btnLabel = _isReps
+        ? `+${_planVal} Wdh${ex.nextWeekPlanConfirmed ? ' ✓' : ''}`
+        : `+${ex.nextWeekPlan || 0}${ex.nextWeekPlanConfirmed ? ' ✓' : ''}`;
+      return `
     <div class="ex-kg-wrap">
       <button
         class="btn-icon btn-icon--kg${ex.nextWeekPlan ? ' is-planned' : ''}${ex.nextWeekPlanConfirmed ? ' is-confirmed' : ''}"
         data-action="inc-weight" data-di="${di}" data-ei="${ei}"
-        aria-label="${
-          ex.nextWeekPlanConfirmed
-            ? `+${ex.nextWeekPlan} kg bestätigt — tippen zum Aufheben, doppeltippen zum Ändern`
-            : ex.nextWeekPlan
-              ? `+${ex.nextWeekPlan} kg geplant — tippen zum Bestätigen, doppeltippen zum Ändern`
-              : 'Tippen zum Bestätigen, doppeltippen zum Planen'
-        }"
-      >+${ex.nextWeekPlan || 0}${ex.nextWeekPlanConfirmed ? ' ✓' : ''}</button>
-      ${_kgPickerKey === `${di}-${ei}` ? `
+        aria-label="${ex.nextWeekPlanConfirmed ? `${_btnLabel} bestätigt` : `${_btnLabel} — tippen zum Bestätigen`}"
+      >${_btnLabel}</button>
+      ${!_isReps && _kgPickerKey === `${di}-${ei}` ? `
       <div class="ex-kg-picker" role="group" aria-label="Steigerung für nächste Woche">
         ${[0, 1.25, 2, 2.5, 5, 7.5, 10, 15, 20].map(v =>
           `<button class="ex-kg-picker-btn${ex.nextWeekPlan === v ? ' is-selected' : ''}"
@@ -986,18 +1007,23 @@ function renderExercise(wk, di, ei, state) {
         ${_kgPickerCustom ? `
         <div class="ex-kg-picker-custom">
           <input type="number" inputmode="decimal" min="0" step="0.25"
-            id="kg-picker-custom-input"
-            class="num-input"
-            placeholder="kg"
+            id="kg-picker-custom-input" class="num-input" placeholder="kg"
             data-action="kg-picker-custom-input" data-di="${di}" data-ei="${ei}"
-            aria-label="Eigener Steigerungswert"
-            autofocus
+            aria-label="Eigener Steigerungswert" autofocus
           />
           <button class="ex-kg-picker-btn" data-action="kg-picker-custom-confirm" data-di="${di}" data-ei="${ei}">OK</button>
         </div>` : `
         <button class="ex-kg-picker-btn ex-kg-picker-btn--other" data-action="kg-picker-show-custom" data-di="${di}" data-ei="${ei}">Anderer Wert</button>`}
       </div>` : ''}
-    </div>` : ''}
+      ${_isReps && _repsPickerKey === `${di}-${ei}` ? `
+      <div class="ex-kg-picker" role="group" aria-label="Wdh-Steigerung nächste Woche">
+        ${[1,2,3,4,5].map(v =>
+          `<button class="ex-kg-picker-btn${ex.nextWeekPlan === v ? ' is-selected' : ''}"
+            data-action="reps-picker-select" data-di="${di}" data-ei="${ei}" data-value="${v}"
+          >+${v}</button>`).join('')}
+      </div>` : ''}
+    </div>`;
+    })() : ''}
 
     <button
       class="btn-fav${isFav ? ' is-fav' : ''}"
@@ -1018,7 +1044,9 @@ function renderExercise(wk, di, ei, state) {
       <div class="ex-menu-dropdown" role="menu">
         ${!locked ? `
         <button class="ex-menu-item" role="menuitem" data-action="menu-open-kg-picker" data-di="${di}" data-ei="${ei}">
-          📈 Steigerung: ${ex.nextWeekPlan ? `+${ex.nextWeekPlan} kg` : 'planen'}
+          📈 Steigerung: ${(ex.progressionType ?? 'weight') === 'reps'
+            ? (ex.nextWeekPlan ? `+${ex.nextWeekPlan} Wdh` : 'Wdh planen')
+            : (ex.nextWeekPlan ? `+${ex.nextWeekPlan} kg` : 'planen')}
         </button>
         <button class="ex-menu-item" role="menuitem" data-action="move-ex-up" data-di="${di}" data-ei="${ei}" ${ei === 0 ? 'disabled' : ''}>▲ Nach oben</button>
         <button class="ex-menu-item" role="menuitem" data-action="move-ex-down" data-di="${di}" data-ei="${ei}" ${ei === wk.days[di].exercises.length - 1 ? 'disabled' : ''}>▼ Nach unten</button>
@@ -2299,10 +2327,11 @@ function _handleClick(e) {
     scheduleRender();
   }
 
-  // Close +kg picker on outside tap
-  if (_kgPickerKey !== null && !e.target.closest('.ex-kg-wrap')) {
+  // Close +kg / +Wdh picker on outside tap
+  if ((_kgPickerKey !== null || _repsPickerKey !== null) && !e.target.closest('.ex-kg-wrap')) {
     _kgPickerKey    = null;
     _kgPickerCustom = false;
+    _repsPickerKey  = null;
     scheduleRender();
   }
 
@@ -2692,25 +2721,43 @@ function _handleClick(e) {
     }
       
     case 'inc-weight': {
-      const _tapKey = `${di}-${ei}`;
-      const _now = Date.now();
-      const _last = _kgPickerLastTap[_tapKey] || 0;
-      if (_now - _last < 400) {
-        // Double-tap → open picker, cancel pending single-tap
-        _kgPickerLastTap[_tapKey] = 0;
-        _kgPickerKey    = _kgPickerKey === _tapKey ? null : _tapKey;
-        _kgPickerCustom = false;
-        scheduleRender();
+      const _iwEx    = getState().weeks[getState().curIdx]?.days[+di]?.exercises[+ei];
+      const _isRepsM = (_iwEx?.progressionType ?? 'weight') === 'reps';
+      const _tapKey  = `${di}-${ei}`;
+      const _now     = Date.now();
+      if (_isRepsM) {
+        const _last = _repsPickerLastTap[_tapKey] || 0;
+        if (_now - _last < 400) {
+          _repsPickerLastTap[_tapKey] = 0;
+          _repsPickerKey = _repsPickerKey === _tapKey ? null : _tapKey;
+          _kgPickerKey   = null;
+          scheduleRender();
+        } else {
+          _repsPickerLastTap[_tapKey] = _now;
+          setTimeout(() => {
+            if (_repsPickerLastTap[_tapKey] === _now) {
+              _repsPickerLastTap[_tapKey] = 0;
+              dispatch(A.EX_TOGGLE_NEXT_WEEK_CONFIRMED, { di: +di, ei: +ei });
+            }
+          }, 400);
+        }
       } else {
-        // First tap — wait to confirm it's not a double-tap
-        _kgPickerLastTap[_tapKey] = _now;
-        setTimeout(() => {
-          if (_kgPickerLastTap[_tapKey] === _now) {
-            // Single-tap confirmed — toggle nextWeekPlanConfirmed
-            _kgPickerLastTap[_tapKey] = 0;
-            dispatch(A.EX_TOGGLE_NEXT_WEEK_CONFIRMED, { di: +di, ei: +ei });
-          }
-        }, 400);
+        const _last = _kgPickerLastTap[_tapKey] || 0;
+        if (_now - _last < 400) {
+          _kgPickerLastTap[_tapKey] = 0;
+          _kgPickerKey    = _kgPickerKey === _tapKey ? null : _tapKey;
+          _kgPickerCustom = false;
+          _repsPickerKey  = null;
+          scheduleRender();
+        } else {
+          _kgPickerLastTap[_tapKey] = _now;
+          setTimeout(() => {
+            if (_kgPickerLastTap[_tapKey] === _now) {
+              _kgPickerLastTap[_tapKey] = 0;
+              dispatch(A.EX_TOGGLE_NEXT_WEEK_CONFIRMED, { di: +di, ei: +ei });
+            }
+          }, 400);
+        }
       }
       break;
     }
@@ -2749,10 +2796,36 @@ function _handleClick(e) {
       break;
     }
 
+    case 'reps-picker-select': {
+      const _rpVal = +el.dataset.value;
+      dispatch(A.EX_SET_NEXT_WEEK_PLAN, { di: +di, ei: +ei, value: _rpVal });
+      showToast(`+${_rpVal} Wdh nächste Woche bestätigt ✓`, 'ok');
+      _repsPickerKey = null;
+      scheduleRender();
+      break;
+    }
+
+    case 'set-progression-type': {
+      dispatch(A.EX_UPDATE, { di: +di, ei: +ei, field: 'progressionType', value: el.dataset.val });
+      // Reset plan when switching modes to avoid stale kg value being used as reps
+      dispatch(A.EX_SET_NEXT_WEEK_PLAN, { di: +di, ei: +ei, value: 0 });
+      _kgPickerKey   = null;
+      _repsPickerKey = null;
+      scheduleRender();
+      break;
+    }
+
     case 'menu-open-kg-picker': {
-      _kgPickerKey    = `${di}-${ei}`;
-      _kgPickerCustom = false;
-      _exMenuOpenKey  = null;
+      const _mpEx = getState().weeks[getState().curIdx]?.days[+di]?.exercises[+ei];
+      if ((_mpEx?.progressionType ?? 'weight') === 'reps') {
+        _repsPickerKey = `${di}-${ei}`;
+        _kgPickerKey   = null;
+      } else {
+        _kgPickerKey    = `${di}-${ei}`;
+        _kgPickerCustom = false;
+        _repsPickerKey  = null;
+      }
+      _exMenuOpenKey = null;
       scheduleRender();
       break;
     }
@@ -3296,6 +3369,7 @@ function _prepNewWeekModal() {
         for (const ex of day.exercises) {
           if (seen.has(ex.name)) continue;
           if (ex.substituteFor) continue;
+          if ((ex.progressionType ?? 'weight') === 'reps') continue;
           seen.add(ex.name);
           const rec = getWeightRecommendation(ex.name, calcWeeks, state.settings?.plateStep ?? 2.5);
           if (rec) aiRecs.push({ name: ex.name, rec });
@@ -3682,9 +3756,10 @@ export function mountApp(root) {
 
   // Close floating menus/pickers when user scrolls the day panel
   root.addEventListener('scroll', () => {
-    if (_exMenuOpenKey || _kgPickerKey) {
+    if (_exMenuOpenKey || _kgPickerKey || _repsPickerKey) {
       _exMenuOpenKey = null;
       _kgPickerKey   = null;
+      _repsPickerKey = null;
       scheduleRender();
     }
   }, { passive: true, capture: true });

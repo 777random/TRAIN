@@ -24,7 +24,7 @@
 
 export const STORAGE_KEY        = 'train_v6';
 export const STORAGE_KEY_SHADOW = 'train_v6_shadow';
-export const SCHEMA_VERSION     = 13;
+export const SCHEMA_VERSION     = 14;
 
 // 4.1: Canonical tag taxonomy
 export const AVAILABLE_TAGS = {
@@ -408,6 +408,14 @@ function migrate(raw) {
     raw.meta = { ...raw.meta, schemaVersion: 13 };
   }
 
+  // v13 → v14: add progressionType to all exercises
+  if ((raw.meta?.schemaVersion ?? 0) < 14) {
+    const _addPT = ex => { if (ex.progressionType === undefined) ex.progressionType = 'weight'; };
+    (raw.weeks ?? []).forEach(wk => (wk.days ?? []).forEach(day => (day.exercises ?? []).forEach(_addPT)));
+    (raw.customTemplate ?? []).forEach(day => (day.exercises ?? []).forEach(_addPT));
+    raw.meta = { ...raw.meta, schemaVersion: 14 };
+  }
+
   // Always-apply defaults for settings added in later versions
   if (raw.settings.vibrationEnabled               === undefined) raw.settings.vibrationEnabled               = true;
   if (raw.settings.rpeEnabled                     === undefined) raw.settings.rpeEnabled                     = true;
@@ -611,7 +619,11 @@ function _applyPlannedProgression(days) {
     (day.exercises ?? []).forEach(ex => {
       const plan = ex.nextWeekPlan || 0;
       if (plan && ex.nextWeekPlanConfirmed) {
-        (ex.sets ?? []).forEach(s => { s.weight = (parseFloat(s.weight) || 0) + plan; });
+        if ((ex.progressionType ?? 'weight') === 'reps') {
+          ex.targetReps = (ex.targetReps ?? 0) + plan;
+        } else {
+          (ex.sets ?? []).forEach(s => { s.weight = (parseFloat(s.weight) || 0) + plan; });
+        }
       }
       ex.nextWeekPlan = 0;
       ex.nextWeekPlanConfirmed = false;
@@ -786,6 +798,7 @@ function reduce(state, action) {
       const day = _currentWeek()?.days[p.di]; if (!day) break;
       day.exercises.push({
         name: p.name, note: '', pauseSec: 90, metric: 'reps',
+        progressionType: 'weight',
         sets: [mkSet(), mkSet(), mkSet()],
       });
       break;
