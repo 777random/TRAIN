@@ -19,9 +19,7 @@ export async function registerServiceWorker() {
   }
 
   try {
-    const registration = await navigator.serviceWorker.register('./sw.js', {
-      scope: '/',
-    });
+    const registration = await navigator.serviceWorker.register('./sw.js');
 
     registration.addEventListener('updatefound', () => {
       const newWorker = registration.installing;
