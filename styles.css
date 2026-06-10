@@ -1712,6 +1712,91 @@ details[open] > .deload-details__summary::before { content: '▾ '; }
 .wr-continue { margin-top: var(--sp-5); }
 .wr-continue__btn { width: 100%; }
 
+/* ── Session rating: static read-only after locking ──────── */
+.session-rating--static { pointer-events: none; }
+.session-rating__chosen { font-size: 22px; }
+.session-rating__meta { font-size: 12px; color: var(--c-text-3); padding: 2px 6px;
+  background: var(--c-surface2); border-radius: var(--r-full); }
+
+/* ── Day completion modal (Sprint 3) ──────────────────────── */
+.completion-modal-overlay {
+  position: fixed; inset: 0; z-index: 900;
+  background: rgba(0,0,0,.65); backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  padding: var(--sp-4);
+}
+.completion-modal {
+  background: var(--c-surface2); border: 1px solid var(--c-border-hi);
+  border-radius: var(--r-xl); box-shadow: var(--shadow-md);
+  padding: var(--sp-6); width: 100%; max-width: 340px;
+  display: flex; flex-direction: column; align-items: center; gap: var(--sp-4);
+}
+.completion-modal__title {
+  font-family: var(--font-display); font-size: 22px; letter-spacing: .08em;
+  color: var(--c-text); text-align: center;
+}
+.completion-modal__ratings { display: flex; gap: var(--sp-4); justify-content: center; }
+.completion-modal__rate-btn {
+  font-size: 36px; background: none; border: 2px solid transparent;
+  border-radius: var(--r-md); padding: var(--sp-2) var(--sp-3);
+  cursor: pointer; transition: transform var(--t-fast), border-color var(--t-fast);
+  min-height: var(--touch); min-width: var(--touch);
+}
+.completion-modal__rate-btn:hover { transform: scale(1.15); border-color: var(--c-border-hi); }
+.completion-modal__slider-row {
+  display: grid; grid-template-columns: auto 1fr auto;
+  align-items: center; gap: var(--sp-3); width: 100%;
+}
+.completion-modal__label { font-size: 14px; color: var(--c-text-2); white-space: nowrap; }
+.completion-modal__slider {
+  width: 100%; accent-color: var(--c-accent); cursor: pointer;
+}
+.completion-modal__val {
+  font-size: 14px; font-weight: 600; color: var(--c-accent);
+  min-width: 36px; text-align: right;
+}
+.completion-modal__confirm {
+  width: 100%; height: var(--touch); border-radius: var(--r-md);
+  background: var(--c-accent); color: #000; font-weight: 600;
+  font-size: 15px; border: none; cursor: pointer;
+  transition: opacity var(--t-fast);
+}
+.completion-modal__confirm:hover { opacity: .85; }
+.completion-modal__skip {
+  background: none; border: none; color: var(--c-text-3);
+  font-size: 13px; cursor: pointer; text-decoration: underline;
+  padding: var(--sp-1);
+}
+
+/* ── Day completion screen (Sprint 3) ─────────────────────── */
+.day-completion-screen {
+  position: fixed; inset: 0; z-index: 950;
+  background: var(--c-bg);
+  display: flex; align-items: center; justify-content: center;
+  animation: cs-in 280ms var(--ease) both;
+}
+@keyframes cs-in { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: none; } }
+.day-completion-screen__inner {
+  display: flex; flex-direction: column; align-items: center; gap: var(--sp-4);
+  padding: var(--sp-8);
+}
+.day-completion-screen__icon { font-size: 64px; line-height: 1; }
+.day-completion-screen__pct {
+  font-family: var(--font-display); font-size: 80px; line-height: 1;
+  color: var(--c-accent); letter-spacing: .04em;
+}
+.day-completion-screen__sets { font-size: 18px; color: var(--c-text-2); }
+.day-completion-screen__pr {
+  font-size: 20px; font-weight: 700; color: var(--c-warn);
+  background: rgba(255,179,0,.12); border-radius: var(--r-full);
+  padding: var(--sp-1) var(--sp-4);
+}
+.day-completion-screen__quote {
+  font-size: 14px; color: var(--c-text-3); text-align: center;
+  font-style: italic; max-width: 260px; line-height: 1.6;
+  margin-top: var(--sp-2);
+}
+
 /* ── Backup reminder banner (C2) ──────────────────────────── */
 .backup-reminder {
   position: fixed; bottom: calc(var(--sp-5) + env(safe-area-inset-bottom));

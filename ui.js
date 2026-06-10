@@ -86,6 +86,9 @@ let _autoOpened = false;
 /** Week index staged for deletion via the confirm modal. */
 let _deleteWeekIdx = null;
 
+/** Day index that triggered the completion modal flow. */
+let _completionModalDi = null;
+
 /** Last rendered week index – used to detect week navigation. */
 let _lastRenderedCurIdx = null;
 
@@ -678,21 +681,13 @@ function renderDayBody(wk, di, state) {
       ${done ? 'Gesperrt – Tippen zum Entsperren' : 'Abgeschlossen & sperren'}
     </button>
 
-    <!-- Fatigue indicator (3.5): shown after locking -->
-    ${done ? `
-    <div class="session-rating" role="group" aria-label="Wie war die Einheit?">
-      <span class="session-rating__lbl">Wie war die Einheit?</span>
-      ${[
-        { val: 1, icon: '😴', label: 'Erschöpft' },
-        { val: 2, icon: '😊', label: 'Gut' },
-        { val: 3, icon: '💪', label: 'Stark' },
-      ].map(r => `
-      <button
-        class="session-rating__btn${day.sessionRating === r.val ? ' is-selected' : ''}"
-        data-action="set-session-rating" data-di="${di}" data-val="${r.val}"
-        aria-pressed="${day.sessionRating === r.val}"
-        aria-label="${r.label}"
-      >${r.icon}</button>`).join('')}
+    <!-- Session rating: static read-only display after locking -->
+    ${done && day.sessionRating != null ? `
+    <div class="session-rating session-rating--static" aria-label="Einheitsbewertung">
+      <span class="session-rating__lbl">Einheit:</span>
+      <span class="session-rating__chosen">${[null,'😴','😊','💪'][day.sessionRating] ?? ''}</span>
+      ${day.sleepHours  != null ? `<span class="session-rating__meta">🛌 ${day.sleepHours}h</span>` : ''}
+      ${day.energyLevel != null ? `<span class="session-rating__meta">⚡ ${day.energyLevel}/5</span>` : ''}
     </div>` : ''}
 
     ${!locked ? `
@@ -2483,23 +2478,15 @@ function _handleClick(e) {
     }
 
     case 'toggle-complete': {
-      dispatch(A.DAY_TOGGLE_COMPLETE, { di: +di });
-      const afterStC  = getState();
-      const day       = afterStC.weeks[afterStC.curIdx]?.days[+di];
-      showToast(day?.markedDone ? 'Tag gesperrt 🔒' : 'Tag entsperrt 🔓', 'info');
-      if (day?.markedDone) {
-        const allDone  = afterStC.weeks[afterStC.curIdx]?.days.every(d => d.markedDone);
-        const trigger  = allDone ? 'WOCHE_ABGESCHLOSSEN' : 'TAG_ABGESCHLOSSEN';
-        const triggered = fireTrigger(trigger, { di: +di });
-        for (const ins of triggered) {
-          if (ins.immediate) showToast(ins.message, ins.type === 'warning' ? 'warn' : 'ok', 5000);
-        }
-        // Increment backup reminder counter when full week is done
-        if (allDone) {
-          const newCnt = (afterStC.settings.weeksSinceLastBackupReminder ?? 0) + 1;
-          dispatch(A.SETTING_SET, { key: 'weeksSinceLastBackupReminder', value: newCnt });
-          if (newCnt >= 4) setTimeout(_showBackupReminderToast, 800);
-        }
+      const stBefore  = getState();
+      const dayBefore = stBefore.weeks[stBefore.curIdx]?.days[+di];
+      if (dayBefore?.markedDone) {
+        // Unlocking: dispatch directly, no modal
+        dispatch(A.DAY_TOGGLE_COMPLETE, { di: +di });
+        showToast('Tag entsperrt 🔓', 'info');
+      } else {
+        // Locking: show 2-step completion modal first
+        _showDayCompletionModal(+di);
       }
       break;
     }
@@ -3656,6 +3643,160 @@ export function mountApp(root) {
       _showBackupReminderToast();
     }
   }, 2000);
+}
+
+function _getDayCompletionStats(di) {
+  const state = getState();
+  const day   = state.weeks[state.curIdx]?.days[di];
+  if (!day) return { successSets: 0, totalSets: 0, prCount: 0, pct: 0, quote: '' };
+  let successSets = 0, totalSets = 0, prCount = 0;
+  for (const ex of day.exercises ?? []) {
+    const exPR = state.prs?.[ex.name];
+    for (const s of ex.sets ?? []) {
+      totalSets++;
+      if (s.status === 'success') {
+        successSets++;
+        if (exPR && (s.weight ?? 0) > 0 && (
+          s.weight > exPR.maxWeight ||
+          (s.weight === exPR.maxWeight && (s.reps ?? 0) > (exPR.maxRepsAtMaxWeight ?? 0))
+        )) prCount++;
+      }
+    }
+  }
+  const pct = totalSets > 0 ? Math.round(successSets / totalSets * 100) : 0;
+  const quotes = [
+    'Kein Fortschritt ohne Konsequenz.',
+    'Du hast heute gewonnen.',
+    'Die Arbeit ist gemacht – dein Körper dankt es dir.',
+    'Stark heute, stärker morgen.',
+    'Jeder Satz zählt.',
+    'Das war kein Zufall – das war Wille.',
+    'Erschöpfung ist der Preis des Wachstums.',
+    'Jede Wiederholung bringt dich weiter.',
+    'Du kommst wieder. Das macht den Unterschied.',
+    'Erholung ist Teil des Plans.',
+  ];
+  return { successSets, totalSets, prCount, pct, quote: quotes[Math.floor(Math.random() * quotes.length)] };
+}
+
+function _finishCompletion(di, rating, sleepHours, energyLevel) {
+  document.getElementById('day-completion-modal')?.remove();
+  _completionModalDi = null;
+
+  const stats = _getDayCompletionStats(di);
+
+  dispatch(A.DAY_TOGGLE_COMPLETE, { di });
+  if (rating      != null) dispatch(A.DAY_SET_FIELD, { di, field: 'sessionRating', value: rating });
+  if (sleepHours  != null) dispatch(A.DAY_SET_FIELD, { di, field: 'sleepHours',    value: sleepHours });
+  if (energyLevel != null) dispatch(A.DAY_SET_FIELD, { di, field: 'energyLevel',   value: energyLevel });
+
+  showToast('Tag gesperrt 🔒', 'info');
+
+  const afterSt   = getState();
+  const lockedDay = afterSt.weeks[afterSt.curIdx]?.days[di];
+  if (lockedDay?.markedDone) {
+    const allDone   = afterSt.weeks[afterSt.curIdx]?.days.every(d => d.markedDone);
+    const trigger   = allDone ? 'WOCHE_ABGESCHLOSSEN' : 'TAG_ABGESCHLOSSEN';
+    const triggered = fireTrigger(trigger, { di });
+    for (const ins of triggered) {
+      if (ins.immediate) showToast(ins.message, ins.type === 'warning' ? 'warn' : 'ok', 5000);
+    }
+    if (allDone) {
+      const newCnt = (afterSt.settings.weeksSinceLastBackupReminder ?? 0) + 1;
+      dispatch(A.SETTING_SET, { key: 'weeksSinceLastBackupReminder', value: newCnt });
+      if (newCnt >= 4) setTimeout(_showBackupReminderToast, 800);
+    }
+  }
+
+  setTimeout(() => _showCompletionScreen(stats), 300);
+}
+
+function _showDayCompletionModal(di) {
+  _completionModalDi = di;
+  document.getElementById('day-completion-modal')?.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id        = 'day-completion-modal';
+  overlay.className = 'completion-modal-overlay';
+  overlay.innerHTML = `
+    <div class="completion-modal">
+      <h3 class="completion-modal__title">Wie war die Einheit?</h3>
+      <div class="completion-modal__ratings">
+        <button class="completion-modal__rate-btn" data-val="1" aria-label="Erschöpft">😴</button>
+        <button class="completion-modal__rate-btn" data-val="2" aria-label="Gut">😊</button>
+        <button class="completion-modal__rate-btn" data-val="3" aria-label="Stark">💪</button>
+      </div>
+      <button class="completion-modal__skip">Überspringen</button>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  overlay.querySelectorAll('.completion-modal__rate-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const rating    = +btn.dataset.val;
+      const st        = getState();
+      const day       = st.weeks[st.curIdx]?.days[di];
+      const initSleep  = day?.sleepHours  ?? 7;
+      const initEnergy = day?.energyLevel ?? 3;
+
+      overlay.innerHTML = `
+        <div class="completion-modal">
+          <h3 class="completion-modal__title">Erholung heute</h3>
+          <div class="completion-modal__slider-row">
+            <span class="completion-modal__label">🛌 Schlaf</span>
+            <input type="range" id="cm-sleep" class="completion-modal__slider"
+              min="3" max="10" step="0.5" value="${initSleep}">
+            <span class="completion-modal__val" id="cm-sleep-val">${initSleep}h</span>
+          </div>
+          <div class="completion-modal__slider-row">
+            <span class="completion-modal__label">⚡ Energie</span>
+            <input type="range" id="cm-energy" class="completion-modal__slider"
+              min="1" max="5" step="1" value="${initEnergy}">
+            <span class="completion-modal__val" id="cm-energy-val">${initEnergy}/5</span>
+          </div>
+          <button class="completion-modal__confirm">Fertig</button>
+          <button class="completion-modal__skip">Überspringen</button>
+        </div>`;
+
+      const sleepIn    = overlay.querySelector('#cm-sleep');
+      const energyIn   = overlay.querySelector('#cm-energy');
+      const sleepDisp  = overlay.querySelector('#cm-sleep-val');
+      const energyDisp = overlay.querySelector('#cm-energy-val');
+
+      sleepIn.addEventListener('input',  () => { sleepDisp.textContent  = `${sleepIn.value}h`; });
+      energyIn.addEventListener('input', () => { energyDisp.textContent = `${energyIn.value}/5`; });
+
+      overlay.querySelector('.completion-modal__confirm').addEventListener('click', () => {
+        _finishCompletion(di, rating, +sleepIn.value, +energyIn.value);
+      });
+      overlay.querySelector('.completion-modal__skip').addEventListener('click', () => {
+        _finishCompletion(di, rating, null, null);
+      });
+    });
+  });
+
+  overlay.querySelector('.completion-modal__skip').addEventListener('click', () => {
+    _finishCompletion(di, null, null, null);
+  });
+}
+
+function _showCompletionScreen(stats) {
+  const { successSets, totalSets, prCount, pct, quote } = stats;
+  document.getElementById('day-completion-screen')?.remove();
+  const el = document.createElement('div');
+  el.id        = 'day-completion-screen';
+  el.className = 'day-completion-screen';
+  el.innerHTML = `
+    <div class="day-completion-screen__inner">
+      <div class="day-completion-screen__icon">💪</div>
+      <div class="day-completion-screen__pct">${pct}%</div>
+      <div class="day-completion-screen__sets">${successSets}/${totalSets} Sätze erfolgreich</div>
+      ${prCount > 0 ? `<div class="day-completion-screen__pr">🏆 ${prCount} neues PR${prCount > 1 ? 's' : ''}!</div>` : ''}
+      <div class="day-completion-screen__quote">"${quote}"</div>
+    </div>`;
+  document.body.appendChild(el);
+  const dismiss = () => { clearTimeout(timer); el.remove(); };
+  const timer   = setTimeout(dismiss, 4000);
+  el.addEventListener('click', dismiss, { once: true });
 }
 
 function _showBackupReminderToast() {

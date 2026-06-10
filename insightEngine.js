@@ -502,11 +502,19 @@ export const INSIGHTS = [
     id: 'E-02', priority: 16, type: 'recovery',
     trigger: ['WOCHE_ABGESCHLOSSEN'],
     evaluate(state) {
-      const sorted = getSortedWeeks(state).filter(w => w.bodyData?.sleep != null);
-      if (sorted.length < 6) return null;
       const threshold = 7;
-      const withS    = sorted.filter(w => w.bodyData.sleep >= threshold);
-      const withoutS = sorted.filter(w => w.bodyData.sleep < threshold);
+      // Prefer per-day sleepHours (averaged over done days), fall back to weekly bodyData.sleep
+      const sleepMap = new Map();
+      const all = getSortedWeeks(state);
+      all.forEach(wk => {
+        const daySleeps = wk.days.filter(d => d.sleepHours != null).map(d => d.sleepHours);
+        const avgDay = daySleeps.length > 0 ? daySleeps.reduce((a, b) => a + b, 0) / daySleeps.length : null;
+        sleepMap.set(wk, avgDay ?? wk.bodyData?.sleep ?? null);
+      });
+      const sorted = all.filter(wk => sleepMap.get(wk) != null);
+      if (sorted.length < 6) return null;
+      const withS    = sorted.filter(w => sleepMap.get(w) >= threshold);
+      const withoutS = sorted.filter(w => sleepMap.get(w) < threshold);
       if (withS.length < 2 || withoutS.length < 2) return null;
       const avgWith    = withS.reduce((s, w) => s + getCompletionRate(w), 0) / withS.length;
       const avgWithout = withoutS.reduce((s, w) => s + getCompletionRate(w), 0) / withoutS.length;

@@ -24,7 +24,7 @@
 
 export const STORAGE_KEY        = 'train_v6';
 export const STORAGE_KEY_SHADOW = 'train_v6_shadow';
-export const SCHEMA_VERSION     = 12;
+export const SCHEMA_VERSION     = 13;
 
 // 4.1: Canonical tag taxonomy
 export const AVAILABLE_TAGS = {
@@ -397,6 +397,17 @@ function migrate(raw) {
     };
   }
 
+  // v12 → v13: add sleepHours/energyLevel to all days
+  if ((raw.meta?.schemaVersion ?? 0) < 13) {
+    (raw.weeks ?? []).forEach(wk =>
+      (wk.days ?? []).forEach(day => {
+        if (day.sleepHours  === undefined) day.sleepHours  = null;
+        if (day.energyLevel === undefined) day.energyLevel = null;
+      })
+    );
+    raw.meta = { ...raw.meta, schemaVersion: 13 };
+  }
+
   // Always-apply defaults for settings added in later versions
   if (raw.settings.vibrationEnabled               === undefined) raw.settings.vibrationEnabled               = true;
   if (raw.settings.rpeEnabled                     === undefined) raw.settings.rpeEnabled                     = true;
@@ -578,6 +589,8 @@ function _resetClonedDays(days) {
     day.sessionRating   = null;
     day.sessionStartTs  = null;
     day.sessionEndTs    = null;
+    day.sleepHours      = null;
+    day.energyLevel     = null;
     (day.exercises ?? []).forEach(ex => {
       if (ex._showCfg) ex._showCfg = false;
       if (ex.substituteFor) ex.name = ex.substituteFor;
@@ -709,6 +722,8 @@ function reduce(state, action) {
         markedDone:     false,
         sessionStartTs: null,
         sessionEndTs:   null,
+        sleepHours:     null,
+        energyLevel:    null,
         exercises:      [],
       });
       break;
@@ -719,13 +734,15 @@ function reduce(state, action) {
       const label   = labels[wk.days.length] ?? String(wk.days.length + 1);
       const srcDay  = p.sourceDi != null ? wk.days[p.sourceDi] : null;
       const newDay = {
-        id:         Date.now(),
-        title:      `Tag ${label}`,
-        subtitle:   srcDay?.subtitle ?? '',
-        warmup:     srcDay?.warmup  ?? '',
-        cooldown:   srcDay?.cooldown ?? '',
-        locked:     false,
-        markedDone: false,
+        id:             Date.now(),
+        title:          `Tag ${label}`,
+        subtitle:       srcDay?.subtitle ?? '',
+        warmup:         srcDay?.warmup   ?? '',
+        cooldown:       srcDay?.cooldown ?? '',
+        locked:         false,
+        markedDone:     false,
+        sleepHours:     null,
+        energyLevel:    null,
         exercises:  srcDay ? srcDay.exercises.map(ex => ({
           ...JSON.parse(JSON.stringify(ex)),
           sets: ex.sets.map(s => ({ ...s, status: 'pending', done: false })),
