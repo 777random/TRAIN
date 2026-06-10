@@ -1712,6 +1712,20 @@ details[open] > .deload-details__summary::before { content: '▾ '; }
 .wr-continue { margin-top: var(--sp-5); }
 .wr-continue__btn { width: 100%; }
 
+/* ── Exercise settings two-level panel (Sprint 4) ─────────── */
+.cfg-adv-toggle {
+  background: none; border: none;
+  color: var(--c-text-3); font-size: 12px;
+  padding: var(--sp-2) 0 var(--sp-1);
+  cursor: pointer; text-align: left; width: 100%;
+  transition: color var(--t-fast);
+}
+.cfg-adv-toggle:hover, .cfg-adv-toggle.is-open { color: var(--c-text-2); }
+.cfg-adv-panel {
+  display: flex; flex-direction: column; gap: var(--sp-2);
+  padding-top: var(--sp-2); border-top: 1px solid var(--c-border);
+}
+
 /* ── Session rating: static read-only after locking ──────── */
 .session-rating--static { pointer-events: none; }
 .session-rating__chosen { font-size: 22px; }

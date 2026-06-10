@@ -80,6 +80,9 @@ let _kgPickerLastTap = {};
 /** Set of `${di}-${ei}` keys whose Vorwoche mini-tables are expanded. */
 const _prevGridOpen = new Set();
 
+/** Set of `${di}-${ei}` keys whose advanced cfg section is expanded. */
+const _cfgAdvOpen = new Set();
+
 /** Tracks whether the first-day auto-open has already happened. */
 let _autoOpened = false;
 
@@ -382,6 +385,7 @@ function renderDayList(state) {
     _overviewMode = false;
     _exChartOpen.clear();
     _prevGridOpen.clear();
+    _cfgAdvOpen.clear();
     _subFormOpenKey = null;
     _scrollToFirstPending(_activeDayIdx);
   }
@@ -806,9 +810,31 @@ function renderExercise(wk, di, ei, state) {
   </div>`
     : '';
 
-  // --- Das neue, cleane Zahnrad-Menü ---
+  // --- Zweistufiges Zahnrad-Menü (Sprint 4) ---
+  const cfgKey    = `${di}-${ei}`;
+  const isAdvOpen = _cfgAdvOpen.has(cfgKey);
   const cfgRow = ex._showCfg ? `
     <div class="exercise__settings">
+      <!-- Ebene 1: häufig genutzt — immer sichtbar -->
+      ${!locked ? `
+      <div class="weight-plan-row" role="group" aria-label="Zielvorgaben">
+        <span class="pause-row__label">Ziel:</span>
+        <span class="pause-row__label">${ex.sets.length}&times;</span>
+        <input
+          class="target-input"
+          type="number"
+          inputmode="${metric === 'm' ? 'decimal' : 'numeric'}"
+          min="1" max="999"
+          step="${metric === 'sec' || metric === 'm' ? '5' : '1'}"
+          value="${ex.targetReps ?? ''}"
+          placeholder="${metric === 'sec' ? 'z.B. 30' : metric === 'm' ? 'z.B. 20' : 'z.B. 10'}"
+          data-action="set-targets" data-field="targetReps"
+          data-di="${di}" data-ei="${ei}"
+          aria-label="Ziel ${metric === 'sec' ? 'Sekunden' : metric === 'm' ? 'Meter' : 'Wiederholungen'}"
+        />
+        <span class="pause-row__label">${metricHdr}</span>
+        ${_suggestionHtml}
+      </div>` : ''}
       <div class="pause-row" role="group" aria-label="Einstellungen">
         <span class="pause-row__label">Pause:</span>
         ${[30, 60, 90, 120].map(sec => `
@@ -835,89 +861,79 @@ function renderExercise(wk, di, ei, state) {
             >${label}</button>`).join('')}
         </div>
       </div>` : ''}
-      ${!locked ? `
-      <div class="weight-plan-row" role="group" aria-label="Steigerungsrate">
-        <span class="pause-row__label">Schrittweite:</span>
-        <div class="weight-step-opts">
-          ${[0, 1.25, 2, 2.5, 5, 7.5, 10].map(s => `
-            <button
-              class="weight-step-btn${step === s ? ' is-selected' : ''}"
-              data-action="set-step" data-di="${di}" data-ei="${ei}" data-step="${s}"
-              aria-pressed="${step === s}"
-            >${s === 0 ? 'Reset' : s}</button>`).join('')}
+      <!-- Erweitert-Toggle -->
+      <button class="cfg-adv-toggle${isAdvOpen ? ' is-open' : ''}"
+        data-action="toggle-cfg-adv" data-di="${di}" data-ei="${ei}"
+        aria-expanded="${isAdvOpen}"
+      >Erweitert ${isAdvOpen ? '▲' : '▼'}</button>
+      <!-- Ebene 2: selten genutzt — hinter Erweitert -->
+      ${isAdvOpen ? `
+      <div class="cfg-adv-panel">
+        ${!locked ? `
+        <div class="weight-plan-row" role="group" aria-label="Satz-Typ">
+          <span class="pause-row__label">Typ:</span>
+          <div class="weight-step-opts">
+            ${[['straight','Straight'],['manual','Manuell']].map(([val, lbl]) => `
+              <button type="button"
+                class="weight-step-btn${(ex.setType ?? 'straight') === val ? ' is-selected' : ''}"
+                data-action="set-settype" data-di="${di}" data-ei="${ei}" data-val="${val}"
+                aria-pressed="${(ex.setType ?? 'straight') === val}"
+              >${lbl}</button>`).join('')}
+          </div>
+          ${(ex.setType ?? 'straight') === 'straight'
+            ? '<span class="pause-row__label" style="color:var(--c-text-3);font-size:10px">Gewicht wird automatisch auf alle Sätze kopiert</span>'
+            : ''}
+        </div>` : ''}
+        ${!locked ? `
+        <div class="weight-plan-row" role="group" aria-label="Gewichtsscheiben">
+          <span class="pause-row__label">Scheiben:</span>
+          <button
+            type="button"
+            class="weight-step-btn${ex.showPlates ? ' is-selected' : ''}"
+            data-action="toggle-plates" data-di="${di}" data-ei="${ei}"
+            aria-pressed="${!!ex.showPlates}"
+          >${ex.showPlates ? 'An' : 'Aus'}</button>
+          ${ex.showPlates ? '<span class="pause-row__label" style="color:var(--c-text-3);font-size:10px">Langhantel 20 kg Basis</span>' : ''}
+        </div>` : ''}
+        ${!locked ? `
+        <div class="weight-plan-row" role="group" aria-label="Superset">
+          <span class="pause-row__label">Superset:</span>
+          <button
+            type="button"
+            class="weight-step-btn${ex.supersetId ? ' is-selected' : ''}"
+            data-action="toggle-superset" data-di="${di}" data-ei="${ei}"
+            aria-pressed="${!!ex.supersetId}"
+          >${ex.supersetId ? 'An (SS)' : 'Aus'}</button>
+        </div>` : ''}
+        <!-- Tags (3.12) -->
+        <div class="weight-plan-row exercise-tags-row" role="group" aria-label="Tags">
+          <span class="pause-row__label">Tags:</span>
+          <div class="tag-chips">
+            ${(state.settings?.activeTags ?? ALL_TAGS_FLAT).map(tag => {
+              const active = (ex.tags ?? []).includes(tag);
+              return `<button
+                type="button"
+                class="tag-chip${active ? ' is-selected' : ''}"
+                data-action="toggle-ex-tag" data-di="${di}" data-ei="${ei}" data-tag="${h(tag)}"
+                aria-pressed="${active}"
+              >${h(tag)}</button>`;
+            }).join('')}
+          </div>
+          <div style="font-size:11px;color:var(--c-text-3);margin-top:2px">Nur aktivierte Tags erscheinen hier.</div>
         </div>
+        ${!locked ? `
+        <div class="weight-plan-row" role="group" aria-label="Steigerungsrate">
+          <span class="pause-row__label">Schrittweite:</span>
+          <div class="weight-step-opts">
+            ${[0, 1.25, 2, 2.5, 5, 7.5, 10].map(s => `
+              <button
+                class="weight-step-btn${step === s ? ' is-selected' : ''}"
+                data-action="set-step" data-di="${di}" data-ei="${ei}" data-step="${s}"
+                aria-pressed="${step === s}"
+              >${s === 0 ? 'Reset' : s}</button>`).join('')}
+          </div>
+        </div>` : ''}
       </div>` : ''}
-      ${!locked ? `
-      <div class="weight-plan-row" role="group" aria-label="Satz-Typ">
-        <span class="pause-row__label">Typ:</span>
-        <div class="weight-step-opts">
-          ${[['straight','Straight'],['manual','Manuell']].map(([val, lbl]) => `
-            <button type="button"
-              class="weight-step-btn${(ex.setType ?? 'straight') === val ? ' is-selected' : ''}"
-              data-action="set-settype" data-di="${di}" data-ei="${ei}" data-val="${val}"
-              aria-pressed="${(ex.setType ?? 'straight') === val}"
-            >${lbl}</button>`).join('')}
-        </div>
-        ${(ex.setType ?? 'straight') === 'straight'
-          ? '<span class="pause-row__label" style="color:var(--c-text-3);font-size:10px">Gewicht wird automatisch auf alle Sätze kopiert</span>'
-          : ''}
-      </div>` : ''}
-      ${!locked ? `
-      <div class="weight-plan-row" role="group" aria-label="Gewichtsscheiben">
-        <span class="pause-row__label">Scheiben:</span>
-        <button
-          type="button"
-          class="weight-step-btn${ex.showPlates ? ' is-selected' : ''}"
-          data-action="toggle-plates" data-di="${di}" data-ei="${ei}"
-          aria-pressed="${!!ex.showPlates}"
-        >${ex.showPlates ? 'An' : 'Aus'}</button>
-        ${ex.showPlates ? '<span class="pause-row__label" style="color:var(--c-text-3);font-size:10px">Langhantel 20 kg Basis</span>' : ''}
-      </div>` : ''}
-      ${!locked ? `
-      <div class="weight-plan-row" role="group" aria-label="Superset">
-        <span class="pause-row__label">Superset:</span>
-        <button
-          type="button"
-          class="weight-step-btn${ex.supersetId ? ' is-selected' : ''}"
-          data-action="toggle-superset" data-di="${di}" data-ei="${ei}"
-          aria-pressed="${!!ex.supersetId}"
-        >${ex.supersetId ? 'An (SS)' : 'Aus'}</button>
-      </div>` : ''}
-      ${!locked ? `
-      <div class="weight-plan-row" role="group" aria-label="Zielvorgaben">
-        <span class="pause-row__label">Ziel:</span>
-        <span class="pause-row__label">${ex.sets.length}&times;</span>
-        <input
-          class="target-input"
-          type="number"
-          inputmode="${metric === 'm' ? 'decimal' : 'numeric'}"
-          min="1" max="999"
-          step="${metric === 'sec' || metric === 'm' ? '5' : '1'}"
-          value="${ex.targetReps ?? ''}"
-          placeholder="${metric === 'sec' ? 'z.B. 30' : metric === 'm' ? 'z.B. 20' : 'z.B. 10'}"
-          data-action="set-targets" data-field="targetReps"
-          data-di="${di}" data-ei="${ei}"
-          aria-label="Ziel ${metric === 'sec' ? 'Sekunden' : metric === 'm' ? 'Meter' : 'Wiederholungen'}"
-        />
-        <span class="pause-row__label">${metricHdr}</span>
-        ${_suggestionHtml}
-      </div>` : ''}
-      <!-- Tags (3.12) -->
-      <div class="weight-plan-row exercise-tags-row" role="group" aria-label="Tags">
-        <span class="pause-row__label">Tags:</span>
-        <div class="tag-chips">
-          ${(state.settings?.activeTags ?? ALL_TAGS_FLAT).map(tag => {
-            const active = (ex.tags ?? []).includes(tag);
-            return `<button
-              type="button"
-              class="tag-chip${active ? ' is-selected' : ''}"
-              data-action="toggle-ex-tag" data-di="${di}" data-ei="${ei}" data-tag="${h(tag)}"
-              aria-pressed="${active}"
-            >${h(tag)}</button>`;
-          }).join('')}
-        </div>
-        <div style="font-size:11px;color:var(--c-text-3);margin-top:2px">Nur aktivierte Tags erscheinen hier.</div>
-      </div>
     </div>` : '';
 
   return `
@@ -2542,6 +2558,14 @@ function _handleClick(e) {
       const _pgKey = `${di}-${ei}`;
       if (_prevGridOpen.has(_pgKey)) _prevGridOpen.delete(_pgKey);
       else _prevGridOpen.add(_pgKey);
+      scheduleRender();
+      break;
+    }
+
+    case 'toggle-cfg-adv': {
+      const _advKey = `${di}-${ei}`;
+      if (_cfgAdvOpen.has(_advKey)) _cfgAdvOpen.delete(_advKey);
+      else _cfgAdvOpen.add(_advKey);
       scheduleRender();
       break;
     }
