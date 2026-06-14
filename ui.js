@@ -82,9 +82,6 @@ let _repsPickerKey = null;
 /** Last-tap timestamp for +Wdh double-tap detection: `${di}-${ei}` → ms. */
 let _repsPickerLastTap = {};
 
-/** Set of `${di}-${ei}` keys whose Vorwoche mini-tables are expanded. */
-const _prevGridOpen = new Set();
-
 /** Set of `${di}-${ei}` keys whose advanced cfg section is expanded. */
 const _cfgAdvOpen = new Set();
 
@@ -549,7 +546,6 @@ function renderDayList(state) {
     _activeDayIdx = _getDefaultDayIndex(wk);
     _overviewMode = false;
     _exChartOpen.clear();
-    _prevGridOpen.clear();
     _cfgAdvOpen.clear();
     _subFormOpenKey = null;
     _scrollToFirstPending(_activeDayIdx);
@@ -1271,35 +1267,6 @@ function renderExercise(wk, di, ei, state) {
     ${setsHtml}
   </div>
 
-  ${prevEx ? (() => {
-    const _pgKey  = `${di}-${ei}`;
-    const _pgOpen = _prevGridOpen.has(_pgKey);
-    return `<div class="prev-grid-wrap">
-      <button
-        class="prev-grid-toggle${_pgOpen ? ' is-open' : ''}"
-        data-action="toggle-prev-grid" data-di="${di}" data-ei="${ei}"
-        aria-expanded="${_pgOpen}"
-        aria-controls="prev-grid-${di}-${ei}"
-      >📋 Vorwoche</button>
-      ${_pgOpen ? `<div class="prev-grid${rpeEnabled ? ' prev-grid--rpe' : ''}" id="prev-grid-${di}-${ei}" role="table" aria-label="Vorwoche Sätze">
-        <div class="prev-grid-row prev-grid-header" role="row">
-          <span role="columnheader">#</span>
-          <span role="columnheader">kg</span>
-          <span role="columnheader">Wdh</span>
-          ${rpeEnabled ? '<span role="columnheader">RPE</span>' : ''}
-          <span role="columnheader">✓</span>
-        </div>
-        ${(prevEx.sets ?? []).map((ps, psi) => `
-          <div class="prev-grid-row" role="row">
-            <span role="cell">${psi + 1}</span>
-            <span role="cell">${ps.weight ?? '–'}</span>
-            <span role="cell">${ps.reps ?? '–'}</span>
-            ${rpeEnabled ? `<span role="cell">${ps.rpe != null ? ps.rpe : '–'}</span>` : ''}
-            <span role="cell" class="${ps.status === 'success' ? 'prev-grid-ok' : ps.status === 'fail' ? 'prev-grid-fail' : ''}">${ps.status === 'success' ? '✓' : ps.status === 'fail' ? '✗' : '–'}</span>
-          </div>`).join('')}
-      </div>` : ''}
-    </div>`;
-  })() : ''}
 
   ${!locked ? (() => {
     const _normSt = s => (s.status === 'success' || s.status === 'fail') ? s.status : (s.done ? 'success' : 'pending');
@@ -1459,7 +1426,7 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
   <!-- RPE popover trigger (2.2) -->
   <div class="set-cell set-cell--rpe">
     ${!rpeEnabled ? '' : locked
-      ? `<span class="rpe-static">${s.rpe ?? '–'}</span>`
+      ? `<span class="rpe-static">${s.rpe ?? '–'}</span>${prevSet?.rpe != null ? `<span class="prev-hint" aria-hidden="true">RPE ${prevSet.rpe}</span>` : ''}`
       : (() => {
           const cur    = s.rpe ?? null;
           const label  = cur !== null ? String(cur) : '–';
@@ -1488,7 +1455,7 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
               }).join('')}
             </div>
           </div>` : ''}
-          <span class="prev-hint" aria-hidden="true">${prevSet?.rpe ? prevSet.rpe : ''}</span>`;
+          <span class="prev-hint" aria-hidden="true">${prevSet?.rpe != null ? 'RPE ' + prevSet.rpe : ''}</span>`;
         })()
     }
   </div>
@@ -1862,6 +1829,7 @@ function renderAnalysisTab(state) {
       ${allExNames.map(n => `<option value="${h(n)}">${h(n)}</option>`).join('')}
     </select>
     <div class="chart-wrap" id="chart-ex-wrap"></div>
+    <div id="chart-last4-wrap"></div>
   </div>
 
   <div class="chart-card">
@@ -2122,6 +2090,58 @@ function _updateExChart(state) {
   } else {
     wrap.innerHTML = '<p style="font-size:13px;color:var(--c-text-3);padding:12px 0">Noch zu wenig Daten — ab 2 Trainingswochen sichtbar.</p>';
   }
+  const last4Wrap = document.getElementById('chart-last4-wrap');
+  if (last4Wrap) last4Wrap.innerHTML = _renderLast4Units(name, state);
+}
+
+function _renderLast4Units(name, state) {
+  const rpeEnabled = state.settings?.rpeEnabled ?? true;
+  const weeksWithEx = [];
+  const sorted = [...state.weeks].sort((a, b) => b.startDate.localeCompare(a.startDate));
+  for (const wk of sorted) {
+    if (wk.mode === 'deload') continue;
+    const found = wk.days.flatMap(d => d.exercises ?? [])
+      .find(ex => ex.name === name || ex.substituteFor === name);
+    if (found?.sets?.length) weeksWithEx.push({ wk, ex: found });
+    if (weeksWithEx.length >= 4) break;
+  }
+  if (!weeksWithEx.length) return '';
+
+  const sections = weeksWithEx.map(({ wk, ex }) => {
+    const d  = new Date(wk.startDate + 'T12:00:00');
+    const kw = _isoWeek(d);
+    const dd = `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.`;
+    const hdr = `KW ${String(kw).padStart(2,'0')} · ${dd}`;
+    const rows = (ex.sets ?? []).map((s, si) => {
+      const sc  = s.status === 'success' ? ' class="l4-ok"' : s.status === 'fail' ? ' class="l4-fail"' : '';
+      const ico = s.status === 'success' ? '✓' : s.status === 'fail' ? '✗' : '–';
+      return `<div class="l4-row" role="row">
+        <span role="cell">${si + 1}</span>
+        <span role="cell">${s.weight ?? '–'}</span>
+        <span role="cell">${s.reps ?? '–'}</span>
+        ${rpeEnabled ? `<span role="cell">${s.rpe ?? '–'}</span>` : ''}
+        <span role="cell"${sc}>${ico}</span>
+      </div>`;
+    }).join('');
+    return `<div class="l4-week">
+      <div class="l4-week-hdr">${hdr}</div>
+      <div class="l4-table${rpeEnabled ? ' l4-table--rpe' : ''}" role="table" aria-label="Sätze ${hdr}">
+        <div class="l4-row l4-row--hdr" role="row">
+          <span role="columnheader">#</span>
+          <span role="columnheader">kg</span>
+          <span role="columnheader">Wdh</span>
+          ${rpeEnabled ? '<span role="columnheader">RPE</span>' : ''}
+          <span role="columnheader">✓</span>
+        </div>
+        ${rows}
+      </div>
+    </div>`;
+  }).join('');
+
+  return `<details class="l4-details">
+    <summary class="l4-summary">📋 Letzte 4 Einheiten</summary>
+    <div class="l4-body">${sections}</div>
+  </details>`;
 }
 
 function _drawHeatmap(state) {
@@ -2880,14 +2900,6 @@ function _handleClick(e) {
       dispatch(A.EX_TOGGLE_CFG, { di: +di, ei: +ei });
       const _cfgEx = getState().weeks[getState().curIdx]?.days[+di]?.exercises[+ei];
       _cfgOpenKey = _cfgEx?._showCfg ? `${di}-${ei}` : null;
-      break;
-    }
-
-    case 'toggle-prev-grid': {
-      const _pgKey = `${di}-${ei}`;
-      if (_prevGridOpen.has(_pgKey)) _prevGridOpen.delete(_pgKey);
-      else _prevGridOpen.add(_pgKey);
-      scheduleRender();
       break;
     }
 
