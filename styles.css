@@ -174,11 +174,18 @@ button, input, select, textarea { font: inherit; }
 .week-nav__btn:disabled { opacity: .35; cursor: not-allowed; }
 .week-nav__info { text-align: center; flex: 1; min-width: 0; }
 .week-nav__label {
-  font-family: var(--font-display); font-size: 24px; letter-spacing: .1em;
-  line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-family: var(--font-display); font-size: 20px; letter-spacing: .06em;
+  line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap;
 }
 .week-nav__label--deload { color: var(--c-deload); }
 .week-nav__range { font-size: 11px; color: var(--c-text-3); }
+.wk-badge-current {
+  font-family: var(--font-body); font-size: 11px; font-weight: 700;
+  background: var(--c-accent); color: #000;
+  padding: 1px 7px; border-radius: var(--r-full); letter-spacing: .04em;
+  flex-shrink: 0;
+}
 
 /* ── Toolbar (now lives inside .day-tab-bar) ───────────────── */
 .toolbar {
@@ -912,8 +919,25 @@ exercise { position: unset; }
 /* +kg-Button im Übungskopf */
 .btn-icon--kg { font-size: 11px; font-weight: 700; letter-spacing: -0.02em; opacity: 0.6; }
 .btn-icon--kg:hover { opacity: 1; }
-.btn-icon--kg.is-planned { color: var(--c-accent); opacity: 1; }
+.btn-icon--kg.is-planned:not(.is-confirmed) { color: var(--c-accent); opacity: 1; }
 .btn-icon--kg.is-confirmed { color: var(--c-ok); opacity: 1; box-shadow: 0 0 0 1.5px var(--c-ok); border-radius: var(--r-sm); }
+
+/* Gewichts-Vergleich Pfeile in Satzzeilen */
+.w-arrow--up { color: var(--c-ok); }
+.w-arrow--eq { color: var(--c-text-3); }
+.w-arrow--dn { color: var(--c-danger); }
+
+/* Timer Reset-Button */
+.toolbar__btn--reset {
+  font-size: 16px; font-weight: 700;
+  width: 30px; height: 30px;
+  border-radius: var(--r-md); border: 1px solid var(--c-border);
+  background: var(--c-surface); color: var(--c-text-3);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; flex-shrink: 0;
+  transition: color var(--t-fast), border-color var(--t-fast);
+}
+.toolbar__btn--reset:hover { color: var(--c-text); border-color: var(--c-border-hi); }
 
 /* +kg Picker Popover */
 .ex-kg-wrap { position: relative; flex-shrink: 0; }
@@ -1891,6 +1915,54 @@ details[open] > .deload-details__summary::before { content: '▾ '; }
   letter-spacing: .08em; line-height: 1;
 }
 .badge-earned-overlay__sub { font-size: 16px; color: var(--c-text-3); }
+
+/* ── Onboarding ──────────────────────────────────────────── */
+.onboarding {
+  position: fixed; inset: 0; z-index: 970;
+  background: var(--c-bg);
+  display: flex; align-items: flex-start; justify-content: center;
+  overflow-y: auto;
+}
+.ob-screen {
+  display: flex; flex-direction: column; align-items: center;
+  gap: var(--sp-4); padding: var(--sp-8) var(--sp-5);
+  width: 100%; max-width: 440px;
+  min-height: 100svh; justify-content: center;
+}
+.ob-indicator { display: flex; gap: var(--sp-2); margin-bottom: var(--sp-2); }
+.ob-dot { width: 8px; height: 8px; border-radius: 50%; background: #2E2E35; transition: background 200ms; }
+.ob-dot--active { background: var(--c-accent); }
+.ob-logo {
+  font-family: var(--font-display); font-size: 88px;
+  color: var(--c-accent); line-height: 1; letter-spacing: .1em;
+}
+.ob-title {
+  font-family: var(--font-display); font-size: 30px;
+  color: var(--c-text); letter-spacing: .04em;
+  text-align: center; margin: 0;
+}
+.ob-title--sm { font-size: 22px; }
+.ob-sub {
+  font-size: 14px; color: var(--c-text-2);
+  text-align: center; line-height: 1.6;
+  margin: 0; max-width: 320px;
+}
+.ob-btn { width: 100%; max-width: 320px; }
+.ob-btn--sm { font-size: 13px; opacity: .6; margin-top: calc(-1 * var(--sp-1)); }
+.ob-tpl-list { display: flex; flex-direction: column; gap: var(--sp-3); width: 100%; }
+.ob-tpl-card {
+  display: flex; align-items: center; gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r-lg); border: 2px solid var(--c-border);
+  background: var(--c-surface); cursor: pointer;
+  transition: border-color 140ms, background 140ms;
+  user-select: none;
+}
+.ob-tpl-card.is-selected { border-color: var(--c-accent); background: rgba(200,255,0,.07); }
+.ob-tpl-icon { font-size: 26px; flex-shrink: 0; }
+.ob-tpl-title { font-size: 14px; font-weight: 600; color: var(--c-text); }
+.ob-tpl-meta { font-size: 12px; color: var(--c-text-2); margin-top: 2px; }
+.ob-tpl-sub { font-size: 11px; color: var(--c-text-3); margin-top: 1px; }
 
 /* ── Backup reminder banner (C2) ──────────────────────────── */
 .backup-reminder {

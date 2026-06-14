@@ -166,7 +166,7 @@ const _MAX_UNDO  = 20;
 
 // Actions that are pure navigation or external events — not worth undoing.
 const _NO_UNDO = new Set([
-  'UNDO', 'WEEK_NAVIGATE', 'STATE_IMPORT', 'SESSION_START', 'SESSION_STOP',
+  'UNDO', 'WEEK_NAVIGATE', 'STATE_IMPORT', 'SESSION_START', 'SESSION_RESET', 'SESSION_STOP',
   'INSIGHTS_SET', 'ONBOARDING_DONE',
 ]);
 
@@ -614,6 +614,7 @@ export const A = Object.freeze({
   EX_SET_SUBSTITUTE:   'EX_SET_SUBSTITUTE',   // { di, ei, substituteFor: string|null }
   // Session log
   SESSION_START:       'SESSION_START',       // { di, ts }  – persists day.sessionStartTs
+  SESSION_RESET:       'SESSION_RESET',       // { di }  – clears sessionStartTs so timer can restart
   SESSION_STOP:        'SESSION_STOP',        // { duration, time }
   // Body data
   BODY_SET_FIELD:      'BODY_SET_FIELD',      // { field, value }
@@ -1061,6 +1062,12 @@ function reduce(state, action) {
       const wk = _currentWeek(); if (!wk) break;
       const day = wk.days[p.di]; if (!day) break;
       if (!day.sessionStartTs) day.sessionStartTs = p.ts ?? Date.now();
+      break;
+    }
+    case A.SESSION_RESET: {
+      const wk = _currentWeek(); if (!wk) break;
+      const day = wk.days[p.di]; if (!day) break;
+      day.sessionStartTs = null;
       break;
     }
     case A.SESSION_STOP: {

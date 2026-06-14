@@ -303,6 +303,36 @@ function wkRange(sd) {
   return `${fmt(d)} – ${fmt(end)}`;
 }
 
+/** ISO-8601 week number for a Date object. */
+function _isoWeek(d) {
+  const t = new Date(d.getTime());
+  t.setHours(12, 0, 0, 0);
+  t.setDate(t.getDate() + 4 - (t.getDay() || 7));
+  const yearStart = new Date(t.getFullYear(), 0, 1);
+  return Math.ceil((((t - yearStart) / 86400000) + 1) / 7);
+}
+
+/** Returns "10.–16. Juni 2026" (full month name, year) for header display. */
+function _wkRangeFull(sd) {
+  const start = new Date(sd + 'T12:00:00');
+  const end   = new Date(start);
+  end.setDate(start.getDate() + 6);
+  const sameMonth = start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear();
+  const startStr  = sameMonth
+    ? `${start.getDate()}.`
+    : start.toLocaleDateString('de-DE', { day: 'numeric', month: 'long' });
+  const endStr = end.toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' });
+  return `${startStr}–${endStr}`;
+}
+
+/** True when today falls within the 7-day span starting at sd. */
+function _isCurrentWeek(sd) {
+  const now   = new Date(); now.setHours(12, 0, 0, 0);
+  const start = new Date(sd + 'T12:00:00');
+  const end   = new Date(start); end.setDate(start.getDate() + 6);
+  return now >= start && now <= end;
+}
+
 /**
  * Calculates plates per side for an Olympic bar (20 kg default).
  * Returns a compact string like "10+5+2.5" or null if not achievable.
@@ -476,10 +506,17 @@ function renderWeekHeader(state) {
   const dlBtn   = document.getElementById('mode-dl');
 
   if (labelEl) {
-    labelEl.textContent = wk ? wkLabel(wk.startDate) : '–';
-    labelEl.className   = 'week-nav__label' + (isDl ? ' week-nav__label--deload' : '');
+    if (wk) {
+      const kw      = _isoWeek(new Date(wk.startDate + 'T12:00:00'));
+      const range   = _wkRangeFull(wk.startDate);
+      const badge   = _isCurrentWeek(wk.startDate) ? ' <span class="wk-badge-current">Aktuell</span>' : '';
+      labelEl.innerHTML = `KW ${String(kw).padStart(2,'0')} · ${range}${badge}`;
+    } else {
+      labelEl.textContent = '–';
+    }
+    labelEl.className = 'week-nav__label' + (isDl ? ' week-nav__label--deload' : '');
   }
-  if (rangeEl)  rangeEl.textContent = wk ? wkRange(wk.startDate) : '';
+  if (rangeEl)  rangeEl.textContent = '';
   if (prevBtn)  prevBtn.disabled    = isFirst;
   if (nextBtn)  nextBtn.disabled    = isLast;
   if (stdBtn)   stdBtn.classList.toggle('is-active', !isDl);
@@ -546,6 +583,7 @@ function renderDayList(state) {
     >${ic.zap()}&thinsp;Deload</button>
     <span class="toolbar__spacer"></span>
     <span id="toolbar-session-timer" class="toolbar-timer" role="timer" aria-label="Session-Timer">00:00</span>
+    <button class="toolbar__btn toolbar__btn--reset" id="btn-reset-timer" data-action="reset-timer" aria-label="Timer zurücksetzen" title="Timer zurücksetzen">↺</button>
     <button class="toolbar__btn" id="btn-undo" data-action="undo"
       aria-label="Rückgängig machen"${!canUndo() ? ' disabled' : ''}>${ic.undo()}</button>
     <button class="toolbar__btn toolbar__btn--accent" data-action="open-new-week"
@@ -1267,6 +1305,7 @@ function renderExercise(wk, di, ei, state) {
   <!-- Soll-Ist + Fulfillment combined row (2.4): always visible, no toggle -->
   ${(() => {
     if (!ex.targetReps) return '';
+    if (ex.substituteFor && (!prevEx || prevEx.metric !== ex.metric)) return '';
     const nSets     = ex.sets.length;
     const target    = nSets * ex.targetReps;
     const achieved  = ex.sets.filter(s => s.status === 'success').reduce((sum, s) => sum + (s.reps ?? 0), 0);
@@ -1366,7 +1405,17 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
     />
     ${isPR ? `<span class="pr-badge" aria-label="Bestleistung! ${s.weight} kg">${ic.trophy()} ${s.weight} kg</span>` : ''}
     ${isEffortGoal ? `<span class="pr-badge pr-badge--goal" aria-label="${effortScore}% Zielerfüllung">✓ ${effortScore}% Ziel</span>` : ''}
-    <span class="prev-hint" aria-hidden="true">${prevSet ? `↑ ${prevSet.weight}kg × ${prevSet.reps ?? '–'}` : ''}</span>
+    ${(() => {
+      if (!prevSet) return '<span class="prev-hint" aria-hidden="true"></span>';
+      const curW = s.weight ?? 0;
+      let arrow = '';
+      if (curW > 0) {
+        if      (curW > prevSet.weight) arrow = '<span class="w-arrow w-arrow--up">↑</span> ';
+        else if (curW < prevSet.weight) arrow = '<span class="w-arrow w-arrow--dn">↓</span> ';
+        else                            arrow = '<span class="w-arrow w-arrow--eq">→</span> ';
+      }
+      return `<span class="prev-hint" aria-hidden="true">${arrow}${prevSet.weight}kg × ${prevSet.reps ?? '–'}</span>`;
+    })()}
     ${ex.showPlates && dispW > 0 ? (() => { const pl = calcPlates(dispW); return pl ? `<span class="plate-hint" aria-hidden="true" title="Scheiben je Seite">▪ ${pl}</span>` : ''; })() : ''}
   </div>
 
@@ -2596,6 +2645,20 @@ function _handleClick(e) {
       dispatch(A.UNDO, {});
       showToast('Rückgängig gemacht ↩', 'ok');
       break;
+
+    case 'reset-timer': {
+      const _rst = getState();
+      const _rwk = _rst.weeks[_rst.curIdx];
+      if (!_rwk) break;
+      const _rdi = _activeDayIdx !== null
+        ? _activeDayIdx
+        : _rwk.days.findIndex(d => d.sessionStartTs && !d.sessionEndTs);
+      const _rday = _rdi >= 0 ? _rwk.days[_rdi] : null;
+      if (!_rday?.sessionStartTs) break;
+      if (!confirm('Timer zurücksetzen?')) break;
+      dispatch(A.SESSION_RESET, { di: _rdi });
+      break;
+    }
 
     case 'nav-prev':
       dispatch(A.WEEK_NAVIGATE, { delta: -1 }); break;
@@ -4262,9 +4325,8 @@ function _showOnboarding() {
       el.innerHTML = `
         <div class="ob-screen">
           <div class="ob-indicator">${_dots()}</div>
-          <div class="ob-logo">T</div>
-          <h1 class="ob-title">Willkommen bei TRAIN</h1>
-          <p class="ob-sub">Dein persönlicher Trainingspartner.</p>
+          <h1 class="ob-title">Jede Woche ein bisschen besser.</h1>
+          <p class="ob-sub">Du trainierst. TRAIN erkennt, wann mehr möglich ist.</p>
           <button class="btn btn--accent ob-btn" data-ob="next">Weiter →</button>
         </div>`;
     } else if (_step === 2) {
@@ -4288,8 +4350,8 @@ function _showOnboarding() {
     } else {
       const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
       const hint  = isIos
-        ? 'Tippe auf das Teilen-Symbol <strong>⎙</strong> und wähle <strong>„Zum Home-Bildschirm"</strong>, um TRAIN zu installieren. Nur so bleiben deine Daten dauerhaft gespeichert.'
-        : 'Tippe auf das Menü <strong>⋮</strong> und wähle <strong>„App installieren"</strong> oder <strong>„Zum Startbildschirm hinzufügen"</strong>.';
+        ? '<strong>Wichtig:</strong> iOS löscht App-Daten automatisch nach 7 Tagen wenn die App nicht auf dem Homescreen installiert ist.<br><br>Tippe auf <strong>Teilen ↑</strong> → <strong>„Zum Home-Bildschirm hinzufügen"</strong> um deine Trainingsdaten dauerhaft zu sichern.'
+        : 'Tippe auf <strong>Menü ⋮</strong> → <strong>„App installieren"</strong> um TRAIN auf deinem Startbildschirm zu speichern und Datenverlust zu vermeiden.';
       el.innerHTML = `
         <div class="ob-screen">
           <div class="ob-indicator">${_dots()}</div>
