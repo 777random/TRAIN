@@ -677,8 +677,16 @@ function _applyPlannedProgression(days) {
     (day.exercises ?? []).forEach(ex => {
       const plan = ex.nextWeekPlan || 0;
       if (plan && ex.nextWeekPlanConfirmed) {
-        if ((ex.progressionType ?? 'weight') === 'reps') {
+        const pt = ex.progressionType ?? 'weight';
+        if (pt === 'reps') {
           ex.targetReps = (ex.targetReps ?? 0) + plan;
+        } else if (pt === 'sets') {
+          const toAdd = Math.max(0, Math.round(plan));
+          const last  = ex.sets[ex.sets.length - 1];
+          for (let i = 0; i < toAdd; i++) {
+            ex.sets.push(mkSet(last?.weight ?? 0, last?.reps ?? ex.targetReps ?? 10));
+          }
+          if (ex.targetSets !== undefined) ex.targetSets += toAdd;
         } else {
           (ex.sets ?? []).forEach(s => { s.weight = (parseFloat(s.weight) || 0) + plan; });
         }

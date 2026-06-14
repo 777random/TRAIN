@@ -919,7 +919,7 @@ exercise { position: unset; }
 /* +kg-Button im Übungskopf */
 .btn-icon--kg { font-size: 11px; font-weight: 700; letter-spacing: -0.02em; opacity: 0.6; }
 .btn-icon--kg:hover { opacity: 1; }
-.btn-icon--kg.is-planned:not(.is-confirmed) { color: var(--c-accent); opacity: 1; }
+.btn-icon--kg.is-planned:not(.is-confirmed) { color: var(--c-ok); opacity: 1; }
 .btn-icon--kg.is-confirmed { color: var(--c-ok); opacity: 1; box-shadow: 0 0 0 1.5px var(--c-ok); border-radius: var(--r-sm); }
 
 /* Gewichts-Vergleich Pfeile in Satzzeilen */

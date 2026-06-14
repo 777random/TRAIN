@@ -305,6 +305,7 @@ function wkRange(sd) {
 
 /** ISO-8601 week number for a Date object. */
 function _isoWeek(d) {
+  if (!d || isNaN(d.getTime())) return 1;
   const t = new Date(d.getTime());
   t.setHours(12, 0, 0, 0);
   t.setDate(t.getDate() + 4 - (t.getDay() || 7));
@@ -314,23 +315,27 @@ function _isoWeek(d) {
 
 /** Returns "10.–16. Juni 2026" (full month name, year) for header display. */
 function _wkRangeFull(sd) {
-  const start = new Date(sd + 'T12:00:00');
-  const end   = new Date(start);
-  end.setDate(start.getDate() + 6);
-  const sameMonth = start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear();
-  const startStr  = sameMonth
-    ? `${start.getDate()}.`
-    : start.toLocaleDateString('de-DE', { day: 'numeric', month: 'long' });
-  const endStr = end.toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' });
-  return `${startStr}–${endStr}`;
+  try {
+    const start = new Date(sd + 'T12:00:00');
+    const end   = new Date(start);
+    end.setDate(start.getDate() + 6);
+    const sameMonth = start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear();
+    const startStr  = sameMonth
+      ? `${start.getDate()}.`
+      : start.toLocaleDateString('de-DE', { day: 'numeric', month: 'long' });
+    const endStr = end.toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' });
+    return `${startStr}–${endStr}`;
+  } catch (_) { return wkRange(sd); }
 }
 
 /** True when today falls within the 7-day span starting at sd. */
 function _isCurrentWeek(sd) {
-  const now   = new Date(); now.setHours(12, 0, 0, 0);
-  const start = new Date(sd + 'T12:00:00');
-  const end   = new Date(start); end.setDate(start.getDate() + 6);
-  return now >= start && now <= end;
+  try {
+    const now   = new Date(); now.setHours(12, 0, 0, 0);
+    const start = new Date(sd + 'T12:00:00');
+    const end   = new Date(start); end.setDate(start.getDate() + 6);
+    return now >= start && now <= end;
+  } catch (_) { return false; }
 }
 
 /**
@@ -1036,6 +1041,11 @@ function renderExercise(wk, di, ei, state) {
             data-action="set-progression-type" data-di="${di}" data-ei="${ei}" data-val="reps"
             aria-pressed="${(ex.progressionType ?? 'weight') === 'reps'}"
           >Wdh ↑</button>
+          <button type="button"
+            class="weight-step-btn${(ex.progressionType ?? 'weight') === 'sets' ? ' is-selected' : ''}"
+            data-action="set-progression-type" data-di="${di}" data-ei="${ei}" data-val="sets"
+            aria-pressed="${(ex.progressionType ?? 'weight') === 'sets'}"
+          >Satz ↑</button>
         </div>
       </div>` : ''}
       <!-- Erweitert-Toggle -->
@@ -1137,11 +1147,15 @@ function renderExercise(wk, di, ei, state) {
     >📈</button>
 
     ${!locked ? (() => {
-      const _isReps = (ex.progressionType ?? 'weight') === 'reps';
-      const _planVal = ex.nextWeekPlan || (_isReps ? 1 : 0);
+      const _pt     = ex.progressionType ?? 'weight';
+      const _isReps = _pt === 'reps';
+      const _isSets = _pt === 'sets';
+      const _planVal = ex.nextWeekPlan || (_isReps || _isSets ? 1 : 0);
       const _btnLabel = _isReps
         ? `+${_planVal} Wdh${ex.nextWeekPlanConfirmed ? ' ✓' : ''}`
-        : `+${ex.nextWeekPlan || 0}${ex.nextWeekPlanConfirmed ? ' ✓' : ''}`;
+        : _isSets
+          ? `+${_planVal} Satz${ex.nextWeekPlanConfirmed ? ' ✓' : ''}`
+          : `+${ex.nextWeekPlan || 0}${ex.nextWeekPlanConfirmed ? ' ✓' : ''}`;
       return `
     <div class="ex-kg-wrap">
       <button
@@ -1149,7 +1163,7 @@ function renderExercise(wk, di, ei, state) {
         data-action="inc-weight" data-di="${di}" data-ei="${ei}"
         aria-label="${ex.nextWeekPlanConfirmed ? `${_btnLabel} bestätigt` : `${_btnLabel} — tippen zum Bestätigen`}"
       >${_btnLabel}</button>
-      ${!_isReps && _kgPickerKey === `${di}-${ei}` ? `
+      ${!_isReps && !_isSets && _kgPickerKey === `${di}-${ei}` ? `
       <div class="ex-kg-picker" role="group" aria-label="Steigerung für nächste Woche">
         ${[0, 1.25, 2, 2.5, 5, 7.5, 10, 15, 20].map(v =>
           `<button class="ex-kg-picker-btn${ex.nextWeekPlan === v ? ' is-selected' : ''}"
@@ -1172,6 +1186,13 @@ function renderExercise(wk, di, ei, state) {
           `<button class="ex-kg-picker-btn${ex.nextWeekPlan === v ? ' is-selected' : ''}"
             data-action="reps-picker-select" data-di="${di}" data-ei="${ei}" data-value="${v}"
           >+${v}</button>`).join('')}
+      </div>` : ''}
+      ${_isSets && _repsPickerKey === `${di}-${ei}` ? `
+      <div class="ex-kg-picker" role="group" aria-label="Satz-Steigerung nächste Woche">
+        ${[0,1,2,3].map(v =>
+          `<button class="ex-kg-picker-btn${ex.nextWeekPlan === v ? ' is-selected' : ''}"
+            data-action="reps-picker-select" data-di="${di}" data-ei="${ei}" data-value="${v}"
+          >${v === 0 ? '0' : '+' + v}</button>`).join('')}
       </div>` : ''}
     </div>`;
     })() : ''}
@@ -1390,6 +1411,21 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
                : st === 'fail'    ? ic.xMark()
                : '';
 
+  // Prev-week weight hint with directional arrow (computed before template literal)
+  let _prevWeightHint = '<span class="prev-hint" aria-hidden="true"></span>';
+  if (prevSet) {
+    const _curW = s.weight ?? 0;
+    let _arr = '';
+    if (_curW > 0) {
+      if      (_curW > (prevSet.weight ?? 0)) _arr = '<span class="w-arrow w-arrow--up">↑</span> ';
+      else if (_curW < (prevSet.weight ?? 0)) _arr = '<span class="w-arrow w-arrow--dn">↓</span> ';
+      else                                    _arr = '<span class="w-arrow w-arrow--eq">→</span> ';
+    }
+    const _pw = prevSet.weight != null ? prevSet.weight : '–';
+    const _pr = prevSet.reps   != null ? prevSet.reps   : '–';
+    _prevWeightHint = `<span class="prev-hint" aria-hidden="true">${_arr}${_pw}kg×${_pr}</span>`;
+  }
+
   return `
 <div class="set-row" role="listitem" data-di="${di}" data-ei="${ei}" data-si="${si}">
 
@@ -1405,17 +1441,7 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
     />
     ${isPR ? `<span class="pr-badge" aria-label="Bestleistung! ${s.weight} kg">${ic.trophy()} ${s.weight} kg</span>` : ''}
     ${isEffortGoal ? `<span class="pr-badge pr-badge--goal" aria-label="${effortScore}% Zielerfüllung">✓ ${effortScore}% Ziel</span>` : ''}
-    ${(() => {
-      if (!prevSet) return '<span class="prev-hint" aria-hidden="true"></span>';
-      const curW = s.weight ?? 0;
-      let arrow = '';
-      if (curW > 0) {
-        if      (curW > prevSet.weight) arrow = '<span class="w-arrow w-arrow--up">↑</span> ';
-        else if (curW < prevSet.weight) arrow = '<span class="w-arrow w-arrow--dn">↓</span> ';
-        else                            arrow = '<span class="w-arrow w-arrow--eq">→</span> ';
-      }
-      return `<span class="prev-hint" aria-hidden="true">${arrow}${prevSet.weight}kg × ${prevSet.reps ?? '–'}</span>`;
-    })()}
+    ${_prevWeightHint}
     ${ex.showPlates && dispW > 0 ? (() => { const pl = calcPlates(dispW); return pl ? `<span class="plate-hint" aria-hidden="true" title="Scheiben je Seite">▪ ${pl}</span>` : ''; })() : ''}
   </div>
 
@@ -2969,7 +2995,7 @@ function _handleClick(e) {
       
     case 'inc-weight': {
       const _iwEx    = getState().weeks[getState().curIdx]?.days[+di]?.exercises[+ei];
-      const _isRepsM = (_iwEx?.progressionType ?? 'weight') === 'reps';
+      const _isRepsM = (_iwEx?.progressionType ?? 'weight') === 'reps' || (_iwEx?.progressionType ?? 'weight') === 'sets';
       const _tapKey  = `${di}-${ei}`;
       const _now     = Date.now();
       if (_isRepsM) {
