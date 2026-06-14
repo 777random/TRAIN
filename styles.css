@@ -620,6 +620,7 @@ exercise { position: unset; }
   font-size: 10px;
   font-weight: 500;
 }
+.prev-grid--rpe .prev-grid-row { grid-template-columns: 20px 1fr 1fr 1fr 20px; }
 .prev-grid-ok  { color: var(--c-ok); }
 .prev-grid-fail { color: var(--c-danger); }
 

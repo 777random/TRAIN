@@ -1150,7 +1150,7 @@ function renderExercise(wk, di, ei, state) {
       const _pt     = ex.progressionType ?? 'weight';
       const _isReps = _pt === 'reps';
       const _isSets = _pt === 'sets';
-      const _planVal = ex.nextWeekPlan || (_isReps || _isSets ? 1 : 0);
+      const _planVal = ex.nextWeekPlanConfirmed ? (ex.nextWeekPlan ?? 0) : (ex.nextWeekPlan || (_isReps || _isSets ? 1 : 0));
       const _btnLabel = _isReps
         ? `+${_planVal} Wdh${ex.nextWeekPlanConfirmed ? ' ✓' : ''}`
         : _isSets
@@ -1182,10 +1182,10 @@ function renderExercise(wk, di, ei, state) {
       </div>` : ''}
       ${_isReps && _repsPickerKey === `${di}-${ei}` ? `
       <div class="ex-kg-picker" role="group" aria-label="Wdh-Steigerung nächste Woche">
-        ${[1,2,3,4,5].map(v =>
+        ${[0,1,2,3,4,5].map(v =>
           `<button class="ex-kg-picker-btn${ex.nextWeekPlan === v ? ' is-selected' : ''}"
             data-action="reps-picker-select" data-di="${di}" data-ei="${ei}" data-value="${v}"
-          >+${v}</button>`).join('')}
+          >${v === 0 ? '0' : '+' + v}</button>`).join('')}
       </div>` : ''}
       ${_isSets && _repsPickerKey === `${di}-${ei}` ? `
       <div class="ex-kg-picker" role="group" aria-label="Satz-Steigerung nächste Woche">
@@ -1281,11 +1281,12 @@ function renderExercise(wk, di, ei, state) {
         aria-expanded="${_pgOpen}"
         aria-controls="prev-grid-${di}-${ei}"
       >📋 Vorwoche</button>
-      ${_pgOpen ? `<div class="prev-grid" id="prev-grid-${di}-${ei}" role="table" aria-label="Vorwoche Sätze">
+      ${_pgOpen ? `<div class="prev-grid${rpeEnabled ? ' prev-grid--rpe' : ''}" id="prev-grid-${di}-${ei}" role="table" aria-label="Vorwoche Sätze">
         <div class="prev-grid-row prev-grid-header" role="row">
           <span role="columnheader">#</span>
           <span role="columnheader">kg</span>
           <span role="columnheader">Wdh</span>
+          ${rpeEnabled ? '<span role="columnheader">RPE</span>' : ''}
           <span role="columnheader">✓</span>
         </div>
         ${(prevEx.sets ?? []).map((ps, psi) => `
@@ -1293,6 +1294,7 @@ function renderExercise(wk, di, ei, state) {
             <span role="cell">${psi + 1}</span>
             <span role="cell">${ps.weight ?? '–'}</span>
             <span role="cell">${ps.reps ?? '–'}</span>
+            ${rpeEnabled ? `<span role="cell">${ps.rpe != null ? ps.rpe : '–'}</span>` : ''}
             <span role="cell" class="${ps.status === 'success' ? 'prev-grid-ok' : ps.status === 'fail' ? 'prev-grid-fail' : ''}">${ps.status === 'success' ? '✓' : ps.status === 'fail' ? '✗' : '–'}</span>
           </div>`).join('')}
       </div>` : ''}
@@ -1422,8 +1424,7 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
       else                                    _arr = '<span class="w-arrow w-arrow--eq">→</span> ';
     }
     const _pw = prevSet.weight != null ? prevSet.weight : '–';
-    const _pr = prevSet.reps   != null ? prevSet.reps   : '–';
-    _prevWeightHint = `<span class="prev-hint" aria-hidden="true">${_arr}${_pw}kg×${_pr}</span>`;
+    _prevWeightHint = `<span class="prev-hint" aria-hidden="true">${_arr}${_pw}kg</span>`;
   }
 
   return `
@@ -3072,7 +3073,9 @@ function _handleClick(e) {
     case 'reps-picker-select': {
       const _rpVal = +el.dataset.value;
       dispatch(A.EX_SET_NEXT_WEEK_PLAN, { di: +di, ei: +ei, value: _rpVal });
-      showToast(`+${_rpVal} Wdh nächste Woche bestätigt ✓`, 'ok');
+      const _rpEx    = getState().weeks[getState().curIdx]?.days[+di]?.exercises[+ei];
+      const _rpLabel = (_rpEx?.progressionType ?? 'reps') === 'sets' ? 'Satz' : 'Wdh';
+      showToast(`+${_rpVal} ${_rpLabel} nächste Woche bestätigt ✓`, 'ok');
       _repsPickerKey = null;
       scheduleRender();
       break;
@@ -4374,7 +4377,7 @@ function _showOnboarding() {
           <button class="btn btn--ghost ob-btn ob-btn--sm" data-ob="skip">Ohne Vorlage starten</button>
         </div>`;
     } else {
-      const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+      const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
       const hint  = isIos
         ? '<strong>Wichtig:</strong> iOS löscht App-Daten automatisch nach 7 Tagen wenn die App nicht auf dem Homescreen installiert ist.<br><br>Tippe auf <strong>Teilen ↑</strong> → <strong>„Zum Home-Bildschirm hinzufügen"</strong> um deine Trainingsdaten dauerhaft zu sichern.'
         : 'Tippe auf <strong>Menü ⋮</strong> → <strong>„App installieren"</strong> um TRAIN auf deinem Startbildschirm zu speichern und Datenverlust zu vermeiden.';

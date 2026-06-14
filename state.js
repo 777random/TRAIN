@@ -682,11 +682,13 @@ function _applyPlannedProgression(days) {
           ex.targetReps = (ex.targetReps ?? 0) + plan;
         } else if (pt === 'sets') {
           const toAdd = Math.max(0, Math.round(plan));
+          console.log(`[TRAIN] sets-progression: "${ex.name}" +${toAdd} Satz (vorher: ${ex.sets.length})`);
           const last  = ex.sets[ex.sets.length - 1];
           for (let i = 0; i < toAdd; i++) {
             ex.sets.push(mkSet(last?.weight ?? 0, last?.reps ?? ex.targetReps ?? 10));
           }
           if (ex.targetSets !== undefined) ex.targetSets += toAdd;
+          console.log(`[TRAIN] sets-progression: "${ex.name}" nachher: ${ex.sets.length} Sätze`);
         } else {
           (ex.sets ?? []).forEach(s => { s.weight = (parseFloat(s.weight) || 0) + plan; });
         }
