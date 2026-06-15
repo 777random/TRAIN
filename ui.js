@@ -2718,6 +2718,9 @@ function _handleClick(e) {
       } else {
         _showInsights = !_showInsights;
       }
+      if (_showInsights && getState().insights.some(i => i.id === 'S-06')) {
+        _maybeShowTip('tip-10', 'TRAIN hat erkannt dass du seit 3 Wochen keine Steigerung mehr machst. Scrolle nach unten für konkrete Strategien.');
+      }
       scheduleRender();
       break;
 
@@ -2778,6 +2781,7 @@ function _handleClick(e) {
       dispatch(A.WEEK_SET_MODE, { mode: 'standard' }); break;
 
     case 'mode-dl':
+      _maybeShowTip('tip-08', 'Deload-Woche: reduziertes Training zur Erholung. TRAIN schließt diese Woche aus der Fortschrittsanalyse aus — kein Einfluss auf Steigerungsempfehlungen.');
       dispatch(A.WEEK_SET_MODE, { mode: 'deload' }); break;
 
     case 'mode-vac':
@@ -2785,6 +2789,9 @@ function _handleClick(e) {
 
     case 'toggle-day-vacation': {
       const _di = +tgt.dataset.di;
+      if (!getState().weeks[getState().curIdx]?.days[_di]?.isVacation) {
+        _maybeShowTip('tip-09', 'Urlaubstage unterbrechen deinen Streak nicht. Markiere sie damit TRAIN deine Analyse korrekt berechnet.');
+      }
       dispatch(A.DAY_TOGGLE_VACATION, { di: _di });
       break;
     }
@@ -3041,6 +3048,7 @@ function _handleClick(e) {
     }
 
     case 'open-sub-form':
+      _maybeShowTip('tip-11', 'Ersetzt diese Übung nur für heute. Nächste Woche kehrt TRAIN automatisch zur Originalübung zurück.');
       _subFormOpenKey = `${di}-${ei}`;
       scheduleRender();
       break;
