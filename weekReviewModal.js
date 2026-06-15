@@ -44,10 +44,11 @@ function _cards(items, mod) {
  * Wird sowohl vom Modal als auch vom Analyse-Tab genutzt.
  */
 export function renderWeekReviewHtml(reviewData) {
-  const { summary, highlights, lowlights, recommendations, isDeload, week } = reviewData;
+  const { summary, highlights, lowlights, recommendations, isDeload, isVacation, week } = reviewData;
   const kw = String(_kw(week.startDate)).padStart(2, '0');
 
   return `
+  ${isVacation ? '<div class="wr-vacation-banner">🏖 Urlaubswoche — Streak läuft weiter</div>' : ''}
   ${isDeload ? '<div class="wr-deload-banner">Deload-Woche — reduziertes Volumen erwartet</div>' : ''}
   <div class="wr-kw-row">
     <span class="wr-kw">KW ${kw}</span>

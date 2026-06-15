@@ -24,7 +24,7 @@
 
 export const STORAGE_KEY        = 'train_v6';
 export const STORAGE_KEY_SHADOW = 'train_v6_shadow';
-export const SCHEMA_VERSION     = 15;
+export const SCHEMA_VERSION     = 17;
 
 export const BADGE_THRESHOLDS = [
   { id: 'badge_4',   weeks: 4,   title: 'Erster Schritt' },
@@ -262,7 +262,7 @@ function _calcCurrentStreak(weeks) {
   const sorted = [...weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
   let cur = 0;
   for (let i = sorted.length - 1; i >= 0; i--) {
-    if (sorted[i].days.some(d => !!d.markedDone)) cur++;
+    if (sorted[i].days.some(d => !!d.markedDone) || sorted[i].mode === 'vacation') cur++;
     else break;
   }
   return cur;
@@ -468,6 +468,14 @@ function migrate(raw) {
     raw.meta = { ...raw.meta, schemaVersion: 15 };
   }
 
+  // v15 → v17: ensure all weeks have a mode field (vacation mode introduced)
+  if ((raw.meta?.schemaVersion ?? 0) < 17) {
+    (raw.weeks ?? []).forEach(wk => {
+      if (!wk.mode) wk.mode = 'standard';
+    });
+    raw.meta = { ...raw.meta, schemaVersion: 17 };
+  }
+
   // Always-apply defaults for settings added in later versions
   if (raw.settings.vibrationEnabled               === undefined) raw.settings.vibrationEnabled               = true;
   if (raw.settings.rpeEnabled                     === undefined) raw.settings.rpeEnabled                     = true;
@@ -582,7 +590,7 @@ export const A = Object.freeze({
   WEEK_CREATE:         'WEEK_CREATE',         // { startDate, note, source?: 'prev'|'template' }
   WEEK_DELETE:         'WEEK_DELETE',         // { weekIdx?: number }  — omit to delete curIdx
   WEEK_COPY_PREV:      'WEEK_COPY_PREV',      // {}
-  WEEK_SET_MODE:       'WEEK_SET_MODE',       // { mode: 'standard'|'deload' }
+  WEEK_SET_MODE:       'WEEK_SET_MODE',       // { mode: 'standard'|'deload'|'vacation' }
   WEEK_SET_NOTE:       'WEEK_SET_NOTE',       // { note }
   // Day
   DAY_ADD:             'DAY_ADD',             // {}

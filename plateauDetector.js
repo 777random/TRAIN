@@ -93,7 +93,7 @@ function _buildTexts(exName, plateauWeeks, strategy) {
 export function detectPlateaus(allWeeks, favoriteExercises = [], rpeEnabled = true) {
   const favs = favoriteExercises ?? [];
   const sortedNonDeload = [...allWeeks]
-    .filter(w => w.mode !== 'deload')
+    .filter(w => w.mode !== 'deload' && w.mode !== 'vacation')
     .sort((a, b) => a.startDate.localeCompare(b.startDate));
 
   if (sortedNonDeload.length < 3) return [];

@@ -166,7 +166,8 @@ function _buildRecommendations(highlights, lowlights, completedDays, plannedDays
  * @returns {{ summary, highlights, lowlights, recommendations, isDeload, week }}
  */
 export function buildWeekReview(week, allWeeks, favoriteExercises = [], plateaus = []) {
-  const isDeload = week.mode === 'deload';
+  const isDeload   = week.mode === 'deload';
+  const isVacation = week.mode === 'vacation';
   const sorted   = [...allWeeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
   const weekIdx  = sorted.findIndex(w => w === week || w.startDate === week.startDate);
   const prevWeek = weekIdx > 0 ? sorted[weekIdx - 1] : null;
@@ -241,5 +242,5 @@ export function buildWeekReview(week, allWeeks, favoriteExercises = [], plateaus
     recommendations[1] = { text: plateaus[0].actionText };
   }
 
-  return { summary, highlights, lowlights, recommendations, isDeload, week };
+  return { summary, highlights, lowlights, recommendations, isDeload, isVacation, week };
 }

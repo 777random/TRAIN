@@ -497,6 +497,7 @@ function _getDefaultDayIndex(wk) {
 function renderWeekHeader(state) {
   const wk      = state.weeks[state.curIdx];
   const isDl    = wk?.mode === 'deload';
+  const isVac   = wk?.mode === 'vacation';
   const isFirst = state.curIdx === 0;
   const isLast  = state.curIdx === state.weeks.length - 1;
 
@@ -511,12 +512,13 @@ function renderWeekHeader(state) {
     if (wk) {
       const kw      = _isoWeek(new Date(wk.startDate + 'T12:00:00'));
       const range   = _wkRangeFull(wk.startDate);
-      const badge   = _isCurrentWeek(wk.startDate) ? ' <span class="wk-badge-current">Aktuell</span>' : '';
-      labelEl.innerHTML = `KW ${String(kw).padStart(2,'0')} · ${range}${badge}`;
+      const badge    = _isCurrentWeek(wk.startDate) ? ' <span class="wk-badge-current">Aktuell</span>' : '';
+      const vacBadge = isVac ? ' <span class="wk-badge-vacation">🏖 Urlaub</span>' : '';
+      labelEl.innerHTML = `KW ${String(kw).padStart(2,'0')} · ${range}${badge}${vacBadge}`;
     } else {
       labelEl.textContent = '–';
     }
-    labelEl.className = 'week-nav__label' + (isDl ? ' week-nav__label--deload' : '');
+    labelEl.className = 'week-nav__label' + (isDl ? ' week-nav__label--deload' : '') + (isVac ? ' week-nav__label--vacation' : '');
   }
   if (rangeEl)  rangeEl.textContent = '';
   if (prevBtn)  prevBtn.disabled    = isFirst;
@@ -539,7 +541,8 @@ function renderDayList(state) {
     return;
   }
 
-  const isDl = wk.mode === 'deload';
+  const isDl  = wk.mode === 'deload';
+  const isVac = wk.mode === 'vacation';
 
   // Week navigation: reset to first non-completed day
   if (_lastRenderedCurIdx !== null && _lastRenderedCurIdx !== state.curIdx && wk.days.length > 0) {
@@ -582,6 +585,12 @@ function renderDayList(state) {
       aria-pressed="${isDl}"
       aria-label="${isDl ? 'Deload-Modus beenden' : 'Deload-Modus aktivieren'}"
     >${ic.zap()}&thinsp;Deload</button>
+    <button
+      class="deload-toggle${isVac ? ' is-active is-active--vacation' : ''}"
+      data-action="${isVac ? 'mode-std' : 'mode-vac'}"
+      aria-pressed="${isVac}"
+      aria-label="${isVac ? 'Urlaubsmodus beenden' : 'Urlaubsmodus aktivieren'}"
+    >🏖&thinsp;Urlaub</button>
     <span class="toolbar__spacer"></span>
     <span id="toolbar-session-timer" class="toolbar-timer" role="timer" aria-label="Session-Timer">00:00</span>
     <button class="toolbar__btn toolbar__btn--reset" id="btn-reset-timer" data-action="reset-timer" aria-label="Timer zurücksetzen" title="Timer zurücksetzen">↺</button>
@@ -1755,6 +1764,7 @@ function renderAnalysisTab(state) {
           <div class="pw-card__title">
             ${wkLabel(wk.startDate)}
             ${isDl ? '<span class="deload-badge">Deload</span>' : ''}
+            ${wk.mode === 'vacation' ? '<span class="vacation-badge">🏖 Urlaub</span>' : ''}
           </div>
           <div class="pw-card__date">${wkRange(wk.startDate)}${wk.note ? ' · ' + h(wk.note) : ''}</div>
           ${dayDurations ? `<div class="pw-day-durs">${dayDurations}</div>` : ''}
@@ -1942,12 +1952,13 @@ function _calcStreak(state) {
   const sorted = [...state.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
   let cur = 0, best = 0, tmp = 0;
   sorted.forEach(w => {
-    const done = w.days.some(d => !!d.markedDone);
-    if (done) { tmp++; best = Math.max(best, tmp); }
+    const active = w.days.some(d => !!d.markedDone) || w.mode === 'vacation';
+    if (active) { tmp++; best = Math.max(best, tmp); }
     else tmp = 0;
   });
   for (let i = sorted.length - 1; i >= 0; i--) {
-    if (sorted[i].days.some(d => !!d.markedDone)) cur++;
+    const active = sorted[i].days.some(d => !!d.markedDone) || sorted[i].mode === 'vacation';
+    if (active) cur++;
     else break;
   }
   return { cur, best };
@@ -1962,16 +1973,17 @@ function _renderStreakChain(state) {
   const H = 28;
   const cy = H / 2;
   const dots = last8.map((wk, i) => {
-    const cx    = PAD + i * GAP;
-    const score = _weekSuccessScore(wk);
-    const done  = score.total > 0 && score.pct >= 50;
-    const ss    = score.total > 0 ? score.pct : 0;
+    const cx       = PAD + i * GAP;
+    const score    = _weekSuccessScore(wk);
+    const isVac    = wk.mode === 'vacation';
+    const done     = isVac || (score.total > 0 && score.pct >= 50);
+    const ss       = score.total > 0 ? score.pct : 0;
     const wkNum = (() => {
       const d = new Date(wk.startDate);
       const jan1 = new Date(d.getFullYear(), 0, 1);
       return Math.ceil(((d - jan1) / 86400000 + jan1.getDay() + 1) / 7);
     })();
-    return { cx, done, ss, wkNum, startDate: wk.startDate };
+    return { cx, done, isVac, ss, wkNum, startDate: wk.startDate };
   });
   const lines = dots.slice(0, -1).map((d, i) => {
     const next  = dots[i + 1];
@@ -1980,9 +1992,9 @@ function _renderStreakChain(state) {
     return `<line x1="${d.cx}" y1="${cy}" x2="${next.cx}" y2="${cy}" stroke="${color}" stroke-width="2" ${dash}/>`;
   });
   const circles = dots.map(d => {
-    const fill   = d.done ? '#C8FF00' : '#1A1A2E';
-    const stroke = d.done ? '#C8FF00' : '#2E2E35';
-    const tip    = `KW ${d.wkNum} · ${d.ss}% Erfolg`;
+    const fill   = d.isVac ? '#D97706' : d.done ? '#C8FF00' : '#1A1A2E';
+    const stroke = d.isVac ? '#D97706' : d.done ? '#C8FF00' : '#2E2E35';
+    const tip    = d.isVac ? `KW ${d.wkNum} · 🏖 Urlaub` : `KW ${d.wkNum} · ${d.ss}% Erfolg`;
     return `<circle cx="${d.cx}" cy="${cy}" r="${R}" fill="${fill}" stroke="${stroke}" stroke-width="2" data-streak-tip="${tip}" style="cursor:pointer"/>`;
   });
   return `<div class="streak-chain-wrap">
@@ -2713,6 +2725,9 @@ function _handleClick(e) {
 
     case 'mode-dl':
       dispatch(A.WEEK_SET_MODE, { mode: 'deload' }); break;
+
+    case 'mode-vac':
+      dispatch(A.WEEK_SET_MODE, { mode: 'vacation' }); break;
 
     case 'open-new-week': {
       const _st = getState();
@@ -3629,7 +3644,7 @@ function _prepNewWeekModal() {
   const aiRecs = [];
   if (curWk) {
     const calcWeeks = state.weeks
-      .filter(w => w.mode !== 'deload' && w !== curWk)
+      .filter(w => w.mode !== 'deload' && w.mode !== 'vacation' && w !== curWk)
       .filter(w => w.days.some(d => d.exercises.some(ex => ex.sets.some(s => s.status === 'success'))));
     if (calcWeeks.length >= 2) {
       const seen = new Set();
@@ -4254,7 +4269,7 @@ function _renderBadgeGallery(state) {
     const sorted = [...state.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
     let cur = 0;
     for (let i = sorted.length - 1; i >= 0; i--) {
-      if (sorted[i].days.some(d => !!d.markedDone)) cur++;
+      if (sorted[i].days.some(d => !!d.markedDone) || sorted[i].mode === 'vacation') cur++;
       else break;
     }
     return cur;
