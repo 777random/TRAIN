@@ -878,6 +878,12 @@ function renderDayBody(wk, di, state) {
         aria-pressed="${isVacDay}"
         aria-label="${isVacDay ? 'Urlaubstag beenden' : 'Als Urlaubstag markieren'}"
       >🏖&thinsp;Urlaubstag</button>
+      ${!done && wk.days.length > 1 ? `
+      <button
+        class="btn btn--sm btn--danger"
+        data-action="remove-day" data-di="${di}"
+        aria-label="${h(day.title)} löschen"
+      >🗑 Tag löschen</button>` : ''}
       <button
         class="complete-btn${done ? ' is-done' : ''}"
         data-action="toggle-complete" data-di="${di}"
@@ -2904,13 +2910,11 @@ function _handleClick(e) {
     case 'remove-day': {
       const _di = +el.dataset.di;
       const _day = getState().weeks[getState().curIdx]?.days[_di];
-      if (_day?.exercises?.length > 0) {
-        if (!confirm(`"${_day.title}" wirklich entfernen? Alle Übungen gehen verloren.`)) break;
-      }
+      if (!confirm(`"${_day?.title ?? 'Tag'}" löschen? Alle Einträge dieses Tags werden entfernt.`)) break;
       if (_activeDayIdx === _di) _activeDayIdx = null;
       else if (_activeDayIdx > _di) _activeDayIdx--;
       dispatch(A.DAY_REMOVE, { di: _di });
-      showToast('Tag entfernt', 'info');
+      showToast('Tag gelöscht — Undo möglich', 'info');
       if (_activeTab === 'settings') renderSettingsTab(getState());
       break;
     }
@@ -4496,7 +4500,7 @@ function _showOnboarding() {
       case 'next':   _step = 2; _render(); break;
       case 'select': _selTpl = +btn.dataset.tpl; _render(); break;
       case 'load':   if (_selTpl !== null) _applyTpl(_selTpl); _advance(); break;
-      case 'skip':   _advance(); break;
+      case 'skip':   _applyBlank(); _advance(); break;
       case 'done':   _finish(); break;
     }
   });
@@ -4530,6 +4534,14 @@ function _showOnboarding() {
       })),
     }));
     dispatch(A.ONBOARDING_WEEK_CREATE, { startDate, days, note: tpl.weekTitle });
+  }
+
+  function _applyBlank() {
+    const d = new Date();
+    const dow = d.getDay();
+    d.setDate(d.getDate() + (dow === 0 ? -6 : 1 - dow));
+    const startDate = d.toISOString().slice(0, 10);
+    dispatch(A.ONBOARDING_WEEK_CREATE, { startDate, days: [], note: '' });
   }
 
   function _finish() {
