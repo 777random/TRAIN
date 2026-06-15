@@ -139,6 +139,7 @@ function buildDefaultState() {
     favoriteExercises: [],    // String[] – Übungsnamen, max 5
     badges: [],               // { id, unlockedAt }[] – earned badges
     onboardingDone: false,    // true after first-run flow completed
+    seenTips: [],             // string[] – tip IDs the user has already seen
     settings: {
       swipe:              true,
       drag:               true,
@@ -167,7 +168,7 @@ const _MAX_UNDO  = 20;
 // Actions that are pure navigation or external events — not worth undoing.
 const _NO_UNDO = new Set([
   'UNDO', 'WEEK_NAVIGATE', 'STATE_IMPORT', 'SESSION_START', 'SESSION_RESET', 'SESSION_STOP',
-  'INSIGHTS_SET', 'ONBOARDING_DONE',
+  'INSIGHTS_SET', 'ONBOARDING_DONE', 'MARK_TIP_SEEN',
 ]);
 
 /** Returns true when there is at least one undo snapshot available. */
@@ -521,6 +522,7 @@ export function loadState() {
       STATE = migrate(parsed);
       if (!Array.isArray(STATE.favoriteExercises)) STATE.favoriteExercises = [];
       if (!Array.isArray(STATE.badges))            STATE.badges = [];
+      if (!Array.isArray(STATE.seenTips))          STATE.seenTips = [];
       if (STATE.onboardingDone === undefined)       STATE.onboardingDone = false;
       // Defensive bounds check — only restore missing week when onboarding is already done
       if (!STATE.weeks.length && STATE.onboardingDone) _appendDefaultWeek();
@@ -667,6 +669,7 @@ export const A = Object.freeze({
   // Onboarding
   ONBOARDING_WEEK_CREATE:   'ONBOARDING_WEEK_CREATE',   // { startDate, days[], note? }
   ONBOARDING_DONE:          'ONBOARDING_DONE',          // {}
+  MARK_TIP_SEEN:            'MARK_TIP_SEEN',            // { tipId: string }
 });
 
 // ─── Reducer ──────────────────────────────────────────────────────────────────
@@ -1305,6 +1308,12 @@ function reduce(state, action) {
     case A.ONBOARDING_DONE: {
       state.onboardingDone = true;
       if (state.weeks.length === 0) _appendDefaultWeek();
+      break;
+    }
+
+    case A.MARK_TIP_SEEN: {
+      if (!Array.isArray(state.seenTips)) state.seenTips = [];
+      if (!state.seenTips.includes(p.tipId)) state.seenTips.push(p.tipId);
       break;
     }
 
