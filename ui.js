@@ -1211,11 +1211,6 @@ function renderExercise(wk, di, ei, state) {
       ${_exMenuOpenKey === `${di}-${ei}` ? `
       <div class="ex-menu-dropdown" role="menu">
         ${!locked ? `
-        <button class="ex-menu-item" role="menuitem" data-action="menu-open-kg-picker" data-di="${di}" data-ei="${ei}">
-          📈 Steigerung: ${(ex.progressionType ?? 'weight') === 'reps'
-            ? (ex.nextWeekPlan ? `+${ex.nextWeekPlan} Wdh` : 'Wdh planen')
-            : (ex.nextWeekPlan ? `+${ex.nextWeekPlan} kg` : 'planen')}
-        </button>
         <button class="ex-menu-item" role="menuitem" data-action="move-ex-up" data-di="${di}" data-ei="${ei}" ${ei === 0 ? 'disabled' : ''}>▲ Nach oben</button>
         <button class="ex-menu-item" role="menuitem" data-action="move-ex-down" data-di="${di}" data-ei="${ei}" ${ei === wk.days[di].exercises.length - 1 ? 'disabled' : ''}>▼ Nach unten</button>
         ` : ''}
@@ -3099,21 +3094,6 @@ function _handleClick(e) {
       dispatch(A.EX_SET_NEXT_WEEK_PLAN, { di: +di, ei: +ei, value: 0 });
       _kgPickerKey   = null;
       _repsPickerKey = null;
-      scheduleRender();
-      break;
-    }
-
-    case 'menu-open-kg-picker': {
-      const _mpEx = getState().weeks[getState().curIdx]?.days[+di]?.exercises[+ei];
-      if ((_mpEx?.progressionType ?? 'weight') === 'reps') {
-        _repsPickerKey = `${di}-${ei}`;
-        _kgPickerKey   = null;
-      } else {
-        _kgPickerKey    = `${di}-${ei}`;
-        _kgPickerCustom = false;
-        _repsPickerKey  = null;
-      }
-      _exMenuOpenKey = null;
       scheduleRender();
       break;
     }
