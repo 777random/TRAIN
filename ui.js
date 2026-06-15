@@ -108,8 +108,6 @@ let _stickyObserver = null;
 /** Toast hide timer. */
 let _toastTimer = null;
 
-/** Micro-tooltip hide timer. */
-let _tooltipTimer = null;
 
 
 /** Übungen mit offenem Fortschritts-Chart im Training: Set von "${di}-${ei}" Keys. */
@@ -383,14 +381,12 @@ function showToast(msg, type = 'info', durationMs = 2600) {
 /** Show a top-centered tip banner; auto-closes after 4 s. */
 function _showTooltip(text) {
   document.getElementById('_train-micro-tooltip')?.remove();
-  clearTimeout(_tooltipTimer);
   const tip = document.createElement('div');
   tip.id = '_train-micro-tooltip';
   tip.className = 'tip-banner';
   tip.textContent = text;
   document.body.appendChild(tip);
-  _tooltipTimer = setTimeout(() => tip.remove(), 4000);
-  const close = () => { tip.remove(); clearTimeout(_tooltipTimer); };
+  const close = () => tip.remove();
   setTimeout(() => document.addEventListener('click', close, { capture: true, once: true }), 0);
 }
 
@@ -2788,7 +2784,7 @@ function _handleClick(e) {
       dispatch(A.WEEK_SET_MODE, { mode: 'vacation' }); break;
 
     case 'toggle-day-vacation': {
-      const _di = +tgt.dataset.di;
+      const _di = +di;
       if (!getState().weeks[getState().curIdx]?.days[_di]?.isVacation) {
         _maybeShowTip('tip-09', 'Urlaubstage unterbrechen deinen Streak nicht. Markiere sie damit TRAIN deine Analyse korrekt berechnet.');
       }
