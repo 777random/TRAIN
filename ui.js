@@ -614,7 +614,7 @@ function renderDayList(state) {
       const total  = day.exercises.reduce((s, ex) => s + ex.sets.length, 0);
       const done_s = day.exercises.reduce((s, ex) => s + ex.sets.filter(st => st.done).length, 0);
       return `<button
-        class="day-tab${isAct ? ' is-active' : ''}${done ? ' day-tab--done' : ''}${isDl ? ' day-tab--deload' : ''}"
+        class="day-tab${isAct ? ' is-active' : ''}${done ? ' day-tab--done' : ''}${isDl ? ' day-tab--deload' : ''}${day.isVacation ? ' day-tab--vacation' : ''}"
         data-day-hdr="${di}"
         role="tab" aria-selected="${isAct}" aria-controls="day-panel-${di}"
         id="day-tab-${di}"
@@ -751,9 +751,10 @@ function renderDayCard(wk, di, state) {
 }
 
 function renderDayBody(wk, di, state) {
-  const day    = wk.days[di];
-  const locked = !!day.locked;
-  const done   = !!day.markedDone;
+  const day      = wk.days[di];
+  const locked   = !!day.locked;
+  const done     = !!day.markedDone;
+  const isVacDay = !!day.isVacation;
 
   let prevBanner = '';
   if (state.curIdx > 0) {
@@ -841,20 +842,29 @@ function renderDayBody(wk, di, state) {
 </div>`;
 
   return `
+    ${isVacDay ? '<div class="day-vacation-banner">🏖 Urlaubstag — Streak läuft weiter</div>' : ''}
     ${prevBanner}
     ${noteBlock}
     ${warmupBlock}
     <div data-ex-list="${di}">${exHtml}</div>
     ${cooldownBlock}
-    <button
-      class="complete-btn${done ? ' is-done' : ''}"
-      data-action="toggle-complete" data-di="${di}"
-      aria-pressed="${done}"
-      aria-label="${lockBtnLabel}"
-    >
-      ${lockBtnIcon}
-      ${done ? 'Gesperrt – Tippen zum Entsperren' : 'Abgeschlossen & sperren'}
-    </button>
+    <div class="day-actions">
+      <button
+        class="deload-toggle${isVacDay ? ' is-active is-active--vacation' : ''}"
+        data-action="toggle-day-vacation" data-di="${di}"
+        aria-pressed="${isVacDay}"
+        aria-label="${isVacDay ? 'Urlaubstag beenden' : 'Als Urlaubstag markieren'}"
+      >🏖&thinsp;Urlaubstag</button>
+      <button
+        class="complete-btn${done ? ' is-done' : ''}"
+        data-action="toggle-complete" data-di="${di}"
+        aria-pressed="${done}"
+        aria-label="${lockBtnLabel}"
+      >
+        ${lockBtnIcon}
+        ${done ? 'Gesperrt – Tippen zum Entsperren' : 'Abgeschlossen & sperren'}
+      </button>
+    </div>
 
     <!-- Session rating: static read-only display after locking -->
     ${done && day.sessionRating != null ? `
@@ -1718,8 +1728,9 @@ function renderAnalysisTab(state) {
     const _wss = _weekSuccessScore(wk);
     const score      = _wss.total > 0 ? _wss.pct : pct;
     const scoreColor = score >= 90 ? 'var(--c-ok)' : score >= 70 ? 'var(--c-warn)' : 'var(--c-danger)';
-    const dd   = wk.days.filter(d => !!d.markedDone).length;
-    const isDl = wk.mode === 'deload';
+    const dd      = wk.days.filter(d => !!d.markedDone).length;
+    const isDl    = wk.mode === 'deload';
+    const vacDays = wk.mode !== 'vacation' ? wk.days.filter(d => !!d.isVacation).length : 0;
     const prev = arr[wi + 1];
     let vd = '';
     if (prev) {
@@ -1765,6 +1776,7 @@ function renderAnalysisTab(state) {
             ${wkLabel(wk.startDate)}
             ${isDl ? '<span class="deload-badge">Deload</span>' : ''}
             ${wk.mode === 'vacation' ? '<span class="vacation-badge">🏖 Urlaub</span>' : ''}
+            ${vacDays > 0 ? `<span class="vac-days-hint">${vacDays} Urlaubstag${vacDays > 1 ? 'e' : ''}</span>` : ''}
           </div>
           <div class="pw-card__date">${wkRange(wk.startDate)}${wk.note ? ' · ' + h(wk.note) : ''}</div>
           ${dayDurations ? `<div class="pw-day-durs">${dayDurations}</div>` : ''}
@@ -1952,12 +1964,13 @@ function _calcStreak(state) {
   const sorted = [...state.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
   let cur = 0, best = 0, tmp = 0;
   sorted.forEach(w => {
-    const active = w.days.some(d => !!d.markedDone) || w.mode === 'vacation';
+    const active = w.days.some(d => !!d.markedDone) || w.days.some(d => !!d.isVacation) || w.mode === 'vacation';
     if (active) { tmp++; best = Math.max(best, tmp); }
     else tmp = 0;
   });
   for (let i = sorted.length - 1; i >= 0; i--) {
-    const active = sorted[i].days.some(d => !!d.markedDone) || sorted[i].mode === 'vacation';
+    const w = sorted[i];
+    const active = w.days.some(d => !!d.markedDone) || w.days.some(d => !!d.isVacation) || w.mode === 'vacation';
     if (active) cur++;
     else break;
   }
@@ -2728,6 +2741,12 @@ function _handleClick(e) {
 
     case 'mode-vac':
       dispatch(A.WEEK_SET_MODE, { mode: 'vacation' }); break;
+
+    case 'toggle-day-vacation': {
+      const _di = +tgt.dataset.di;
+      dispatch(A.DAY_TOGGLE_VACATION, { di: _di });
+      break;
+    }
 
     case 'open-new-week': {
       const _st = getState();
@@ -4269,7 +4288,8 @@ function _renderBadgeGallery(state) {
     const sorted = [...state.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
     let cur = 0;
     for (let i = sorted.length - 1; i >= 0; i--) {
-      if (sorted[i].days.some(d => !!d.markedDone) || sorted[i].mode === 'vacation') cur++;
+      const w = sorted[i];
+      if (w.days.some(d => !!d.markedDone) || w.days.some(d => !!d.isVacation) || w.mode === 'vacation') cur++;
       else break;
     }
     return cur;

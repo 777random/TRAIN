@@ -24,7 +24,7 @@
 
 export const STORAGE_KEY        = 'train_v6';
 export const STORAGE_KEY_SHADOW = 'train_v6_shadow';
-export const SCHEMA_VERSION     = 17;
+export const SCHEMA_VERSION     = 18;
 
 export const BADGE_THRESHOLDS = [
   { id: 'badge_4',   weeks: 4,   title: 'Erster Schritt' },
@@ -262,7 +262,8 @@ function _calcCurrentStreak(weeks) {
   const sorted = [...weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
   let cur = 0;
   for (let i = sorted.length - 1; i >= 0; i--) {
-    if (sorted[i].days.some(d => !!d.markedDone) || sorted[i].mode === 'vacation') cur++;
+    const w = sorted[i];
+    if (w.days.some(d => !!d.markedDone) || w.days.some(d => !!d.isVacation) || w.mode === 'vacation') cur++;
     else break;
   }
   return cur;
@@ -476,6 +477,19 @@ function migrate(raw) {
     raw.meta = { ...raw.meta, schemaVersion: 17 };
   }
 
+  // v17 → v18: add isVacation to all days
+  if ((raw.meta?.schemaVersion ?? 0) < 18) {
+    (raw.weeks ?? []).forEach(wk =>
+      (wk.days ?? []).forEach(day => {
+        if (day.isVacation === undefined) day.isVacation = false;
+      })
+    );
+    (raw.customTemplate ?? []).forEach(day => {
+      if (day.isVacation === undefined) day.isVacation = false;
+    });
+    raw.meta = { ...raw.meta, schemaVersion: 18 };
+  }
+
   // Always-apply defaults for settings added in later versions
   if (raw.settings.vibrationEnabled               === undefined) raw.settings.vibrationEnabled               = true;
   if (raw.settings.rpeEnabled                     === undefined) raw.settings.rpeEnabled                     = true;
@@ -596,8 +610,9 @@ export const A = Object.freeze({
   DAY_ADD:             'DAY_ADD',             // {}
   DAY_ADD_CLONE:       'DAY_ADD_CLONE',       // { sourceDi: number|null } – null = empty
   DAY_REMOVE:          'DAY_REMOVE',          // { di }
-  DAY_TOGGLE_COMPLETE: 'DAY_TOGGLE_COMPLETE', // { di }
-  DAY_SET_FIELD:       'DAY_SET_FIELD',       // { di, field, value }
+  DAY_TOGGLE_COMPLETE:  'DAY_TOGGLE_COMPLETE',  // { di }
+  DAY_TOGGLE_VACATION:  'DAY_TOGGLE_VACATION',  // { di }
+  DAY_SET_FIELD:        'DAY_SET_FIELD',        // { di, field, value }
   // Exercise
   EX_ADD:              'EX_ADD',              // { di, name }
   EX_REMOVE:           'EX_REMOVE',           // { di, ei }
@@ -660,6 +675,7 @@ function _resetClonedDays(days) {
   days.forEach(day => {
     day.locked          = false;
     day.markedDone      = false;
+    day.isVacation      = false;
     day.sessionNote     = '';
     day.sessionRating   = null;
     day.sessionStartTs  = null;
@@ -773,7 +789,7 @@ function reduce(state, action) {
       if (state.curIdx === 0) break;
       const d = clone(state.weeks[state.curIdx - 1].days);
       d.forEach(day => {
-        day.markedDone = false; day.locked = false;
+        day.markedDone = false; day.locked = false; day.isVacation = false;
         day.exercises.forEach(ex => {
           if (ex.substituteFor) ex.name = ex.substituteFor;
           ex.substituteFor = null;
@@ -788,7 +804,13 @@ function reduce(state, action) {
     }
     case A.WEEK_SET_MODE: {
       const wk = _currentWeek(); if (!wk) break;
+      const wasVacation = wk.mode === 'vacation';
       wk.mode = p.mode;
+      if (p.mode === 'vacation') {
+        wk.days.forEach(d => { d.isVacation = true; });
+      } else if (wasVacation && p.mode === 'standard') {
+        wk.days.forEach(d => { d.isVacation = false; });
+      }
       break;
     }
     case A.WEEK_SET_NOTE: {
@@ -810,6 +832,7 @@ function reduce(state, action) {
         cooldown:       '',
         locked:         false,
         markedDone:     false,
+        isVacation:     false,
         sessionStartTs: null,
         sessionEndTs:   null,
         sleepHours:     null,
@@ -831,6 +854,7 @@ function reduce(state, action) {
         cooldown:       srcDay?.cooldown ?? '',
         locked:         false,
         markedDone:     false,
+        isVacation:     false,
         sleepHours:     null,
         energyLevel:    null,
         exercises:  srcDay ? srcDay.exercises.map(ex => ({
@@ -863,6 +887,19 @@ function reduce(state, action) {
       day.markedDone = becomingDone;
       day.locked     = becomingDone;
       if (becomingDone) _checkAndGrantBadges(state);
+      break;
+    }
+    case A.DAY_TOGGLE_VACATION: {
+      const wk = _currentWeek(); if (!wk) break;
+      const day = wk.days[p.di]; if (!day) break;
+      day.isVacation = !day.isVacation;
+      const allVac = wk.days.every(d => d.isVacation);
+      if (allVac) {
+        wk.mode = 'vacation';
+      } else if (wk.mode === 'vacation') {
+        wk.mode = 'standard';
+      }
+      _checkAndGrantBadges(state);
       break;
     }
     case A.DAY_SET_FIELD: {

@@ -284,6 +284,7 @@ button, input, select, textarea { font: inherit; }
 .day-tab--done { border-color: var(--c-ok); color: var(--c-ok); }
 .day-tab--done.is-active { background: var(--c-ok); border-color: var(--c-ok); color: #000; }
 .day-tab--deload { background: var(--c-deload-bg); border-color: var(--c-deload-bd); color: var(--c-deload); }
+.day-tab--vacation { border-color: rgba(217,119,6,.4); color: #D97706; }
 
 .day-card__dot {
   width: 8px; height: 8px; border-radius: var(--r-full);
@@ -860,6 +861,24 @@ exercise { position: unset; }
 .complete-btn svg { width: 18px; height: 18px; }
 .complete-btn:hover { border-color: var(--c-ok); color: var(--c-ok); }
 .complete-btn.is-done { background: var(--c-ok); border-color: var(--c-ok); color: #000; }
+
+.day-actions {
+  display: flex; gap: var(--sp-2); align-items: stretch;
+  margin-top: var(--sp-3); flex-wrap: wrap;
+}
+.day-actions .complete-btn { flex: 1; min-width: 160px; margin-top: 0; }
+.day-actions .deload-toggle { flex-shrink: 0; }
+
+.day-vacation-banner {
+  background: rgba(217,119,6,.1); border: 1px solid #D97706;
+  border-radius: var(--r-md); padding: var(--sp-2) var(--sp-3);
+  font-size: 13px; color: #D97706; margin-bottom: var(--sp-2);
+}
+
+.vac-days-hint {
+  font-size: 9px; font-weight: 600; color: #D97706;
+  margin-left: 3px; vertical-align: middle; letter-spacing: .02em;
+}
 
 .exercise.drag-over { outline: 2px solid var(--c-accent); border-radius: var(--r-sm); }
 
