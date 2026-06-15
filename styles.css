@@ -1400,8 +1400,13 @@ label > svg {
 
 /* Override für ältere !important-Regeln die noch im Browser-Cache sein könnten */
 .day-card {
+  position: relative;
   margin-left: 0;
   margin-right: 0;
+}
+.day-menu-wrap {
+  position: relative;
+  flex-shrink: 0;
 }
 
 /* --- MANUELLE ÜBUNGS-SORTIERUNG (PFEILE) --- */

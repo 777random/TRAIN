@@ -65,6 +65,9 @@ let _subFormOpenKey = null;
 /** Key of the exercise whose ⋮ context menu is open: `${di}-${ei}` or null. */
 let _exMenuOpenKey = null;
 
+/** Index of the day whose ⋮ context menu is open: String(di) or null. */
+let _dayMenuOpenKey = null;
+
 /** Key of the exercise whose settings panel (cfgRow) is open: `${di}-${ei}` or null. */
 let _cfgOpenKey = null;
 
@@ -619,6 +622,22 @@ function renderDayList(state) {
     <button class="toolbar__btn toolbar__btn--reset" id="btn-reset-timer" data-action="reset-timer" aria-label="Timer zurücksetzen" title="Timer zurücksetzen">↺</button>
     <button class="toolbar__btn" id="btn-undo" data-action="undo"
       aria-label="Rückgängig machen"${!canUndo() ? ' disabled' : ''}>${ic.undo()}</button>
+    ${!_overviewMode && _activeDayIdx !== null && wk.days[_activeDayIdx] ? `
+    <div class="day-menu-wrap">
+      <button class="toolbar__btn" data-action="toggle-day-menu" data-di="${_activeDayIdx}"
+        aria-label="${h(wk.days[_activeDayIdx].title)}-Menü öffnen"
+        aria-expanded="${_dayMenuOpenKey === String(_activeDayIdx)}"
+      >⋮</button>
+      ${_dayMenuOpenKey === String(_activeDayIdx) ? `
+      <div class="ex-menu-dropdown" role="menu">
+        <button class="ex-menu-item" role="menuitem" data-action="day-rename" data-di="${_activeDayIdx}">✏️ Tag umbenennen</button>
+        <button class="ex-menu-item" role="menuitem" data-action="day-duplicate" data-di="${_activeDayIdx}">📋 Tag duplizieren</button>
+        <button class="ex-menu-item" role="menuitem" data-action="day-reset-sets" data-di="${_activeDayIdx}">🔄 Sätze zurücksetzen</button>
+        <button class="ex-menu-item" role="menuitem" data-action="toggle-day-vacation" data-di="${_activeDayIdx}">🏖 Urlaubstag markieren</button>
+        <hr style="border-color:var(--c-border);margin:0">
+        <button class="ex-menu-item ex-menu-item--danger" role="menuitem" data-action="remove-day" data-di="${_activeDayIdx}"${wk.days.length <= 1 ? ' disabled' : ''}>🗑 Tag löschen</button>
+      </div>` : ''}
+    </div>` : ''}
     <button class="toolbar__btn toolbar__btn--accent" data-action="open-new-week"
       aria-label="Neue Trainingswoche erstellen">${ic.plus()}</button>
   </div>
@@ -759,6 +778,24 @@ function renderDayCard(wk, di, state) {
     </div>
   </button>
 
+  <div class="day-menu-wrap">
+    <button class="ex-menu-btn"
+      data-action="toggle-day-menu" data-di="${di}"
+      aria-label="Tag-Menü öffnen"
+      aria-expanded="${_dayMenuOpenKey === String(di)}"
+    >⋮</button>
+    ${_dayMenuOpenKey === String(di) ? `
+    <div class="ex-menu-dropdown" role="menu">
+      ${(day.sessionNote ?? '').trim() ? `<button class="ex-menu-item" role="menuitem" data-action="day-edit-note" data-di="${di}">📝 Notiz bearbeiten</button>` : ''}
+      <button class="ex-menu-item" role="menuitem" data-action="day-rename" data-di="${di}">✏️ Tag umbenennen</button>
+      <button class="ex-menu-item" role="menuitem" data-action="day-duplicate" data-di="${di}">📋 Tag duplizieren</button>
+      <button class="ex-menu-item" role="menuitem" data-action="day-reset-sets" data-di="${di}">🔄 Sätze zurücksetzen</button>
+      <button class="ex-menu-item" role="menuitem" data-action="toggle-day-vacation" data-di="${di}">🏖 Urlaubstag markieren</button>
+      <hr style="border-color:var(--c-border);margin:0">
+      <button class="ex-menu-item ex-menu-item--danger" role="menuitem" data-action="remove-day" data-di="${di}"${wk.days.length <= 1 ? ' disabled' : ''}>🗑 Tag löschen</button>
+    </div>` : ''}
+  </div>
+
   <div
     class="day-card__body"
     id="day-body-${di}"
@@ -872,18 +909,6 @@ function renderDayBody(wk, di, state) {
     <div data-ex-list="${di}">${exHtml}</div>
     ${cooldownBlock}
     <div class="day-actions">
-      <button
-        class="deload-toggle${isVacDay ? ' is-active is-active--vacation' : ''}"
-        data-action="toggle-day-vacation" data-di="${di}"
-        aria-pressed="${isVacDay}"
-        aria-label="${isVacDay ? 'Urlaubstag beenden' : 'Als Urlaubstag markieren'}"
-      >🏖&thinsp;Urlaubstag</button>
-      ${!done && wk.days.length > 1 ? `
-      <button
-        class="btn btn--sm btn--danger"
-        data-action="remove-day" data-di="${di}"
-        aria-label="${h(day.title)} löschen"
-      >🗑 Tag löschen</button>` : ''}
       <button
         class="complete-btn${done ? ' is-done' : ''}"
         data-action="toggle-complete" data-di="${di}"
@@ -2650,6 +2675,12 @@ function _handleClick(e) {
     scheduleRender();
   }
 
+  // Close day ⋮ menu when clicking outside the toggle button
+  if (_dayMenuOpenKey !== null && !e.target.closest('[data-action="toggle-day-menu"]')) {
+    _dayMenuOpenKey = null;
+    scheduleRender();
+  }
+
   // Close exercise settings panel on outside tap
   if (_cfgOpenKey !== null) {
     const _inSettings = !!e.target.closest('.exercise__settings');
@@ -2913,6 +2944,7 @@ function _handleClick(e) {
       if (!confirm(`"${_day?.title ?? 'Tag'}" löschen? Alle Einträge dieses Tags werden entfernt.`)) break;
       if (_activeDayIdx === _di) _activeDayIdx = null;
       else if (_activeDayIdx > _di) _activeDayIdx--;
+      _dayMenuOpenKey = null;
       dispatch(A.DAY_REMOVE, { di: _di });
       showToast('Tag gelöscht — Undo möglich', 'info');
       if (_activeTab === 'settings') renderSettingsTab(getState());
@@ -3044,6 +3076,52 @@ function _handleClick(e) {
       const _menuKey = `${di}-${ei}`;
       _exMenuOpenKey = _exMenuOpenKey === _menuKey ? null : _menuKey;
       scheduleRender();
+      break;
+    }
+
+    case 'toggle-day-menu': {
+      _dayMenuOpenKey = _dayMenuOpenKey === di ? null : di;
+      scheduleRender();
+      break;
+    }
+
+    case 'day-rename': {
+      const _rDay = getState().weeks[getState().curIdx]?.days[+di];
+      const _newTitle = prompt('Tag umbenennen (max. 20 Zeichen):', _rDay?.title ?? '');
+      if (_newTitle === null) break;
+      const _trimmed = _newTitle.trim().slice(0, 20);
+      if (!_trimmed) break;
+      dispatch(A.DAY_RENAME, { di: +di, title: _trimmed });
+      _dayMenuOpenKey = null;
+      break;
+    }
+
+    case 'day-duplicate': {
+      dispatch(A.DAY_DUPLICATE, { di: +di });
+      _dayMenuOpenKey = null;
+      showToast('Tag dupliziert — Undo möglich', 'info');
+      if (_activeTab === 'settings') renderSettingsTab(getState());
+      break;
+    }
+
+    case 'day-reset-sets': {
+      const _rsDay = getState().weeks[getState().curIdx]?.days[+di];
+      if (!confirm(`Alle Sätze von "${_rsDay?.title ?? 'Tag'}" zurücksetzen? Eingetragene Werte gehen verloren.`)) break;
+      dispatch(A.DAY_RESET_SETS, { di: +di });
+      _dayMenuOpenKey = null;
+      showToast('Sätze zurückgesetzt — Undo möglich', 'info');
+      break;
+    }
+
+    case 'day-edit-note': {
+      _dayMenuOpenKey = null;
+      _activeDayIdx = +di;
+      scheduleRender();
+      setTimeout(() => {
+        const _noteArea = document.querySelector(`[data-action="day-field"][data-di="${di}"][data-field="sessionNote"]`);
+        _noteArea?.focus();
+        _noteArea?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 80);
       break;
     }
 
@@ -3930,6 +4008,15 @@ function _positionFloating() {
       dropdown.style.right = `${window.innerWidth - r.right}px`;
     }
   }
+  if (_dayMenuOpenKey !== null) {
+    const btn = document.querySelector(`[data-action="toggle-day-menu"][data-di="${_dayMenuOpenKey}"]`);
+    const dropdown = btn?.closest('.day-menu-wrap')?.querySelector('.ex-menu-dropdown');
+    if (btn && dropdown) {
+      const r = btn.getBoundingClientRect();
+      dropdown.style.top   = `${r.bottom + 2}px`;
+      dropdown.style.right = `${window.innerWidth - r.right}px`;
+    }
+  }
 }
 
 function scheduleRender() {
@@ -4133,10 +4220,11 @@ export function mountApp(root) {
 
   // Close floating menus/pickers when user scrolls the day panel
   root.addEventListener('scroll', () => {
-    if (_exMenuOpenKey || _kgPickerKey || _repsPickerKey) {
-      _exMenuOpenKey = null;
-      _kgPickerKey   = null;
-      _repsPickerKey = null;
+    if (_exMenuOpenKey || _dayMenuOpenKey || _kgPickerKey || _repsPickerKey) {
+      _exMenuOpenKey  = null;
+      _dayMenuOpenKey = null;
+      _kgPickerKey    = null;
+      _repsPickerKey  = null;
       scheduleRender();
     }
   }, { passive: true, capture: true });

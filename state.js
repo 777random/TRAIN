@@ -612,6 +612,9 @@ export const A = Object.freeze({
   DAY_ADD:             'DAY_ADD',             // {}
   DAY_ADD_CLONE:       'DAY_ADD_CLONE',       // { sourceDi: number|null } – null = empty
   DAY_REMOVE:          'DAY_REMOVE',          // { di }
+  DAY_RENAME:          'DAY_RENAME',          // { di, title }
+  DAY_DUPLICATE:       'DAY_DUPLICATE',       // { di }
+  DAY_RESET_SETS:      'DAY_RESET_SETS',      // { di }
   DAY_TOGGLE_COMPLETE:  'DAY_TOGGLE_COMPLETE',  // { di }
   DAY_TOGGLE_VACATION:  'DAY_TOGGLE_VACATION',  // { di }
   DAY_SET_FIELD:        'DAY_SET_FIELD',        // { di, field, value }
@@ -872,6 +875,57 @@ function reduce(state, action) {
       const wk = _currentWeek(); if (!wk) break;
       if (wk.days.length <= 1) break;
       wk.days.splice(p.di, 1);
+      break;
+    }
+    case A.DAY_RENAME: {
+      const day = _currentWeek()?.days[p.di]; if (!day) break;
+      day.title = String(p.title).trim().slice(0, 20);
+      break;
+    }
+    case A.DAY_DUPLICATE: {
+      const wk = _currentWeek(); if (!wk) break;
+      const src = wk.days[p.di]; if (!src) break;
+      const clone = JSON.parse(JSON.stringify(src));
+      clone.id            = Date.now();
+      clone.title         = `${src.title} (Kopie)`;
+      clone.locked        = false;
+      clone.markedDone    = false;
+      clone.sessionStartTs = null;
+      clone.sessionEndTs   = null;
+      clone.sleepHours     = null;
+      clone.energyLevel    = null;
+      clone.sessionNote    = '';
+      clone.sessionRating  = null;
+      for (const ex of clone.exercises) {
+        for (const s of ex.sets) {
+          s.status = 'pending';
+          s.done   = false;
+          s.weight = null;
+          s.reps   = null;
+          s.rpe    = null;
+        }
+      }
+      wk.days.push(clone);
+      break;
+    }
+    case A.DAY_RESET_SETS: {
+      const wk = _currentWeek(); if (!wk) break;
+      const day = wk.days[p.di]; if (!day) break;
+      for (const ex of day.exercises) {
+        for (const s of ex.sets) {
+          s.status = 'pending';
+          s.done   = false;
+          s.weight = null;
+          s.reps   = null;
+          s.rpe    = null;
+        }
+      }
+      day.markedDone    = false;
+      day.locked        = false;
+      day.sessionStartTs = null;
+      day.sessionRating  = null;
+      day.sleepHours     = null;
+      day.energyLevel    = null;
       break;
     }
     case A.DAY_TOGGLE_COMPLETE: {
