@@ -2026,6 +2026,55 @@ details[open] > .deload-details__summary::before { content: '▾ '; }
 .ob-tpl-meta { font-size: 12px; color: var(--c-text-2); margin-top: 2px; }
 .ob-tpl-sub { font-size: 11px; color: var(--c-text-3); margin-top: 1px; }
 
+/* ── Micro-tooltip system ─────────────────────────────────── */
+.tooltip-trigger {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 16px;
+  font-size: 10px; font-weight: 700; line-height: 1;
+  border-radius: 50%; border: 1px solid var(--c-border);
+  background: transparent; color: var(--c-text-3);
+  cursor: pointer; opacity: 0.5; flex-shrink: 0;
+  padding: 0;
+  transition: opacity var(--t-fast), border-color var(--t-fast);
+  vertical-align: middle;
+}
+.tooltip-trigger:hover,
+.tooltip-trigger:focus-visible { opacity: 1; border-color: var(--c-border-hi); }
+
+.micro-tooltip {
+  position: fixed; z-index: 9990;
+  background: var(--c-surface2);
+  border: 1px solid var(--c-border-hi);
+  color: var(--c-text);
+  font-size: 13px; line-height: 1.5;
+  padding: 10px 14px;
+  border-radius: var(--r-md);
+  max-width: 280px;
+  box-shadow: var(--shadow-md);
+  pointer-events: none;
+}
+
+/* ── Empty states ─────────────────────────────────────────── */
+.empty-state {
+  display: flex; flex-direction: column; align-items: center;
+  gap: var(--sp-4); padding: var(--sp-8) var(--sp-5);
+  text-align: center;
+}
+.empty-state__icon { font-size: 48px; line-height: 1; }
+.empty-state__text {
+  font-size: 14px; color: var(--c-text-2); line-height: 1.6;
+  max-width: 280px; margin: 0;
+}
+.empty-state__hint {
+  font-size: 13px; color: var(--c-text-3); line-height: 1.5;
+  padding: var(--sp-3) 0; margin: 0;
+}
+
+/* ── Effort-pct row (tooltip next to % Ziel) ──────────────── */
+.effort-pct-row {
+  display: flex; align-items: center; gap: var(--sp-1);
+}
+
 /* ── Backup reminder banner (C2) ──────────────────────────── */
 .backup-reminder {
   position: fixed; bottom: calc(var(--sp-5) + env(safe-area-inset-bottom));

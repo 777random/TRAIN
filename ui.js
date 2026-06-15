@@ -108,6 +108,9 @@ let _stickyObserver = null;
 /** Toast hide timer. */
 let _toastTimer = null;
 
+/** Micro-tooltip hide timer. */
+let _tooltipTimer = null;
+
 
 /** Übungen mit offenem Fortschritts-Chart im Training: Set von "${di}-${ei}" Keys. */
 const _exChartOpen = new Set();
@@ -264,6 +267,18 @@ const _ONBOARDING_TEMPLATES = [
   },
 ];
 
+// ─── Tooltip texts ────────────────────────────────────────────────────────────
+const _TIP = {
+  progression:  'Plane hier deine Steigerung für nächste Woche. Einmal tippen = bestätigen, zweimal tippen = Wert wählen.',
+  rpeNudge:     'RPE = wie anstrengend war der Satz? 7 = leicht, 8 = moderat, 9 = schwer, 10 = maximale Anstrengung.',
+  effortScore:  'Du hast mehr Wiederholungen geschafft als geplant. 100% = Ziel exakt erreicht.',
+  successScore: 'Anteil der erfolgreich abgeschlossenen Sätze in der Vorwoche.',
+  streakChain:  'Jeder Punkt ist eine Woche. Blau = Training, Amber = Urlaub, Grau = Pause.',
+  coachChip:    'TRAIN empfiehlt basierend auf deinen letzten Wochen. Tippe zum Bestätigen oder ignoriere den Vorschlag.',
+  sleepSlider:  'Schlaf beeinflusst deine Leistung. TRAIN erkennt Muster und passt Empfehlungen an.',
+  badges:       'Abzeichen verdienst du durch konsequentes Training über mehrere Wochen.',
+};
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /** Escape HTML special chars for safe innerHTML injection. */
@@ -373,6 +388,33 @@ function showToast(msg, type = 'info', durationMs = 2600) {
   _toastTimer = setTimeout(() => {
     _toast.classList.remove('is-visible');
   }, durationMs);
+}
+
+/** Returns HTML for a contextual ? tooltip trigger button. */
+const _tip = text => `<button type="button" class="tooltip-trigger" data-action="show-tooltip" data-tooltip-text="${h(text)}" aria-label="Erklärung anzeigen">?</button>`;
+
+/** Show a micro-tooltip popover near anchorEl; auto-closes after 4 s. */
+function _showTooltip(text, anchorEl) {
+  document.getElementById('_train-micro-tooltip')?.remove();
+  clearTimeout(_tooltipTimer);
+  const tip = document.createElement('div');
+  tip.id = '_train-micro-tooltip';
+  tip.className = 'micro-tooltip';
+  tip.textContent = text;
+  document.body.appendChild(tip);
+  const rect = anchorEl.getBoundingClientRect();
+  const vw   = window.innerWidth;
+  const tw   = tip.offsetWidth;
+  const th   = tip.offsetHeight;
+  let left = rect.left + rect.width / 2 - tw / 2;
+  let top  = rect.top - th - 8;
+  left = Math.max(8, Math.min(left, vw - tw - 8));
+  if (top < 8) top = rect.bottom + 8;
+  tip.style.left = left + 'px';
+  tip.style.top  = top  + 'px';
+  _tooltipTimer = setTimeout(() => tip.remove(), 4000);
+  const close = () => { tip.remove(); clearTimeout(_tooltipTimer); };
+  setTimeout(() => document.addEventListener('click', close, { capture: true, once: true }), 0);
 }
 
 /** Open a modal by id. */
@@ -771,6 +813,7 @@ function renderDayBody(wk, di, state) {
       const streakPart  = streak.cur >= 2 ? `&nbsp;&nbsp;🔥 ${streak.cur} Wochen` : '';
       prevBanner = `<div class="prev-banner" role="status">
         ${ic.barChart()}<span>Vorwoche: ${_pbScore}% · ${_pbSucc}/${_pbTotal} Sätze ✓${streakPart}</span>
+        ${_tip(_TIP.successScore)}
       </div>`;
     }
   }
@@ -1178,6 +1221,7 @@ function renderExercise(wk, di, ei, state) {
         data-action="inc-weight" data-di="${di}" data-ei="${ei}"
         aria-label="${ex.nextWeekPlanConfirmed ? `${_btnLabel} bestätigt` : `${_btnLabel} — tippen zum Bestätigen`}"
       >${_btnLabel}</button>
+      ${_tip(_TIP.progression)}
       ${!_isReps && !_isSets && _kgPickerKey === `${di}-${ei}` ? `
       <div class="ex-kg-picker" role="group" aria-label="Steigerung für nächste Woche">
         ${[0, 1.25, 2, 2.5, 5, 7.5, 10, 15, 20].map(v =>
@@ -1297,6 +1341,7 @@ function renderExercise(wk, di, ei, state) {
       ${_nudgeSi != null ? `
       <div class="rpe-nudge" role="group" aria-label="RPE eingeben">
         <span class="rpe-nudge__label">Wie anstrengend?</span>
+        ${_tip(_TIP.rpeNudge)}
         ${[7,8,9,10].map(v => `
           <button class="rpe-nudge__btn"
             data-action="rpe-nudge-select"
@@ -1324,7 +1369,7 @@ function renderExercise(wk, di, ei, state) {
       </div>
       <span class="fulfill-meter__label" style="color:${color}">Ziel: ${nSets}×${ex.targetReps} | Ist: ${achieved}/${target} ${unit}</span>
     </div>
-    ${actualPct > 0 ? `<div class="effort-pct" style="color:${actualPct > 100 ? 'var(--c-accent)' : 'var(--c-text-3)'}">${actualPct > 100 ? '↑ ' : ''}${actualPct}% Ziel</div>` : ''}`;
+    ${actualPct > 0 ? `<div class="effort-pct-row"><div class="effort-pct" style="color:${actualPct > 100 ? 'var(--c-accent)' : 'var(--c-text-3)'}">${actualPct > 100 ? '↑ ' : ''}${actualPct}% Ziel</div>${_tip(_TIP.effortScore)}</div>` : ''}`;
   })()}
 
   ${!locked ? `
@@ -1672,6 +1717,8 @@ function renderBodyTab(state) {
     </div>
   </div>
   ${bodyInsightHtml}
+  ${!histRows && !bd.weight && !bd.sleep ? `
+  <p class="empty-state__hint" style="margin-top:var(--sp-3)">Trage dein Körpergewicht ein um langfristige Entwicklungen zu verfolgen.</p>` : ''}
   ${histRows ? `
   <div style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--c-text-3);margin-bottom:8px">Verlauf</div>
   ${histRows}` : ''}`;
@@ -1703,6 +1750,18 @@ function _weekSuccessScore(week) {
 function renderAnalysisTab(state) {
   const container = document.getElementById('analysis-tab-content');
   if (!container) return;
+
+  const hasTrainingData = state.weeks.some(w =>
+    w.days.some(d => d.exercises.some(ex => ex.sets.some(s => s.status === 'success' || s.status === 'fail')))
+  );
+  if (!hasTrainingData) {
+    container.innerHTML = `
+    <div class="empty-state">
+      <div class="empty-state__icon">📊</div>
+      <p class="empty-state__text">Noch keine Daten vorhanden.<br>Schließe deine erste Trainingswoche ab um hier Auswertungen zu sehen.</p>
+    </div>`;
+    return;
+  }
 
   const streak   = _calcStreak(state);
   const sorted   = [...state.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
@@ -2015,6 +2074,7 @@ function _renderStreakChain(state) {
       ${lines.join('')}
       ${circles.join('')}
     </svg>
+    ${_tip(_TIP.streakChain)}
     <div id="streak-chain-tooltip" style="display:none;position:absolute;background:#1A1A2E;border:1px solid #2E2E35;color:#E0E0E8;font-size:11px;padding:4px 8px;border-radius:6px;pointer-events:none;z-index:50;white-space:nowrap"></div>
   </div>`;
 }
@@ -2108,7 +2168,7 @@ function _updateExChart(state) {
     wrap.innerHTML = svg;
     _attachChartTooltips(wrap);
   } else {
-    wrap.innerHTML = '<p style="font-size:13px;color:var(--c-text-3);padding:12px 0">Noch zu wenig Daten — ab 2 Trainingswochen sichtbar.</p>';
+    wrap.innerHTML = '<p class="empty-state__hint">Wähle eine Übung und trainiere mindestens 2 Wochen um den Verlauf zu sehen.</p>';
   }
   const last4Wrap = document.getElementById('chart-last4-wrap');
   if (last4Wrap) last4Wrap.innerHTML = _renderLast4Units(name, state);
@@ -3436,6 +3496,10 @@ function _handleClick(e) {
     // Handled in _handleChange; nothing to do on click.
     case 'import-json': break;
 
+    case 'show-tooltip':
+      _showTooltip(el.dataset.tooltipText, el);
+      break;
+
     default:
       // Unknown action – ignore silently
       break;
@@ -3693,7 +3757,7 @@ function _prepNewWeekModal() {
   const _rpeEnabled = state.settings?.rpeEnabled ?? true;
   const aiRecHtml = _displayRecs.length > 0 ? `
   <div class="nw-weight-recs">
-    <div class="nw-weight-recs__title">💡 KI-Empfehlung</div>
+    <div class="nw-weight-recs__title" style="display:flex;align-items:center;gap:6px">💡 KI-Empfehlung ${_tip(_TIP.coachChip)}</div>
     ${_displayRecs.map(r => {
       const _filtReasons = (r.rec.reasons ?? []).filter(rs => !rs.isRpe || _rpeEnabled).slice(0, 2);
       const _action = r.rec.delta > 0
@@ -4206,6 +4270,7 @@ function _showDayCompletionModal(di) {
           <h3 class="completion-modal__title">Erholung heute</h3>
           <div class="completion-modal__slider-row">
             <span class="completion-modal__label">🛌 Schlaf</span>
+            <button type="button" class="tooltip-trigger" id="cm-sleep-tip" aria-label="Erklärung anzeigen">?</button>
             <input type="range" id="cm-sleep" class="completion-modal__slider"
               min="3" max="10" step="0.5" value="${initSleep}">
             <span class="completion-modal__val" id="cm-sleep-val">${initSleep}h</span>
@@ -4219,6 +4284,11 @@ function _showDayCompletionModal(di) {
           <button class="completion-modal__confirm">Fertig</button>
           <button class="completion-modal__skip">Überspringen</button>
         </div>`;
+
+      overlay.querySelector('#cm-sleep-tip')?.addEventListener('click', e => {
+        e.stopPropagation();
+        _showTooltip(_TIP.sleepSlider, e.currentTarget);
+      });
 
       const sleepIn    = overlay.querySelector('#cm-sleep');
       const energyIn   = overlay.querySelector('#cm-energy');
@@ -4311,7 +4381,7 @@ function _renderBadgeGallery(state) {
       <div class="badge-item__sub">noch ${weeksLeft} Wo.</div>
     </div>`;
   });
-  return `<div class="section-label" style="margin-top:var(--sp-5)">Abzeichen</div>
+  return `<div class="section-label" style="margin-top:var(--sp-5);display:flex;align-items:center;gap:6px">Abzeichen ${_tip(_TIP.badges)}</div>
     <div class="badge-gallery">${items.join('')}</div>`;
 }
 
