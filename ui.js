@@ -2391,6 +2391,29 @@ function drawLineChart(id, labels, data, color) {
 }
 
 // ─── Settings tab ─────────────────────────────────────────────────────────────
+function _backupAgeInDays(settings) {
+  const lbd = settings?.lastBackupDate;
+  if (!lbd) return null;
+  const ts = typeof lbd === 'number' ? lbd : new Date(lbd + 'T00:00:00').getTime();
+  return Math.floor((Date.now() - ts) / 86_400_000);
+}
+
+function _backupStatusHtml(settings) {
+  const days = _backupAgeInDays(settings);
+  if (days === null) return '<span class="bk-status bk-status--warn">⚠️ Noch nie gesichert</span>';
+  if (days === 0)    return '<span class="bk-status bk-status--ok">✓ Heute gesichert</span>';
+  if (days <= 14)    return `<span class="bk-status bk-status--ok">✓ Vor ${days} ${days === 1 ? 'Tag' : 'Tagen'}</span>`;
+  return `<span class="bk-status bk-status--warn">⚠️ Vor ${days} Tagen — zu alt</span>`;
+}
+
+function _shouldShowBackupReminder(state) {
+  const s = state.settings ?? {};
+  if (s.backupReminderSnoozed && (Date.now() - s.backupReminderSnoozed) < 7 * 86_400_000) return false;
+  const days = _backupAgeInDays(s);
+  if (days === null) return state.weeks.length >= 2;
+  return days > 14;
+}
+
 function renderSettingsTab(state) {
   const container = document.getElementById('settings-tab-content');
   if (!container) return;
@@ -2638,23 +2661,23 @@ function renderSettingsTab(state) {
     }).join('')}
   </div>
 
-  <!-- Daten -->
+  <!-- Deine Daten -->
   <div class="settings-section">
-    <div class="settings-section__title">Daten</div>
+    <div class="settings-section__title">Deine Daten</div>
     <div class="settings-row settings-row--clickable" data-action="export-json">
       <div>
-        <div class="settings-row__label">${ic.download()} Daten exportieren (JSON)</div>
-        <div class="settings-row__desc">Vollständige Sicherungskopie</div>
+        <div class="settings-row__label">💾 Backup erstellen</div>
+        <div class="settings-row__desc backup-status-line">${_backupStatusHtml(s)}</div>
       </div>
       <div class="settings-row__action">${ic.chevronRight()}</div>
     </div>
     <label class="settings-row settings-row--clickable">
       <div>
-        <div class="settings-row__label">${ic.upload()} Daten importieren (JSON)</div>
-        <div class="settings-row__desc">Backup wiederherstellen</div>
+        <div class="settings-row__label">📂 Backup wiederherstellen</div>
+        <div class="settings-row__desc">Aktuelle Daten werden ersetzt</div>
       </div>
       <div class="settings-row__action">${ic.chevronRight()}</div>
-      <input type="file" accept=".json" class="sr-only" data-action="import-json" aria-label="JSON-Datei wählen"/>
+      <input type="file" accept=".json" class="sr-only" data-action="import-json" aria-label="JSON-Backup-Datei wählen"/>
     </label>
   </div>
 
@@ -3666,8 +3689,8 @@ function _handleClick(e) {
     }
 
     case 'export-json':
-      exportJSON();
-      showToast('JSON-Backup wird heruntergeladen …', 'ok'); break;
+      exportJSON(() => showToast('✓ Backup gespeichert', 'ok', 2000));
+      break;
 
     case 'save-tpl':
       _saveTemplate(); break;
@@ -3761,9 +3784,16 @@ function _handleChange(e) {
     case 'import-json': {
       const file = el.files?.[0];
       if (!file) break;
+      const confirmed = confirm(
+        'Aktuelle Trainingsdaten werden durch das Backup ersetzt.\nNicht rückgängig machbar.'
+      );
+      if (!confirmed) { el.value = ''; break; }
       importJSON(file)
-        .then(() => showToast('Backup importiert ✓', 'ok'))
-        .catch(err => showToast(`Fehler: ${err.message}`, 'warn'));
+        .then(() => {
+          const weeks = getState().weeks.length;
+          showToast(`✓ ${weeks} Wochen Trainingsdaten wiederhergestellt`, 'ok', 3000);
+        })
+        .catch(() => showToast('⚠️ Ungültige Backup-Datei', 'warn', 3000));
       el.value = '';
       break;
     }
@@ -4321,8 +4351,7 @@ export function mountApp(root) {
   _storageWarn = document.getElementById('storage-warning');
 
   document.getElementById('storage-warn-btn')?.addEventListener('click', () => {
-    exportJSON();
-    showToast('JSON-Backup wird heruntergeladen …', 'ok');
+    exportJSON(() => showToast('✓ Backup gespeichert', 'ok', 2000));
   });
 
   _bindEvents(root);
@@ -4363,7 +4392,7 @@ export function mountApp(root) {
     }
 
     const st = getState();
-    if ((st.settings.weeksSinceLastBackupReminder ?? 0) >= 4) {
+    if (_shouldShowBackupReminder(st)) {
       _showBackupReminderToast();
     }
   }, 2000);
@@ -4436,10 +4465,8 @@ function _finishCompletion(di, rating, sleepHours, energyLevel) {
     for (const ins of triggered) {
       if (ins.immediate) showToast(ins.message, ins.type === 'warning' ? 'warn' : 'ok', 5000);
     }
-    if (allDone) {
-      const newCnt = (afterSt.settings.weeksSinceLastBackupReminder ?? 0) + 1;
-      dispatch(A.SETTING_SET, { key: 'weeksSinceLastBackupReminder', value: newCnt });
-      if (newCnt >= 4) setTimeout(_showBackupReminderToast, 800);
+    if (allDone && _shouldShowBackupReminder(afterSt)) {
+      setTimeout(_showBackupReminderToast, 4500);
     }
   }
 
@@ -4594,20 +4621,18 @@ function _showBackupReminderToast() {
   const div = document.createElement('div');
   div.id = 'backup-reminder-toast';
   div.className = 'backup-reminder';
-  div.innerHTML = `<span>Zeit für ein Backup! (4 Wochen seit letzter Erinnerung)</span>
+  div.innerHTML = `<span>💾 Zeit für ein Backup — sichere deine Trainingsdaten</span>
     <div class="backup-reminder__btns">
-      <button id="backup-now-btn" class="btn btn--accent btn--sm">Jetzt exportieren</button>
+      <button id="backup-now-btn" class="btn btn--accent btn--sm">Jetzt sichern</button>
       <button id="backup-later-btn" class="btn btn--ghost btn--sm">Später</button>
     </div>`;
   document.body.appendChild(div);
   document.getElementById('backup-now-btn')?.addEventListener('click', () => {
-    exportJSON();
-    dispatch(A.SETTING_SET, { key: 'weeksSinceLastBackupReminder', value: 0 });
     div.remove();
-    showToast('JSON-Backup heruntergeladen.', 'ok');
+    exportJSON(() => showToast('✓ Backup gespeichert', 'ok', 2000));
   });
   document.getElementById('backup-later-btn')?.addEventListener('click', () => {
-    dispatch(A.SETTING_SET, { key: 'weeksSinceLastBackupReminder', value: 0 });
+    dispatch(A.SETTING_SET, { key: 'backupReminderSnoozed', value: Date.now() });
     div.remove();
   });
 }
@@ -4687,6 +4712,11 @@ function _showOnboarding() {
           <div class="ob-logo" style="font-size:56px">📲</div>
           <h2 class="ob-title ob-title--sm">Für zuverlässige Datenspeicherung</h2>
           <p class="ob-sub">${hint}</p>
+          <div class="ob-backup-warn">
+            ⚠️ Browser-Daten löschen = Trainingsdaten verloren.<br>
+            Erstelle regelmäßig ein Backup unter<br>
+            <strong>Einstellungen → Backup erstellen</strong>.
+          </div>
           <button class="btn btn--accent ob-btn" data-ob="done">Verstanden</button>
         </div>`;
     }
