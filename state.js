@@ -528,6 +528,8 @@ export function loadState() {
       if (!STATE.weeks.length && STATE.onboardingDone) _appendDefaultWeek();
       if (STATE.curIdx >= STATE.weeks.length) STATE.curIdx = STATE.weeks.length - 1;
       if (STATE.curIdx < 0)                   STATE.curIdx = 0;
+      _checkAndGrantBadges(STATE);
+      console.log('[TRAIN] streak:', _calcCurrentStreak(STATE.weeks), 'badges:', STATE.badges);
       persistState(); // re-write so both keys are in sync
       return true;
     } catch (e) {

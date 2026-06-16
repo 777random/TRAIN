@@ -1763,13 +1763,14 @@ const MOVEMENT_MAP = {
   'Dips': 'Push', 'Liegestütz': 'Push', 'KB Press': 'Push', 'Push Press': 'Push',
   'Landmine Press': 'Push', 'Chest Press Maschine': 'Push', 'Shoulder Press Maschine': 'Push',
   'Trizepsdips': 'Push', 'Trizepsdrücken': 'Push', 'Skull Crushers': 'Push',
+  'KH Flys': 'Push', 'Flys Kabel': 'Push',
   'Klimmzüge': 'Pull', 'Latziehen': 'Pull', 'Lat Maschine': 'Pull',
   'Kabelrudern': 'Pull', 'Rudern': 'Pull', 'Rudern Maschine': 'Pull',
   'KH Rudern': 'Pull', 'T-Bar Rudern': 'Pull', 'Pendlay Row': 'Pull',
   'Kabelbizeps': 'Pull', 'Bizepscurls': 'Pull', 'Hammercurls': 'Pull',
   'Konzentrationscurls': 'Pull', 'Butterfly': 'Pull', 'Face Pulls': 'Pull',
   'Reverse Flys': 'Pull', 'Frontheben': 'Pull', 'Seitheben': 'Pull',
-  'KH Shrugs': 'Pull', 'Gesichtszug': 'Pull', 'Flys Kabel': 'Pull',
+  'KH Shrugs': 'Pull',
   'Kniebeuge': 'Squat', 'Frontkniebeuge': 'Squat', 'Bulgarische Kniebeuge': 'Squat',
   'Beinpresse': 'Squat', 'Hack Squat': 'Squat', 'Smith Maschine Kniebeuge': 'Squat',
   'Beinstrecker': 'Squat', 'Beinbeuger': 'Squat', 'Ausfallschritte': 'Squat',
@@ -1781,8 +1782,8 @@ const MOVEMENT_MAP = {
   'KB Carry': 'Carry',
   'Plank': 'Core', 'Crunch': 'Core', 'Situps': 'Core', 'Beinheben': 'Core',
   'Ab-Wheel': 'Core', 'Cable Crunches': 'Core', 'Russian Twists': 'Core',
-  'Hollow Hold': 'Core', 'Pallof Press': 'Core', 'Broad Jumps': 'Core',
-  'Battle Ropes': 'Core', 'Burpees': 'Core',
+  'Hollow Hold': 'Core', 'Pallof Press': 'Core', 'Battle Ropes': 'Core',
+  'Burpees': 'Core', 'Broad Jumps': 'Core',
 };
 
 function _renderRadarSVG(catPct) {
