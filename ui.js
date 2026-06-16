@@ -1756,6 +1756,148 @@ function _weekSuccessScore(week) {
 
 
 // ─── Analysis tab ─────────────────────────────────────────────────────────────
+
+const MOVEMENT_MAP = {
+  'Bankdrücken': 'Push', 'Schrägbankdrücken': 'Push', 'Schrägbankdrücken tief': 'Push',
+  'Schulterdrücken': 'Push', 'Militärpress': 'Push', 'Kurzhanteldrücken': 'Push',
+  'Dips': 'Push', 'Liegestütz': 'Push', 'KB Press': 'Push', 'Push Press': 'Push',
+  'Landmine Press': 'Push', 'Chest Press Maschine': 'Push', 'Shoulder Press Maschine': 'Push',
+  'Trizepsdips': 'Push', 'Trizepsdrücken': 'Push', 'Skull Crushers': 'Push',
+  'Klimmzüge': 'Pull', 'Latziehen': 'Pull', 'Lat Maschine': 'Pull',
+  'Kabelrudern': 'Pull', 'Rudern': 'Pull', 'Rudern Maschine': 'Pull',
+  'KH Rudern': 'Pull', 'T-Bar Rudern': 'Pull', 'Pendlay Row': 'Pull',
+  'Kabelbizeps': 'Pull', 'Bizepscurls': 'Pull', 'Hammercurls': 'Pull',
+  'Konzentrationscurls': 'Pull', 'Butterfly': 'Pull', 'Face Pulls': 'Pull',
+  'Reverse Flys': 'Pull', 'Frontheben': 'Pull', 'Seitheben': 'Pull',
+  'KH Shrugs': 'Pull', 'Gesichtszug': 'Pull', 'Flys Kabel': 'Pull',
+  'Kniebeuge': 'Squat', 'Frontkniebeuge': 'Squat', 'Bulgarische Kniebeuge': 'Squat',
+  'Beinpresse': 'Squat', 'Hack Squat': 'Squat', 'Smith Maschine Kniebeuge': 'Squat',
+  'Beinstrecker': 'Squat', 'Beinbeuger': 'Squat', 'Ausfallschritte': 'Squat',
+  'Box Jumps': 'Squat', 'KB Goblet Squat': 'Squat',
+  'Kreuzheben': 'Hinge', 'Rumänisches Kreuzheben': 'Hinge', 'Sumo Kreuzheben': 'Hinge',
+  'Hip Thrust': 'Hinge', 'KB Swings': 'Hinge', 'Kettlebell Swings': 'Hinge',
+  'KB Clean': 'Hinge', 'KB Snatch': 'Hinge', 'KB Turkish Get-Up': 'Hinge',
+  'KB Windmill': 'Hinge', 'Wadenheben': 'Hinge',
+  'KB Carry': 'Carry',
+  'Plank': 'Core', 'Crunch': 'Core', 'Situps': 'Core', 'Beinheben': 'Core',
+  'Ab-Wheel': 'Core', 'Cable Crunches': 'Core', 'Russian Twists': 'Core',
+  'Hollow Hold': 'Core', 'Pallof Press': 'Core', 'Broad Jumps': 'Core',
+  'Battle Ropes': 'Core', 'Burpees': 'Core',
+};
+
+function _renderRadarSVG(catPct) {
+  const AXES = ['Push', 'Pull', 'Squat', 'Hinge', 'Carry', 'Core'];
+  const cx = 100, cy = 110, r = 70;
+  const ang = i => -Math.PI / 2 + i * (2 * Math.PI / AXES.length);
+  const pt  = (i, f) => [
+    +(cx + f * r * Math.cos(ang(i))).toFixed(1),
+    +(cy + f * r * Math.sin(ang(i))).toFixed(1),
+  ];
+  const rings = [1, 0.75, 0.5, 0.25].map(f => {
+    const pts = AXES.map((_, i) => pt(i, f).join(',')).join(' ');
+    return `<polygon points="${pts}" fill="none" stroke="#2E2E35" stroke-width="1"/>`;
+  }).join('');
+  const axisLines = AXES.map((_, i) => {
+    const [x2, y2] = pt(i, 1);
+    return `<line x1="${cx}" y1="${cy}" x2="${x2}" y2="${y2}" stroke="#2E2E35" stroke-width="1"/>`;
+  }).join('');
+  const dataPts = AXES.map((nm, i) => pt(i, Math.min((catPct[nm] ?? 0) / 100, 1)).join(',')).join(' ');
+  const polygon = `<polygon points="${dataPts}" fill="rgba(200,255,0,.18)" stroke="#C8FF00" stroke-width="2" stroke-linejoin="round"/>`;
+  const dots = AXES.map((nm, i) => {
+    if (!(catPct[nm] ?? 0)) return '';
+    const [dx, dy] = pt(i, Math.min((catPct[nm] ?? 0) / 100, 1));
+    return `<circle cx="${dx}" cy="${dy}" r="3" fill="#C8FF00"/>`;
+  }).join('');
+  const labels = AXES.map((nm, i) => {
+    const [lx, ly] = pt(i, 1.32);
+    const anchor = lx < cx - 5 ? 'end' : lx > cx + 5 ? 'start' : 'middle';
+    return `<text x="${lx}" y="${ly}" text-anchor="${anchor}" dominant-baseline="middle" font-size="10" fill="#AAA" font-family="system-ui,sans-serif">${nm}</text>
+      <text x="${lx}" y="${ly + 13}" text-anchor="${anchor}" dominant-baseline="middle" font-size="9" fill="#C8FF00" font-family="system-ui,sans-serif">${catPct[nm] ?? 0}%</text>`;
+  }).join('');
+  return `<svg viewBox="0 0 200 225" width="100%" style="max-width:220px;display:block;margin:0 auto" role="img" aria-label="Radar-Diagramm Bewegungsmuster">${rings}${axisLines}${polygon}${dots}${labels}</svg>`;
+}
+
+function _renderMovementPattern(state) {
+  const RADAR_CATS = ['Push', 'Pull', 'Squat', 'Hinge', 'Carry', 'Core'];
+  const last4 = [...state.weeks]
+    .filter(w => w.mode !== 'deload')
+    .sort((a, b) => a.startDate.localeCompare(b.startDate))
+    .slice(-4);
+  if (!last4.length) return '';
+  const catSets = {};
+  let totalSets = 0;
+  for (const wk of last4) {
+    for (const day of wk.days) {
+      for (const ex of day.exercises) {
+        const baseName = ex.substituteFor ?? ex.name;
+        const cat = MOVEMENT_MAP[baseName] ?? 'Sonstige';
+        const n = ex.sets.filter(s => s.status === 'success').length;
+        if (!n) continue;
+        catSets[cat] = (catSets[cat] ?? 0) + n;
+        totalSets += n;
+      }
+    }
+  }
+  if (!totalSets) return '';
+  const catPct = {};
+  for (const c of RADAR_CATS) catPct[c] = totalSets > 0 ? Math.round((catSets[c] ?? 0) / totalSets * 100) : 0;
+  const catsWithData = RADAR_CATS.filter(c => (catSets[c] ?? 0) > 0);
+
+  const warnings = [];
+  const pp = [catPct['Push'], catPct['Pull']];
+  const sh = [catPct['Squat'], catPct['Hinge']];
+  if (pp[0] > 0 && pp[1] > 0) {
+    if (pp[0] > pp[1] * 2) warnings.push('Push überwiegt Pull — Ungleichgewicht möglich.');
+    else if (pp[1] > pp[0] * 2) warnings.push('Pull überwiegt Push — Ungleichgewicht möglich.');
+  }
+  if (sh[0] > 0 && sh[1] > 0) {
+    if (sh[0] > sh[1] * 2) warnings.push('Squat überwiegt Hinge — Ungleichgewicht möglich.');
+    else if (sh[1] > sh[0] * 2) warnings.push('Hinge überwiegt Squat — Ungleichgewicht möglich.');
+  }
+  const warningsHtml = warnings.map(w => `<div class="movement-warning">⚠ ${h(w)}</div>`).join('');
+
+  let chartHtml;
+  if (catsWithData.length >= 4) {
+    chartHtml = _renderRadarSVG(catPct);
+  } else {
+    const maxPct = Math.max(...RADAR_CATS.map(c => catPct[c]), 1);
+    chartHtml = RADAR_CATS.map(cat => {
+      const pct = catPct[cat];
+      return `<div class="mg-bar-row">
+        <span class="mg-bar-label">${cat}</span>
+        <div class="mg-bar-wrap"><div class="mg-bar" style="width:${pct ? Math.round(pct / maxPct * 100) : 0}%"></div></div>
+        <span class="mg-bar-val">${pct ? pct + '%' : '—'}</span>
+      </div>`;
+    }).join('');
+  }
+
+  return `<div class="chart-card">
+    <div class="chart-card__title">Bewegungsmuster</div>
+    <p style="font-size:11px;color:var(--c-text-3);margin-bottom:var(--sp-3)">Letzte 4 Wochen (ohne Deload)</p>
+    ${chartHtml}
+    ${warningsHtml}
+  </div>`;
+}
+
+function _renderAnalysis1RM(name, state) {
+  const allSets = state.weeks
+    .filter(w => w.mode !== 'deload')
+    .flatMap(w => w.days.flatMap(d =>
+      d.exercises
+        .filter(ex => ex.name === name || ex.substituteFor === name)
+        .flatMap(ex => {
+          if (ex.metric && ex.metric !== 'kg') return [];
+          return ex.sets
+            .filter(s => s.status === 'success' && (s.reps ?? 0) >= 1 && (s.reps ?? 0) <= 10 && (s.weight ?? 0) > 0)
+            .map(s => ({ w: s.weight, r: s.reps, est: s.weight * (1 + s.reps / 30) }));
+        })
+    ));
+  if (!allSets.length) return '';
+  const best = allSets.reduce((mx, s) => s.est > (mx?.est ?? 0) ? s : mx, null);
+  if (!best) return '';
+  return `<div class="orm-hint orm-hint--analysis">~${best.est.toFixed(1)} kg geschätzter 1RM <span class="orm-hint__basis">(Epley · ${best.w} kg × ${best.r} Wdh)</span></div>`;
+}
+
 function renderAnalysisTab(state) {
   const container = document.getElementById('analysis-tab-content');
   if (!container) return;
@@ -1772,29 +1914,23 @@ function renderAnalysisTab(state) {
     return;
   }
 
-  const streak   = _calcStreak(state);
-  const sorted   = [...state.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
-  const last8    = sorted.slice(-8);
-  // Tatsächliches Volumen: nur success-Sätze (2.1)
-  const vols     = last8.map(_trueVol);
-  const wkLabels = last8.map(w => wkLabel(w.startDate).split('·')[0].trim());
+  const streak     = _calcStreak(state);
+  const sorted     = [...state.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
   const _scoreList = state.weeks.map(w => _weekSuccessScore(w)).filter(s => s.total > 0).map(s => s.pct);
-  const avgScore = _scoreList.length > 0 ? Math.round(_scoreList.reduce((a, b) => a + b, 0) / _scoreList.length) : null;
-
+  const avgScore   = _scoreList.length > 0 ? Math.round(_scoreList.reduce((a, b) => a + b, 0) / _scoreList.length) : null;
   const allExNames = [...new Set(
     state.weeks.flatMap(w => w.days.flatMap(d => d.exercises.map(e => e.name)))
   )].sort();
-
   const insights = state.insights ?? [];
 
+  // ── 1. Wochenüberblick ──────────────────────────────────────────────────────
   const weekCards = [...sorted].reverse().map((wk, wi, arr) => {
     const _realWkIdx = state.weeks.findIndex(w => w.id === wk.id);
     const tot  = wk.days.reduce((s, d) => s + d.exercises.reduce((ss, ex) => ss + ex.sets.length, 0), 0);
     const don  = wk.days.reduce((s, d) => s + d.exercises.reduce((ss, ex) => ss + ex.sets.filter(st => st.status === 'success').length, 0), 0);
     const vol  = _trueVol(wk);
-    const pct  = tot > 0 ? Math.round(don / tot * 100) : 0;
     const _wss = _weekSuccessScore(wk);
-    const score      = _wss.total > 0 ? _wss.pct : pct;
+    const score      = _wss.total > 0 ? _wss.pct : (tot > 0 ? Math.round(don / tot * 100) : 0);
     const scoreColor = score >= 90 ? 'var(--c-ok)' : score >= 70 ? 'var(--c-warn)' : 'var(--c-danger)';
     const dd      = wk.days.filter(d => !!d.markedDone).length;
     const isDl    = wk.mode === 'deload';
@@ -1805,37 +1941,18 @@ function renderAnalysisTab(state) {
       const pv = _trueVol(prev);
       if (pv > 0) {
         const df = Math.round((vol - pv) / pv * 100);
-        vd = df > 0
-          ? `<span class="diff-up"> ↑${df}%</span>`
-          : df < 0 ? `<span class="diff-dn"> ↓${Math.abs(df)}%</span>` : '';
+        vd = df > 0 ? `<span class="diff-up"> ↑${df}%</span>` : df < 0 ? `<span class="diff-dn"> ↓${Math.abs(df)}%</span>` : '';
       }
     }
-
-    // Day durations from sessionLog (2.6)
     const dayDurations = wk.days.map((day, di) => {
       const logs = (wk.sessionLog ?? []).filter(l => l.dayIdx === di);
       if (!logs.length) return '';
       const mins = Math.round(logs.reduce((s, l) => s + l.duration, 0) / 60);
       return `<span class="pw-day-dur">${h(day.title)}: ${mins} min</span>`;
     }).filter(Boolean).join(' · ');
-
-    // Average session duration
     const avgDur = wk.sessionLog?.length
       ? Math.round(wk.sessionLog.reduce((s, l) => s + l.duration, 0) / wk.sessionLog.length / 60)
       : null;
-
-    // Target fulfillment (2.5)
-    let avgFulfill = null;
-    const withTargets = wk.days.flatMap(d => d.exercises.filter(ex => ex.targetReps));
-    if (withTargets.length > 0) {
-      const rates = withTargets.map(ex => {
-        const target   = ex.sets.length * (ex.targetReps ?? 0);
-        const achieved = ex.sets.filter(s => s.status === 'success').reduce((sum, s) => sum + (s.reps ?? 0), 0);
-        return target > 0 ? achieved / target : 0;
-      });
-      avgFulfill = Math.round(rates.reduce((a, b) => a + b, 0) / rates.length * 100);
-    }
-
     return `
     <div class="pw-card${isDl ? ' pw-card--deload' : ''}">
       <div class="pw-card__top">
@@ -1858,11 +1975,53 @@ function renderAnalysisTab(state) {
         ${avgDur ? `<div><div class="pw-stat__num">${avgDur}'</div><div class="pw-stat__lbl">Ø Dauer</div></div>` : ''}
       </div>
       <div class="progress-bar-wrap"><div class="progress-bar" style="width:${score}%"></div></div>
-      ${avgFulfill !== null ? `<div class="pw-card__effort">Ø Zielerfüllung: <strong style="color:${avgFulfill>=100?'var(--c-ok)':avgFulfill>=80?'var(--c-warn)':'var(--c-danger)'}">${avgFulfill}%</strong></div>` : ''}
       ${state.weeks.length > 1 ? `<button class="pw-card__delete" data-action="open-delete-week" data-week-idx="${_realWkIdx}" aria-label="Woche löschen">${ic.trash()}</button>` : ''}
     </div>`;
   }).join('');
 
+  const reviewableWeeks = [...sorted].filter(w => w.days.some(d => d.markedDone)).reverse();
+  const weekReviewHtml = reviewableWeeks.length ? (() => {
+    const opts = reviewableWeeks.map((wk, i) => {
+      const d   = new Date(wk.startDate + 'T12:00:00');
+      const jan = new Date(d.getFullYear(), 0, 1);
+      const kw  = Math.ceil(((d - jan) / 86_400_000 + jan.getDay() + 1) / 7);
+      const lbl = `KW ${String(kw).padStart(2,'0')} · ${d.getFullYear()}${wk.note ? ' · ' + wk.note : ''}`;
+      return `<option value="${i}">${h(lbl)}</option>`;
+    }).join('');
+    return `<div class="chart-card" id="week-review-card">
+      <div class="chart-card__title">📋 Wochenrückblick</div>
+      <select class="chart-select" id="week-review-select" aria-label="Woche für Rückblick auswählen">${opts}</select>
+      <div id="week-review-inline" style="margin-top:var(--sp-3)"></div>
+    </div>`;
+  })() : '';
+
+  // ── 3. Bestleistungen ──────────────────────────────────────────────────────
+  const bestleistungenHtml = (() => {
+    const prs = state.prs ?? {};
+    const favSet = new Set(state.favoriteExercises ?? []);
+    const entries = Object.entries(prs).sort((a, b) => b[1].maxWeight - a[1].maxWeight);
+    if (!entries.length) return '';
+    const favEntries  = entries.filter(([nm]) => favSet.has(nm));
+    const restEntries = entries.filter(([nm]) => !favSet.has(nm));
+    const renderRow = ([nm, pr], isFav) => `
+      <div class="pr-row${isFav ? ' pr-row--fav' : ''}">
+        <span class="pr-name">${isFav ? '⭐ ' : ''}${h(nm)}</span>
+        <span class="pr-val">${pr.maxWeight} kg</span>
+        ${pr.date ? `<span class="pr-date">${pr.date}</span>` : ''}
+      </div>`;
+    const restHtml = restEntries.length ? `
+      <details class="pr-collapse">
+        <summary class="pr-collapse__summary">Alle Übungen (${restEntries.length}) ▼</summary>
+        <div class="pr-collapse__body">${restEntries.map(e => renderRow(e, false)).join('')}</div>
+      </details>` : '';
+    return `<div class="chart-card">
+      <div class="chart-card__title">${ic.trophy()} Bestleistungen</div>
+      ${favEntries.map(e => renderRow(e, true)).join('')}
+      ${restHtml}
+    </div>`;
+  })();
+
+  // ── Insights ────────────────────────────────────────────────────────────────
   const _typeColor = { progression:'var(--c-accent)', stagnation:'var(--c-warn)', recovery:'var(--c-blue)', balance:'var(--c-deload)', goal:'var(--c-accent)', consistency:'var(--c-ok)', warning:'var(--c-danger)', motivation:'var(--c-accent)' };
   const insightHtml = _showInsights && insights.length > 0
     ? insights.map(ins => `
@@ -1877,131 +2036,54 @@ function renderAnalysisTab(state) {
     : '';
 
   container.innerHTML = `
-  ${_renderStreakChain(state)}
-  ${(() => {
-    // 3.1: Ø Session + Gesamt time from sessionLog
-    const allLogs  = state.weeks.flatMap(w => w.sessionLog ?? []);
-    const totalMin = allLogs.length ? Math.round(allLogs.reduce((s, l) => s + l.duration, 0) / 60) : null;
-    const avgMin   = allLogs.length ? Math.round(totalMin / allLogs.length) : null;
-    const fmtMin   = m => m >= 60 ? `${Math.floor(m/60)}h${m%60 ? String(m%60).padStart(2,'0') : ''}` : `${m}'`;
-    return `
-  <div class="streak-row">
-    <div class="streak-card"><div class="streak-num">${streak.cur}</div><div class="streak-lbl">Streak</div></div>
-    <div class="streak-card"><div class="streak-num">${streak.best}</div><div class="streak-lbl">Best</div></div>
-    <div class="streak-card"><div class="streak-num">${state.weeks.length}</div><div class="streak-lbl">Wochen</div></div>
-    ${avgScore !== null ? `<div class="streak-card"><div class="streak-num" style="color:${avgScore>=90?'var(--c-ok)':avgScore>=70?'var(--c-warn)':'var(--c-danger)'}">${avgScore}%</div><div class="streak-lbl">Ø Erfolg</div></div>` : ''}
-    ${avgMin != null ? `<div class="streak-card"><div class="streak-num">${fmtMin(avgMin)}</div><div class="streak-lbl">Ø Session</div></div>` : ''}
-    ${totalMin != null ? `<div class="streak-card"><div class="streak-num">${fmtMin(totalMin)}</div><div class="streak-lbl">Gesamt</div></div>` : ''}
-    ${state.weeks.length >= 2 ? `
-    <button class="streak-card insight-toggle${_showInsights ? ' is-active' : ''}${insights.length > 0 ? ' has-insights' : ''}"
-      data-action="toggle-insights"
-      aria-pressed="${_showInsights}"
-      aria-label="Coach-Insights anzeigen"
-    >${ic.lightbulb()}<div class="streak-lbl">Coach${insights.length > 0 ? ` (${insights.length})` : ''}</div></button>` : ''}
-  </div>`;
-  })()}
-
   ${insightHtml}
 
-  <div class="chart-card">
-    <div class="chart-card__title">Tatsächliches Volumen</div>
-    <div class="chart-wrap"><canvas id="chart-vol" aria-label="Volumen-Verlauf Diagramm" role="img"></canvas></div>
-  </div>
+  ${weekCards}
+
+  ${weekReviewHtml}
 
   <div class="chart-card">
-    <div class="chart-card__title">Gewichtsprogression</div>
+    <div class="chart-card__title">Übungsfortschritt</div>
     <select class="chart-select" id="chart-ex-select" aria-label="Übung für Progressionskurve wählen">
       ${allExNames.map(n => `<option value="${h(n)}">${h(n)}</option>`).join('')}
     </select>
     <div class="chart-wrap" id="chart-ex-wrap"></div>
+    <div id="chart-1rm-hint"></div>
     <div id="chart-last4-wrap"></div>
   </div>
 
+  ${bestleistungenHtml}
+
+  ${_renderMovementPattern(state)}
+
   <div class="chart-card">
-    <div class="chart-card__title">Trainings-Heatmap</div>
-    <p style="font-size:11px;color:var(--c-text-3);margin-bottom:6px">Letzte 12 Wochen</p>
-    <div class="heatmap" id="heatmap" role="grid" aria-label="Trainings-Heatmap"></div>
-    <div style="display:flex;gap:8px;margin-top:8px;align-items:center;font-size:10px;color:var(--c-text-3)">
-      <div class="hm-cell" style="width:12px;height:12px" aria-hidden="true"></div><span>0</span>
-      <div class="hm-cell hm-cell--1" style="width:12px;height:12px" aria-hidden="true"></div><span>1</span>
-      <div class="hm-cell hm-cell--2" style="width:12px;height:12px" aria-hidden="true"></div><span>2</span>
-      <div class="hm-cell hm-cell--3" style="width:12px;height:12px" aria-hidden="true"></div><span>3 Tage</span>
-    </div>
-  </div>
-
-  ${weekCards}
-
-  ${(() => {
-    const prs = state.prs ?? {};
-    const entries = Object.entries(prs).sort((a, b) => b[1].maxWeight - a[1].maxWeight);
-    if (!entries.length) return '';
-    return `<div class="chart-card">
-      <div class="chart-card__title">${ic.trophy()} Bestleistungen</div>
-      ${entries.map(([name, pr]) => `
-      <div class="pr-row">
-        <span class="pr-name">${h(name)}</span>
-        <span class="pr-val">${pr.maxWeight} kg</span>
-        ${pr.date ? `<span class="pr-date">${pr.date}</span>` : ''}
-      </div>`).join('')}
+    ${_renderStreakChain(state)}
+    ${(() => {
+      const allLogs  = state.weeks.flatMap(w => w.sessionLog ?? []);
+      const totalMin = allLogs.length ? Math.round(allLogs.reduce((s, l) => s + l.duration, 0) / 60) : null;
+      const avgMin   = allLogs.length ? Math.round(totalMin / allLogs.length) : null;
+      const fmtMin   = m => m >= 60 ? `${Math.floor(m/60)}h${m%60 ? String(m%60).padStart(2,'0') : ''}` : `${m}'`;
+      return `
+    <div class="streak-row">
+      <div class="streak-card"><div class="streak-num">${streak.cur}</div><div class="streak-lbl">Streak</div></div>
+      <div class="streak-card"><div class="streak-num">${streak.best}</div><div class="streak-lbl">Best</div></div>
+      <div class="streak-card"><div class="streak-num">${state.weeks.length}</div><div class="streak-lbl">Wochen</div></div>
+      ${avgScore !== null ? `<div class="streak-card"><div class="streak-num" style="color:${avgScore>=90?'var(--c-ok)':avgScore>=70?'var(--c-warn)':'var(--c-danger)'}">${avgScore}%</div><div class="streak-lbl">Ø Erfolg</div></div>` : ''}
+      ${avgMin != null ? `<div class="streak-card"><div class="streak-num">${fmtMin(avgMin)}</div><div class="streak-lbl">Ø Session</div></div>` : ''}
+      ${totalMin != null ? `<div class="streak-card"><div class="streak-num">${fmtMin(totalMin)}</div><div class="streak-lbl">Gesamt</div></div>` : ''}
+      ${state.weeks.length >= 2 ? `
+      <button class="streak-card insight-toggle${_showInsights ? ' is-active' : ''}${insights.length > 0 ? ' has-insights' : ''}"
+        data-action="toggle-insights"
+        aria-pressed="${_showInsights}"
+        aria-label="Coach-Insights anzeigen"
+      >${ic.lightbulb()}<div class="streak-lbl">Coach${insights.length > 0 ? ` (${insights.length})` : ''}</div></button>` : ''}
     </div>`;
-  })()}
-
-  ${_renderBadgeGallery(state)}
-
-  ${(() => {
-    // Muscle group analysis (3.13): only shown when tags exist
-    const curWk = state.weeks[state.curIdx];
-    if (!curWk) return '';
-    const tagCounts = {};
-    for (const day of curWk.days) {
-      for (const ex of day.exercises) {
-        const tags = ex.tags ?? [];
-        const sets = ex.sets.filter(s => s.status === 'success').length;
-        if (sets === 0 || !tags.length) continue;
-        for (const tag of tags) {
-          tagCounts[tag] = (tagCounts[tag] ?? 0) + sets;
-        }
-      }
-    }
-    const entries = Object.entries(tagCounts).sort((a, b) => b[1] - a[1]);
-    if (!entries.length) return '';
-    const maxVal = entries[0][1];
-    return `<div class="chart-card">
-      <div class="chart-card__title">${ic.muscleGroup()} Muskelgruppen (Sätze ✓)</div>
-      ${entries.map(([tag, count]) => `
-      <div class="mg-bar-row">
-        <span class="mg-bar-label">${h(tag)}</span>
-        <div class="mg-bar-wrap">
-          <div class="mg-bar" style="width:${Math.round(count/maxVal*100)}%"></div>
-        </div>
-        <span class="mg-bar-val">${count}</span>
-      </div>`).join('')}
-    </div>`;
-  })()}
-
-  ${(() => {
-    const reviewableWeeks = [...sorted]
-      .filter(w => w.days.some(d => d.markedDone))
-      .reverse();
-    if (!reviewableWeeks.length) return '';
-    const opts = reviewableWeeks.map((wk, i) => {
-      const d   = new Date(wk.startDate + 'T12:00:00');
-      const jan = new Date(d.getFullYear(), 0, 1);
-      const kw  = Math.ceil(((d - jan) / 86_400_000 + jan.getDay() + 1) / 7);
-      const lbl = `KW ${String(kw).padStart(2,'0')} · ${d.getFullYear()}${wk.note ? ' · ' + wk.note : ''}`;
-      return `<option value="${i}">${h(lbl)}</option>`;
-    }).join('');
-    return `<div class="chart-card" id="week-review-card">
-      <div class="chart-card__title">📋 Wochenrückblick</div>
-      <select class="chart-select" id="week-review-select" aria-label="Woche für Rückblick auswählen">${opts}</select>
-      <div id="week-review-inline" style="margin-top:var(--sp-3)"></div>
-    </div>`;
-  })()}`;
+    })()}
+    ${_renderBadgeGallery(state)}
+  </div>`;
 
   requestAnimationFrame(() => {
-    drawLineChart('chart-vol', wkLabels, vols, '#C8FF00');
     _updateExChart(state);
-    _drawHeatmap(state);
     _attachStreakChainTooltips();
     document.getElementById('chart-ex-select')?.addEventListener('change', () => {
       _updateExChart(getState());
@@ -2178,6 +2260,8 @@ function _updateExChart(state) {
   } else {
     wrap.innerHTML = '<p class="empty-state__hint">Wähle eine Übung und trainiere mindestens 2 Wochen um den Verlauf zu sehen.</p>';
   }
+  const ormWrap = document.getElementById('chart-1rm-hint');
+  if (ormWrap) ormWrap.innerHTML = _renderAnalysis1RM(name, state);
   const last4Wrap = document.getElementById('chart-last4-wrap');
   if (last4Wrap) last4Wrap.innerHTML = _renderLast4Units(name, state);
 }

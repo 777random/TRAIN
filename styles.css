@@ -1022,6 +1022,12 @@ exercise { position: unset; }
 .pr-name { flex: 1; }
 .pr-val  { font-family: var(--font-display); font-size: 16px; color: var(--c-accent); }
 .pr-date { font-size: 10px; color: var(--c-text-3); }
+.pr-row--fav { background: color-mix(in srgb, var(--c-accent) 6%, transparent); border-radius: var(--r-sm); padding-left: 6px; }
+.pr-row--fav .pr-name { font-weight: 600; }
+.pr-collapse { margin-top: var(--sp-3); }
+.pr-collapse__summary { cursor: pointer; font-size: 12px; color: var(--c-text-3); padding: var(--sp-2) 0; list-style: none; user-select: none; }
+.pr-collapse__summary::-webkit-details-marker { display: none; }
+.pr-collapse__body { margin-top: var(--sp-2); }
 
 /* ── RPE popover (2.2) ─────────────────────────────────────── */
 .set-cell--rpe { position: relative; overflow: visible; }
@@ -1706,6 +1712,17 @@ details[open] > .deload-details__summary::before { content: '▾ '; }
 .orm-hint {
   font-size: 10px; color: var(--c-text-3); letter-spacing: .05em;
   margin-top: 2px; margin-bottom: 4px;
+}
+.orm-hint--analysis {
+  margin: var(--sp-2) 0; padding: var(--sp-2) var(--sp-3);
+  background: var(--c-surface2); border-radius: var(--r-sm);
+  font-size: 13px; color: var(--c-accent); font-family: var(--font-display); letter-spacing: .05em;
+}
+.orm-hint__basis { font-size: 11px; color: var(--c-text-3); font-family: var(--font-body); margin-left: 6px; letter-spacing: 0; }
+.movement-warning {
+  margin-top: var(--sp-3); padding: var(--sp-2) var(--sp-3);
+  background: rgba(255,180,0,.1); border: 1px solid rgba(255,180,0,.3);
+  border-radius: var(--r-sm); font-size: 12px; color: #FFB400;
 }
 
 /* ── Exercise tags (3.12) ──────────────────────────────────── */
