@@ -75,6 +75,18 @@ function _findBestGain(week, prevWeek) {
   return { type: 'gain', label: 'Stärkste Steigerung', text: `${best.name} +${best.delta} kg ggü. Vorwoche`, exName: best.name };
 }
 
+function _calcSuccessScore(week) {
+  let success = 0, fail = 0;
+  for (const d of week.days)
+    for (const ex of d.exercises)
+      for (const s of ex.sets) {
+        if (s.status === 'success') success++;
+        else if (s.status === 'fail') fail++;
+      }
+  const total = success + fail;
+  return total > 0 ? Math.round(success / total * 100) : null;
+}
+
 function _calcStreak(sortedWeeks, week) {
   const idx = sortedWeeks.findIndex(w => w === week || w.startDate === week.startDate);
   if (idx < 0) return 0;
@@ -173,7 +185,6 @@ export function buildWeekReview(week, allWeeks, favoriteExercises = [], plateaus
   const prevWeek = weekIdx > 0 ? sorted[weekIdx - 1] : null;
 
   // ── Summary ──────────────────────────────────────────────────────────────────
-  const totalVolume      = _sumVolume(week);
   const totalSets        = _countSuccessSets(week);
   const completedDays    = week.days.filter(d => d.markedDone).length;
   const plannedDays      = week.days.length;
@@ -181,12 +192,9 @@ export function buildWeekReview(week, allWeeks, favoriteExercises = [], plateaus
   const avgSessionDuration = sessionDurs.length
     ? Math.round(sessionDurs.reduce((a, b) => a + b, 0) / sessionDurs.length / 60)
     : null;
-  let volumeVsPrevWeek = null;
-  if (prevWeek) {
-    const pv = _sumVolume(prevWeek);
-    if (pv > 0) volumeVsPrevWeek = Math.round((totalVolume - pv) / pv * 100);
-  }
-  const summary = { totalVolume, totalSets, completedDays, plannedDays, avgSessionDuration, volumeVsPrevWeek };
+  const streak         = _calcStreak(sorted, week);
+  const goalFulfillment = _calcSuccessScore(week);
+  const summary = { streak, totalSets, completedDays, plannedDays, avgSessionDuration, goalFulfillment };
 
   // ── Highlights ────────────────────────────────────────────────────────────────
   const highlights  = [];
@@ -197,7 +205,6 @@ export function buildWeekReview(week, allWeeks, favoriteExercises = [], plateaus
     const gainH = _findBestGain(week, prevWeek);
     if (gainH && highlights.length < 3) highlights.push(gainH);
   }
-  const streak = _calcStreak(sorted, week);
   if (streak >= 2 && highlights.length < 3)
     highlights.push({ type: 'streak', label: 'Streak', text: `${streak} Wochen in Folge` });
 

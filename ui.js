@@ -44,6 +44,9 @@ let _activeTab = 'workout';
 /** Insights visible in analysis tab (2.1). */
 let _showInsights = false;
 
+/** Whether older pw-cards (>4) are expanded. */
+let _showOlderWeeks = false;
+
 /** Whether insights tooltip has been shown (3.2). */
 let _insightsTooltipShown = false;
 
@@ -1786,6 +1789,17 @@ const MOVEMENT_MAP = {
   'Burpees': 'Core', 'Broad Jumps': 'Core',
 };
 
+function _relDate(startDate) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const weekStart = new Date(startDate + 'T00:00:00');
+  const diffDays = Math.round((today - weekStart) / 86_400_000);
+  if (diffDays < 7)  return 'Diese Woche';
+  if (diffDays < 14) return 'Letzte Woche';
+  const weeks = Math.floor(diffDays / 7);
+  return `Vor ${weeks} Wochen`;
+}
+
 function _renderRadarSVG(catPct) {
   const AXES = ['Push', 'Pull', 'Squat', 'Hinge', 'Carry', 'Core'];
   const cx = 100, cy = 110, r = 70;
@@ -1925,68 +1939,56 @@ function renderAnalysisTab(state) {
   const insights = state.insights ?? [];
 
   // ── 1. Wochenüberblick ──────────────────────────────────────────────────────
-  const weekCards = [...sorted].reverse().map((wk, wi, arr) => {
-    const _realWkIdx = state.weeks.findIndex(w => w.id === wk.id);
-    const tot  = wk.days.reduce((s, d) => s + d.exercises.reduce((ss, ex) => ss + ex.sets.length, 0), 0);
-    const don  = wk.days.reduce((s, d) => s + d.exercises.reduce((ss, ex) => ss + ex.sets.filter(st => st.status === 'success').length, 0), 0);
-    const vol  = _trueVol(wk);
-    const _wss = _weekSuccessScore(wk);
-    const score      = _wss.total > 0 ? _wss.pct : (tot > 0 ? Math.round(don / tot * 100) : 0);
-    const scoreColor = score >= 90 ? 'var(--c-ok)' : score >= 70 ? 'var(--c-warn)' : 'var(--c-danger)';
-    const dd      = wk.days.filter(d => !!d.markedDone).length;
-    const isDl    = wk.mode === 'deload';
-    const vacDays = wk.mode !== 'vacation' ? wk.days.filter(d => !!d.isVacation).length : 0;
-    const prev = arr[wi + 1];
-    let vd = '';
-    if (prev) {
-      const pv = _trueVol(prev);
-      if (pv > 0) {
-        const df = Math.round((vol - pv) / pv * 100);
-        vd = df > 0 ? `<span class="diff-up"> ↑${df}%</span>` : df < 0 ? `<span class="diff-dn"> ↓${Math.abs(df)}%</span>` : '';
-      }
-    }
-    const dayDurations = wk.days.map((day, di) => {
-      const logs = (wk.sessionLog ?? []).filter(l => l.dayIdx === di);
-      if (!logs.length) return '';
-      const mins = Math.round(logs.reduce((s, l) => s + l.duration, 0) / 60);
-      return `<span class="pw-day-dur">${h(day.title)}: ${mins} min</span>`;
-    }).filter(Boolean).join(' · ');
-    const avgDur = wk.sessionLog?.length
-      ? Math.round(wk.sessionLog.reduce((s, l) => s + l.duration, 0) / wk.sessionLog.length / 60)
-      : null;
-    return `
-    <div class="pw-card${isDl ? ' pw-card--deload' : ''}">
+  const reviewableWeeks = [...sorted].filter(w => w.days.some(d => d.markedDone)).reverse();
+
+  const weekCards = (() => {
+    const allCards = [...sorted].reverse().map((wk, wi) => {
+      const _realWkIdx = state.weeks.findIndex(w => w.id === wk.id);
+      const _wss       = _weekSuccessScore(wk);
+      const tot        = wk.days.reduce((s, d) => s + d.exercises.reduce((ss, ex) => ss + ex.sets.length, 0), 0);
+      const don        = wk.days.reduce((s, d) => s + d.exercises.reduce((ss, ex) => ss + ex.sets.filter(st => st.status === 'success').length, 0), 0);
+      const score      = _wss.total > 0 ? _wss.pct : (tot > 0 ? Math.round(don / tot * 100) : 0);
+      const scoreColor = score >= 90 ? 'var(--c-ok)' : score >= 70 ? 'var(--c-warn)' : 'var(--c-danger)';
+      const isDl       = wk.mode === 'deload';
+      const isVac      = wk.mode === 'vacation';
+      const reviewIdx  = reviewableWeeks.findIndex(r => r.id === wk.id);
+      const isReviewable = reviewIdx !== -1;
+      return { wk, wi, _realWkIdx, score, scoreColor, isDl, isVac, reviewIdx, isReviewable };
+    });
+
+    const visibleCards = _showOlderWeeks ? allCards : allCards.slice(0, 4);
+    const hiddenCount  = allCards.length - 4;
+
+    const cardsHtml = visibleCards.map(({ wk, wi, _realWkIdx, score, scoreColor, isDl, isVac, reviewIdx, isReviewable }) => `
+    <div class="pw-card${isDl ? ' pw-card--deload' : ''}${isReviewable ? ' pw-card--nav' : ''}"
+      ${isReviewable ? `data-action="pw-card-jump" data-review-idx="${reviewIdx}"` : ''}>
       <div class="pw-card__top">
-        <div>
+        <div class="pw-card__labels">
           <div class="pw-card__title">
-            ${wkLabel(wk.startDate)}
+            ${_relDate(wk.startDate)}
             ${isDl ? '<span class="deload-badge">Deload</span>' : ''}
-            ${wk.mode === 'vacation' ? '<span class="vacation-badge">🏖 Urlaub</span>' : ''}
-            ${vacDays > 0 ? `<span class="vac-days-hint">${vacDays} Urlaubstag${vacDays > 1 ? 'e' : ''}</span>` : ''}
+            ${isVac ? '<span class="vacation-badge">🏖 Urlaub</span>' : ''}
           </div>
           <div class="pw-card__date">${wkRange(wk.startDate)}${wk.note ? ' · ' + h(wk.note) : ''}</div>
-          ${dayDurations ? `<div class="pw-day-durs">${dayDurations}</div>` : ''}
         </div>
         <div class="pw-card__pct" style="color:${scoreColor}">${score}%</div>
       </div>
-      <div class="pw-card__stats">
-        <div><div class="pw-stat__num" style="color:${isDl?'var(--c-deload)':'var(--c-accent)'}">${dd}/${wk.days.length}</div><div class="pw-stat__lbl">Tage</div></div>
-        <div><div class="pw-stat__num">${_wss.total > 0 ? `${don}/${_wss.total}` : don}</div><div class="pw-stat__lbl">Sätze ✓</div></div>
-        <div><div class="pw-stat__num" style="font-size:11px;color:var(--c-text-2)">${vol >= 1000 ? (vol/1000).toFixed(1)+'t' : vol+'kg'}</div><div class="pw-stat__lbl">Vol.${vd}</div></div>
-        ${avgDur ? `<div><div class="pw-stat__num">${avgDur}'</div><div class="pw-stat__lbl">Ø Dauer</div></div>` : ''}
-      </div>
       <div class="progress-bar-wrap"><div class="progress-bar" style="width:${score}%"></div></div>
       ${state.weeks.length > 1 ? `<button class="pw-card__delete" data-action="open-delete-week" data-week-idx="${_realWkIdx}" aria-label="Woche löschen">${ic.trash()}</button>` : ''}
-    </div>`;
-  }).join('');
+    </div>`).join('');
 
-  const reviewableWeeks = [...sorted].filter(w => w.days.some(d => d.markedDone)).reverse();
+    const toggleHtml = allCards.length > 4
+      ? `<button class="pw-older-toggle" data-action="toggle-older-weeks">
+           ${_showOlderWeeks ? `Weniger anzeigen ▲` : `${hiddenCount} ältere Wochen ▼`}
+         </button>`
+      : '';
+
+    return cardsHtml + toggleHtml;
+  })();
+
   const weekReviewHtml = reviewableWeeks.length ? (() => {
     const opts = reviewableWeeks.map((wk, i) => {
-      const d   = new Date(wk.startDate + 'T12:00:00');
-      const jan = new Date(d.getFullYear(), 0, 1);
-      const kw  = Math.ceil(((d - jan) / 86_400_000 + jan.getDay() + 1) / 7);
-      const lbl = `KW ${String(kw).padStart(2,'0')} · ${d.getFullYear()}${wk.note ? ' · ' + wk.note : ''}`;
+      const lbl = `${_relDate(wk.startDate)} · ${wkRange(wk.startDate)}${wk.note ? ' · ' + wk.note : ''}`;
       return `<option value="${i}">${h(lbl)}</option>`;
     }).join('');
     return `<div class="chart-card" id="week-review-card">
@@ -2840,6 +2842,29 @@ function _handleClick(e) {
         _maybeShowTip('tip-10', 'TRAIN hat erkannt dass du seit 3 Wochen keine Steigerung mehr machst. Scrolle nach unten für konkrete Strategien.');
       }
       scheduleRender();
+      break;
+
+    // ── pw-Card: jump to Wochenrückblick ──────────────────────────────────
+    case 'pw-card-jump': {
+      const idx = +el.dataset.reviewIdx;
+      const sel = document.getElementById('week-review-select');
+      if (sel && idx >= 0) {
+        sel.value = String(idx);
+        sel.dispatchEvent(new Event('change'));
+      }
+      const reviewCard = document.getElementById('week-review-card');
+      if (reviewCard) {
+        const app = document.getElementById('app');
+        const top = reviewCard.getBoundingClientRect().top + app.scrollTop - app.getBoundingClientRect().top;
+        app.scrollTo({ top, behavior: 'smooth' });
+      }
+      break;
+    }
+
+    // ── Toggle older pw-Cards ──────────────────────────────────────────────
+    case 'toggle-older-weeks':
+      _showOlderWeeks = !_showOlderWeeks;
+      renderAnalysisTab(getState());
       break;
 
     // ── Body correlation insight toggle (2.2) ──────────────────────────────
@@ -4056,6 +4081,7 @@ function _switchToTab(tab) {
   const state = getState();
   if (tab === 'body')     renderBodyTab(state);
   if (tab === 'analysis') {
+    document.getElementById('app').scrollTop = 0;
     renderAnalysisTab(state);
     const _completedWks = state.weeks.filter(w => w.days?.some(d => d.markedDone)).length;
     if (_completedWks >= 2) {

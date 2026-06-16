@@ -1130,6 +1130,16 @@ exercise { position: unset; }
 .insight-card--motivation  { border-left: 3px solid var(--c-accent); }
 .progress-bar { height: 100%; background: var(--c-accent); border-radius: var(--r-full); transition: width var(--t-normal); }
 .pw-card--deload .progress-bar { background: var(--c-deload); }
+.pw-card--nav { cursor: pointer; }
+.pw-card--nav:hover { border-color: var(--c-accent); }
+.pw-older-toggle {
+  display: block; width: 100%; padding: var(--sp-2) var(--sp-3);
+  background: none; border: 1px solid var(--c-border);
+  border-radius: var(--r-md); color: var(--c-text-2);
+  font-size: 12px; cursor: pointer; margin-bottom: var(--sp-2);
+  transition: color var(--t-fast), border-color var(--t-fast);
+}
+.pw-older-toggle:hover { color: var(--c-text); border-color: var(--c-text-3); }
 .chart-select {
   width: 100%; background: var(--c-surface2); border: 1px solid var(--c-border);
   border-radius: var(--r-md); color: var(--c-text); font-size: 13px;
@@ -1792,8 +1802,9 @@ details[open] > .deload-details__summary::before { content: '▾ '; }
   color: var(--c-text-3); margin: var(--sp-4) 0 var(--sp-2);
 }
 
-/* Summary 2×2 grid */
+/* Summary 2×N grid (5-tile: last odd tile spans full width) */
 .wr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-2); }
+.wr-tile:last-child:nth-child(odd) { grid-column: 1 / -1; }
 .wr-tile {
   background: #1E293B; border-radius: var(--r-md);
   padding: var(--sp-3) var(--sp-3); text-align: center;
