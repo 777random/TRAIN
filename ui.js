@@ -17,7 +17,7 @@
  */
 
 import {
-  getState, dispatch, subscribe, A, canUndo, AVAILABLE_TAGS, ALL_TAGS_FLAT, BADGE_THRESHOLDS,
+  getState, dispatch, subscribe, A, canUndo, AVAILABLE_TAGS, ALL_TAGS_FLAT, BADGE_THRESHOLDS, VACATION_PLANS,
 } from './state.js';
 import {
   exportJSON, importJSON, exportCSV,
@@ -2900,11 +2900,16 @@ function _handleClick(e) {
       dispatch(A.WEEK_SET_MODE, { mode: 'vacation' }); break;
 
     case 'toggle-day-vacation': {
-      const _di = +di;
-      if (!getState().weeks[getState().curIdx]?.days[_di]?.isVacation) {
+      const _di  = +di;
+      const _day = getState().weeks[getState().curIdx]?.days[_di];
+      if (_day?.isVacation) {
+        dispatch(A.DAY_TOGGLE_VACATION, { di: _di });
+      } else {
         _maybeShowTip('tip-09', 'Urlaubstage unterbrechen deinen Streak nicht. Markiere sie damit TRAIN deine Analyse korrekt berechnet.');
+        _dayMenuOpenKey = null;
+        scheduleRender();
+        _showVacationPlanModal(_di);
       }
-      dispatch(A.DAY_TOGGLE_VACATION, { di: _di });
       break;
     }
 
@@ -3034,11 +3039,11 @@ function _handleClick(e) {
       const stBefore  = getState();
       const dayBefore = stBefore.weeks[stBefore.curIdx]?.days[+di];
       if (dayBefore?.markedDone) {
-        // Unlocking: dispatch directly, no modal
         dispatch(A.DAY_TOGGLE_COMPLETE, { di: +di });
         showToast('Tag entsperrt 🔓', 'info');
+      } else if (dayBefore?.vacationPlan === 'rest') {
+        dispatch(A.DAY_TOGGLE_COMPLETE, { di: +di });
       } else {
-        // Locking: show 2-step completion modal first
         _showDayCompletionModal(+di);
       }
       break;
@@ -4421,6 +4426,58 @@ function _finishCompletion(di, rating, sleepHours, energyLevel) {
   }
 
   setTimeout(() => _showCompletionScreen(stats), 300);
+}
+
+function _showVacationPlanModal(di) {
+  document.getElementById('vac-plan-modal')?.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'vac-plan-modal';
+  overlay.className = 'vac-plan-modal-overlay';
+
+  const screen1 = () => `
+    <div class="vac-plan-modal">
+      <div class="vac-plan-modal__title">🏖 Urlaubstag</div>
+      <p class="vac-plan-modal__sub">Was möchtest du heute trainieren?</p>
+      <button class="vac-plan-option" data-vac="normal">✓ Normaler Plan</button>
+      <button class="vac-plan-option" data-vac="equipment">🏋 Equipment wählen</button>
+      <button class="vac-plan-option" data-vac="custom">📝 Eigene Übungen</button>
+      <button class="vac-plan-option" data-vac="rest">😴 Ruhetag — kein Training</button>
+    </div>`;
+
+  const screen2 = () => `
+    <div class="vac-plan-modal">
+      <div class="vac-plan-modal__title">🏋 Equipment</div>
+      <p class="vac-plan-modal__sub">Welches Equipment hast du?</p>
+      <button class="vac-plan-option" data-vac="bodyweight">🤸 Kein Equipment</button>
+      <button class="vac-plan-option" data-vac="light_kb">🏋 Leichte KH (bis 15 kg)</button>
+      <button class="vac-plan-option" data-vac="heavy_kb">💪 Schwere KH (15 kg+)</button>
+      <button class="vac-plan-option" data-vac="hotel_gym">🏢 Hotel-Gym / Maschinen</button>
+    </div>`;
+
+  overlay.innerHTML = screen1();
+  document.body.appendChild(overlay);
+
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) { overlay.remove(); return; }
+    const btn = e.target.closest('[data-vac]');
+    if (!btn) return;
+    const vac = btn.dataset.vac;
+    if (vac === 'normal') {
+      dispatch(A.DAY_TOGGLE_VACATION, { di });
+      overlay.remove();
+    } else if (vac === 'equipment') {
+      overlay.innerHTML = screen2();
+    } else if (vac === 'custom') {
+      dispatch(A.DAY_LOAD_VACATION_PLAN, { di, plan: 'custom' });
+      overlay.remove();
+    } else if (vac === 'rest') {
+      dispatch(A.DAY_LOAD_VACATION_PLAN, { di, plan: 'rest' });
+      overlay.remove();
+    } else if (VACATION_PLANS[vac]) {
+      dispatch(A.DAY_LOAD_VACATION_PLAN, { di, plan: vac });
+      overlay.remove();
+    }
+  });
 }
 
 function _showDayCompletionModal(di) {

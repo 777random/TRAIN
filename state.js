@@ -24,7 +24,7 @@
 
 export const STORAGE_KEY        = 'train_v6';
 export const STORAGE_KEY_SHADOW = 'train_v6_shadow';
-export const SCHEMA_VERSION     = 18;
+export const SCHEMA_VERSION     = 19;
 
 export const BADGE_THRESHOLDS = [
   { id: 'badge_4',   weeks: 4,   title: 'Erster Schritt' },
@@ -47,6 +47,38 @@ export const AVAILABLE_TAGS = {
 
 /** Flat list of all tags (used as default for activeTags). */
 export const ALL_TAGS_FLAT = Object.values(AVAILABLE_TAGS).flat();
+
+/** Predefined vacation training plans. Each entry: { name, sets, reps, metric }. */
+export const VACATION_PLANS = {
+  bodyweight: [
+    { name: 'Liegestütz',      sets: 3, reps: 10, metric: 'reps' },
+    { name: 'Kniebeuge',       sets: 3, reps: 15, metric: 'reps' },
+    { name: 'Dips',            sets: 3, reps: 10, metric: 'reps' },
+    { name: 'Ausfallschritte', sets: 3, reps: 12, metric: 'reps' },
+    { name: 'Plank',           sets: 3, reps: 30, metric: 'sec'  },
+  ],
+  light_kb: [
+    { name: 'KH Rudern',         sets: 4, reps: 12, metric: 'reps' },
+    { name: 'Kurzhanteldrücken', sets: 3, reps: 10, metric: 'reps' },
+    { name: 'Bizepscurls',       sets: 3, reps: 12, metric: 'reps' },
+    { name: 'Seitheben',         sets: 3, reps: 15, metric: 'reps' },
+    { name: 'Hip Thrust',        sets: 3, reps: 15, metric: 'reps' },
+  ],
+  heavy_kb: [
+    { name: 'Rumänisches KH',    sets: 4, reps: 8,  metric: 'reps' },
+    { name: 'Kurzhanteldrücken', sets: 4, reps: 8,  metric: 'reps' },
+    { name: 'KH Rudern',         sets: 4, reps: 8,  metric: 'reps' },
+    { name: 'Ausfallschritte',   sets: 3, reps: 10, metric: 'reps' },
+    { name: 'Hammercurls',       sets: 3, reps: 10, metric: 'reps' },
+  ],
+  hotel_gym: [
+    { name: 'Rudern Maschine',         sets: 4, reps: 10, metric: 'reps' },
+    { name: 'Chest Press Maschine',    sets: 4, reps: 10, metric: 'reps' },
+    { name: 'Lat Maschine',            sets: 4, reps: 10, metric: 'reps' },
+    { name: 'Beinpresse',              sets: 4, reps: 12, metric: 'reps' },
+    { name: 'Shoulder Press Maschine', sets: 3, reps: 12, metric: 'reps' },
+  ],
+};
 
 // ─── Factory helpers ──────────────────────────────────────────────────────────
 
@@ -491,6 +523,19 @@ function migrate(raw) {
     raw.meta = { ...raw.meta, schemaVersion: 18 };
   }
 
+  // v18 → v19: add vacationPlan to all days
+  if ((raw.meta?.schemaVersion ?? 0) < 19) {
+    (raw.weeks ?? []).forEach(wk =>
+      (wk.days ?? []).forEach(day => {
+        if (day.vacationPlan === undefined) day.vacationPlan = null;
+      })
+    );
+    (raw.customTemplate ?? []).forEach(day => {
+      if (day.vacationPlan === undefined) day.vacationPlan = null;
+    });
+    raw.meta = { ...raw.meta, schemaVersion: 19 };
+  }
+
   // Always-apply defaults for settings added in later versions
   if (raw.settings.vibrationEnabled               === undefined) raw.settings.vibrationEnabled               = true;
   if (raw.settings.rpeEnabled                     === undefined) raw.settings.rpeEnabled                     = true;
@@ -617,9 +662,10 @@ export const A = Object.freeze({
   DAY_RENAME:          'DAY_RENAME',          // { di, title }
   DAY_DUPLICATE:       'DAY_DUPLICATE',       // { di }
   DAY_RESET_SETS:      'DAY_RESET_SETS',      // { di }
-  DAY_TOGGLE_COMPLETE:  'DAY_TOGGLE_COMPLETE',  // { di }
-  DAY_TOGGLE_VACATION:  'DAY_TOGGLE_VACATION',  // { di }
-  DAY_SET_FIELD:        'DAY_SET_FIELD',        // { di, field, value }
+  DAY_TOGGLE_COMPLETE:       'DAY_TOGGLE_COMPLETE',       // { di }
+  DAY_TOGGLE_VACATION:       'DAY_TOGGLE_VACATION',       // { di }
+  DAY_LOAD_VACATION_PLAN:    'DAY_LOAD_VACATION_PLAN',    // { di, plan: 'bodyweight'|'light_kb'|'heavy_kb'|'hotel_gym'|'custom'|'rest' }
+  DAY_SET_FIELD:             'DAY_SET_FIELD',             // { di, field, value }
   // Exercise
   EX_ADD:              'EX_ADD',              // { di, name }
   EX_REMOVE:           'EX_REMOVE',           // { di, ei }
@@ -684,6 +730,7 @@ function _resetClonedDays(days) {
     day.locked          = false;
     day.markedDone      = false;
     day.isVacation      = false;
+    day.vacationPlan    = null;
     day.sessionNote     = '';
     day.sessionRating   = null;
     day.sessionStartTs  = null;
@@ -797,7 +844,7 @@ function reduce(state, action) {
       if (state.curIdx === 0) break;
       const d = clone(state.weeks[state.curIdx - 1].days);
       d.forEach(day => {
-        day.markedDone = false; day.locked = false; day.isVacation = false;
+        day.markedDone = false; day.locked = false; day.isVacation = false; day.vacationPlan = null;
         day.exercises.forEach(ex => {
           if (ex.substituteFor) ex.name = ex.substituteFor;
           ex.substituteFor = null;
@@ -841,6 +888,7 @@ function reduce(state, action) {
         locked:         false,
         markedDone:     false,
         isVacation:     false,
+        vacationPlan:   null,
         sessionStartTs: null,
         sessionEndTs:   null,
         sleepHours:     null,
@@ -961,6 +1009,40 @@ function reduce(state, action) {
       _checkAndGrantBadges(state);
       break;
     }
+    case A.DAY_LOAD_VACATION_PLAN: {
+      const wk  = _currentWeek(); if (!wk) break;
+      const day = wk.days[p.di]; if (!day) break;
+      day.isVacation   = true;
+      day.vacationPlan = p.plan;
+      if (p.plan === 'rest' || p.plan === 'custom') {
+        day.exercises = [];
+      } else {
+        const tpl = VACATION_PLANS[p.plan];
+        if (!tpl) break;
+        day.exercises = tpl.map(t => ({
+          name:                  t.name,
+          note:                  '',
+          pauseSec:              90,
+          metric:                t.metric,
+          progressionType:       'weight',
+          setType:               'straight',
+          targetReps:            t.reps,
+          nextWeekPlan:          0,
+          nextWeekPlanConfirmed: false,
+          tags:                  [],
+          supersetId:            null,
+          sets: Array.from({ length: t.sets }, () => ({
+            weight: null, reps: null, rpe: null,
+            status: 'pending', done: false, note: '',
+          })),
+        }));
+      }
+      const allVac = wk.days.every(d => d.isVacation);
+      if (allVac) wk.mode = 'vacation';
+      _checkAndGrantBadges(state);
+      break;
+    }
+
     case A.DAY_SET_FIELD: {
       const day = _currentWeek()?.days[p.di]; if (!day) break;
       day[p.field] = p.value;

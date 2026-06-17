@@ -2086,3 +2086,34 @@ details[open] > .deload-details__summary::before { content: '▾ '; }
 .bk-status--ok  { color: var(--c-ok); }
 .bk-status--warn { color: var(--c-warn); }
 
+/* ── Vacation plan modal (Sprint 2) ────────────────────────── */
+.vac-plan-modal-overlay {
+  position: fixed; inset: 0; z-index: 9000;
+  background: rgba(0,0,0,.72); backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  padding: var(--sp-4);
+}
+.vac-plan-modal {
+  background: var(--c-surface2); border: 1px solid var(--c-border-hi);
+  border-radius: var(--r-xl); box-shadow: var(--shadow-md);
+  width: 100%; max-width: 340px;
+  display: flex; flex-direction: column; gap: var(--sp-3);
+  padding: var(--sp-5);
+}
+.vac-plan-modal__title {
+  font-family: var(--font-display); font-size: 22px; letter-spacing: .08em;
+  color: var(--c-text); text-align: center;
+}
+.vac-plan-modal__sub {
+  font-size: 14px; color: var(--c-text-2); text-align: center; margin: 0;
+}
+.vac-plan-option {
+  width: 100%; min-height: var(--touch);
+  background: var(--c-surface); border: 1px solid var(--c-border);
+  border-radius: var(--r-md); color: var(--c-text);
+  font-size: 15px; font-weight: 500; text-align: left;
+  padding: 0 var(--sp-4); cursor: pointer;
+  transition: background var(--t-fast), border-color var(--t-fast);
+}
+.vac-plan-option:hover { background: var(--c-surface2); border-color: var(--c-border-hi); }
+
