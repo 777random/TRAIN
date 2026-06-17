@@ -531,12 +531,10 @@ function renderWeekHeader(state) {
   const isFirst = state.curIdx === 0;
   const isLast  = state.curIdx === state.weeks.length - 1;
 
-  const labelEl    = document.getElementById('wk-label');
-  const rangeEl    = document.getElementById('wk-range');
-  const prevBtn    = document.getElementById('btn-prev-wk');
-  const nextBtn    = document.getElementById('btn-next-wk');
-  const wkMenuBtn  = document.getElementById('btn-week-menu');
-  const wkMenuDrop = document.getElementById('week-menu-dropdown');
+  const labelEl = document.getElementById('wk-label');
+  const rangeEl = document.getElementById('wk-range');
+  const prevBtn = document.getElementById('btn-prev-wk');
+  const nextBtn = document.getElementById('btn-next-wk');
 
   if (labelEl) {
     if (wk) {
@@ -553,31 +551,6 @@ function renderWeekHeader(state) {
   if (rangeEl)  rangeEl.textContent = '';
   if (prevBtn)  prevBtn.disabled    = isFirst;
   if (nextBtn)  nextBtn.disabled    = isLast;
-  if (wkMenuBtn)  wkMenuBtn.setAttribute('aria-expanded', String(_weekMenuOpen));
-  if (wkMenuDrop) {
-    if (_weekMenuOpen) {
-      wkMenuDrop.className = 'ex-menu-dropdown';
-      wkMenuDrop.setAttribute('role', 'menu');
-      wkMenuDrop.innerHTML = `
-        <button class="ex-menu-item${isDl ? ' ex-menu-item--active' : ''}" role="menuitem"
-          data-action="${isDl ? 'mode-std' : 'mode-dl'}">
-          ⚡ Deload-Woche${isDl ? ' ✓' : ''}
-        </button>
-        <button class="ex-menu-item${isVac ? ' ex-menu-item--active' : ''}" role="menuitem"
-          data-action="${isVac ? 'mode-std' : 'mode-vac'}">
-          🏖 Urlaubswoche${isVac ? ' ✓' : ''}
-        </button>
-        <hr style="border-color:var(--c-border);margin:0">
-        <button class="ex-menu-item ex-menu-item--danger" role="menuitem"
-          data-action="open-delete-week">
-          ${ic.trash()} Woche löschen
-        </button>`;
-    } else {
-      wkMenuDrop.className = '';
-      wkMenuDrop.removeAttribute('role');
-      wkMenuDrop.innerHTML = '';
-    }
-  }
 
   const undoBtn = document.getElementById('btn-undo');
   if (undoBtn) undoBtn.disabled = !canUndo();
@@ -637,22 +610,27 @@ function renderDayList(state) {
     <button class="toolbar__btn toolbar__btn--reset" id="btn-reset-timer" data-action="reset-timer" aria-label="Timer zurücksetzen" title="Timer zurücksetzen">↺</button>
     <button class="toolbar__btn" id="btn-undo" data-action="undo"
       aria-label="Rückgängig machen"${!canUndo() ? ' disabled' : ''}>${ic.undo()}</button>
-    ${!_overviewMode && _activeDayIdx !== null && wk.days[_activeDayIdx] ? `
-    <div class="day-menu-wrap">
-      <button class="toolbar__btn" data-action="toggle-day-menu" data-di="${_activeDayIdx}"
-        aria-label="${h(wk.days[_activeDayIdx].title)}-Menü öffnen"
-        aria-expanded="${_dayMenuOpenKey === String(_activeDayIdx)}"
+    <div class="week-menu-wrap">
+      <button class="toolbar__btn" data-action="toggle-week-menu"
+        aria-label="Wochen-Menü öffnen" aria-expanded="${_weekMenuOpen}"
       >⋮</button>
-      ${_dayMenuOpenKey === String(_activeDayIdx) ? `
+      ${_weekMenuOpen ? `
       <div class="ex-menu-dropdown" role="menu">
-        <button class="ex-menu-item" role="menuitem" data-action="day-rename" data-di="${_activeDayIdx}">✏️ Tag umbenennen</button>
-        <button class="ex-menu-item" role="menuitem" data-action="day-duplicate" data-di="${_activeDayIdx}">📋 Tag duplizieren</button>
-        <button class="ex-menu-item" role="menuitem" data-action="day-reset-sets" data-di="${_activeDayIdx}">🔄 Sätze zurücksetzen</button>
-        <button class="ex-menu-item" role="menuitem" data-action="toggle-day-vacation" data-di="${_activeDayIdx}">🏖 Urlaubstag markieren</button>
+        <button class="ex-menu-item${isDl ? ' ex-menu-item--active' : ''}" role="menuitem"
+          data-action="${isDl ? 'mode-std' : 'mode-dl'}">
+          ⚡ Deload-Woche${isDl ? ' ✓' : ''}
+        </button>
+        <button class="ex-menu-item${isVac ? ' ex-menu-item--active' : ''}" role="menuitem"
+          data-action="${isVac ? 'mode-std' : 'mode-vac'}">
+          🏖 Urlaubswoche${isVac ? ' ✓' : ''}
+        </button>
         <hr style="border-color:var(--c-border);margin:0">
-        <button class="ex-menu-item ex-menu-item--danger" role="menuitem" data-action="remove-day" data-di="${_activeDayIdx}"${wk.days.length <= 1 ? ' disabled' : ''}>🗑 Tag löschen</button>
+        <button class="ex-menu-item ex-menu-item--danger" role="menuitem"
+          data-action="open-delete-week">
+          ${ic.trash()} Woche löschen
+        </button>
       </div>` : ''}
-    </div>` : ''}
+    </div>
     <button class="toolbar__btn toolbar__btn--accent" data-action="open-new-week"
       aria-label="Neue Trainingswoche erstellen">${ic.plus()}</button>
   </div>
@@ -2903,8 +2881,7 @@ function _handleClick(e) {
 
     case 'toggle-week-menu': {
       _weekMenuOpen = !_weekMenuOpen;
-      renderWeekHeader(getState());
-      _positionFloating();
+      scheduleRender();
       break;
     }
 
@@ -2919,7 +2896,6 @@ function _handleClick(e) {
 
     case 'mode-vac': {
       _weekMenuOpen = false;
-      renderWeekHeader(getState());
       _showVacationWeekPopup();
       break;
     }
@@ -4138,8 +4114,8 @@ function _positionFloating() {
     }
   }
   if (_weekMenuOpen) {
-    const btn = document.getElementById('btn-week-menu');
-    const dropdown = document.getElementById('week-menu-dropdown');
+    const btn = document.querySelector('[data-action="toggle-week-menu"]');
+    const dropdown = btn?.closest('.week-menu-wrap')?.querySelector('.ex-menu-dropdown');
     if (btn && dropdown) {
       const r = btn.getBoundingClientRect();
       dropdown.style.top   = `${r.bottom + 2}px`;
@@ -4199,11 +4175,6 @@ function _buildScaffold(root) {
     <div class="week-nav__info" aria-live="polite">
       <div id="wk-label" class="week-nav__label">–</div>
       <div id="wk-range" class="week-nav__range"></div>
-    </div>
-    <div class="week-menu-wrap">
-      <button class="week-nav__btn" id="btn-week-menu" data-action="toggle-week-menu"
-        aria-label="Wochen-Menü" aria-expanded="false">⋮</button>
-      <div id="week-menu-dropdown"></div>
     </div>
     <button class="week-nav__btn" id="btn-next-wk" data-action="nav-next"
       aria-label="Nächste Woche">${ic.chevronRight()}</button>
