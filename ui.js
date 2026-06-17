@@ -613,11 +613,12 @@ function renderDayList(state) {
       aria-label="${isDl ? 'Deload-Modus beenden' : 'Deload-Modus aktivieren'}"
     >${ic.zap()}&thinsp;Deload</button>
     <button
-      class="deload-toggle${isVac ? ' is-active is-active--vacation' : ''}"
+      class="toolbar__btn toolbar__btn--vacation${isVac ? ' is-vac' : ''}"
       data-action="${isVac ? 'mode-std' : 'mode-vac'}"
       aria-pressed="${isVac}"
       aria-label="${isVac ? 'Urlaubsmodus beenden' : 'Urlaubsmodus aktivieren'}"
-    >🏖&thinsp;Urlaub</button>
+      title="Urlaubswoche"
+    >🏖</button>
     <span class="toolbar__spacer"></span>
     <span id="toolbar-session-timer" class="toolbar-timer" role="timer" aria-label="Session-Timer">00:00</span>
     <button class="toolbar__btn toolbar__btn--reset" id="btn-reset-timer" data-action="reset-timer" aria-label="Timer zurücksetzen" title="Timer zurücksetzen">↺</button>
