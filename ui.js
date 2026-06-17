@@ -607,11 +607,12 @@ function renderDayList(state) {
   const tabsHtml = `<div class="day-tab-bar" role="tablist" aria-label="Trainingstage">
   <div class="day-tab-bar__toolbar" role="toolbar" aria-label="Wochenaktionen">
     <button
-      class="deload-toggle${isDl ? ' is-active' : ''}"
+      class="toolbar__btn toolbar__btn--deload${isDl ? ' is-dl' : ''}"
       data-action="${isDl ? 'mode-std' : 'mode-dl'}"
       aria-pressed="${isDl}"
       aria-label="${isDl ? 'Deload-Modus beenden' : 'Deload-Modus aktivieren'}"
-    >${ic.zap()}&thinsp;Deload</button>
+      title="Deload-Woche"
+    >${ic.zap()}</button>
     <button
       class="toolbar__btn toolbar__btn--vacation${isVac ? ' is-vac' : ''}"
       data-action="${isVac ? 'mode-std' : 'mode-vac'}"

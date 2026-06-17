@@ -234,6 +234,7 @@ button, input, select, textarea { font: inherit; }
 .toolbar__btn--accent { background: var(--c-accent); color: #000; border-color: transparent; }
 .toolbar__btn--accent:hover { background: var(--c-accent-dk); }
 .toolbar__btn--danger:hover { border-color: var(--c-danger); color: var(--c-danger); }
+.toolbar__btn--deload.is-dl { background: var(--c-deload); color: #000; border-color: transparent; }
 .toolbar__btn--vacation { font-size: 20px; }
 .toolbar__btn--vacation.is-vac { background: #D97706; color: #fff; border-color: #D97706; }
 
