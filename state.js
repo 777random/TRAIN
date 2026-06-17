@@ -542,6 +542,9 @@ function migrate(raw) {
   if (raw.settings.weeksSinceLastBackupReminder   === undefined) raw.settings.weeksSinceLastBackupReminder   = 0;
   if (raw.settings.maxSessionMs                   === undefined) raw.settings.maxSessionMs                   = 10800000;
 
+  // Always-apply: week label (optional user-set name, no schema bump needed)
+  (raw.weeks ?? []).forEach(wk => { if (!('label' in wk)) wk.label = ''; });
+
   // Backward compat: rename legacy setType 'pyramid' → 'manual'
   const _normSetType = ex => { if (ex.setType === 'pyramid') ex.setType = 'manual'; };
   (raw.weeks ?? []).forEach(wk => (wk.days ?? []).forEach(day => (day.exercises ?? []).forEach(_normSetType)));
@@ -655,6 +658,7 @@ export const A = Object.freeze({
   WEEK_COPY_PREV:      'WEEK_COPY_PREV',      // {}
   WEEK_SET_MODE:       'WEEK_SET_MODE',       // { mode: 'standard'|'deload'|'vacation' }
   WEEK_SET_NOTE:       'WEEK_SET_NOTE',       // { note }
+  WEEK_SET_LABEL:      'WEEK_SET_LABEL',      // { label: string }
   // Day
   DAY_ADD:             'DAY_ADD',             // {}
   DAY_ADD_CLONE:       'DAY_ADD_CLONE',       // { sourceDi: number|null } – null = empty
@@ -872,6 +876,11 @@ function reduce(state, action) {
     case A.WEEK_SET_NOTE: {
       const wk = _currentWeek(); if (!wk) break;
       wk.note = p.note;
+      break;
+    }
+    case A.WEEK_SET_LABEL: {
+      const wk = _currentWeek(); if (!wk) break;
+      wk.label = p.label;
       break;
     }
 

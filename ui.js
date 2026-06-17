@@ -542,7 +542,8 @@ function renderWeekHeader(state) {
       const range   = _wkRangeFull(wk.startDate);
       const badge    = _isCurrentWeek(wk.startDate) ? ' <span class="wk-badge-current">Aktuell</span>' : '';
       const vacBadge = isVac ? ' <span class="wk-badge-vacation">🏖 Urlaub</span>' : '';
-      labelEl.innerHTML = `KW ${String(kw).padStart(2,'0')} · ${range}${badge}${vacBadge}`;
+      const rangePart = wk.label ? h(wk.label) : range;
+      labelEl.innerHTML = `KW ${String(kw).padStart(2,'0')} · ${rangePart}${badge}${vacBadge}`;
     } else {
       labelEl.textContent = '–';
     }
@@ -623,6 +624,13 @@ function renderDayList(state) {
         <button class="ex-menu-item${isVac ? ' ex-menu-item--active' : ''}" role="menuitem"
           data-action="${isVac ? 'mode-std' : 'mode-vac'}">
           🏖 Urlaubswoche${isVac ? ' ✓' : ''}
+        </button>
+        <hr style="border-color:var(--c-border);margin:0">
+        <button class="ex-menu-item" role="menuitem" data-action="rename-week">
+          ✏️ Woche umbenennen
+        </button>
+        <button class="ex-menu-item" role="menuitem" data-action="copy-prev">
+          📋 Vorwoche übernehmen
         </button>
         <hr style="border-color:var(--c-border);margin:0">
         <button class="ex-menu-item ex-menu-item--danger" role="menuitem"
@@ -2930,7 +2938,18 @@ function _handleClick(e) {
       break;
     }
 
+    case 'rename-week': {
+      _weekMenuOpen = false;
+      const _wkNow = getState().weeks[getState().curIdx];
+      const _curLabel = _wkNow?.label ?? '';
+      const _newLabel = prompt('Woche umbenennen (leer lassen = Datum anzeigen):', _curLabel);
+      if (_newLabel === null) break;
+      dispatch(A.WEEK_SET_LABEL, { label: _newLabel.trim().slice(0, 40) });
+      break;
+    }
+
     case 'copy-prev':
+      _weekMenuOpen = false;
       if (!confirm('Aktuelle Woche mit der Vorwoche überschreiben?\nAlle aktuellen Einträge gehen verloren.')) break;
       dispatch(A.WEEK_COPY_PREV, {});
       showToast('Vorwoche übernommen ✓', 'ok'); break;
