@@ -665,6 +665,7 @@ export const A = Object.freeze({
   DAY_TOGGLE_COMPLETE:       'DAY_TOGGLE_COMPLETE',       // { di }
   DAY_TOGGLE_VACATION:       'DAY_TOGGLE_VACATION',       // { di }
   DAY_LOAD_VACATION_PLAN:    'DAY_LOAD_VACATION_PLAN',    // { di, plan: 'bodyweight'|'light_kb'|'heavy_kb'|'hotel_gym'|'custom'|'rest' }
+  WEEK_LOAD_VACATION_PLAN:   'WEEK_LOAD_VACATION_PLAN',   // { plan: 'bodyweight'|'light_kb'|'heavy_kb'|'hotel_gym'|'custom'|'rest' }
   DAY_SET_FIELD:             'DAY_SET_FIELD',             // { di, field, value }
   // Exercise
   EX_ADD:              'EX_ADD',              // { di, name }
@@ -1039,6 +1040,40 @@ function reduce(state, action) {
       }
       const allVac = wk.days.every(d => d.isVacation);
       if (allVac) wk.mode = 'vacation';
+      _checkAndGrantBadges(state);
+      break;
+    }
+    case A.WEEK_LOAD_VACATION_PLAN: {
+      const wk = _currentWeek(); if (!wk) break;
+      wk.mode = 'vacation';
+      wk.days.forEach(day => {
+        day.isVacation   = true;
+        day.vacationPlan = p.plan;
+        if (p.plan === 'rest' || p.plan === 'custom') {
+          day.exercises = [];
+        } else {
+          const tpl = VACATION_PLANS[p.plan];
+          if (tpl) {
+            day.exercises = tpl.map(t => ({
+              name:                  t.name,
+              note:                  '',
+              pauseSec:              90,
+              metric:                t.metric,
+              progressionType:       'weight',
+              setType:               'straight',
+              targetReps:            t.reps,
+              nextWeekPlan:          0,
+              nextWeekPlanConfirmed: false,
+              tags:                  [],
+              supersetId:            null,
+              sets: Array.from({ length: t.sets }, () => ({
+                weight: null, reps: null, rpe: null,
+                status: 'pending', done: false, note: '',
+              })),
+            }));
+          }
+        }
+      });
       _checkAndGrantBadges(state);
       break;
     }

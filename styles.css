@@ -1396,6 +1396,8 @@ label > svg {
   position: relative;
   flex-shrink: 0;
 }
+.week-menu-wrap { position: relative; flex-shrink: 0; }
+.ex-menu-item--active { color: var(--c-accent); }
 
 /* --- MANUELLE ÜBUNGS-SORTIERUNG (PFEILE) --- */
 .exercise__order-btns {

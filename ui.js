@@ -69,6 +69,9 @@ let _exMenuOpenKey = null;
 /** Index of the day whose ⋮ context menu is open: String(di) or null. */
 let _dayMenuOpenKey = null;
 
+/** Whether the week-level ⋮ menu is open. */
+let _weekMenuOpen = false;
+
 /** Key of the exercise whose settings panel (cfgRow) is open: `${di}-${ei}` or null. */
 let _cfgOpenKey = null;
 
@@ -528,12 +531,12 @@ function renderWeekHeader(state) {
   const isFirst = state.curIdx === 0;
   const isLast  = state.curIdx === state.weeks.length - 1;
 
-  const labelEl = document.getElementById('wk-label');
-  const rangeEl = document.getElementById('wk-range');
-  const prevBtn = document.getElementById('btn-prev-wk');
-  const nextBtn = document.getElementById('btn-next-wk');
-  const stdBtn  = document.getElementById('mode-std');
-  const dlBtn   = document.getElementById('mode-dl');
+  const labelEl    = document.getElementById('wk-label');
+  const rangeEl    = document.getElementById('wk-range');
+  const prevBtn    = document.getElementById('btn-prev-wk');
+  const nextBtn    = document.getElementById('btn-next-wk');
+  const wkMenuBtn  = document.getElementById('btn-week-menu');
+  const wkMenuDrop = document.getElementById('week-menu-dropdown');
 
   if (labelEl) {
     if (wk) {
@@ -550,8 +553,31 @@ function renderWeekHeader(state) {
   if (rangeEl)  rangeEl.textContent = '';
   if (prevBtn)  prevBtn.disabled    = isFirst;
   if (nextBtn)  nextBtn.disabled    = isLast;
-  if (stdBtn)   stdBtn.classList.toggle('is-active', !isDl);
-  if (dlBtn)    dlBtn.classList.toggle('is-active',   isDl);
+  if (wkMenuBtn)  wkMenuBtn.setAttribute('aria-expanded', String(_weekMenuOpen));
+  if (wkMenuDrop) {
+    if (_weekMenuOpen) {
+      wkMenuDrop.className = 'ex-menu-dropdown';
+      wkMenuDrop.setAttribute('role', 'menu');
+      wkMenuDrop.innerHTML = `
+        <button class="ex-menu-item${isDl ? ' ex-menu-item--active' : ''}" role="menuitem"
+          data-action="${isDl ? 'mode-std' : 'mode-dl'}">
+          ⚡ Deload-Woche${isDl ? ' ✓' : ''}
+        </button>
+        <button class="ex-menu-item${isVac ? ' ex-menu-item--active' : ''}" role="menuitem"
+          data-action="${isVac ? 'mode-std' : 'mode-vac'}">
+          🏖 Urlaubswoche${isVac ? ' ✓' : ''}
+        </button>
+        <hr style="border-color:var(--c-border);margin:0">
+        <button class="ex-menu-item ex-menu-item--danger" role="menuitem"
+          data-action="open-delete-week">
+          ${ic.trash()} Woche löschen
+        </button>`;
+    } else {
+      wkMenuDrop.className = '';
+      wkMenuDrop.removeAttribute('role');
+      wkMenuDrop.innerHTML = '';
+    }
+  }
 
   const undoBtn = document.getElementById('btn-undo');
   if (undoBtn) undoBtn.disabled = !canUndo();
@@ -606,20 +632,6 @@ function renderDayList(state) {
   // ── Unified sticky bar: toolbar row + day pills + progress bar ───────────
   const tabsHtml = `<div class="day-tab-bar" role="tablist" aria-label="Trainingstage">
   <div class="day-tab-bar__toolbar" role="toolbar" aria-label="Wochenaktionen">
-    <button
-      class="toolbar__btn toolbar__btn--deload${isDl ? ' is-dl' : ''}"
-      data-action="${isDl ? 'mode-std' : 'mode-dl'}"
-      aria-pressed="${isDl}"
-      aria-label="${isDl ? 'Deload-Modus beenden' : 'Deload-Modus aktivieren'}"
-      title="Deload-Woche"
-    >${ic.zap()}</button>
-    <button
-      class="toolbar__btn toolbar__btn--vacation${isVac ? ' is-vac' : ''}"
-      data-action="${isVac ? 'mode-std' : 'mode-vac'}"
-      aria-pressed="${isVac}"
-      aria-label="${isVac ? 'Urlaubsmodus beenden' : 'Urlaubsmodus aktivieren'}"
-      title="Urlaubswoche"
-    >🏖</button>
     <span class="toolbar__spacer"></span>
     <span id="toolbar-session-timer" class="toolbar-timer" role="timer" aria-label="Session-Timer">00:00</span>
     <button class="toolbar__btn toolbar__btn--reset" id="btn-reset-timer" data-action="reset-timer" aria-label="Timer zurücksetzen" title="Timer zurücksetzen">↺</button>
@@ -2889,15 +2901,28 @@ function _handleClick(e) {
     case 'nav-next':
       dispatch(A.WEEK_NAVIGATE, { delta: 1 }); break;
 
+    case 'toggle-week-menu': {
+      _weekMenuOpen = !_weekMenuOpen;
+      renderWeekHeader(getState());
+      _positionFloating();
+      break;
+    }
+
     case 'mode-std':
+      _weekMenuOpen = false;
       dispatch(A.WEEK_SET_MODE, { mode: 'standard' }); break;
 
     case 'mode-dl':
+      _weekMenuOpen = false;
       _maybeShowTip('tip-08', 'Deload-Woche: reduziertes Training zur Erholung. TRAIN schließt diese Woche aus der Fortschrittsanalyse aus — kein Einfluss auf Steigerungsempfehlungen.');
       dispatch(A.WEEK_SET_MODE, { mode: 'deload' }); break;
 
-    case 'mode-vac':
-      dispatch(A.WEEK_SET_MODE, { mode: 'vacation' }); break;
+    case 'mode-vac': {
+      _weekMenuOpen = false;
+      renderWeekHeader(getState());
+      _showVacationWeekPopup();
+      break;
+    }
 
     case 'toggle-day-vacation': {
       const _di  = +di;
@@ -4112,6 +4137,15 @@ function _positionFloating() {
       dropdown.style.right = `${window.innerWidth - r.right}px`;
     }
   }
+  if (_weekMenuOpen) {
+    const btn = document.getElementById('btn-week-menu');
+    const dropdown = document.getElementById('week-menu-dropdown');
+    if (btn && dropdown) {
+      const r = btn.getBoundingClientRect();
+      dropdown.style.top   = `${r.bottom + 2}px`;
+      dropdown.style.right = `${window.innerWidth - r.right}px`;
+    }
+  }
 }
 
 function scheduleRender() {
@@ -4165,6 +4199,11 @@ function _buildScaffold(root) {
     <div class="week-nav__info" aria-live="polite">
       <div id="wk-label" class="week-nav__label">–</div>
       <div id="wk-range" class="week-nav__range"></div>
+    </div>
+    <div class="week-menu-wrap">
+      <button class="week-nav__btn" id="btn-week-menu" data-action="toggle-week-menu"
+        aria-label="Wochen-Menü" aria-expanded="false">⋮</button>
+      <div id="week-menu-dropdown"></div>
     </div>
     <button class="week-nav__btn" id="btn-next-wk" data-action="nav-next"
       aria-label="Nächste Woche">${ic.chevronRight()}</button>
@@ -4426,6 +4465,58 @@ function _finishCompletion(di, rating, sleepHours, energyLevel) {
   }
 
   setTimeout(() => _showCompletionScreen(stats), 300);
+}
+
+function _showVacationWeekPopup() {
+  document.getElementById('vac-plan-modal')?.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'vac-plan-modal';
+  overlay.className = 'vac-plan-modal-overlay';
+
+  const screen1 = () => `
+    <div class="vac-plan-modal">
+      <div class="vac-plan-modal__title">🏖 Urlaubswoche</div>
+      <p class="vac-plan-modal__sub">Was möchtest du diese Woche trainieren?</p>
+      <button class="vac-plan-option" data-vac="normal">✓ Normaler Plan</button>
+      <button class="vac-plan-option" data-vac="equipment">🏋 Equipment wählen</button>
+      <button class="vac-plan-option" data-vac="custom">📝 Eigene Übungen</button>
+      <button class="vac-plan-option" data-vac="rest">😴 Ruhetag — kein Training</button>
+    </div>`;
+
+  const screen2 = () => `
+    <div class="vac-plan-modal">
+      <div class="vac-plan-modal__title">🏋 Equipment</div>
+      <p class="vac-plan-modal__sub">Welches Equipment hast du?</p>
+      <button class="vac-plan-option" data-vac="bodyweight">🤸 Kein Equipment</button>
+      <button class="vac-plan-option" data-vac="light_kb">🏋 Leichte KH (bis 15 kg)</button>
+      <button class="vac-plan-option" data-vac="heavy_kb">💪 Schwere KH (15 kg+)</button>
+      <button class="vac-plan-option" data-vac="hotel_gym">🏢 Hotel-Gym / Maschinen</button>
+    </div>`;
+
+  overlay.innerHTML = screen1();
+  document.body.appendChild(overlay);
+
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) { overlay.remove(); return; }
+    const btn = e.target.closest('[data-vac]');
+    if (!btn) return;
+    const vac = btn.dataset.vac;
+    if (vac === 'normal') {
+      dispatch(A.WEEK_SET_MODE, { mode: 'vacation' });
+      overlay.remove();
+    } else if (vac === 'equipment') {
+      overlay.innerHTML = screen2();
+    } else if (vac === 'custom') {
+      dispatch(A.WEEK_LOAD_VACATION_PLAN, { plan: 'custom' });
+      overlay.remove();
+    } else if (vac === 'rest') {
+      dispatch(A.WEEK_LOAD_VACATION_PLAN, { plan: 'rest' });
+      overlay.remove();
+    } else if (VACATION_PLANS[vac]) {
+      dispatch(A.WEEK_LOAD_VACATION_PLAN, { plan: vac });
+      overlay.remove();
+    }
+  });
 }
 
 function _showVacationPlanModal(di) {
