@@ -1068,39 +1068,17 @@ exercise { position: unset; }
 .session-rating__btn.is-selected { border-color: var(--c-accent); transform: scale(1.1); }
 .session-rating__btn:hover { transform: scale(1.05); }
 
-.streak-row { display: flex; gap: var(--sp-3); margin-bottom: var(--sp-4); }
-.streak-card { flex: 1; background: var(--c-surface2); border-radius: var(--r-md); padding: var(--sp-3); text-align: center; }
+.streak-row {
+  display: flex; gap: var(--sp-3); margin-bottom: var(--sp-4);
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+  scrollbar-width: none; padding-bottom: 2px;
+}
+.streak-row::-webkit-scrollbar { display: none; }
+.streak-card { flex: 0 0 auto; min-width: 56px; background: var(--c-surface2); border-radius: var(--r-md); padding: var(--sp-3); text-align: center; }
 .streak-num { font-family: var(--font-display); font-size: 32px; color: var(--c-accent); line-height: 1; }
 .streak-lbl { font-size: 9px; color: var(--c-text-3); letter-spacing: .1em; text-transform: uppercase; margin-top: 3px; }
-.pw-card {
-  background: var(--c-surface); border: 1px solid var(--c-border);
-  border-radius: var(--r-lg); padding: var(--sp-3) var(--sp-4); margin-bottom: var(--sp-2);
-  position: relative;
-}
-.pw-card__delete {
-  position: absolute; top: var(--sp-2); right: var(--sp-2);
-  width: 28px; height: 28px;
-  border: none; background: none; color: var(--c-text-3);
-  border-radius: var(--r-sm); cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  transition: color var(--t-fast), background var(--t-fast);
-}
-.pw-card__delete svg { width: 14px; height: 14px; }
-.pw-card__delete:hover { color: var(--c-danger); background: color-mix(in srgb, var(--c-danger) 10%, transparent); }
-.pw-card--deload { border-color: var(--c-deload-bd); background: var(--c-deload-bg); }
-.pw-card__top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: var(--sp-2); }
-.pw-card__title { font-family: var(--font-display); font-size: 19px; letter-spacing: .1em; }
-.pw-card__date  { font-size: 11px; color: var(--c-text-3); margin-top: 2px; }
-.pw-card__pct   { font-family: var(--font-display); font-size: 22px; line-height: 1; }
-.pw-card__stats { display: flex; gap: var(--sp-4); }
-.pw-stat__num   { font-family: var(--font-display); font-size: 22px; line-height: 1; }
-.pw-stat__lbl   { font-size: 9px; color: var(--c-text-3); letter-spacing: .1em; text-transform: uppercase; }
 .diff-up { color: var(--c-ok); } .diff-dn { color: var(--c-danger); }
 .progress-bar-wrap { margin-top: var(--sp-2); background: var(--c-surface2); border-radius: var(--r-full); height: 3px; overflow: hidden; }
-
-/* Day-level durations under week card title (2.6) */
-.pw-day-durs { font-size: 10px; color: var(--c-text-3); margin-top: 4px; }
-.pw-day-dur  { white-space: nowrap; }
 
 /* Coach insight toggle */
 .insight-toggle { display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; gap: 2px; }
@@ -1129,17 +1107,6 @@ exercise { position: unset; }
 .insight-card--consistency { border-left: 3px solid var(--c-ok); }
 .insight-card--motivation  { border-left: 3px solid var(--c-accent); }
 .progress-bar { height: 100%; background: var(--c-accent); border-radius: var(--r-full); transition: width var(--t-normal); }
-.pw-card--deload .progress-bar { background: var(--c-deload); }
-.pw-card--nav { cursor: pointer; }
-.pw-card--nav:hover { border-color: var(--c-accent); }
-.pw-older-toggle {
-  display: block; width: 100%; padding: var(--sp-2) var(--sp-3);
-  background: none; border: 1px solid var(--c-border);
-  border-radius: var(--r-md); color: var(--c-text-2);
-  font-size: 12px; cursor: pointer; margin-bottom: var(--sp-2);
-  transition: color var(--t-fast), border-color var(--t-fast);
-}
-.pw-older-toggle:hover { color: var(--c-text); border-color: var(--c-text-3); }
 .chart-select {
   width: 100%; background: var(--c-surface2); border: 1px solid var(--c-border);
   border-radius: var(--r-md); color: var(--c-text); font-size: 13px;

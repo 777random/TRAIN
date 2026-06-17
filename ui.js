@@ -44,8 +44,6 @@ let _activeTab = 'workout';
 /** Insights visible in analysis tab (2.1). */
 let _showInsights = false;
 
-/** Whether older pw-cards (>4) are expanded. */
-let _showOlderWeeks = false;
 
 /** Whether insights tooltip has been shown (3.2). */
 let _insightsTooltipShown = false;
@@ -1065,7 +1063,7 @@ function renderExercise(wk, di, ei, state) {
           min="1" max="999"
           step="${metric === 'sec' || metric === 'm' ? '5' : '1'}"
           value="${ex.targetReps ?? ''}"
-          placeholder="${metric === 'sec' ? 'z.B. 30' : metric === 'm' ? 'z.B. 20' : 'z.B. 10'}"
+          placeholder="${(() => { const avg = _avgRepsLast4(ex.name, state.weeks); return avg !== null ? String(avg) : (metric === 'sec' ? 'z.B. 30' : metric === 'm' ? 'z.B. 20' : 'z.B. 10'); })()}"
           data-action="set-targets" data-field="targetReps"
           data-di="${di}" data-ei="${ei}"
           aria-label="Ziel ${metric === 'sec' ? 'Sekunden' : metric === 'm' ? 'Meter' : 'Wiederholungen'}"
@@ -1789,6 +1787,22 @@ const MOVEMENT_MAP = {
   'Burpees': 'Core', 'Broad Jumps': 'Core',
 };
 
+function _avgRepsLast4(exName, allWeeks) {
+  const sorted = [...allWeeks]
+    .filter(w => (w.mode ?? 'standard') !== 'deload')
+    .sort((a, b) => a.startDate.localeCompare(b.startDate));
+  const repsSum = [];
+  for (const wk of sorted.slice(-4)) {
+    for (const day of wk.days) {
+      const ex = day.exercises.find(e => e.name === exName);
+      if (!ex) continue;
+      const ok = ex.sets.filter(s => s.status === 'success' && (s.reps ?? 0) > 0).map(s => s.reps);
+      if (ok.length) repsSum.push(Math.round(ok.reduce((a, b) => a + b) / ok.length));
+    }
+  }
+  return repsSum.length ? Math.round(repsSum.reduce((a, b) => a + b) / repsSum.length) : null;
+}
+
 function _relDate(startDate) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -1938,53 +1952,8 @@ function renderAnalysisTab(state) {
   )].sort();
   const insights = state.insights ?? [];
 
-  // ── 1. Wochenüberblick ──────────────────────────────────────────────────────
+  // ── 1. Wochenrückblick-Auswahl ─────────────────────────────────────────────
   const reviewableWeeks = [...sorted].filter(w => w.days.some(d => d.markedDone)).reverse();
-
-  const weekCards = (() => {
-    const allCards = [...sorted].reverse().map((wk, wi) => {
-      const _realWkIdx = state.weeks.findIndex(w => w.id === wk.id);
-      const _wss       = _weekSuccessScore(wk);
-      const tot        = wk.days.reduce((s, d) => s + d.exercises.reduce((ss, ex) => ss + ex.sets.length, 0), 0);
-      const don        = wk.days.reduce((s, d) => s + d.exercises.reduce((ss, ex) => ss + ex.sets.filter(st => st.status === 'success').length, 0), 0);
-      const score      = _wss.total > 0 ? _wss.pct : (tot > 0 ? Math.round(don / tot * 100) : 0);
-      const scoreColor = score >= 90 ? 'var(--c-ok)' : score >= 70 ? 'var(--c-warn)' : 'var(--c-danger)';
-      const isDl       = wk.mode === 'deload';
-      const isVac      = wk.mode === 'vacation';
-      const reviewIdx  = reviewableWeeks.findIndex(r => r.id === wk.id);
-      const isReviewable = reviewIdx !== -1;
-      return { wk, wi, _realWkIdx, score, scoreColor, isDl, isVac, reviewIdx, isReviewable };
-    });
-
-    const visibleCards = _showOlderWeeks ? allCards : allCards.slice(0, 4);
-    const hiddenCount  = allCards.length - 4;
-
-    const cardsHtml = visibleCards.map(({ wk, wi, _realWkIdx, score, scoreColor, isDl, isVac, reviewIdx, isReviewable }) => `
-    <div class="pw-card${isDl ? ' pw-card--deload' : ''}${isReviewable ? ' pw-card--nav' : ''}"
-      ${isReviewable ? `data-action="pw-card-jump" data-review-idx="${reviewIdx}"` : ''}>
-      <div class="pw-card__top">
-        <div class="pw-card__labels">
-          <div class="pw-card__title">
-            ${_relDate(wk.startDate)}
-            ${isDl ? '<span class="deload-badge">Deload</span>' : ''}
-            ${isVac ? '<span class="vacation-badge">🏖 Urlaub</span>' : ''}
-          </div>
-          <div class="pw-card__date">${wkRange(wk.startDate)}${wk.note ? ' · ' + h(wk.note) : ''}</div>
-        </div>
-        <div class="pw-card__pct" style="color:${scoreColor}">${score}%</div>
-      </div>
-      <div class="progress-bar-wrap"><div class="progress-bar" style="width:${score}%"></div></div>
-      ${state.weeks.length > 1 ? `<button class="pw-card__delete" data-action="open-delete-week" data-week-idx="${_realWkIdx}" aria-label="Woche löschen">${ic.trash()}</button>` : ''}
-    </div>`).join('');
-
-    const toggleHtml = allCards.length > 4
-      ? `<button class="pw-older-toggle" data-action="toggle-older-weeks">
-           ${_showOlderWeeks ? `Weniger anzeigen ▲` : `${hiddenCount} ältere Wochen ▼`}
-         </button>`
-      : '';
-
-    return cardsHtml + toggleHtml;
-  })();
 
   const weekReviewHtml = reviewableWeeks.length ? (() => {
     const opts = reviewableWeeks.map((wk, i) => {
@@ -2040,8 +2009,6 @@ function renderAnalysisTab(state) {
 
   container.innerHTML = `
   ${insightHtml}
-
-  ${weekCards}
 
   ${weekReviewHtml}
 
@@ -2867,29 +2834,6 @@ function _handleClick(e) {
       scheduleRender();
       break;
 
-    // ── pw-Card: jump to Wochenrückblick ──────────────────────────────────
-    case 'pw-card-jump': {
-      const idx = +el.dataset.reviewIdx;
-      const sel = document.getElementById('week-review-select');
-      if (sel && idx >= 0) {
-        sel.value = String(idx);
-        sel.dispatchEvent(new Event('change'));
-      }
-      const reviewCard = document.getElementById('week-review-card');
-      if (reviewCard) {
-        const app = document.getElementById('app');
-        const top = reviewCard.getBoundingClientRect().top + app.scrollTop - app.getBoundingClientRect().top;
-        app.scrollTo({ top, behavior: 'smooth' });
-      }
-      break;
-    }
-
-    // ── Toggle older pw-Cards ──────────────────────────────────────────────
-    case 'toggle-older-weeks':
-      _showOlderWeeks = !_showOlderWeeks;
-      renderAnalysisTab(getState());
-      break;
-
     // ── Body correlation insight toggle (2.2) ──────────────────────────────
     case 'toggle-body-insights':
       _showBodyInsights = !_showBodyInsights;
@@ -3477,15 +3421,18 @@ function _handleClick(e) {
     }
     case 'toggle-done': {
       const _s = getState().weeks[getState().curIdx]?.days[+di]?.exercises[+ei]?.sets[+si];
-      // Validate only when marking pending → success (not when un-doing)
       if (_s && _s.status === 'pending') {
         const _wInp = document.querySelector(`[data-action="set-weight"][data-di="${di}"][data-ei="${ei}"][data-si="${si}"]`);
         const _rInp = document.querySelector(`[data-action="set-reps"][data-di="${di}"][data-ei="${ei}"][data-si="${si}"]`);
-        const _rVal = parseFloat(_rInp?.value);
-        if (!Number.isFinite(_rVal) || _rVal <= 0) {
-          showToast('Bitte zuerst Wiederholungen eintragen ✋', 'warn'); break;
+        const _rVal = parseFloat(_rInp?.value ?? _s.reps);
+        const _wVal = parseFloat(_wInp?.value ?? _s.weight);
+        const canSuccess = Number.isFinite(_wVal) && _wVal > 0 && Number.isFinite(_rVal) && _rVal > 0;
+        if (!canSuccess) {
+          // Fail is always allowed — go directly to fail when success criteria not met
+          dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'status', value: 'fail' });
+          break;
         }
-        // Flush uncommitted input values to state before toggling
+        // Flush uncommitted input values to state before marking success
         if (_wInp) dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'weight', value: _wInp.value });
         if (_rInp) dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'reps',   value: _rInp.value });
       }
@@ -4440,7 +4387,8 @@ function _getDayCompletionStats(di) {
     'Du kommst wieder. Das macht den Unterschied.',
     'Erholung ist Teil des Plans.',
   ];
-  return { successSets, totalSets, prCount, pct, effortPct, quote: quotes[Math.floor(Math.random() * quotes.length)] };
+  const isVacation = !!(day.isVacation);
+  return { successSets, totalSets, prCount, pct, effortPct, isVacation, quote: quotes[Math.floor(Math.random() * quotes.length)] };
 }
 
 function _finishCompletion(di, rating, sleepHours, energyLevel) {
@@ -4543,7 +4491,16 @@ function _showDayCompletionModal(di) {
 }
 
 function _showCompletionScreen(stats) {
-  const { successSets, totalSets, prCount, pct, effortPct, quote } = stats;
+  const { successSets, totalSets, prCount, pct, effortPct, isVacation, quote } = stats;
+  const vacQuotes = [
+    'Kein Gym? Kein Problem.',
+    'Urlaub vom Alltag, nicht vom Training.',
+    'Überall wo du bist, kannst du trainieren.',
+    'Stark bleiben, egal wo.',
+  ];
+  const displayQuote = isVacation
+    ? vacQuotes[Math.floor(Math.random() * vacQuotes.length)]
+    : quote;
   document.getElementById('day-completion-screen')?.remove();
   const el = document.createElement('div');
   el.id        = 'day-completion-screen';
@@ -4551,11 +4508,13 @@ function _showCompletionScreen(stats) {
   el.innerHTML = `
     <div class="day-completion-screen__inner">
       <div class="day-completion-screen__icon">💪</div>
-      <div class="day-completion-screen__pct">${pct}%</div>
-      <div class="day-completion-screen__sets">${successSets}/${totalSets} Sätze erfolgreich</div>
+      ${isVacation
+        ? `<div class="day-completion-screen__pct" style="font-size:20px">🏖 Stark! Auch im Urlaub trainiert.</div>`
+        : `<div class="day-completion-screen__pct">${pct}%</div>`}
+      ${successSets > 0 ? `<div class="day-completion-screen__sets">${successSets}/${totalSets} Sätze erfolgreich</div>` : ''}
       ${prCount > 0 ? `<div class="day-completion-screen__pr">🏆 ${prCount} neues PR${prCount > 1 ? 's' : ''}!</div>` : ''}
-      ${effortPct !== null ? `<div class="day-completion-screen__effort">🎯 ${effortPct}% Zielerfüllung</div>` : ''}
-      <div class="day-completion-screen__quote">"${quote}"</div>
+      ${!isVacation && effortPct !== null ? `<div class="day-completion-screen__effort">🎯 ${effortPct}% Zielerfüllung</div>` : ''}
+      <div class="day-completion-screen__quote">"${displayQuote}"</div>
     </div>`;
   document.body.appendChild(el);
   const dismiss = () => { clearTimeout(timer); el.remove(); };

@@ -1072,9 +1072,19 @@ function reduce(state, action) {
       else if (p.field === 'rpe')  v = (v === '' || v === null) ? null : Math.min(10, Math.max(1, +v));
       else if (p.field === 'note') v = String(v ?? '').slice(0, 120);
       s[p.field] = v;
-      // Straight sets: auto-propagate weight only to all following sets (1.3)
-      if (ex.setType === 'straight' && p.field === 'weight') {
-        for (let j = p.si + 1; j < ex.sets.length; j++) ex.sets[j].weight = v;
+      // Straight sets: auto-propagate weight/reps from set 0 to all following pending+empty sets
+      if (p.si === 0 && (ex.setType ?? 'straight') === 'straight') {
+        if (p.field === 'weight') {
+          for (let j = 1; j < ex.sets.length; j++) {
+            if (ex.sets[j].status === 'pending' && !(parseFloat(ex.sets[j].weight) > 0))
+              ex.sets[j].weight = v;
+          }
+        } else if (p.field === 'reps') {
+          for (let j = 1; j < ex.sets.length; j++) {
+            if (ex.sets[j].status === 'pending' && !(parseFloat(ex.sets[j].reps) > 0))
+              ex.sets[j].reps = v;
+          }
+        }
       }
       break;
     }
@@ -1252,6 +1262,18 @@ function reduce(state, action) {
       if (!Array.isArray(state.badges))      state.badges    = [];
       if (!state.weeks.length) _appendDefaultWeek();
       if (state.curIdx >= state.weeks.length) state.curIdx = state.weeks.length - 1;
+      _checkAndGrantBadges(state);
+      const _streak = (() => {
+        const sorted = [...state.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
+        let cur = 0;
+        for (let i = sorted.length - 1; i >= 0; i--) {
+          const w = sorted[i];
+          if (w.days.some(d => d.markedDone) || w.days.some(d => d.isVacation) || w.mode === 'vacation') cur++;
+          else break;
+        }
+        return cur;
+      })();
+      console.log('[TRAIN] Post-import streak:', _streak, 'badges:', state.badges);
       break;
     }
 
