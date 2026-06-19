@@ -869,14 +869,32 @@ exercise { position: unset; }
 .ex-menu-item:disabled { opacity: .4; cursor: not-allowed; }
 
 .add-exercise-row { display: flex; gap: var(--sp-2); margin-top: var(--sp-3); align-items: center; }
-.add-exercise-input {
-  flex: 1; background: var(--c-surface2); border: 1px solid var(--c-border);
-  border-radius: var(--r-md); color: var(--c-text); font-size: 14px;
-  padding: 0 var(--sp-3); height: var(--touch);
-  transition: border-color var(--t-fast);
+
+/* ── Exercise search modal ─────────────────────────────────────────────── */
+.modal-overlay--search { z-index: 9000; }
+#ex-search-results { margin-top: var(--sp-3); max-height: 50vh; overflow-y: auto; }
+.ex-search-group-title {
+  font-size: 10px; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--c-text-3); margin: var(--sp-3) 0 var(--sp-1);
 }
-.add-exercise-input::placeholder { color: var(--c-text-3); }
-.add-exercise-input:focus { border-color: var(--c-accent); outline: none; }
+.ex-search-item {
+  display: block; width: 100%; text-align: left; background: none; border: none;
+  color: var(--c-text); font-size: 14px; padding: var(--sp-2) var(--sp-1);
+  border-radius: var(--r-sm); cursor: pointer; min-height: var(--touch);
+}
+.ex-search-item:hover, .ex-search-item:focus-visible { background: var(--c-surface2); }
+.ex-search-item--create { color: var(--c-accent); font-weight: 600; border-top: 1px solid var(--c-border); margin-top: var(--sp-2); padding-top: var(--sp-3); }
+.ex-search-empty { font-size: 13px; color: var(--c-text-3); padding: var(--sp-3) 0; }
+
+/* ── Exercise create/edit modal ────────────────────────────────────────── */
+.ex-form-error { font-size: 12px; color: var(--c-danger); margin-top: var(--sp-1); min-height: 1em; }
+
+/* ── "Meine Übungen" settings list ─────────────────────────────────────── */
+.custom-ex-row { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); padding: var(--sp-2) 0; border-bottom: 1px solid var(--c-border); }
+.custom-ex-row:last-child { border-bottom: none; }
+.custom-ex-row__main { flex: 1; cursor: pointer; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.custom-ex-row__name { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.custom-ex-row__meta { font-size: 11px; color: var(--c-text-3); }
 
 .complete-btn {
   width: 100%; margin-top: var(--sp-3); padding: 0 var(--sp-4); height: var(--touch);

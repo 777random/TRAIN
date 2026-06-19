@@ -24,7 +24,7 @@
 
 export const STORAGE_KEY        = 'train_v6';
 export const STORAGE_KEY_SHADOW = 'train_v6_shadow';
-export const SCHEMA_VERSION     = 21;
+export const SCHEMA_VERSION     = 22;
 
 export const BADGE_THRESHOLDS = [
   { id: 'badge_4',   weeks: 4,   title: 'Erster Schritt' },
@@ -169,6 +169,7 @@ function buildDefaultState() {
     prs: {},                  // { [exerciseName]: { maxWeight, maxVolume, maxEstimated1RM, date } }
     insights: [],             // Insight[] – populated by triggerEngine, transient coaching feedback
     favoriteExercises: [],    // String[] – Übungsnamen, max 5
+    customExercises: [],      // { name, metric: 'reps'|'sec'|'m', category: 'Push'|'Pull'|'Squat'|'Hinge'|'Carry'|'Core'|null }[]
     badges: [],               // { id, unlockedAt }[] – earned badges
     onboardingDone: false,    // true after first-run flow completed
     seenTips: [],             // string[] – tip IDs the user has already seen
@@ -606,6 +607,12 @@ function migrate(raw) {
     raw.meta = { ...raw.meta, schemaVersion: 21 };
   }
 
+  // v21 → v22: add state.customExercises[]
+  if ((raw.meta?.schemaVersion ?? 0) < 22) {
+    if (!Array.isArray(raw.customExercises)) raw.customExercises = [];
+    raw.meta = { ...raw.meta, schemaVersion: 22 };
+  }
+
   // Always-apply defaults for settings added in later versions
   if (raw.settings.vibrationEnabled               === undefined) raw.settings.vibrationEnabled               = true;
   if (raw.settings.rpeEnabled                     === undefined) raw.settings.rpeEnabled                     = true;
@@ -640,6 +647,7 @@ export function loadState() {
       if (!Array.isArray(parsed?.weeks)) continue;
       STATE = migrate(parsed);
       if (!Array.isArray(STATE.favoriteExercises)) STATE.favoriteExercises = [];
+      if (!Array.isArray(STATE.customExercises))   STATE.customExercises   = [];
       if (!Array.isArray(STATE.badges))            STATE.badges = [];
       if (!Array.isArray(STATE.seenTips))          STATE.seenTips = [];
       if (STATE.onboardingDone === undefined)       STATE.onboardingDone = false;
@@ -744,7 +752,10 @@ export const A = Object.freeze({
   WEEK_LOAD_VACATION_PLAN:   'WEEK_LOAD_VACATION_PLAN',   // { plan: 'bodyweight'|'light_kb'|'heavy_kb'|'hotel_gym'|'custom'|'rest' }
   DAY_SET_FIELD:             'DAY_SET_FIELD',             // { di, field, value }
   // Exercise
-  EX_ADD:              'EX_ADD',              // { di, name }
+  EX_ADD:              'EX_ADD',              // { di, name, metric? }
+  CUSTOM_EX_ADD:        'CUSTOM_EX_ADD',        // { name, metric, category }
+  CUSTOM_EX_UPDATE:     'CUSTOM_EX_UPDATE',     // { oldName, name, metric, category }
+  CUSTOM_EX_DELETE:     'CUSTOM_EX_DELETE',     // { name }
   EX_REMOVE:           'EX_REMOVE',           // { di, ei }
   EX_UPDATE:           'EX_UPDATE',           // { di, ei, field, value }
   EX_MOVE:             'EX_MOVE',             // { di, fromEi, toEi }
@@ -866,6 +877,7 @@ function reduce(state, action) {
       customTemplate:    state.customTemplate,
       settings:          state.settings,
       favoriteExercises: state.favoriteExercises ?? [],
+      customExercises:   state.customExercises ?? [],
     }));
     if (_undoStack.length > _MAX_UNDO) _undoStack.shift();
   }
@@ -1169,7 +1181,7 @@ function reduce(state, action) {
     case A.EX_ADD: {
       const day = _currentWeek()?.days[p.di]; if (!day) break;
       day.exercises.push({
-        name: p.name, note: '', pauseSec: 90, metric: 'reps',
+        name: p.name, note: '', pauseSec: 90, metric: p.metric ?? 'reps',
         progressionType: 'weight',
         sets: [mkSet(), mkSet(), mkSet()],
       });
@@ -1526,6 +1538,7 @@ function reduce(state, action) {
       state.customTemplate    = prev.customTemplate;
       state.settings          = prev.settings;
       state.favoriteExercises = prev.favoriteExercises ?? [];
+      state.customExercises   = prev.customExercises ?? [];
       break;
     }
 
@@ -1570,6 +1583,36 @@ function reduce(state, action) {
     // ── Insights ──────────────────────────────────────────────────────────────
     case A.INSIGHTS_SET: {
       state.insights = p.insights ?? [];
+      break;
+    }
+
+    // ── Custom exercises ──────────────────────────────────────────────────────
+    case A.CUSTOM_EX_ADD: {
+      if (!Array.isArray(state.customExercises)) state.customExercises = [];
+      state.customExercises.push({
+        name: p.name, metric: p.metric ?? 'reps', category: p.category ?? null,
+      });
+      break;
+    }
+    case A.CUSTOM_EX_UPDATE: {
+      if (!Array.isArray(state.customExercises)) state.customExercises = [];
+      const ce = state.customExercises.find(c => c.name === p.oldName);
+      if (!ce) break;
+      ce.name = p.name; ce.metric = p.metric ?? 'reps'; ce.category = p.category ?? null;
+      if (p.oldName !== p.name) {
+        state.weeks.forEach(wk => wk.days.forEach(day => day.exercises.forEach(ex => {
+          if (ex.name === p.oldName) ex.name = p.name;
+        })));
+        state.customTemplate.forEach(day => day.exercises.forEach(ex => {
+          if (ex.name === p.oldName) ex.name = p.name;
+        }));
+        const fi = (state.favoriteExercises ?? []).indexOf(p.oldName);
+        if (fi >= 0) state.favoriteExercises[fi] = p.name;
+      }
+      break;
+    }
+    case A.CUSTOM_EX_DELETE: {
+      state.customExercises = (state.customExercises ?? []).filter(c => c.name !== p.name);
       break;
     }
 

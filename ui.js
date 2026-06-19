@@ -101,6 +101,19 @@ let _deleteWeekIdx = null;
 /** Day index that triggered the completion modal flow. */
 let _completionModalDi = null;
 
+/** Day index the exercise search modal is currently adding to. */
+let _exSearchDi = null;
+/** Exercise create/edit form: 'create' | 'edit'. */
+let _exFormMode = 'create';
+/** Day index to EX_ADD into after creating (create mode only). */
+let _exFormTargetDi = null;
+/** Original exercise name being edited (edit mode only), for CUSTOM_EX_UPDATE lookup + rename. */
+let _exFormOriginalName = null;
+/** Selected metric pill in the exercise create/edit form. */
+let _exFormMetric = 'reps';
+/** Selected category pill in the exercise create/edit form (null = keine). */
+let _exFormCategory = null;
+
 /** Key of the confirmed set showing RPE nudge: `${di}-${ei}-${si}` or null. */
 let _rpeNudgeKey = null;
 /** Auto-dismiss timer for the RPE nudge. */
@@ -950,26 +963,13 @@ function renderDayBody(wk, di, state) {
     </div>` : ''}
 
     ${!locked ? `
-    <datalist id="ex-list-${di}">
-      ${_STANDARD_EXERCISES.map(n => `<option value="${h(n)}">`).join('')}
-    </datalist>
     <div class="add-exercise-row">
-      <input
-        class="add-exercise-input"
-        id="add-ex-input-${di}"
-        type="text"
-        list="ex-list-${di}"
-        placeholder="Übung hinzufügen …"
-        aria-label="Name der neuen Übung"
-        maxlength="80"
-        data-di="${di}"
-        autocomplete="off"
-      />
       <button
         class="btn btn--accent btn--sm"
-        data-action="add-ex" data-di="${di}"
+        data-action="open-ex-search" data-di="${di}"
         aria-label="Übung hinzufügen"
-      >${ic.plus()}${ic.srOnly('Hinzufügen')}</button>
+        style="width:100%"
+      >${ic.plus()} Übung hinzufügen</button>
     </div>` : ''}
   `;
 }
@@ -1193,6 +1193,10 @@ function renderExercise(wk, di, ei, state) {
               >${s === 0 ? 'Reset' : s}</button>`).join('')}
           </div>
         </div>` : ''}
+        ${(state.customExercises ?? []).some(c => c.name === ex.name) ? `
+        <button type="button" class="btn btn--ghost btn--sm" data-action="edit-custom-ex" data-di="${di}" data-ei="${ei}" style="margin-top:var(--sp-2)">
+          ✏️ Übung bearbeiten
+        </button>` : ''}
       </div>` : ''}
     </div>` : '';
 
@@ -1898,6 +1902,10 @@ function _renderRadarSVG(catPct) {
 
 function _renderMovementPattern(state) {
   const RADAR_CATS = ['Push', 'Pull', 'Squat', 'Hinge', 'Carry', 'Core'];
+  const customCatMap = {};
+  for (const ce of state.customExercises ?? []) {
+    if (ce.category) customCatMap[ce.name] = ce.category;
+  }
   const last4 = [...state.weeks]
     .filter(w => w.mode !== 'deload')
     .sort((a, b) => a.startDate.localeCompare(b.startDate))
@@ -1909,7 +1917,7 @@ function _renderMovementPattern(state) {
     for (const day of wk.days) {
       for (const ex of day.exercises) {
         const baseName = ex.substituteFor ?? ex.name;
-        const cat = MOVEMENT_MAP[baseName] ?? 'Sonstige';
+        const cat = MOVEMENT_MAP[baseName] ?? customCatMap[baseName] ?? 'Sonstige';
         const n = ex.sets.filter(s => s.status === 'success').length;
         if (!n) continue;
         catSets[cat] = (catSets[cat] ?? 0) + n;
@@ -2642,6 +2650,20 @@ function renderSettingsTab(state) {
     </div>
   </div>
 
+  <!-- Meine Übungen -->
+  <div class="settings-section">
+    <div class="settings-section__title">Meine Übungen</div>
+    ${(state.customExercises ?? []).length === 0 ? `
+    <p class="settings-row__desc">Noch keine eigenen Übungen — beim Hinzufügen einer Übung über "+ anlegen" erstellt.</p>` : (state.customExercises ?? []).map(ce => `
+    <div class="custom-ex-row">
+      <div class="custom-ex-row__main" data-action="edit-custom-ex-settings" data-name="${h(ce.name)}">
+        <span class="custom-ex-row__name">${h(ce.name)}</span>
+        <span class="custom-ex-row__meta">${ce.category ? h(ce.category) + ' · ' : ''}${ce.metric === 'sec' ? 'Sek' : ce.metric === 'm' ? 'm' : 'Wdh'}</span>
+      </div>
+      <button class="btn btn--ghost btn--sm" data-action="delete-custom-ex" data-name="${h(ce.name)}" aria-label="Übung '${h(ce.name)}' löschen">✕</button>
+    </div>`).join('')}
+  </div>
+
   <!-- Info -->
   <div class="settings-section">
     <div class="settings-section__title">Info</div>
@@ -3098,13 +3120,74 @@ function _handleClick(e) {
       break;
     }
 
-    case 'add-ex': {
-      const inp  = document.getElementById(`add-ex-input-${di}`);
-      const name = inp?.value.trim();
-      if (!name) { inp?.focus(); break; }
-      dispatch(A.EX_ADD, { di: +di, name });
-      if (inp) inp.value = '';
+    case 'open-ex-search': {
+      _openExSearchModal(+di);
+      break;
+    }
+
+    case 'ex-search-pick': {
+      const name = el.dataset.name;
+      const customMatch = (getState().customExercises ?? []).find(c => c.name === name);
+      dispatch(A.EX_ADD, { di: _exSearchDi, name, metric: customMatch?.metric ?? 'reps' });
+      closeModal('modal-ex-search');
       showToast(`"${name}" hinzugefügt`, 'ok');
+      break;
+    }
+
+    case 'ex-search-create': {
+      const query = document.getElementById('ex-search-input')?.value.trim() ?? '';
+      closeModal('modal-ex-search');
+      _openExFormModal({ mode: 'create', di: _exSearchDi, name: query });
+      break;
+    }
+
+    case 'ex-form-set-metric': {
+      _exFormMetric = el.dataset.metric;
+      _renderExFormModal(document.getElementById('ex-form-name')?.value ?? '');
+      break;
+    }
+
+    case 'ex-form-set-category': {
+      const cat = el.dataset.cat;
+      _exFormCategory = _exFormCategory === cat ? null : cat;
+      _renderExFormModal(document.getElementById('ex-form-name')?.value ?? '');
+      break;
+    }
+
+    case 'ex-form-submit': {
+      const nameInp = document.getElementById('ex-form-name');
+      const errEl   = document.getElementById('ex-form-error');
+      const name    = nameInp?.value.trim() ?? '';
+      if (errEl) errEl.textContent = '';
+      if (!name) {
+        if (errEl) errEl.textContent = 'Name darf nicht leer sein.';
+        nameInp?.focus();
+        break;
+      }
+      const lcName = name.toLowerCase();
+      const isDup = _STANDARD_EXERCISES.some(n => n.toLowerCase() === lcName) ||
+        (getState().customExercises ?? []).some(c =>
+          c.name.toLowerCase() === lcName &&
+          c.name.toLowerCase() !== (_exFormOriginalName ?? '').toLowerCase()
+        );
+      if (isDup) {
+        if (errEl) errEl.textContent = 'Diese Übung existiert bereits.';
+        break;
+      }
+      if (_exFormMode === 'edit') {
+        dispatch(A.CUSTOM_EX_UPDATE, {
+          oldName: _exFormOriginalName, name, metric: _exFormMetric, category: _exFormCategory,
+        });
+        showToast('Übung aktualisiert ✓', 'ok');
+      } else {
+        dispatch(A.CUSTOM_EX_ADD, { name, metric: _exFormMetric, category: _exFormCategory });
+        if (_exFormTargetDi !== null) {
+          dispatch(A.EX_ADD, { di: _exFormTargetDi, name, metric: _exFormMetric });
+        }
+        showToast(`"${name}" hinzugefügt`, 'ok');
+      }
+      closeModal('modal-ex-form');
+      if (_activeTab === 'settings') renderSettingsTab(getState());
       break;
     }
 
@@ -3121,6 +3204,15 @@ function _handleClick(e) {
       if (_cfgAdvOpen.has(_advKey)) _cfgAdvOpen.delete(_advKey);
       else _cfgAdvOpen.add(_advKey);
       scheduleRender();
+      break;
+    }
+
+    case 'edit-custom-ex': {
+      const exToEdit = getState().weeks[getState().curIdx]?.days[+di]?.exercises[+ei];
+      if (!exToEdit) break;
+      const ce = (getState().customExercises ?? []).find(c => c.name === exToEdit.name);
+      if (!ce) break;
+      _openExFormModal({ mode: 'edit', name: ce.name, metric: ce.metric, category: ce.category, originalName: ce.name });
       break;
     }
 
@@ -3649,6 +3741,23 @@ function _handleClick(e) {
       break;
     }
 
+    case 'edit-custom-ex-settings': {
+      const ce = (getState().customExercises ?? []).find(c => c.name === el.dataset.name);
+      if (!ce) break;
+      _openExFormModal({ mode: 'edit', name: ce.name, metric: ce.metric, category: ce.category, originalName: ce.name });
+      break;
+    }
+
+    case 'delete-custom-ex': {
+      const name = el.dataset.name;
+      if (confirm(`"${name}" löschen? Bereits hinzugefügte Übungen in Wochen bleiben erhalten.`)) {
+        dispatch(A.CUSTOM_EX_DELETE, { name });
+        showToast('Übung gelöscht', 'info');
+        if (_activeTab === 'settings') renderSettingsTab(getState());
+      }
+      break;
+    }
+
     case 'export-json':
       exportJSON(() => showToast('✓ Backup gespeichert', 'ok', 2000));
       break;
@@ -3797,17 +3906,6 @@ function _handleKeydown(e) {
       return;
     }
 
-    // Add-exercise input → add the exercise
-    if (inp.classList.contains('add-exercise-input')) {
-      const name = inp.value.trim();
-      if (di !== undefined && name) {
-        dispatch(A.EX_ADD, { di: +di, name });
-        inp.value = '';
-        showToast(`"${name}" hinzugefügt`, 'ok');
-      }
-      return;
-    }
-
     // Set inputs: weight → reps → rpe → next set weight
     if (action === 'set-weight') {
       e.preventDefault();
@@ -3857,6 +3955,114 @@ function _toggleAccordion(di) {
   _activeDayIdx = di;
   scheduleRender();
   _scrollToFirstPending(di);
+}
+
+// ─── Exercise search modal ──────────────────────────────────────────────────
+function _openExSearchModal(di) {
+  _exSearchDi = di;
+  openModal('modal-ex-search');
+  const inp = document.getElementById('ex-search-input');
+  if (inp) {
+    inp.value = '';
+    inp.oninput = () => _renderExSearchResults();
+    setTimeout(() => inp.focus(), 30);
+  }
+  _renderExSearchResults();
+}
+
+function _renderExSearchResults() {
+  const container = document.getElementById('ex-search-results');
+  if (!container) return;
+  const query = (document.getElementById('ex-search-input')?.value ?? '').trim();
+  const q = query.toLowerCase();
+
+  const existingNames = new Set();
+  const wk = getState().weeks[getState().curIdx];
+  if (wk && _exSearchDi !== null) {
+    (wk.days[_exSearchDi]?.exercises ?? []).forEach(ex => existingNames.add(ex.name));
+  }
+
+  const std = _STANDARD_EXERCISES
+    .filter(n => !q || n.toLowerCase().includes(q))
+    .slice(0, 8);
+  const custom = (getState().customExercises ?? [])
+    .map(c => c.name)
+    .filter(n => !q || n.toLowerCase().includes(q))
+    .slice(0, 8);
+
+  const renderItem = name => `
+    <button type="button" class="ex-search-item" data-action="ex-search-pick" data-name="${h(name)}">
+      ${h(name)}${existingNames.has(name) ? ' <span style="color:var(--c-text-3);font-size:11px">(bereits im Tag)</span>' : ''}
+    </button>`;
+
+  const stdHtml = std.length ? `<div class="ex-search-group-title">Standardübungen</div>${std.map(renderItem).join('')}` : '';
+  const customHtml = custom.length ? `<div class="ex-search-group-title">Meine Übungen</div>${custom.map(renderItem).join('')}` : '';
+
+  const allNames = new Set([..._STANDARD_EXERCISES, ...(getState().customExercises ?? []).map(c => c.name)].map(n => n.toLowerCase()));
+  const createHtml = query && !allNames.has(q)
+    ? `<button type="button" class="ex-search-item ex-search-item--create" data-action="ex-search-create">+ "${h(query)}" anlegen →</button>`
+    : '';
+
+  const emptyHtml = (!std.length && !custom.length && !query)
+    ? `<p class="ex-search-empty">Tippe um Übungen zu durchsuchen.</p>` : '';
+
+  container.innerHTML = stdHtml + customHtml + emptyHtml + createHtml;
+}
+
+// ─── Exercise create/edit modal ──────────────────────────────────────────────
+function _openExFormModal({ mode, di = null, name = '', metric = 'reps', category = null, originalName = null }) {
+  _exFormMode         = mode;
+  _exFormTargetDi     = di;
+  _exFormMetric       = metric;
+  _exFormCategory     = category;
+  _exFormOriginalName = originalName;
+  _renderExFormModal(name);
+  openModal('modal-ex-form');
+  setTimeout(() => document.getElementById('ex-form-name')?.focus(), 30);
+}
+
+function _renderExFormModal(name) {
+  const titleEl = document.getElementById('ex-form-title');
+  const bodyEl  = document.getElementById('ex-form-body');
+  if (!titleEl || !bodyEl) return;
+  titleEl.textContent = _exFormMode === 'edit' ? 'Übung bearbeiten' : 'Neue Übung';
+
+  const metrics = [{ id: 'reps', label: 'Wdh' }, { id: 'sec', label: 'Sek' }, { id: 'm', label: 'm' }];
+  const cats = ['Push', 'Pull', 'Squat', 'Hinge', 'Carry', 'Core'];
+
+  bodyEl.innerHTML = `
+    <div class="body-field">
+      <label for="ex-form-name">Name</label>
+      <input id="ex-form-name" class="body-input" type="text" maxlength="80"
+        value="${h(name ?? '')}" placeholder="z. B. Pendulum Squat" aria-label="Übungsname" />
+      <div class="ex-form-error" id="ex-form-error"></div>
+    </div>
+    <div class="body-field" style="margin-top:var(--sp-3)">
+      <label>Metrik</label>
+      <div class="weight-step-opts">
+        ${metrics.map(m => `
+          <button type="button"
+            class="weight-step-btn${_exFormMetric === m.id ? ' is-selected' : ''}"
+            data-action="ex-form-set-metric" data-metric="${m.id}"
+            aria-pressed="${_exFormMetric === m.id}"
+          >${m.label}</button>`).join('')}
+      </div>
+    </div>
+    <div class="body-field" style="margin-top:var(--sp-3)">
+      <label>Kategorie (optional)</label>
+      <div class="weight-step-opts">
+        ${cats.map(c => `
+          <button type="button"
+            class="weight-step-btn${_exFormCategory === c ? ' is-selected' : ''}"
+            data-action="ex-form-set-category" data-cat="${c}"
+            aria-pressed="${_exFormCategory === c}"
+          >${c}</button>`).join('')}
+      </div>
+    </div>
+    <div class="modal__actions">
+      <button class="btn btn--accent" data-action="ex-form-submit" style="width:100%">
+        ${_exFormMode === 'edit' ? 'Speichern' : 'Übung anlegen'}</button>
+    </div>`;
 }
 
 // ─── New week modal (2.3) ─────────────────────────────────────────────────────
@@ -4297,6 +4503,29 @@ function _buildScaffold(root) {
       <button class="btn btn--ghost" data-action="close-modal" data-target="modal-add-day">Abbrechen</button>
       <button class="btn btn--accent" data-action="confirm-add-day">Hinzufügen</button>
     </div>
+  </div>
+</div>
+
+<!-- Modal: Übung suchen -->
+<div class="modal-overlay modal-overlay--search" id="modal-ex-search" role="dialog"
+  aria-modal="true" aria-labelledby="modal-exsearch-title">
+  <div class="modal">
+    <h2 class="modal__title" id="modal-exsearch-title">Übung suchen</h2>
+    <input id="ex-search-input" class="body-input" type="text" autocomplete="off"
+      placeholder="🔍 Übung suchen …" aria-label="Übung suchen" />
+    <div id="ex-search-results"></div>
+    <div class="modal__actions">
+      <button class="btn btn--ghost" data-action="close-modal">Abbrechen</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Übung anlegen / bearbeiten -->
+<div class="modal-overlay" id="modal-ex-form" role="dialog"
+  aria-modal="true" aria-labelledby="ex-form-title">
+  <div class="modal">
+    <h2 class="modal__title" id="ex-form-title">Neue Übung</h2>
+    <div id="ex-form-body"></div>
   </div>
 </div>
 
