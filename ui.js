@@ -17,7 +17,7 @@
  */
 
 import {
-  getState, dispatch, subscribe, A, canUndo, AVAILABLE_TAGS, ALL_TAGS_FLAT, BADGE_THRESHOLDS, VACATION_PLANS,
+  getState, dispatch, subscribe, A, canUndo, BADGE_THRESHOLDS, VACATION_PLANS,
 } from './state.js';
 import {
   exportJSON, importJSON, exportCSV,
@@ -131,8 +131,6 @@ let _dragSrc = null; // { di, ei }
 let _root        = null;
 let _toast       = null;
 let _storageWarn = null;
-
-// _EXERCISE_TAGS removed in 4.1 – use AVAILABLE_TAGS / settings.activeTags instead
 
 // ─── Standard exercise list (3.2) ────────────────────────────────────────────
 const _STANDARD_EXERCISES = [
@@ -1183,22 +1181,6 @@ function renderExercise(wk, di, ei, state) {
             aria-pressed="${!!ex.supersetId}"
           >${ex.supersetId ? 'An (SS)' : 'Aus'}</button>
         </div>` : ''}
-        <!-- Tags (3.12) -->
-        <div class="weight-plan-row exercise-tags-row" role="group" aria-label="Tags">
-          <span class="pause-row__label">Tags:</span>
-          <div class="tag-chips">
-            ${(state.settings?.activeTags ?? ALL_TAGS_FLAT).map(tag => {
-              const active = (ex.tags ?? []).includes(tag);
-              return `<button
-                type="button"
-                class="tag-chip${active ? ' is-selected' : ''}"
-                data-action="toggle-ex-tag" data-di="${di}" data-ei="${ei}" data-tag="${h(tag)}"
-                aria-pressed="${active}"
-              >${h(tag)}</button>`;
-            }).join('')}
-          </div>
-          <div style="font-size:11px;color:var(--c-text-3);margin-top:2px">Nur aktivierte Tags erscheinen hier.</div>
-        </div>
         ${!locked ? `
         <div class="weight-plan-row" role="group" aria-label="Steigerungsrate">
           <span class="pause-row__label">Schrittweite:</span>
@@ -2449,38 +2431,19 @@ function renderSettingsTab(state) {
   const dlPresets  = [0.5, 0.6, 0.7, 0.75, 0.8];
   const isCustomDl = !dlPresets.includes(dlFactor) || _showCustomDeload;
 
-  container.innerHTML = `
-  <div class="settings-section">
-    ${tog('swipe', 'Swipe-Navigation', 'Wischen zum Wochenwechsel')}
-    ${tog('drag',  'Drag & Drop',      'Übungen per Griff verschieben')}
-    ${tog('vibrationEnabled', 'Vibration nach Pause', 'Funktioniert nur auf Android — iOS unterstützt Vibration in PWAs technisch nicht.')}
-    ${tog('rpeEnabled', 'RPE anzeigen', 'Rate of Perceived Exertion — Anstrengungsgrad pro Satz')}
-    ${tog('autoStartPauseTimer', 'Pausentimer Autostart', 'Timer startet automatisch nach jedem bestätigten Satz (außer dem letzten)')}
-  </div>
+  // Max session duration pill options (in ms)
+  const msOpts    = [3600000, 5400000, 7200000, 10800000, 14400000];
+  const msLabels  = { 3600000: '1h', 5400000: '1,5h', 7200000: '2h', 10800000: '3h', 14400000: '4h' };
+  const curMaxMs  = s.maxSessionMs ?? 10800000;
 
-  <!-- Körper & BMI -->
+  container.innerHTML = `
+  <!-- Training -->
   <div class="settings-section">
-    <div class="settings-section__title">Körper</div>
-    ${tog('showBmi', 'BMI anzeigen', 'Zeigt BMI im Körper-Tab unterhalb des Gewichts')}
-    <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:var(--sp-1)">
-      <div class="settings-row__label">Körpergröße (cm)</div>
-      <div class="settings-row__desc">Wird für die BMI-Berechnung benötigt</div>
-      <input class="body-input" type="number" step="1" min="100" max="250"
-        value="${s.heightCm ?? ''}" placeholder="178"
-        data-action="set-height"
-        style="margin-top:var(--sp-1);width:120px"
-        aria-label="Körpergröße in cm"
-      />
-    </div>
-    <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:var(--sp-1)">
-      <div class="settings-row__label">Stangengewicht Langhantel (kg)</div>
-      <input class="body-input" type="number" step="0.5" min="5" max="50"
-        value="${s.barbellWeight ?? 20}" placeholder="20"
-        data-action="set-barbell-weight"
-        style="margin-top:var(--sp-1);width:120px"
-        aria-label="Stangengewicht in kg"
-      />
-    </div>
+    <div class="settings-section__title">Training</div>
+    ${tog('swipe', 'Swipe-Navigation', 'Wischen zum Wochenwechsel')}
+    ${tog('vibrationEnabled', 'Vibration nach Pause', 'Funktioniert nur auf Android — iOS unterstützt Vibration in PWAs technisch nicht.')}
+    ${tog('autoStartPauseTimer', 'Pausentimer automatisch', 'Timer startet automatisch nach jedem bestätigten Satz (außer dem letzten)')}
+    ${tog('rpeEnabled', 'RPE anzeigen', 'Rate of Perceived Exertion — Anstrengungsgrad pro Satz')}
     <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:var(--sp-2)">
       <div>
         <div class="settings-row__label">Kleinstmögliche Steigerung</div>
@@ -2495,11 +2458,15 @@ function renderSettingsTab(state) {
           >${String(ps).replace('.', ',')} kg</button>`).join('')}
       </div>
     </div>
-  </div>
-
-  <!-- Deload -->
-  <div class="settings-section">
-    <div class="settings-section__title">Deload</div>
+    <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:var(--sp-1)">
+      <div class="settings-row__label">Stangengewicht (kg)</div>
+      <input class="body-input" type="number" step="0.5" min="5" max="50"
+        value="${s.barbellWeight ?? 20}" placeholder="20"
+        data-action="set-barbell-weight"
+        style="margin-top:var(--sp-1);width:120px"
+        aria-label="Stangengewicht in kg"
+      />
+    </div>
     <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:var(--sp-2)">
       <div>
         <div class="settings-row__label">Deload-Faktor</div>
@@ -2534,6 +2501,40 @@ function renderSettingsTab(state) {
         </div>
       </details>
     </div>
+    <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:var(--sp-2)">
+      <div>
+        <div class="settings-row__label">Max. Sitzungsdauer</div>
+        <div class="settings-row__desc">Session-Timer stoppt bei Erreichen des Limits</div>
+      </div>
+      <div class="weight-step-opts">
+        ${msOpts.map(ms => `
+          <button type="button"
+            class="weight-step-btn${curMaxMs === ms ? ' is-selected' : ''}"
+            data-action="set-max-session" data-ms="${ms}"
+            aria-pressed="${curMaxMs === ms}"
+          >${msLabels[ms]}</button>`).join('')}
+      </div>
+    </div>
+  </div>
+
+  <!-- Deine Daten -->
+  <div class="settings-section">
+    <div class="settings-section__title">Deine Daten</div>
+    <div class="settings-row settings-row--clickable" data-action="export-json">
+      <div>
+        <div class="settings-row__label">💾 Backup erstellen</div>
+        <div class="settings-row__desc backup-status-line">${_backupStatusHtml(s)}</div>
+      </div>
+      <div class="settings-row__action">${ic.chevronRight()}</div>
+    </div>
+    <label class="settings-row settings-row--clickable">
+      <div>
+        <div class="settings-row__label">📂 Backup wiederherstellen</div>
+        <div class="settings-row__desc">Aktuelle Daten werden ersetzt</div>
+      </div>
+      <div class="settings-row__action">${ic.chevronRight()}</div>
+      <input type="file" accept=".json" class="sr-only" data-action="import-json" aria-label="JSON-Backup-Datei wählen"/>
+    </label>
   </div>
 
   <!-- Trainingstage -->
@@ -2557,43 +2558,9 @@ function renderSettingsTab(state) {
     </div>
   </div>
 
-  <!-- Wochen-Management -->
-  <div class="settings-section">
-    <div class="settings-section__title">Wochen-Management</div>
-    <div class="settings-row settings-row--clickable" data-action="copy-prev">
-      <div>
-        <div class="settings-row__label">${ic.copy()} Vorwoche übernehmen</div>
-        <div class="settings-row__desc">Aktuelle Woche mit der Vorwoche überschreiben</div>
-      </div>
-      <div class="settings-row__action">${ic.chevronRight()}</div>
-    </div>
-    <div class="settings-row settings-row--clickable" data-action="save-week-as-template">
-      <div>
-        <div class="settings-row__label">${ic.save()} Als Template speichern</div>
-        <div class="settings-row__desc">Aktuelle Woche als Standard-Vorlage sichern</div>
-      </div>
-      <div class="settings-row__action">${ic.chevronRight()}</div>
-    </div>
-    <div class="settings-row settings-row--clickable" data-action="open-export">
-      <div>
-        <div class="settings-row__label">${ic.download()} Woche exportieren (CSV)</div>
-        <div class="settings-row__desc">Trainingsdaten herunterladen</div>
-      </div>
-      <div class="settings-row__action">${ic.chevronRight()}</div>
-    </div>
-    <div class="settings-row settings-row--clickable" data-action="open-delete-week"
-      style="color:var(--c-danger)">
-      <div>
-        <div class="settings-row__label" style="color:var(--c-danger)">${ic.trash()} Aktuelle Woche löschen</div>
-        <div class="settings-row__desc">Wird unwiderruflich entfernt</div>
-      </div>
-      <div class="settings-row__action">${ic.chevronRight()}</div>
-    </div>
-  </div>
-
   <!-- Template -->
   <div class="settings-section">
-    <div class="settings-section__title">Vorlagen (3.4)</div>
+    <div class="settings-section__title">Vorlagen</div>
     <div class="settings-row settings-row--clickable" data-action="open-tpl">
       <div>
         <div class="settings-row__label">📋 Standard-Template bearbeiten</div>
@@ -2633,68 +2600,20 @@ function renderSettingsTab(state) {
     </div>
   </div>
 
-  <!-- Favoriten -->
+  <!-- CSV-Export (Erweitert) -->
   <div class="settings-section">
-    <div class="settings-section__title">⭐ Meine Favoriten</div>
-    <div class="settings-row__desc" style="padding:0 0 var(--sp-2)">Bis zu 5 Übungen — Empfehlungen fokussieren sich darauf.</div>
-    ${(() => {
-      const favs = state.favoriteExercises ?? [];
-      if (!favs.length) return '<p class="settings-row__desc" style="padding:var(--sp-2) 0">Noch keine Favoriten — tippe ☆ bei einer Übung.</p>';
-      return favs.map(name => `
-      <div class="settings-row" style="justify-content:space-between">
-        <span class="settings-row__label">⭐ ${h(name)}</span>
-        <button class="btn btn--ghost btn--sm" data-action="remove-fav" data-name="${h(name)}"
-          aria-label="Favorit '${h(name)}' entfernen">✕</button>
-      </div>`).join('');
-    })()}
-  </div>
-
-  <!-- Tags verwalten (4.1) -->
-  <div class="settings-section">
-    <div class="settings-section__title">Tags verwalten</div>
-    <div class="settings-row__desc" style="padding:0 0 8px">Nur aktivierte Tags erscheinen bei der Übungs-Einstellung.</div>
-    ${Object.entries(AVAILABLE_TAGS).map(([cat, tags]) => {
-      const catLabel = { muskelgruppen:'Muskelgruppen', trainingsziel:'Trainingsziel', uebungsstil:'Übungsstil', bewegungsmuster:'Bewegungsmuster', kontext:'Kontext' }[cat] ?? cat;
-      const active   = s.activeTags ?? ALL_TAGS_FLAT;
-      return `
-      <details class="deload-details" style="margin-bottom:4px">
-        <summary class="deload-details__summary" style="padding-left:var(--sp-4)">${catLabel}</summary>
-        <div class="deload-details__body" style="display:flex;flex-wrap:wrap;gap:6px;padding:8px 0">
-          ${tags.map(tag => `
-          <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:12px;padding-left:var(--sp-4)">
-            <input type="checkbox"
-              data-action="toggle-active-tag"
-              data-tag="${h(tag)}"
-              ${active.includes(tag) ? 'checked' : ''}
-            />
-            ${h(tag)}
-          </label>`).join('')}
-        </div>
-      </details>`;
-    }).join('')}
-  </div>
-
-  <!-- Deine Daten -->
-  <div class="settings-section">
-    <div class="settings-section__title">Deine Daten</div>
-    <div class="settings-row settings-row--clickable" data-action="export-json">
+    <div class="settings-row settings-row--clickable" data-action="open-export">
       <div>
-        <div class="settings-row__label">💾 Backup erstellen</div>
-        <div class="settings-row__desc backup-status-line">${_backupStatusHtml(s)}</div>
+        <div class="settings-row__label">${ic.download()} Woche exportieren (CSV)</div>
+        <div class="settings-row__desc">Trainingsdaten herunterladen</div>
       </div>
       <div class="settings-row__action">${ic.chevronRight()}</div>
     </div>
-    <label class="settings-row settings-row--clickable">
-      <div>
-        <div class="settings-row__label">📂 Backup wiederherstellen</div>
-        <div class="settings-row__desc">Aktuelle Daten werden ersetzt</div>
-      </div>
-      <div class="settings-row__action">${ic.chevronRight()}</div>
-      <input type="file" accept=".json" class="sr-only" data-action="import-json" aria-label="JSON-Backup-Datei wählen"/>
-    </label>
   </div>
 
+  <!-- Info -->
   <div class="settings-section">
+    <div class="settings-section__title">Info</div>
     <div class="settings-row">
       <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN v9.0</div></div>
     </div>
@@ -3212,11 +3131,6 @@ function _handleClick(e) {
       break;
     }
 
-    case 'remove-fav': {
-      dispatch(A.TOGGLE_FAVORITE, { name: el.dataset.name });
-      break;
-    }
-
     case 'set-pause':
       dispatch(A.EX_UPDATE, { di: +di, ei: +ei, field: 'pauseSec', value: +sec }); break;
 
@@ -3442,19 +3356,6 @@ function _handleClick(e) {
       if (_exSS) {
         const newId = _exSS.supersetId ? null : Date.now();
         dispatch(A.EX_UPDATE, { di: +di, ei: +ei, field: 'supersetId', value: newId });
-      }
-      break;
-    }
-
-    // Exercise tags (3.12)
-    case 'toggle-ex-tag': {
-      const _exTag = getState().weeks[getState().curIdx]?.days[+di]?.exercises[+ei];
-      if (_exTag) {
-        const tag  = el.dataset.tag;
-        const tags = Array.isArray(_exTag.tags) ? [..._exTag.tags] : [];
-        const idx  = tags.indexOf(tag);
-        if (idx >= 0) tags.splice(idx, 1); else tags.push(tag);
-        dispatch(A.EX_UPDATE, { di: +di, ei: +ei, field: 'tags', value: tags });
       }
       break;
     }
@@ -3736,6 +3637,12 @@ function _handleClick(e) {
       break;
     }
 
+    case 'set-max-session': {
+      const ms = parseInt(el.dataset.ms, 10);
+      dispatch(A.SETTING_SET, { key: 'maxSessionMs', value: Number.isFinite(ms) && ms > 0 ? ms : 10800000 });
+      break;
+    }
+
     case 'adopt-prev-weight': {
       dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'weight', value: +el.dataset.value });
       break;
@@ -3785,11 +3692,6 @@ function _handleChange(e) {
       });
       break;
     }
-    case 'set-height': {
-      const hv = parseFloat(el.value);
-      dispatch(A.SETTING_SET, { key: 'heightCm', value: Number.isFinite(hv) && hv > 0 ? hv : null });
-      break;
-    }
     case 'set-target-weight': {
       const tw = parseFloat(el.value);
       dispatch(A.SETTING_SET, { key: 'targetWeight', value: Number.isFinite(tw) && tw > 0 ? tw : null });
@@ -3829,14 +3731,6 @@ function _handleChange(e) {
           showToast(`✓ ${weeks} Wochen Trainingsdaten wiederhergestellt`, 'ok', 3000);
         })
         .catch(() => _showInvalidBackupDialog(el));
-      break;
-    }
-    case 'toggle-active-tag': {
-      // 4.1: toggle a tag in settings.activeTags without re-rendering (checkbox handles own state)
-      const tag    = el.dataset.tag;
-      const cur    = getState().settings?.activeTags ?? ALL_TAGS_FLAT;
-      const next   = el.checked ? [...cur, tag] : cur.filter(t => t !== tag);
-      dispatch(A.SETTING_SET, { key: 'activeTags', value: next });
       break;
     }
   }

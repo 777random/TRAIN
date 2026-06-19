@@ -1732,17 +1732,6 @@ details[open] > .deload-details__summary::before { content: '▾ '; }
   border-radius: var(--r-sm); font-size: 12px; color: #FFB400;
 }
 
-/* ── Exercise tags (3.12) ──────────────────────────────────── */
-.exercise-tags-row  { align-items: flex-start; }
-.tag-chips          { display: flex; flex-wrap: wrap; gap: 4px; }
-.tag-chip {
-  font-size: 11px; background: var(--c-surface2); border: 1px solid var(--c-border);
-  border-radius: var(--r-full); padding: 3px 8px; cursor: pointer;
-  color: var(--c-text-3); transition: background var(--t-fast), color var(--t-fast);
-}
-.tag-chip.is-selected { background: rgba(200,255,0,.15); border-color: var(--c-accent); color: var(--c-accent); }
-.tag-chip:hover:not(.is-selected) { border-color: var(--c-border-hi); color: var(--c-text); }
-
 /* ── Muscle group bar chart (3.13) ─────────────────────────── */
 .mg-bar-row   { display: flex; align-items: center; gap: var(--sp-2); margin-bottom: 6px; }
 .mg-bar-label { width: 80px; font-size: 11px; flex-shrink: 0; }
