@@ -3641,8 +3641,8 @@ function _handleClick(e) {
     case 'autofill-down': {
       const _rInp = document.querySelector(`[data-action="set-reps"][data-di="${di}"][data-ei="${ei}"][data-si="${si}"]`);
       const repsVal = _rInp?.value ?? '';
-      dispatch(A.SET_AUTOFILL_DOWN, { di: +di, ei: +ei, si: +si, repsOnly: true, repsVal });
-      showToast('Wdh in folgende Sätze übernommen', 'ok');
+      dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si + 1, field: 'reps', value: repsVal });
+      showToast('Wdh in nächsten Satz übernommen', 'ok');
       break;
     }
 
@@ -3888,27 +3888,11 @@ function _handleKeydown(e) {
     }
     if (action === 'set-reps') {
       e.preventDefault();
-      // If RPE button is visible, focus it; otherwise go straight to next set weight
-      const rpeBtn = document.querySelector(
-        `[data-action="open-rpe-popover"][data-di="${di}"][data-ei="${ei}"][data-si="${si}"]`
-      );
-      if (rpeBtn) { rpeBtn.focus(); return; }
-      const nextSi = +si + 1;
       const nextWeight = document.querySelector(
-        `[data-action="set-weight"][data-di="${di}"][data-ei="${ei}"][data-si="${nextSi}"]`
+        `[data-action="set-weight"][data-di="${di}"][data-ei="${ei}"][data-si="${+si + 1}"]`
       );
       if (nextWeight) nextWeight.focus();
-      else inp.blur();
-      return;
-    }
-    if (action === 'open-rpe-popover') {
-      e.preventDefault();
-      const nextSi = +si + 1;
-      const nextWeight = document.querySelector(
-        `[data-action="set-weight"][data-di="${di}"][data-ei="${ei}"][data-si="${nextSi}"]`
-      );
-      if (nextWeight) nextWeight.focus();
-      else inp.blur();
+      else document.activeElement?.blur();
       return;
     }
   }
