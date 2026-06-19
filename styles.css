@@ -591,6 +591,20 @@ exercise { position: unset; }
   flex: 1;
   min-width: 0;
 }
+.prev-hint--btn {
+  background: none;
+  border: none;
+  font-size: 9px;
+  font-family: var(--font-sans);
+  color: var(--c-text-3);
+  cursor: pointer;
+  padding: 0;
+  line-height: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.prev-hint--btn:hover { color: var(--c-accent); }
 
 /* ─── Vorwoche mini-table ─────────────────────────────────────── */
 .prev-grid-wrap {

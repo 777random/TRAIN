@@ -1270,18 +1270,11 @@ function reduce(state, action) {
       else if (p.field === 'rpe')  v = (v === '' || v === null) ? null : Math.min(10, Math.max(1, +v));
       else if (p.field === 'note') v = String(v ?? '').slice(0, 120);
       s[p.field] = v;
-      // Straight sets: auto-propagate weight/reps from set 0 to all following pending+empty sets
-      if (p.si === 0 && (ex.setType ?? 'straight') === 'straight') {
-        if (p.field === 'weight') {
-          for (let j = 1; j < ex.sets.length; j++) {
-            if (ex.sets[j].status === 'pending' && !(parseFloat(ex.sets[j].weight) > 0))
-              ex.sets[j].weight = v;
-          }
-        } else if (p.field === 'reps') {
-          for (let j = 1; j < ex.sets.length; j++) {
-            if (ex.sets[j].status === 'pending' && !(parseFloat(ex.sets[j].reps) > 0))
-              ex.sets[j].reps = v;
-          }
+      // Straight sets: auto-propagate weight from set 0 to all following pending sets
+      if (p.si === 0 && p.field === 'weight' && (ex.setType ?? 'straight') === 'straight') {
+        for (let j = 1; j < ex.sets.length; j++) {
+          if (ex.sets[j].status === 'pending')
+            ex.sets[j].weight = v;
         }
       }
       break;
@@ -1294,7 +1287,9 @@ function reduce(state, action) {
         cur = s.done ? 'success' : 'pending';
       }
       const i = Math.max(0, order.indexOf(cur));
-      const next = order[(i + 1) % 3];
+      const canSuccess = (parseFloat(s.reps) || 0) > 0;
+      let next = order[(i + 1) % 3];
+      if (next === 'success' && !canSuccess) next = 'fail';
       s.status = next;
       s.done   = next === 'success';
 

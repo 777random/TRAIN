@@ -1446,12 +1446,15 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
       data-action="autofill-down" data-di="${di}" data-ei="${ei}" data-si="${si}"
       aria-label="Gewicht und ${metricValLabel} von Satz ${si + 1} auf alle folgenden Sätze übernehmen"
     >${ic.autofillDown()}</button>` : '';
+  const prevRepsAdopt = (!locked && prevVal != null && prevVal !== '')
+    ? `<button type="button" class="prev-hint prev-hint--btn" data-action="adopt-prev-reps" data-di="${di}" data-ei="${ei}" data-si="${si}" data-value="${prevVal}" aria-label="Vorwoche ${prevRepHint}">${prevRepHint}</button>`
+    : (prevRepHint ? `<span class="prev-hint" aria-hidden="true">${prevRepHint}</span>` : '');
   const metricCellFooter = hasAutofill
     ? `<div class="set-cell__footer">
-        <span class="prev-hint" aria-hidden="true">${prevRepHint}</span>
+        ${prevRepsAdopt}
         ${autofillBtn}
       </div>`
-    : `<span class="prev-hint" aria-hidden="true">${prevRepHint}</span>`;
+    : prevRepsAdopt;
 
   let st = s.status;
   if (st !== 'pending' && st !== 'success' && st !== 'fail') {
@@ -1475,7 +1478,7 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
                : '';
 
   // Prev-week weight hint with directional arrow (computed before template literal)
-  let _prevWeightHint = '<span class="prev-hint" aria-hidden="true"></span>';
+  let _prevWeightHint = '';
   if (prevSet) {
     const _curW = s.weight ?? 0;
     let _arr = '';
@@ -1485,7 +1488,11 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
       else                                    _arr = '<span class="w-arrow w-arrow--eq">→</span> ';
     }
     const _pw = prevSet.weight != null ? prevSet.weight : '–';
-    _prevWeightHint = `<span class="prev-hint" aria-hidden="true">${_arr}${_pw}kg</span>`;
+    if (!locked) {
+      _prevWeightHint = `<button type="button" class="prev-hint prev-hint--btn" data-action="adopt-prev-weight" data-di="${di}" data-ei="${ei}" data-si="${si}" data-value="${prevSet.weight ?? 0}" aria-label="Vorwoche ${_pw} kg">${_arr}${_pw}kg</button>`;
+    } else {
+      _prevWeightHint = `<span class="prev-hint" aria-hidden="true">${_arr}${_pw}kg</span>`;
+    }
   }
 
   return `
@@ -1502,7 +1509,6 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
       aria-label="Satz ${si + 1} Gewicht in kg"
     />
     ${isWeightPR ? `<span class="pr-badge"           aria-label="Gewichts-PR! ${s.weight} kg">🏆 ${s.weight} kg</span>` : ''}
-    ${isRepsPR   ? `<span class="pr-badge pr-badge--reps" aria-label="Wdh-PR! ${s.reps}×">🔄 ${s.reps}×</span>` : ''}
     ${isEffortGoal ? `<span class="pr-badge pr-badge--goal" aria-label="${effortScore}% Zielerfüllung">✓ ${effortScore}% Ziel</span>` : ''}
     ${_prevWeightHint}
     ${ex.showPlates && dispW > 0 ? (() => { const pl = calcPlates(dispW); return pl ? `<span class="plate-hint" aria-hidden="true" title="Scheiben je Seite">▪ ${pl}</span>` : ''; })() : ''}
@@ -1510,11 +1516,12 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
 
   <div class="set-cell">
     <input class="num-input" type="number" inputmode="${repMode}"
-      min="0" step="${repStep}" placeholder="${ex.targetReps ?? ''}" value="${s.reps}"
+      min="0" step="${repStep}" placeholder="${ex.targetReps ?? ''}" value="${st === 'pending' ? '' : s.reps}"
       ${locked ? 'disabled' : ''}
       data-action="set-reps" data-di="${di}" data-ei="${ei}" data-si="${si}"
       aria-label="${repAria}"
     />
+    ${isRepsPR   ? `<span class="pr-badge pr-badge--reps" aria-label="Wdh-PR! ${s.reps}×">🔄 ${s.reps}×</span>` : ''}
     ${metricCellFooter}
   </div>
 
@@ -3632,11 +3639,9 @@ function _handleClick(e) {
       break;
     }
     case 'autofill-down': {
-      // Flush uncommitted weight/reps inputs before autofilling (1.3: RPE is buttons, no flush needed)
+      // Flush uncommitted weight input before autofilling (reps not propagated)
       const _wInp = document.querySelector(`[data-action="set-weight"][data-di="${di}"][data-ei="${ei}"][data-si="${si}"]`);
-      const _rInp = document.querySelector(`[data-action="set-reps"][data-di="${di}"][data-ei="${ei}"][data-si="${si}"]`);
       if (_wInp) dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'weight', value: _wInp.value });
-      if (_rInp) dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'reps',   value: _rInp.value });
       dispatch(A.SET_AUTOFILL_DOWN, { di: +di, ei: +ei, si: +si });
       showToast('In folgende Sätze übernommen', 'ok');
       break;
@@ -3726,6 +3731,21 @@ function _handleClick(e) {
     // Handled in _handleChange; nothing to do on click.
     case 'import-json': break;
 
+    case 'set-plate-step': {
+      const ps = parseFloat(el.dataset.step);
+      dispatch(A.SETTING_SET, { key: 'plateStep', value: Number.isFinite(ps) ? ps : 2.5 });
+      break;
+    }
+
+    case 'adopt-prev-weight': {
+      dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'weight', value: +el.dataset.value });
+      break;
+    }
+
+    case 'adopt-prev-reps': {
+      dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'reps', value: +el.dataset.value });
+      break;
+    }
 
     default:
       // Unknown action – ignore silently
@@ -3779,11 +3799,6 @@ function _handleChange(e) {
     case 'set-barbell-weight': {
       const bw = parseFloat(el.value);
       dispatch(A.SETTING_SET, { key: 'barbellWeight', value: Number.isFinite(bw) && bw > 0 ? bw : 20 });
-      break;
-    }
-    case 'set-plate-step': {
-      const ps = parseFloat(el.dataset.step);
-      dispatch(A.SETTING_SET, { key: 'plateStep', value: Number.isFinite(ps) ? ps : 2.5 });
       break;
     }
     case 'set-deload-factor-value': {
