@@ -24,7 +24,7 @@
 
 export const STORAGE_KEY        = 'train_v6';
 export const STORAGE_KEY_SHADOW = 'train_v6_shadow';
-export const SCHEMA_VERSION     = 20;
+export const SCHEMA_VERSION     = 21;
 
 export const BADGE_THRESHOLDS = [
   { id: 'badge_4',   weeks: 4,   title: 'Erster Schritt' },
@@ -188,7 +188,7 @@ function buildDefaultState() {
       rpeEnabled:                     true,
       weeksSinceLastBackupReminder:   0,
       maxSessionMs:                   10800000, // 3h default
-      autoStartPauseTimer:            false,
+      autoStartPauseTimer:            true,
     },
   };
 }
@@ -326,6 +326,44 @@ function _checkAndGrantBadges(state) {
       window.dispatchEvent(new CustomEvent('train:badge-earned', { detail: newOnes }));
     }, 0);
   }
+}
+
+function _recalcExercisePRs(state) {
+  const curWk = state.weeks[state.curIdx];
+  if (!curWk) return;
+  // Build name → {prWeight, prRepsAtMaxWeight} from all completed sets
+  const prMap = {};
+  state.weeks.forEach(wk => {
+    if (wk.mode === 'deload') return;
+    wk.days.forEach(day => {
+      day.exercises.forEach(ex => {
+        ex.sets.forEach(s => {
+          if (s.status !== 'success') return;
+          const reps   = parseFloat(s.reps)   || 0;
+          if (reps === 0) return;
+          const weight = parseFloat(s.weight) || 0;
+          const name   = ex.substituteFor || ex.name;
+          if (!name) return;
+          if (!prMap[name]) prMap[name] = { prWeight: null, prReps: null };
+          const m = prMap[name];
+          if (m.prWeight === null || weight > m.prWeight) {
+            m.prWeight = weight; m.prReps = reps;
+          } else if (weight === m.prWeight && reps > (m.prReps ?? 0)) {
+            m.prReps = reps;
+          }
+        });
+      });
+    });
+  });
+  // Apply to current week exercises where prWeight is still null
+  curWk.days.forEach(day => {
+    day.exercises.forEach(ex => {
+      if (ex.prWeight !== null) return;
+      const name = ex.substituteFor || ex.name;
+      const m = prMap[name];
+      if (m) { ex.prWeight = m.prWeight; ex.prRepsAtMaxWeight = m.prReps; }
+    });
+  });
 }
 
 /**
@@ -555,12 +593,25 @@ function migrate(raw) {
     raw.meta = { ...raw.meta, schemaVersion: 20 };
   }
 
+  // v20 → v21: add ex.prWeight + ex.prRepsAtMaxWeight to all exercises
+  if ((raw.meta?.schemaVersion ?? 0) < 21) {
+    const _addPR = ex => {
+      if (ex.prWeight           === undefined) ex.prWeight           = null;
+      if (ex.prRepsAtMaxWeight  === undefined) ex.prRepsAtMaxWeight  = null;
+    };
+    (raw.weeks ?? []).forEach(wk =>
+      (wk.days ?? []).forEach(day => (day.exercises ?? []).forEach(_addPR))
+    );
+    (raw.customTemplate ?? []).forEach(day => (day.exercises ?? []).forEach(_addPR));
+    raw.meta = { ...raw.meta, schemaVersion: 21 };
+  }
+
   // Always-apply defaults for settings added in later versions
   if (raw.settings.vibrationEnabled               === undefined) raw.settings.vibrationEnabled               = true;
   if (raw.settings.rpeEnabled                     === undefined) raw.settings.rpeEnabled                     = true;
   if (raw.settings.weeksSinceLastBackupReminder   === undefined) raw.settings.weeksSinceLastBackupReminder   = 0;
   if (raw.settings.maxSessionMs                   === undefined) raw.settings.maxSessionMs                   = 10800000;
-  if (raw.settings.autoStartPauseTimer            === undefined) raw.settings.autoStartPauseTimer            = false;
+  if (raw.settings.autoStartPauseTimer            === undefined) raw.settings.autoStartPauseTimer            = true;
 
   // Always-apply: week label (optional user-set name, no schema bump needed)
   (raw.weeks ?? []).forEach(wk => { if (!('label' in wk)) wk.label = ''; });
@@ -596,6 +647,7 @@ export function loadState() {
       if (!STATE.weeks.length && STATE.onboardingDone) _appendDefaultWeek();
       if (STATE.curIdx >= STATE.weeks.length) STATE.curIdx = STATE.weeks.length - 1;
       if (STATE.curIdx < 0)                   STATE.curIdx = 0;
+      _recalcExercisePRs(STATE);
       _checkAndGrantBadges(STATE);
       console.log('[TRAIN] streak:', _calcCurrentStreak(STATE.weeks), 'badges:', STATE.badges);
       persistState(); // re-write so both keys are in sync
@@ -1246,23 +1298,30 @@ function reduce(state, action) {
       s.status = next;
       s.done   = next === 'success';
 
-      // Update PRs when a set is newly marked success in a non-deload week (3.1)
+      // Update PRs when a set is newly marked success in a non-deload week
       if (next === 'success' && _currentWeek()?.mode !== 'deload') {
         const ex     = _currentWeek()?.days[p.di]?.exercises[p.ei];
         const weight = parseFloat(s.weight) || 0;
         const reps   = parseFloat(s.reps)   || 0;
-        if (ex && weight > 0 && reps > 0) {
-          const volume       = weight * reps;
-          const est1RM       = reps <= 10 ? weight * (1 + reps / 30) : 0;
-          const name         = ex.name;
-          if (!state.prs) state.prs = {};
-          const prev         = state.prs[name] ?? { maxWeight: 0, maxVolume: 0, maxEstimated1RM: 0, maxRepsAtMaxWeight: 0, date: null };
-          const newMaxW      = Math.max(prev.maxWeight,      weight);
-          const newMaxV      = Math.max(prev.maxVolume,      volume);
-          const newMaxE      = Math.max(prev.maxEstimated1RM, est1RM);
-          const newMaxRMW    = weight > prev.maxWeight ? reps : (weight === prev.maxWeight ? Math.max(prev.maxRepsAtMaxWeight ?? 0, reps) : prev.maxRepsAtMaxWeight ?? 0);
-          if (newMaxW > prev.maxWeight || newMaxV > prev.maxVolume || newMaxE > prev.maxEstimated1RM) {
-            state.prs[name] = { maxWeight: newMaxW, maxVolume: newMaxV, maxEstimated1RM: newMaxE, maxRepsAtMaxWeight: newMaxRMW, date: new Date().toISOString().split('T')[0] };
+        if (ex && reps > 0) {
+          if (weight > 0) {
+            const volume   = weight * reps;
+            const est1RM   = reps <= 10 ? weight * (1 + reps / 30) : 0;
+            const name     = ex.name;
+            if (!state.prs) state.prs = {};
+            const prev     = state.prs[name] ?? { maxWeight: 0, maxVolume: 0, maxEstimated1RM: 0, maxRepsAtMaxWeight: 0, date: null };
+            const newMaxW  = Math.max(prev.maxWeight,      weight);
+            const newMaxV  = Math.max(prev.maxVolume,      volume);
+            const newMaxE  = Math.max(prev.maxEstimated1RM, est1RM);
+            const newMaxRMW = weight > prev.maxWeight ? reps : (weight === prev.maxWeight ? Math.max(prev.maxRepsAtMaxWeight ?? 0, reps) : prev.maxRepsAtMaxWeight ?? 0);
+            if (newMaxW > prev.maxWeight || newMaxV > prev.maxVolume || newMaxE > prev.maxEstimated1RM) {
+              state.prs[name] = { maxWeight: newMaxW, maxVolume: newMaxV, maxEstimated1RM: newMaxE, maxRepsAtMaxWeight: newMaxRMW, date: new Date().toISOString().split('T')[0] };
+            }
+          }
+          if (ex.prWeight === null || weight > ex.prWeight) {
+            ex.prWeight = weight; ex.prRepsAtMaxWeight = reps;
+          } else if (weight >= ex.prWeight && reps > (ex.prRepsAtMaxWeight ?? 0)) {
+            ex.prRepsAtMaxWeight = reps;
           }
         }
       }
@@ -1275,13 +1334,11 @@ function reduce(state, action) {
       if (si < 0 || si >= sets.length - 1) break;
       const src = sets[si]; if (!src) break;
       const w = parseFloat(src.weight) || 0;
-      const r = parseFloat(src.reps)   || 0;
-      // Weight → all following sets; Reps → next set only; RPE always cleared
+      // Weight only → all following sets; RPE always cleared; reps not copied
       for (let j = si + 1; j < sets.length; j++) {
         sets[j].weight = w;
         sets[j].rpe = null;
       }
-      if (sets[si + 1]) sets[si + 1].reps = r;
       break;
     }
     case A.SET_AUTOFILL_RPE: {
@@ -1304,21 +1361,28 @@ function reduce(state, action) {
         const ex     = wk.days[p.di]?.exercises[p.ei];
         const weight = parseFloat(s.weight) || 0;
         const reps   = parseFloat(s.reps)   || 0;
-        if (ex && weight > 0 && reps > 0) {
-          const volume   = weight * reps;
-          const est1RM   = reps <= 10 ? weight * (1 + reps / 30) : 0;
-          const name     = ex.name;
-          if (!state.prs) state.prs = {};
-          const prev     = state.prs[name] ?? { maxWeight: 0, maxVolume: 0, maxEstimated1RM: 0, maxRepsAtMaxWeight: 0, date: null };
-          const newMaxW  = Math.max(prev.maxWeight,       weight);
-          const newMaxV  = Math.max(prev.maxVolume,       volume);
-          const newMaxE  = Math.max(prev.maxEstimated1RM, est1RM);
-          const newMaxRMW = weight > prev.maxWeight ? reps : (weight === prev.maxWeight ? Math.max(prev.maxRepsAtMaxWeight ?? 0, reps) : prev.maxRepsAtMaxWeight ?? 0);
-          if (newMaxW > prev.maxWeight || newMaxV > prev.maxVolume || newMaxE > prev.maxEstimated1RM) {
-            state.prs[name] = { maxWeight: newMaxW, maxVolume: newMaxV, maxEstimated1RM: newMaxE, maxRepsAtMaxWeight: newMaxRMW, date: new Date().toISOString().split('T')[0] };
+        if (ex && reps > 0) {
+          if (weight > 0) {
+            const volume   = weight * reps;
+            const est1RM   = reps <= 10 ? weight * (1 + reps / 30) : 0;
+            const name     = ex.name;
+            if (!state.prs) state.prs = {};
+            const prev     = state.prs[name] ?? { maxWeight: 0, maxVolume: 0, maxEstimated1RM: 0, maxRepsAtMaxWeight: 0, date: null };
+            const newMaxW  = Math.max(prev.maxWeight,       weight);
+            const newMaxV  = Math.max(prev.maxVolume,       volume);
+            const newMaxE  = Math.max(prev.maxEstimated1RM, est1RM);
+            const newMaxRMW = weight > prev.maxWeight ? reps : (weight === prev.maxWeight ? Math.max(prev.maxRepsAtMaxWeight ?? 0, reps) : prev.maxRepsAtMaxWeight ?? 0);
+            if (newMaxW > prev.maxWeight || newMaxV > prev.maxVolume || newMaxE > prev.maxEstimated1RM) {
+              state.prs[name] = { maxWeight: newMaxW, maxVolume: newMaxV, maxEstimated1RM: newMaxE, maxRepsAtMaxWeight: newMaxRMW, date: new Date().toISOString().split('T')[0] };
+            }
+            if (est1RM > 0 && (ex.oneRM == null || est1RM > ex.oneRM)) {
+              ex.oneRM = Math.round(est1RM * 10) / 10;
+            }
           }
-          if (est1RM > 0 && (ex.oneRM == null || est1RM > ex.oneRM)) {
-            ex.oneRM = Math.round(est1RM * 10) / 10;
+          if (ex.prWeight === null || weight > ex.prWeight) {
+            ex.prWeight = weight; ex.prRepsAtMaxWeight = reps;
+          } else if (weight >= ex.prWeight && reps > (ex.prRepsAtMaxWeight ?? 0)) {
+            ex.prRepsAtMaxWeight = reps;
           }
         }
       }

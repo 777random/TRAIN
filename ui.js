@@ -1460,13 +1460,14 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
   const doneClass = st === 'success' ? ' is-done' : st === 'fail' ? ' is-fail' : '';
   const stLabel   = st === 'success' ? 'erfolgreich' : st === 'fail' ? 'nicht geschafft' : 'offen';
 
-  // PR indicator (3.1): trophy when this set's weight matches the current all-time PR
-  const prs   = getState().prs ?? {};
-  const exPR  = prs[ex.name];
-  const isPR  = st === 'success' && exPR && (s.weight ?? 0) > 0 && (
-    s.weight > exPR.maxWeight ||
-    (s.weight === exPR.maxWeight && (s.reps ?? 0) > (exPR.maxRepsAtMaxWeight ?? 0))
-  );
+  // PR indicators: 🏆 weight PR (gold) | 🔄 reps PR (green)
+  const isWeightPR = st === 'success' && ex.prWeight !== null &&
+                     (s.weight ?? 0) > 0 && (s.weight ?? 0) >= ex.prWeight;
+  const isRepsPR   = st === 'success' && ex.prRepsAtMaxWeight != null &&
+                     ex.prRepsAtMaxWeight > 0 &&
+                     (s.weight ?? 0) >= (ex.prWeight ?? 0) &&
+                     (s.reps ?? 0) >= ex.prRepsAtMaxWeight;
+  const isPR = isWeightPR || isRepsPR;
   const effortScore   = (st === 'success' && ex.targetReps) ? Math.round((s.reps ?? 0) / ex.targetReps * 100) : null;
   const isEffortGoal  = effortScore !== null && effortScore >= 100;
   const doneIcon = st === 'success' ? ic.check()
@@ -1500,7 +1501,8 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
       placeholder=""
       aria-label="Satz ${si + 1} Gewicht in kg"
     />
-    ${isPR ? `<span class="pr-badge" aria-label="Bestleistung! ${s.weight} kg">${ic.trophy()} ${s.weight} kg</span>` : ''}
+    ${isWeightPR ? `<span class="pr-badge"           aria-label="Gewichts-PR! ${s.weight} kg">🏆 ${s.weight} kg</span>` : ''}
+    ${isRepsPR   ? `<span class="pr-badge pr-badge--reps" aria-label="Wdh-PR! ${s.reps}×">🔄 ${s.reps}×</span>` : ''}
     ${isEffortGoal ? `<span class="pr-badge pr-badge--goal" aria-label="${effortScore}% Zielerfüllung">✓ ${effortScore}% Ziel</span>` : ''}
     ${_prevWeightHint}
     ${ex.showPlates && dispW > 0 ? (() => { const pl = calcPlates(dispW); return pl ? `<span class="plate-hint" aria-hidden="true" title="Scheiben je Seite">▪ ${pl}</span>` : ''; })() : ''}
@@ -2478,7 +2480,7 @@ function renderSettingsTab(state) {
         <div class="settings-row__desc">Rundung für KI-Gewichtsempfehlungen</div>
       </div>
       <div class="weight-step-opts">
-        ${[1.25, 2.5].map(ps => `
+        ${[1.25, 2.5, 5].map(ps => `
           <button type="button"
             class="weight-step-btn${(s.plateStep ?? 2.5) === ps ? ' is-selected' : ''}"
             data-action="set-plate-step" data-step="${ps}"
@@ -3806,13 +3808,13 @@ function _handleChange(e) {
         'Aktuelle Trainingsdaten werden durch das Backup ersetzt.\nNicht rückgängig machbar.'
       );
       if (!confirmed) { el.value = ''; break; }
+      el.value = '';
       importJSON(file)
         .then(() => {
           const weeks = getState().weeks.length;
           showToast(`✓ ${weeks} Wochen Trainingsdaten wiederhergestellt`, 'ok', 3000);
         })
-        .catch(() => showToast('⚠️ Ungültige Backup-Datei', 'warn', 3000));
-      el.value = '';
+        .catch(() => _showInvalidBackupDialog(el));
       break;
     }
     case 'toggle-active-tag': {
@@ -4757,6 +4759,31 @@ function _renderBadgeGallery(state) {
   });
   return `<div class="section-label" style="margin-top:var(--sp-5)">Abzeichen</div>
     <div class="badge-gallery">${items.join('')}</div>`;
+}
+
+function _showInvalidBackupDialog(fileInput) {
+  const existing = document.getElementById('invalid-backup-dialog');
+  if (existing) existing.remove();
+  const el = document.createElement('div');
+  el.id = 'invalid-backup-dialog';
+  el.className = 'modal-overlay is-open';
+  el.innerHTML = `
+    <div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="ibdlg-title">
+      <div class="modal__title" id="ibdlg-title">Ungültiges Backup</div>
+      <p style="font-size:14px;color:var(--c-text-2);margin-bottom:var(--sp-4)">Diese Datei ist kein gültiges TRAIN-Backup.</p>
+      <div class="modal__actions">
+        <button class="btn btn--ghost" id="ibdlg-cancel">Abbrechen</button>
+        <button class="btn btn--accent" id="ibdlg-retry">📂 Andere Datei wählen</button>
+      </div>
+    </div>`;
+  document.body.appendChild(el);
+  const dismiss = () => el.remove();
+  document.getElementById('ibdlg-cancel').addEventListener('click', dismiss);
+  document.getElementById('ibdlg-retry').addEventListener('click', () => {
+    dismiss();
+    fileInput.click();
+  });
+  el.addEventListener('click', e => { if (e.target === el) dismiss(); });
 }
 
 function _showBackupReminderToast() {
