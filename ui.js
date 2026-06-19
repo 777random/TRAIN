@@ -1516,7 +1516,7 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
 
   <div class="set-cell">
     <input class="num-input" type="number" inputmode="${repMode}"
-      min="0" step="${repStep}" placeholder="${ex.targetReps ?? ''}" value="${(parseFloat(s.reps) || 0) > 0 ? s.reps : ''}"
+      min="0" step="${repStep}" placeholder="${ex.targetReps ?? ''}" value="${s.reps != null && s.reps !== '' ? s.reps : ''}"
       ${locked ? 'disabled' : ''}
       data-action="set-reps" data-di="${di}" data-ei="${ei}" data-si="${si}"
       aria-label="${repAria}"
@@ -3639,11 +3639,10 @@ function _handleClick(e) {
       break;
     }
     case 'autofill-down': {
-      // Flush uncommitted weight input before autofilling (reps not propagated)
-      const _wInp = document.querySelector(`[data-action="set-weight"][data-di="${di}"][data-ei="${ei}"][data-si="${si}"]`);
-      if (_wInp) dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'weight', value: _wInp.value });
-      dispatch(A.SET_AUTOFILL_DOWN, { di: +di, ei: +ei, si: +si });
-      showToast('In folgende Sätze übernommen', 'ok');
+      const _rInp = document.querySelector(`[data-action="set-reps"][data-di="${di}"][data-ei="${ei}"][data-si="${si}"]`);
+      const repsVal = _rInp?.value ?? '';
+      dispatch(A.SET_AUTOFILL_DOWN, { di: +di, ei: +ei, si: +si, repsOnly: true, repsVal });
+      showToast('Wdh in folgende Sätze übernommen', 'ok');
       break;
     }
 
@@ -3899,12 +3898,7 @@ function _handleKeydown(e) {
         `[data-action="set-weight"][data-di="${di}"][data-ei="${ei}"][data-si="${nextSi}"]`
       );
       if (nextWeight) nextWeight.focus();
-      else {
-        inp.blur();
-        document.querySelector(
-          `[data-action="add-set"][data-di="${di}"][data-ei="${ei}"]`
-        )?.focus();
-      }
+      else inp.blur();
       return;
     }
     if (action === 'open-rpe-popover') {

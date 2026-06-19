@@ -1327,12 +1327,19 @@ function reduce(state, action) {
       const si   = p.si;
       const sets = ex.sets;
       if (si < 0 || si >= sets.length - 1) break;
-      const src = sets[si]; if (!src) break;
-      const w = parseFloat(src.weight) || 0;
-      // Weight only → all following sets; RPE always cleared; reps not copied
-      for (let j = si + 1; j < sets.length; j++) {
-        sets[j].weight = w;
-        sets[j].rpe = null;
+      if (!sets[si]) break;
+      if (p.repsOnly) {
+        const repsVal = parseFloat(p.repsVal);
+        const v = Number.isFinite(repsVal) ? repsVal : 0;
+        for (let j = si + 1; j < sets.length; j++) {
+          sets[j].reps = v;
+        }
+      } else {
+        const w = parseFloat(sets[si].weight) || 0;
+        for (let j = si + 1; j < sets.length; j++) {
+          sets[j].weight = w;
+          sets[j].rpe = null;
+        }
       }
       break;
     }
