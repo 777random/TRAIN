@@ -25,7 +25,7 @@ import {
 import * as ic from './icons.js';
 import { fireTrigger } from './triggerEngine.js';
 import { getWeightRecommendation } from './weightRecommendation.js';
-import { renderProgressChart }    from './progressChart.js';
+import { renderProgressChart, renderBodyWeightChart } from './progressChart.js';
 import { buildWeekReview }        from './weekReview.js';
 import { showWeekReviewModal, renderWeekReviewHtml } from './weekReviewModal.js';
 import { detectPlateaus }         from './plateauDetector.js';
@@ -1587,54 +1587,161 @@ ${s._showNote ? `
 }
 
 // ─── Body tab ────────────────────────────────────────────────────────────────
+
+/** Körpergewichts-Verlauf: ein Eintrag pro Woche mit gesetztem bodyData.weight, aufsteigend. */
+function _bodyWeightHistory(state) {
+  return [...state.weeks]
+    .filter(w => w.bodyData?.weight)
+    .sort((a, b) => a.startDate.localeCompare(b.startDate))
+    .map(w => ({ startDate: w.startDate, weight: w.bodyData.weight }));
+}
+
+/** Gewichts-Übungen der aktuellen Woche mit bekannter Bestleistung, dedupliziert nach Name. */
+function _relativeStrengthExercises(state) {
+  const wk = state.weeks[state.curIdx];
+  if (!wk) return [];
+  const map = new Map();
+  for (const day of wk.days) {
+    for (const ex of day.exercises) {
+      if (ex.metric !== 'reps') continue;
+      if (!ex.prWeight || ex.prWeight <= 0) continue;
+      const cur = map.get(ex.name);
+      if (cur === undefined || ex.prWeight > cur) map.set(ex.name, ex.prWeight);
+    }
+  }
+  return [...map.entries()].map(([name, prWeight]) => ({ name, prWeight }));
+}
+
+function _bodyTabShowsRelativeStrength(state) {
+  return _bodyWeightHistory(state).length > 0 && _relativeStrengthExercises(state).length > 0;
+}
+
+function _weekAvg(week, field) {
+  const vals = (week?.days ?? []).map(d => d[field]).filter(v => v != null);
+  return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+}
+
 function renderBodyTab(state) {
   const container = document.getElementById('body-tab-content');
   if (!container) return;
   const wk = state.weeks[state.curIdx];
   const bd = wk?.bodyData ?? {};
-  const heightCm     = state.settings?.heightCm;
   const targetWeight = state.settings?.targetWeight;
-  const bmi = heightCm && bd.weight
-    ? (bd.weight / Math.pow(heightCm / 100, 2)).toFixed(1)
-    : null;
-  const bmiLabel = bmi
-    ? (+bmi < 18.5 ? 'Untergewicht' : +bmi < 25 ? 'Normalgewicht' : +bmi < 30 ? 'Übergewicht' : 'Adipositas')
-    : null;
   const weightDiff = targetWeight && bd.weight
     ? (targetWeight - bd.weight)
     : null;
 
-  const histRows = [...state.weeks]
-    .slice().reverse().slice(0, 8)
-    .filter(w => w.bodyData && (w.bodyData.weight || w.bodyData.energy || w.bodyData.sleep))
-    .map(w => {
-      const b = w.bodyData;
-      return `
-      <div style="background:var(--c-surface);border:1px solid var(--c-border);
-        border-radius:var(--r-md);padding:var(--sp-2) var(--sp-4);margin-bottom:var(--sp-2);
-        display:flex;justify-content:space-between;align-items:center;">
-        <div>
-          <div style="font-size:13px;font-weight:600">${wkLabel(w.startDate)}</div>
-          <div style="font-size:11px;color:var(--c-text-3)">${wkRange(w.startDate)}</div>
-        </div>
-        <div style="display:flex;gap:16px;text-align:center">
-          ${b.weight ? `<div><div style="font-family:var(--font-display);font-size:18px">${b.weight}</div><div style="font-size:9px;color:var(--c-text-3)">KG</div></div>` : ''}
-          ${b.sleep  ? `<div><div style="font-family:var(--font-display);font-size:18px">${b.sleep}</div><div style="font-size:9px;color:var(--c-text-3)">STD</div></div>` : ''}
-          ${b.energy ? `<div><div style="font-family:var(--font-display);font-size:18px;color:var(--c-accent)">${b.energy}/5</div><div style="font-size:9px;color:var(--c-text-3)">ENERGIE</div></div>` : ''}
-        </div>
-      </div>`;
-    }).join('');
+  // ── Sektion 1: Körpergewicht ─────────────────────────────────────────────
+  const history = _bodyWeightHistory(state);
+  const chartSvg = renderBodyWeightChart(history.map(p => ({ label: wkLabel(p.startDate), weight: p.weight })));
+  const first = history[0] ?? null;
+  const last  = history[history.length - 1] ?? null;
+  const change = first && last ? Math.round((last.weight - first.weight) * 10) / 10 : null;
+  const trendPct = first && last && first.weight
+    ? Math.round((last.weight - first.weight) / first.weight * 1000) / 10
+    : null;
 
-  // Body correlation insight (2.2): only if ≥4 weeks have sleep data
-  const weeksWithSleep = state.weeks.filter(w => w.bodyData?.sleep);
+  const bodyweightSectionHtml = `
+  <div class="chart-card">
+    <div class="chart-card__title">Körpergewicht</div>
+    <div class="body-today-row">
+      <span class="body-today-row__label">Heute:</span>
+      <input id="body-weight-today" class="body-input" type="number" step="0.1"
+        value="${bd.weight ?? ''}" placeholder="82.5"
+        aria-label="Körpergewicht heute in kg"
+        style="width:100px"
+      />
+      <span style="font-size:13px;color:var(--c-text-3)">kg</span>
+      <button class="btn btn--accent btn--sm" data-action="log-bodyweight">Eintragen</button>
+    </div>
+    ${!last ? `
+    <p class="empty-state__hint" style="margin-top:var(--sp-3)">Trage dein Körpergewicht ein um deine relative Stärke zu verfolgen.</p>` : `
+    ${chartSvg ? `<div style="margin-top:var(--sp-3)">${chartSvg}</div>` : ''}
+    <div class="body-metrics-row">
+      <div class="body-metric">
+        <div class="body-metric__val">${last.weight} kg</div>
+        <div class="body-metric__lbl">Aktuell</div>
+      </div>
+      ${change !== null ? `
+      <div class="body-metric">
+        <div class="body-metric__val" style="color:${change > 0 ? 'var(--c-warn)' : change < 0 ? 'var(--c-ok)' : 'var(--c-text-3)'}">${change > 0 ? '+' : ''}${change} kg</div>
+        <div class="body-metric__lbl">Veränderung seit Start</div>
+      </div>` : ''}
+      ${trendPct !== null ? `
+      <div class="body-metric">
+        <div class="body-metric__val" style="color:${trendPct > 0 ? 'var(--c-warn)' : trendPct < 0 ? 'var(--c-ok)' : 'var(--c-text-3)'}">${trendPct > 0 ? '+' : ''}${trendPct}%</div>
+        <div class="body-metric__lbl">Trend seit erstem Eintrag</div>
+      </div>` : ''}
+    </div>`}
+    <div class="body-field" style="margin-top:var(--sp-3)">
+      <label for="body-target-weight">Zielgewicht (kg)</label>
+      <input id="body-target-weight" class="body-input" type="number" step="0.1"
+        value="${targetWeight ?? ''}" placeholder="80.0"
+        data-action="set-target-weight"
+        aria-label="Zielgewicht in kg"
+      />
+      ${weightDiff !== null ? `
+      <div class="body-badge" style="color:${Math.abs(weightDiff) < 0.1 ? 'var(--c-ok)' : 'var(--c-text-3)'}">
+        ${Math.abs(weightDiff) < 0.1 ? '✓ Ziel erreicht!' : weightDiff > 0 ? `noch ${weightDiff.toFixed(1)} kg` : `${Math.abs(weightDiff).toFixed(1)} kg drüber`}
+      </div>` : ''}
+    </div>
+    <div class="body-field" style="margin-top:var(--sp-2)">
+      <label for="body-note">Notiz</label>
+      <input id="body-note" class="body-input" type="text"
+        value="${h(bd.note ?? '')}" placeholder="z. B. leichte Verspannung …"
+        data-action="body-field" data-field="note"
+        aria-label="Notiz zur Woche"
+      />
+    </div>
+  </div>`;
+
+  // ── Sektion 2: Relative Stärke (Pound-for-Pound) ─────────────────────────
+  let relativeStrengthHtml = '';
+  if (last) {
+    const exercises = _relativeStrengthExercises(state);
+    if (exercises.length > 0) {
+      const currentBodyWeight = last.weight;
+      const daysSinceWeight = Math.floor((Date.now() - new Date(last.startDate + 'T12:00:00').getTime()) / 86_400_000);
+      const isStale = daysSinceWeight > 90;
+      const favSet = new Set(state.favoriteExercises ?? []);
+      const withRatio = exercises.map(e => ({ ...e, ratio: e.prWeight / currentBodyWeight }))
+        .sort((a, b) => b.ratio - a.ratio);
+      const favEntries  = withRatio.filter(e => favSet.has(e.name));
+      const restEntries = withRatio.filter(e => !favSet.has(e.name));
+      const avgSource = favEntries.length ? favEntries : withRatio;
+      const avgRatio  = avgSource.reduce((s, e) => s + e.ratio, 0) / avgSource.length;
+      const renderRow = (e, isFav) => `
+        <div class="pr-row${isFav ? ' pr-row--fav' : ''}">
+          <span class="pr-name">${isFav ? '⭐ ' : ''}${h(e.name)}</span>
+          <span class="pr-val">${e.prWeight} kg</span>
+          <span class="pr-val" style="color:var(--c-text-3);font-size:13px">${e.ratio.toFixed(2)}×</span>
+        </div>`;
+      const restHtml = restEntries.length ? `
+        <details class="pr-collapse">
+          <summary class="pr-collapse__summary">Alle Übungen (${restEntries.length}) ▼</summary>
+          <div class="pr-collapse__body">${restEntries.map(e => renderRow(e, false)).join('')}</div>
+        </details>` : '';
+      relativeStrengthHtml = `
+      <div class="chart-card">
+        <div class="chart-card__title">${ic.trophy()} Relative Stärke</div>
+        ${isStale ? `<div class="movement-warning">Aktualisiere dein Körpergewicht für genaue Werte.</div>` : ''}
+        ${favEntries.map(e => renderRow(e, true)).join('')}
+        <div class="rs-avg">Ø Relative Stärke: <strong>${avgRatio.toFixed(2)}×</strong></div>
+        ${restHtml}
+      </div>`;
+    }
+  }
+
+  // ── Sektion 3: Schlaf & Energie ──────────────────────────────────────────
+  const avgSleep  = wk ? _weekAvg(wk, 'sleepHours')  : null;
+  const avgEnergy = wk ? _weekAvg(wk, 'energyLevel') : null;
+
+  // Schlaf/Volumen-Korrelations-Insight (2.2) — jetzt auf Basis täglicher sleepHours
+  const weeksWithSleep = state.weeks.filter(w => _weekAvg(w, 'sleepHours') !== null);
   let bodyInsightHtml = '';
   if (weeksWithSleep.length >= 4) {
-    const avgSleepHigh = weeksWithSleep
-      .filter(w => (w.bodyData.sleep ?? 0) >= 7.5)
-      .map(w => _trueVol(w));
-    const avgSleepLow  = weeksWithSleep
-      .filter(w => (w.bodyData.sleep ?? 0) < 7.5)
-      .map(w => _trueVol(w));
+    const avgSleepHigh = weeksWithSleep.filter(w => _weekAvg(w, 'sleepHours') >= 7.5).map(w => _trueVol(w));
+    const avgSleepLow  = weeksWithSleep.filter(w => _weekAvg(w, 'sleepHours') <  7.5).map(w => _trueVol(w));
     const mean = arr => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
     const highMean = mean(avgSleepHigh), lowMean = mean(avgSleepLow);
     let insightMsg = '';
@@ -1648,7 +1755,7 @@ function renderBodyTab(state) {
     }
     if (insightMsg) {
       bodyInsightHtml = `
-      <div style="margin-bottom:var(--sp-3)">
+      <div style="margin-top:var(--sp-3)">
         <button class="insight-toggle${_showBodyInsights ? ' is-active' : ''}"
           data-action="toggle-body-insights"
           aria-pressed="${_showBodyInsights}"
@@ -1661,92 +1768,20 @@ function renderBodyTab(state) {
     }
   }
 
-  const scale = (field, label) => {
-    const cur = bd[field];
-    return `
-    <div class="body-field" style="margin-bottom:var(--sp-3)">
-      <label>${label} (1–5)</label>
-      <div class="scale-row" role="group" aria-label="${label}">
-        ${[1,2,3,4,5].map(n => {
-          const isSel = cur === n;
-          const mod   = n <= 2 ? ' is-low' : n === 3 ? ' is-mid' : '';
-          return `<button
-            class="scale-btn${isSel ? ' is-selected' + mod : ''}"
-            data-action="body-scale" data-field="${field}" data-val="${n}"
-            aria-pressed="${isSel}"
-            aria-label="${label}: ${n}"
-          >${n}</button>`;
-        }).join('')}
-      </div>
-    </div>`;
-  };
+  const sleepEnergyHtml = `
+  <div class="chart-card">
+    <div class="chart-card__title">Schlaf & Energie</div>
+    ${avgSleep === null && avgEnergy === null ? `
+    <p class="empty-state__hint">Schlaf und Energie werden beim Abschließen eines Trainingstags erfasst.</p>` : `
+    <div style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--c-text-3);margin-bottom:8px">Letzte Woche</div>
+    <div class="body-metrics-row">
+      ${avgSleep !== null ? `<div class="body-metric"><div class="body-metric__val">😴 Ø ${avgSleep.toFixed(1)}h</div><div class="body-metric__lbl">Schlaf</div></div>` : ''}
+      ${avgEnergy !== null ? `<div class="body-metric"><div class="body-metric__val">⚡ Ø ${avgEnergy.toFixed(1)}/5</div><div class="body-metric__lbl">Energie</div></div>` : ''}
+    </div>`}
+    ${bodyInsightHtml}
+  </div>`;
 
-  container.innerHTML = `
-  <div class="body-section">
-    <button class="body-section__header" aria-expanded="true"
-      onclick="this.setAttribute('aria-expanded',
-        this.getAttribute('aria-expanded')==='true'?'false':'true');
-        this.nextElementSibling.classList.toggle('is-open')">
-      <span class="body-section__title">${wk ? wkLabel(wk.startDate) : '–'}</span>
-      <span aria-hidden="true">${ic.chevronDown()}</span>
-    </button>
-    <div class="body-section__body is-open">
-      <div class="body-section__body-inner">
-        <div class="body-grid">
-          <div class="body-field">
-            <label for="body-weight">Körpergewicht (kg)</label>
-            <input id="body-weight" class="body-input" type="number" step="0.1"
-              value="${bd.weight ?? ''}" placeholder="78.5"
-              data-action="body-field" data-field="weight"
-              aria-label="Körpergewicht in kg"
-            />
-          </div>
-        </div>
-        ${state.settings?.showBmi && bmi ? `
-        <div class="bmi-badge" style="margin-bottom:var(--sp-3)">
-          BMI ${bmi} <span>${bmiLabel}</span>
-        </div>` : ''}
-        <div class="body-grid">
-          <div class="body-field">
-            <label for="body-sleep">Schlaf (Std)</label>
-            <input id="body-sleep" class="body-input" type="number" step="0.5"
-              value="${bd.sleep ?? ''}" placeholder="7.5"
-              data-action="body-field" data-field="sleep"
-              aria-label="Schlafdauer in Stunden"
-            />
-          </div>
-          <div class="body-field">
-            <label for="body-target-weight">Zielgewicht (kg)</label>
-            <input id="body-target-weight" class="body-input" type="number" step="0.1"
-              value="${targetWeight ?? ''}" placeholder="80.0"
-              data-action="set-target-weight"
-              aria-label="Zielgewicht in kg"
-            />
-            ${weightDiff !== null ? `
-            <div class="bmi-badge" style="color:${Math.abs(weightDiff) < 0.1 ? 'var(--c-ok)' : 'var(--c-text-3)'}">
-              ${Math.abs(weightDiff) < 0.1 ? '✓ Ziel erreicht!' : weightDiff > 0 ? `noch ${weightDiff.toFixed(1)} kg` : `${Math.abs(weightDiff).toFixed(1)} kg drüber`}
-            </div>` : ''}
-          </div>
-        </div>
-        ${scale('energy',   'Energielevel')}
-        ${scale('wellbeing','Wohlbefinden')}
-        <div class="body-field">
-          <label for="body-note">Notiz</label>
-          <input id="body-note" class="body-input" type="text"
-            value="${h(bd.note ?? '')}" placeholder="z. B. leichte Verspannung …"
-            data-action="body-field" data-field="note"
-            aria-label="Notiz zur Woche"
-          />
-        </div>
-      </div>
-    </div>
-  </div>
-  ${bodyInsightHtml}
-  ${!histRows && !bd.weight && !bd.sleep ? `
-  <p class="empty-state__hint" style="margin-top:var(--sp-3)">Trage dein Körpergewicht ein um langfristige Entwicklungen zu verfolgen.</p>` : ''}
-  ${histRows ? `
-  <div style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--c-text-3);margin-bottom:8px">Verlauf</div>
-  ${histRows}` : ''}`;
+  container.innerHTML = bodyweightSectionHtml + relativeStrengthHtml + sleepEnergyHtml;
 }
 
 // ─── Tatsächliches Volumen helper (only success sets) ────────────────────────
@@ -2322,13 +2357,9 @@ function _drawHeatmap(state) {
     .slice(-12)
     .forEach(wk => {
       const done     = wk.days.filter(d => !!d.markedDone).length;
-      const hasRest  = (wk.restDays ?? []).length > 0;
       const cell     = document.createElement('div');
-      // Rest day = dark gray, training days use accent intensity (3.3)
-      cell.className = hasRest && done === 0
-        ? 'hm-cell hm-cell--rest'
-        : 'hm-cell' + (done === 0 ? '' : ` hm-cell--${Math.min(done, 3)}`);
-      const label = hasRest ? `${wkLabel(wk.startDate)}: Ruhetag` : `${wkLabel(wk.startDate)}: ${done}/${wk.days.length} Tage`;
+      cell.className = 'hm-cell' + (done === 0 ? '' : ` hm-cell--${Math.min(done, 3)}`);
+      const label = `${wkLabel(wk.startDate)}: ${done}/${wk.days.length} Tage`;
       cell.setAttribute('role', 'gridcell');
       cell.setAttribute('aria-label', label);
       cell.title = label;
@@ -3547,9 +3578,14 @@ function _handleClick(e) {
       break;
     }
 
-    // ── Body scale buttons ─────────────────────────────────────────────────
-    case 'body-scale':
-      dispatch(A.BODY_SET_FIELD, { field, value: +val }); break;
+    case 'log-bodyweight': {
+      const input = document.getElementById('body-weight-today');
+      const w     = parseFloat(input?.value);
+      if (!Number.isFinite(w) || w <= 0) break;
+      dispatch(A.BODY_SET_FIELD, { field: 'weight', value: w });
+      showToast('Körpergewicht eingetragen ✓', 'ok');
+      break;
+    }
 
     // ── Settings rows (previously role=button, now data-action on the div) ─
     case 'toggle-setting':
@@ -4030,7 +4066,12 @@ function _switchToTab(tab) {
     p.classList.toggle('is-active', p.id === `page-${tab}`)
   );
   const state = getState();
-  if (tab === 'body')     renderBodyTab(state);
+  if (tab === 'body') {
+    renderBodyTab(state);
+    if (_bodyTabShowsRelativeStrength(state)) {
+      _maybeShowTip('tip-12', '1× = dein Körpergewicht. Je höher, desto stärker bist du relativ zu deinem Gewicht.');
+    }
+  }
   if (tab === 'analysis') {
     document.getElementById('app').scrollTop = 0;
     renderAnalysisTab(state);
