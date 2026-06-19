@@ -841,6 +841,14 @@ exercise { position: unset; }
 }
 .ex-menu-item + .ex-menu-item { border-top: 1px solid var(--c-border); }
 .ex-menu-item:hover { background: var(--c-surface); color: var(--c-text); }
+.ex-menu-section-header {
+  padding: var(--sp-2) var(--sp-3) calc(var(--sp-1) / 2);
+  font-size: 10px; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--c-text-3); pointer-events: none; user-select: none;
+  border-top: 1px solid var(--c-border);
+  margin-top: 0;
+}
+.ex-menu-section-header:first-child { border-top: none; }
 .ex-menu-item.is-planned { color: var(--c-accent); }
 .ex-menu-item--danger { color: var(--c-danger); }
 .ex-menu-item--danger:hover { background: rgba(255,68,68,.1); color: var(--c-danger); }
@@ -1398,6 +1406,7 @@ label > svg {
 }
 .week-menu-wrap { position: relative; flex-shrink: 0; }
 .ex-menu-item--active { color: var(--c-accent); }
+.ex-menu-item--vacation { color: var(--c-warn); }
 
 /* --- MANUELLE ÜBUNGS-SORTIERUNG (PFEILE) --- */
 .exercise__order-btns {

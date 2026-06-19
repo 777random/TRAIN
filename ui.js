@@ -615,29 +615,50 @@ function renderDayList(state) {
       <button class="toolbar__btn" data-action="toggle-week-menu"
         aria-label="Wochen-Menü öffnen" aria-expanded="${_weekMenuOpen}"
       >⋮</button>
-      ${_weekMenuOpen ? `
+      ${_weekMenuOpen ? (() => {
+        const _ad = (!_overviewMode && _activeDayIdx !== null) ? wk.days[_activeDayIdx] : null;
+        return `
       <div class="ex-menu-dropdown" role="menu">
+        <div class="ex-menu-section-header" aria-hidden="true">Diese Woche</div>
         <button class="ex-menu-item${isDl ? ' ex-menu-item--active' : ''}" role="menuitem"
           data-action="${isDl ? 'mode-std' : 'mode-dl'}">
           ⚡ Deload-Woche${isDl ? ' ✓' : ''}
         </button>
-        <button class="ex-menu-item${isVac ? ' ex-menu-item--active' : ''}" role="menuitem"
+        <button class="ex-menu-item${isVac ? ' ex-menu-item--vacation' : ''}" role="menuitem"
           data-action="${isVac ? 'mode-std' : 'mode-vac'}">
           🏖 Urlaubswoche${isVac ? ' ✓' : ''}
         </button>
-        <hr style="border-color:var(--c-border);margin:0">
         <button class="ex-menu-item" role="menuitem" data-action="rename-week">
           ✏️ Woche umbenennen
         </button>
         <button class="ex-menu-item" role="menuitem" data-action="copy-prev">
           📋 Vorwoche übernehmen
         </button>
-        <hr style="border-color:var(--c-border);margin:0">
         <button class="ex-menu-item ex-menu-item--danger" role="menuitem"
           data-action="open-delete-week">
           ${ic.trash()} Woche löschen
         </button>
-      </div>` : ''}
+        ${_ad ? `
+        <div class="ex-menu-section-header" aria-hidden="true">Tag ${h(_ad.title)}</div>
+        <button class="ex-menu-item${_ad.isVacation ? ' ex-menu-item--vacation' : ''}" role="menuitem"
+          data-action="toggle-day-vacation" data-di="${_activeDayIdx}">
+          🏖 Urlaubstag${_ad.isVacation ? ' ✓' : ''}
+        </button>
+        <button class="ex-menu-item" role="menuitem" data-action="day-rename" data-di="${_activeDayIdx}">
+          ✏️ Tag umbenennen
+        </button>
+        <button class="ex-menu-item" role="menuitem" data-action="day-duplicate" data-di="${_activeDayIdx}">
+          📋 Tag duplizieren
+        </button>
+        <button class="ex-menu-item" role="menuitem" data-action="day-reset-sets" data-di="${_activeDayIdx}">
+          🔄 Sätze zurücksetzen
+        </button>
+        <button class="ex-menu-item ex-menu-item--danger" role="menuitem"
+          data-action="remove-day" data-di="${_activeDayIdx}"${wk.days.length <= 1 ? ' disabled' : ''}>
+          ${ic.trash()} Tag löschen
+        </button>` : ''}
+      </div>`;
+      })() : ''}
     </div>
     <button class="toolbar__btn toolbar__btn--accent" data-action="open-new-week"
       aria-label="Neue Trainingswoche erstellen">${ic.plus()}</button>
@@ -2912,10 +2933,13 @@ function _handleClick(e) {
       const _di  = +di;
       const _day = getState().weeks[getState().curIdx]?.days[_di];
       if (_day?.isVacation) {
+        _dayMenuOpenKey = null;
+        _weekMenuOpen = false;
         dispatch(A.DAY_TOGGLE_VACATION, { di: _di });
       } else {
         _maybeShowTip('tip-09', 'Urlaubstage unterbrechen deinen Streak nicht. Markiere sie damit TRAIN deine Analyse korrekt berechnet.');
         _dayMenuOpenKey = null;
+        _weekMenuOpen = false;
         scheduleRender();
         _showVacationPlanModal(_di);
       }
@@ -3049,6 +3073,7 @@ function _handleClick(e) {
       if (_activeDayIdx === _di) _activeDayIdx = null;
       else if (_activeDayIdx > _di) _activeDayIdx--;
       _dayMenuOpenKey = null;
+      _weekMenuOpen = false;
       dispatch(A.DAY_REMOVE, { di: _di });
       showToast('Tag gelöscht — Undo möglich', 'info');
       if (_activeTab === 'settings') renderSettingsTab(getState());
@@ -3197,12 +3222,14 @@ function _handleClick(e) {
       if (!_trimmed) break;
       dispatch(A.DAY_RENAME, { di: +di, title: _trimmed });
       _dayMenuOpenKey = null;
+      _weekMenuOpen = false;
       break;
     }
 
     case 'day-duplicate': {
       dispatch(A.DAY_DUPLICATE, { di: +di });
       _dayMenuOpenKey = null;
+      _weekMenuOpen = false;
       showToast('Tag dupliziert — Undo möglich', 'info');
       if (_activeTab === 'settings') renderSettingsTab(getState());
       break;
@@ -3213,6 +3240,7 @@ function _handleClick(e) {
       if (!confirm(`Alle Sätze von "${_rsDay?.title ?? 'Tag'}" zurücksetzen? Eingetragene Werte gehen verloren.`)) break;
       dispatch(A.DAY_RESET_SETS, { di: +di });
       _dayMenuOpenKey = null;
+      _weekMenuOpen = false;
       showToast('Sätze zurückgesetzt — Undo möglich', 'info');
       break;
     }
