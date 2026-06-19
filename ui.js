@@ -1516,7 +1516,7 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
 
   <div class="set-cell">
     <input class="num-input" type="number" inputmode="${repMode}"
-      min="0" step="${repStep}" placeholder="${ex.targetReps ?? ''}" value="${st === 'pending' ? '' : s.reps}"
+      min="0" step="${repStep}" placeholder="${ex.targetReps ?? ''}" value="${(parseFloat(s.reps) || 0) > 0 ? s.reps : ''}"
       ${locked ? 'disabled' : ''}
       data-action="set-reps" data-di="${di}" data-ei="${ei}" data-si="${si}"
       aria-label="${repAria}"
@@ -3506,7 +3506,7 @@ function _handleClick(e) {
         const _rInp = document.querySelector(`[data-action="set-reps"][data-di="${di}"][data-ei="${ei}"][data-si="${si}"]`);
         const _rVal = parseFloat(_rInp?.value ?? _s.reps);
         const _wVal = parseFloat(_wInp?.value ?? _s.weight);
-        const canSuccess = Number.isFinite(_wVal) && _wVal > 0 && Number.isFinite(_rVal) && _rVal > 0;
+        const canSuccess = Number.isFinite(_rVal) && _rVal > 0;
         if (!canSuccess) {
           // Fail is always allowed — go directly to fail when success criteria not met
           dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'status', value: 'fail' });
@@ -3889,6 +3889,11 @@ function _handleKeydown(e) {
     }
     if (action === 'set-reps') {
       e.preventDefault();
+      // If RPE button is visible, focus it; otherwise go straight to next set weight
+      const rpeBtn = document.querySelector(
+        `[data-action="open-rpe-popover"][data-di="${di}"][data-ei="${ei}"][data-si="${si}"]`
+      );
+      if (rpeBtn) { rpeBtn.focus(); return; }
       const nextSi = +si + 1;
       const nextWeight = document.querySelector(
         `[data-action="set-weight"][data-di="${di}"][data-ei="${ei}"][data-si="${nextSi}"]`
@@ -3896,11 +3901,20 @@ function _handleKeydown(e) {
       if (nextWeight) nextWeight.focus();
       else {
         inp.blur();
-        // Focus the add-set button when on the last set (1.2)
         document.querySelector(
           `[data-action="add-set"][data-di="${di}"][data-ei="${ei}"]`
         )?.focus();
       }
+      return;
+    }
+    if (action === 'open-rpe-popover') {
+      e.preventDefault();
+      const nextSi = +si + 1;
+      const nextWeight = document.querySelector(
+        `[data-action="set-weight"][data-di="${di}"][data-ei="${ei}"][data-si="${nextSi}"]`
+      );
+      if (nextWeight) nextWeight.focus();
+      else inp.blur();
       return;
     }
   }
