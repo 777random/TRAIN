@@ -2101,18 +2101,25 @@ function _updateInlineReview(state) {
   wrap.innerHTML = renderWeekReviewHtml(review);
 }
 
+function _isWeekDoneForStreak(w) {
+  const active = w.days.filter(d => !(d.isVacation && d.vacationPlan === 'rest'));
+  if (active.length === 0) return null;
+  return active.every(d => d.markedDone || d.isVacation);
+}
+
 function _calcStreak(state) {
   const sorted = [...state.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
   let cur = 0, best = 0, tmp = 0;
   sorted.forEach(w => {
-    const active = w.days.some(d => !!d.markedDone) || w.days.some(d => !!d.isVacation) || w.mode === 'vacation';
-    if (active) { tmp++; best = Math.max(best, tmp); }
+    const status = _isWeekDoneForStreak(w);
+    if (status === null) return; // skip rest-only weeks
+    if (status) { tmp++; best = Math.max(best, tmp); }
     else tmp = 0;
   });
   for (let i = sorted.length - 1; i >= 0; i--) {
-    const w = sorted[i];
-    const active = w.days.some(d => !!d.markedDone) || w.days.some(d => !!d.isVacation) || w.mode === 'vacation';
-    if (active) cur++;
+    const status = _isWeekDoneForStreak(sorted[i]);
+    if (status === null) continue;
+    if (status) cur++;
     else break;
   }
   return { cur, best };
@@ -2129,15 +2136,16 @@ function _renderStreakChain(state) {
   const dots = last8.map((wk, i) => {
     const cx       = PAD + i * GAP;
     const score    = _weekSuccessScore(wk);
-    const isVac    = wk.mode === 'vacation';
-    const done     = isVac || (score.total > 0 && score.pct >= 50);
+    const streakStatus = _isWeekDoneForStreak(wk); // true=done, false=broken, null=rest-only
+    const isRestOnly = streakStatus === null;
+    const done     = streakStatus === true;
     const ss       = score.total > 0 ? score.pct : 0;
     const wkNum = (() => {
       const d = new Date(wk.startDate);
       const jan1 = new Date(d.getFullYear(), 0, 1);
       return Math.ceil(((d - jan1) / 86400000 + jan1.getDay() + 1) / 7);
     })();
-    return { cx, done, isVac, ss, wkNum, startDate: wk.startDate };
+    return { cx, done, isRestOnly, ss, wkNum, startDate: wk.startDate };
   });
   const lines = dots.slice(0, -1).map((d, i) => {
     const next  = dots[i + 1];
@@ -2146,9 +2154,9 @@ function _renderStreakChain(state) {
     return `<line x1="${d.cx}" y1="${cy}" x2="${next.cx}" y2="${cy}" stroke="${color}" stroke-width="2" ${dash}/>`;
   });
   const circles = dots.map(d => {
-    const fill   = d.isVac ? '#D97706' : d.done ? '#C8FF00' : '#1A1A2E';
-    const stroke = d.isVac ? '#D97706' : d.done ? '#C8FF00' : '#2E2E35';
-    const tip    = d.isVac ? `KW ${d.wkNum} · 🏖 Urlaub` : `KW ${d.wkNum} · ${d.ss}% Erfolg`;
+    const fill   = d.isRestOnly ? '#2E2E35' : d.done ? '#C8FF00' : '#1A1A2E';
+    const stroke = d.isRestOnly ? '#444'    : d.done ? '#C8FF00' : '#2E2E35';
+    const tip    = d.isRestOnly ? `KW ${d.wkNum} · 😴 Ruhe` : `KW ${d.wkNum} · ${d.ss}% Erfolg`;
     return `<circle cx="${d.cx}" cy="${cy}" r="${R}" fill="${fill}" stroke="${stroke}" stroke-width="2" data-streak-tip="${tip}" style="cursor:pointer"/>`;
   });
   return `<div class="streak-chain-wrap">
@@ -4715,8 +4723,9 @@ function _renderBadgeGallery(state) {
     const sorted = [...state.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
     let cur = 0;
     for (let i = sorted.length - 1; i >= 0; i--) {
-      const w = sorted[i];
-      if (w.days.some(d => !!d.markedDone) || w.days.some(d => !!d.isVacation) || w.mode === 'vacation') cur++;
+      const status = _isWeekDoneForStreak(sorted[i]);
+      if (status === null) continue;
+      if (status) cur++;
       else break;
     }
     return cur;

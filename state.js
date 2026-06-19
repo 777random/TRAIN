@@ -291,13 +291,21 @@ function _normalizeAllExerciseMetrics(raw) {
   });
 }
 
+function _isWeekDoneForStreak(w) {
+  // Returns true (counts), false (breaks), or null (skip — all-rest week)
+  const active = w.days.filter(d => !(d.isVacation && d.vacationPlan === 'rest'));
+  if (active.length === 0) return null;
+  return active.every(d => d.markedDone || d.isVacation);
+}
+
 function _calcCurrentStreak(weeks) {
   const sorted = [...weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
   let cur = 0;
   for (let i = sorted.length - 1; i >= 0; i--) {
-    const w = sorted[i];
-    if (w.days.some(d => !!d.markedDone) || w.days.some(d => !!d.isVacation) || w.mode === 'vacation') cur++;
-    else break;
+    const status = _isWeekDoneForStreak(sorted[i]);
+    if (status === null) continue; // all-rest week: skip, don't break
+    if (status)          cur++;
+    else                 break;
   }
   return cur;
 }
@@ -1393,8 +1401,9 @@ function reduce(state, action) {
         const sorted = [...state.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
         let cur = 0;
         for (let i = sorted.length - 1; i >= 0; i--) {
-          const w = sorted[i];
-          if (w.days.some(d => d.markedDone) || w.days.some(d => d.isVacation) || w.mode === 'vacation') cur++;
+          const status = _isWeekDoneForStreak(sorted[i]);
+          if (status === null) continue;
+          if (status) cur++;
           else break;
         }
         return cur;
