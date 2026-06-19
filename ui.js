@@ -850,7 +850,7 @@ function renderDayBody(wk, di, state) {
       const _pbTotal    = _pbSucc + _pbFail;
       const _pbScore    = _pbTotal > 0 ? Math.round(_pbSucc / _pbTotal * 100) : 0;
       const streak      = _calcStreak(state);
-      const streakPart  = streak.cur >= 2 ? `&nbsp;&nbsp;🔥 ${streak.cur} Wochen` : '';
+      const streakPart  = streak.cur >= 2 ? `&nbsp;&nbsp;🔥 ${streak.cur * 7} Tage in Folge` : '';
       prevBanner = `<div class="prev-banner" role="status">
         ${ic.barChart()}<span>Vorwoche: ${_pbScore}% · ${_pbSucc}/${_pbTotal} Sätze ✓${streakPart}</span>
       </div>`;
@@ -1340,6 +1340,9 @@ function renderExercise(wk, di, ei, state) {
 
   <!-- 1RM estimator hint (3.7) -->
   ${(() => {
+    if (ex.oneRM != null && ex.oneRM > 0) {
+      return `<div class="orm-hint" aria-label="Geschätztes 1RM">~${ex.oneRM.toFixed(1)} kg 1RM</div>`;
+    }
     const best1RM = ex.sets
       .filter(s => s.status === 'success' && (s.reps ?? 0) > 0 && (s.reps ?? 0) <= 10 && (s.weight ?? 0) > 0)
       .map(s => s.weight * (1 + s.reps / 30))
@@ -1930,6 +1933,10 @@ function _renderMovementPattern(state) {
 }
 
 function _renderAnalysis1RM(name, state) {
+  const pr = state.prs?.[name];
+  if (pr?.maxEstimated1RM > 0) {
+    return `<div class="orm-hint orm-hint--analysis">~${pr.maxEstimated1RM.toFixed(1)} kg geschätzter 1RM</div>`;
+  }
   const allSets = state.weeks
     .filter(w => w.mode !== 'deload')
     .flatMap(w => w.days.flatMap(d =>
@@ -2056,7 +2063,7 @@ function renderAnalysisTab(state) {
       const fmtMin   = m => m >= 60 ? `${Math.floor(m/60)}h${m%60 ? String(m%60).padStart(2,'0') : ''}` : `${m}'`;
       return `
     <div class="streak-row">
-      <div class="streak-card"><div class="streak-num">${streak.cur}</div><div class="streak-lbl">Streak</div></div>
+      <div class="streak-card"><div class="streak-num">${streak.cur}</div><div class="streak-lbl">Wo. · ${streak.cur * 7} T.</div></div>
       <div class="streak-card"><div class="streak-num">${streak.best}</div><div class="streak-lbl">Best</div></div>
       <div class="streak-card"><div class="streak-num">${state.weeks.length}</div><div class="streak-lbl">Wochen</div></div>
       ${avgScore !== null ? `<div class="streak-card"><div class="streak-num" style="color:${avgScore>=90?'var(--c-ok)':avgScore>=70?'var(--c-warn)':'var(--c-danger)'}">${avgScore}%</div><div class="streak-lbl">Ø Erfolg</div></div>` : ''}
@@ -2439,6 +2446,7 @@ function renderSettingsTab(state) {
     ${tog('drag',  'Drag & Drop',      'Übungen per Griff verschieben')}
     ${tog('vibrationEnabled', 'Vibration nach Pause', 'Funktioniert nur auf Android — iOS unterstützt Vibration in PWAs technisch nicht.')}
     ${tog('rpeEnabled', 'RPE anzeigen', 'Rate of Perceived Exertion — Anstrengungsgrad pro Satz')}
+    ${tog('autoStartPauseTimer', 'Pausentimer Autostart', 'Timer startet automatisch nach jedem bestätigten Satz (außer dem letzten)')}
   </div>
 
   <!-- Körper & BMI -->
@@ -3574,7 +3582,7 @@ function _handleClick(e) {
         }
       }
       const isLastSet = _csi === (_aftEx?.sets?.length ?? 0) - 1;
-      if (!isLastSet) {
+      if (!isLastSet && _aft.settings?.autoStartPauseTimer) {
         window.dispatchEvent(new CustomEvent('train:set-done', { detail: { pauseSec: _cex.pauseSec ?? 90, di: +di } }));
       }
       const nextPending = (_aftEx?.sets ?? []).findIndex(s => s.status === 'pending');
@@ -4709,7 +4717,7 @@ function _showBadgeOverlay(badge) {
       <div class="badge-earned-overlay__header">Abzeichen freigeschaltet!</div>
       <img src="./badges/${badge.id}.png" alt="${badge.title}" class="badge-img" width="160" height="160">
       <div class="badge-earned-overlay__title">${badge.title}</div>
-      <div class="badge-earned-overlay__sub">nach ${badge.weeks} Wochen Streak</div>
+      <div class="badge-earned-overlay__sub">nach ${badge.weeks * 7} Tagen konsequentem Training</div>
     </div>`;
   document.body.appendChild(el);
   const dismiss = () => { clearTimeout(timer); el.remove(); };
@@ -4744,7 +4752,7 @@ function _renderBadgeGallery(state) {
     return `<div class="badge-item">
       <img src="./badges/${thr.id}.png" alt="${thr.title}" class="badge-img" width="80" height="80" style="filter:grayscale(100%) opacity(0.3)">
       <div class="badge-item__title">${thr.title}</div>
-      <div class="badge-item__sub">noch ${weeksLeft} Wo.</div>
+      <div class="badge-item__sub">noch ${weeksLeft * 7} Tage</div>
     </div>`;
   });
   return `<div class="section-label" style="margin-top:var(--sp-5)">Abzeichen</div>

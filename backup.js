@@ -54,7 +54,13 @@ export function importJSON(file) {
       if (!parsed || !Array.isArray(parsed.weeks)) {
         reject(new Error('Keine Trainingsdaten gefunden (weeks-Array fehlt).')); return;
       }
-      const importedVersion = parsed?.meta?.schemaVersion ?? 0;
+      if (!parsed.meta?.schemaVersion) {
+        reject(new Error('⚠️ Ungültige Backup-Datei. Import abgebrochen.')); return;
+      }
+      if (!parsed.settings || typeof parsed.settings !== 'object') {
+        reject(new Error('⚠️ Ungültige Backup-Datei. Import abgebrochen.')); return;
+      }
+      const importedVersion = parsed.meta.schemaVersion;
       if (importedVersion > SCHEMA_VERSION) {
         console.warn(`[TRAIN] Importing from newer schema (${importedVersion} > ${SCHEMA_VERSION}).`);
       }

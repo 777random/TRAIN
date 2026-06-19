@@ -24,7 +24,7 @@
 
 export const STORAGE_KEY        = 'train_v6';
 export const STORAGE_KEY_SHADOW = 'train_v6_shadow';
-export const SCHEMA_VERSION     = 19;
+export const SCHEMA_VERSION     = 20;
 
 export const BADGE_THRESHOLDS = [
   { id: 'badge_4',   weeks: 4,   title: 'Erster Schritt' },
@@ -188,6 +188,7 @@ function buildDefaultState() {
       rpeEnabled:                     true,
       weeksSinceLastBackupReminder:   0,
       maxSessionMs:                   10800000, // 3h default
+      autoStartPauseTimer:            false,
     },
   };
 }
@@ -544,11 +545,22 @@ function migrate(raw) {
     raw.meta = { ...raw.meta, schemaVersion: 19 };
   }
 
+  // v19 → v20: add ex.oneRM to all exercises
+  if ((raw.meta?.schemaVersion ?? 0) < 20) {
+    const _addOneRM = ex => { if (ex.oneRM === undefined) ex.oneRM = null; };
+    (raw.weeks ?? []).forEach(wk =>
+      (wk.days ?? []).forEach(day => (day.exercises ?? []).forEach(_addOneRM))
+    );
+    (raw.customTemplate ?? []).forEach(day => (day.exercises ?? []).forEach(_addOneRM));
+    raw.meta = { ...raw.meta, schemaVersion: 20 };
+  }
+
   // Always-apply defaults for settings added in later versions
   if (raw.settings.vibrationEnabled               === undefined) raw.settings.vibrationEnabled               = true;
   if (raw.settings.rpeEnabled                     === undefined) raw.settings.rpeEnabled                     = true;
   if (raw.settings.weeksSinceLastBackupReminder   === undefined) raw.settings.weeksSinceLastBackupReminder   = 0;
   if (raw.settings.maxSessionMs                   === undefined) raw.settings.maxSessionMs                   = 10800000;
+  if (raw.settings.autoStartPauseTimer            === undefined) raw.settings.autoStartPauseTimer            = false;
 
   // Always-apply: week label (optional user-set name, no schema bump needed)
   (raw.weeks ?? []).forEach(wk => { if (!('label' in wk)) wk.label = ''; });
@@ -1264,9 +1276,10 @@ function reduce(state, action) {
       const src = sets[si]; if (!src) break;
       const w = parseFloat(src.weight) || 0;
       const r = parseFloat(src.reps)   || 0;
-      // Weight → all following sets; Reps → next set only (1.3)
+      // Weight → all following sets; Reps → next set only; RPE always cleared
       for (let j = si + 1; j < sets.length; j++) {
         sets[j].weight = w;
+        sets[j].rpe = null;
       }
       if (sets[si + 1]) sets[si + 1].reps = r;
       break;
@@ -1303,6 +1316,9 @@ function reduce(state, action) {
           const newMaxRMW = weight > prev.maxWeight ? reps : (weight === prev.maxWeight ? Math.max(prev.maxRepsAtMaxWeight ?? 0, reps) : prev.maxRepsAtMaxWeight ?? 0);
           if (newMaxW > prev.maxWeight || newMaxV > prev.maxVolume || newMaxE > prev.maxEstimated1RM) {
             state.prs[name] = { maxWeight: newMaxW, maxVolume: newMaxV, maxEstimated1RM: newMaxE, maxRepsAtMaxWeight: newMaxRMW, date: new Date().toISOString().split('T')[0] };
+          }
+          if (est1RM > 0 && (ex.oneRM == null || est1RM > ex.oneRM)) {
+            ex.oneRM = Math.round(est1RM * 10) / 10;
           }
         }
       }
