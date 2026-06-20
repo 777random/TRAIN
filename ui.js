@@ -4350,7 +4350,7 @@ function _prepNewWeekModal() {
   ${suggestHtml}
   ${aiRecHtml}`;
 
-  if (_displayRecs.length > 0) {
+  if (aiRecs.length > 0) {
     _maybeShowTip('tip-04', 'TRAIN empfiehlt basierend auf deinen letzten Wochen. Tippe zum Bestätigen oder ignoriere den Vorschlag.');
   }
 
