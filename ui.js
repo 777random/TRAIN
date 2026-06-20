@@ -2199,8 +2199,8 @@ function renderProgressTab(state) {
       <button class="streak-card insight-toggle${_showInsights ? ' is-active' : ''}${insights.length > 0 ? ' has-insights' : ''}"
         data-action="toggle-insights"
         aria-pressed="${_showInsights}"
-        aria-label="Coach-Insights anzeigen"
-      >${ic.lightbulb()}<div class="streak-lbl">Coach${insights.length > 0 ? ` (${insights.length})` : ''}</div></button>` : ''}
+        aria-label="Insights anzeigen"
+      >${ic.lightbulb()}<div class="streak-lbl">Insights${insights.length > 0 ? ` (${insights.length})` : ''}</div></button>` : ''}
     </div>`;
     })()}
     ${_renderBadgeGallery(state)}
@@ -4702,24 +4702,24 @@ function _buildScaffold(root) {
   <button class="nav__logo" data-action="go-home" aria-label="Zur Trainingsübersicht">TRAIN</button>
   <div class="nav__tabs" role="tablist" aria-label="App-Bereiche">
     <button class="nav__tab is-active" role="tab" data-tab="workout"
-      aria-selected="true" aria-controls="page-workout">
-      ${ic.dumbbell()}<span class="sr-only">Training</span><span aria-hidden="true">Training</span>
+      aria-selected="true" aria-controls="page-workout" aria-label="Training">
+      ${ic.dumbbell()}
     </button>
     <button class="nav__tab" role="tab" data-tab="coach"
-      aria-selected="false" aria-controls="page-coach">
-      ${ic.compass()}<span class="sr-only">Coach</span><span aria-hidden="true">Coach</span>
+      aria-selected="false" aria-controls="page-coach" aria-label="Coach">
+      ${ic.compass()}
     </button>
     <button class="nav__tab" role="tab" data-tab="progress"
-      aria-selected="false" aria-controls="page-progress">
-      ${ic.barChart()}<span class="sr-only">Fortschritt</span><span aria-hidden="true">Fortschritt</span>
+      aria-selected="false" aria-controls="page-progress" aria-label="Fortschritt">
+      ${ic.barChart()}
     </button>
     <button class="nav__tab" role="tab" data-tab="body"
-      aria-selected="false" aria-controls="page-body">
-      ${ic.person()}<span class="sr-only">Körper</span><span aria-hidden="true">Körper</span>
+      aria-selected="false" aria-controls="page-body" aria-label="Körper">
+      ${ic.person()}
     </button>
     <button class="nav__tab" role="tab" data-tab="settings"
-      aria-selected="false" aria-controls="page-settings">
-      ${ic.settings()}<span class="sr-only">Einstellungen</span><span aria-hidden="true">Einstellungen</span>
+      aria-selected="false" aria-controls="page-settings" aria-label="Einstellungen">
+      ${ic.settings()}
     </button>
   </div>
 </nav>

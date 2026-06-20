@@ -145,21 +145,21 @@ button, input, select, textarea { font: inherit; }
 .nav__tabs::-webkit-scrollbar { display: none; }
 .nav__tab {
   min-height: var(--touch); min-width: var(--touch);
-  padding: 0 var(--sp-2);
-  display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-1);
+  padding: 0 var(--sp-3);
+  display: inline-flex; align-items: center; justify-content: center;
   border: none; border-radius: var(--r-full); background: none;
-  color: var(--c-text-3); font-size: 13px; font-weight: 500;
-  white-space: nowrap; cursor: pointer; position: relative;
+  color: var(--c-text-3); cursor: pointer; position: relative;
   transition: background var(--t-fast), color var(--t-fast);
 }
-.nav__tab svg { width: 18px; height: 18px; }
+.nav__tab svg { width: 22px; height: 22px; }
 .nav__tab:hover { background: var(--c-surface2); color: var(--c-text-2); }
 .nav__tab.is-active { background: var(--c-surface2); color: var(--c-text); }
 
-/* 5 Tabs auf sehr schmalen Screens: Label-Schrift verkleinern statt ausblenden */
+/* Icon-only Tabs sind schon schmal genug für 5 Stück — etwas engerer
+   Abstand auf sehr schmalen Screens, damit alle 5 ohne Scroll passen. */
 @media (max-width: 359px) {
-  .nav__tab { font-size: 11px; padding: 0 6px; gap: 4px; }
-  .nav__tab svg { width: 16px; height: 16px; }
+  .nav__tab { padding: 0 var(--sp-2); }
+  .nav__tab svg { width: 20px; height: 20px; }
 }
 
 /* ── Week navigation ───────────────────────────────────────── */
