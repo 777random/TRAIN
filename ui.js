@@ -2051,7 +2051,10 @@ function _hasAnyTrainingData(state) {
   );
 }
 
-// ─── Coach tab: Wochenrückblick, Deine Erkenntnisse, Gesamt-Trend (Platzhalter) ──
+// ─── Coach tab: vorerst nur der Gesamt-Trend/Fokus-Platzhalter ───────────────
+// ("Deine Erkenntnisse"/"Beobachtungen" wohnt jetzt im Fortschritt-Tab —
+// reine Feststellungen ohne Handlungsaufforderung gehören zum Accounting,
+// nicht zum Controlling/Coach.)
 function renderCoachTab(state) {
   const container = document.getElementById('coach-tab-content');
   if (!container) return;
@@ -2061,25 +2064,16 @@ function renderCoachTab(state) {
     return;
   }
 
-  // ── "Deine Erkenntnisse" — dauerhafte Sektion, bei jedem Render frisch
-  // berechnet (nicht event-getrieben wie state.insights/Toast-System).
-  const erkenntnisLines = computeErkenntnisLines(state);
-  const erkenntnisseHtml = erkenntnisLines.length > 0 ? `
-  <div class="chart-card">
-    <div class="chart-card__title">💡 Deine Erkenntnisse</div>
-    ${erkenntnisLines.map(line => `<p class="erkenntnis-line">${h(line)}</p>`).join('')}
-  </div>` : '';
-
-  // ── Gesamt-Trend — Platzhalter, Inhalt folgt im nächsten Sprint ─────────────
-  const overallTrendHtml = `<div id="overall-trend-placeholder" style="display:none"></div>`;
-
+  // ── Gesamt-Trend / Fokus der Woche — Platzhalter, Inhalt folgt in einem
+  // späteren Sprint. Coach-Tab ist dadurch aktuell fast leer — neutraler,
+  // dezenter Hinweis statt leerer Fläche. overall-trend-placeholder bleibt
+  // als unsichtbarer Einsatzpunkt für den künftigen Inhalt erhalten.
   container.innerHTML = `
-  ${erkenntnisseHtml}
-
-  ${overallTrendHtml}`;
+  <p class="coach-placeholder">Hier entsteht dein wöchentlicher Fokus</p>
+  <div id="overall-trend-placeholder" style="display:none"></div>`;
 }
 
-// ─── Fortschritt tab: Übungsfortschritt, Bestleistungen, Bewegungsmuster, Streak+Abzeichen ──
+// ─── Fortschritt tab: Wochenrückblick, Beobachtungen, Übungsfortschritt, Bestleistungen, Bewegungsmuster, Streak+Abzeichen ──
 function renderProgressTab(state) {
   const container = document.getElementById('progress-tab-content');
   if (!container) return;
@@ -2104,6 +2098,16 @@ function renderProgressTab(state) {
       <div id="week-review-inline" style="margin-top:var(--sp-3)"></div>
     </div>`;
   })() : '';
+
+  // ── Beobachtungen (vormals "Deine Erkenntnisse") — dauerhafte Sektion, bei
+  // jedem Render frisch berechnet (nicht event-getrieben wie state.insights/
+  // Toast-System). Berechnungslogik unverändert, nur Titel/Position geändert.
+  const erkenntnisLines = computeErkenntnisLines(state);
+  const erkenntnisseHtml = erkenntnisLines.length > 0 ? `
+  <div class="chart-card">
+    <div class="chart-card__title">📊 Beobachtungen</div>
+    ${erkenntnisLines.map(line => `<p class="erkenntnis-line">${h(line)}</p>`).join('')}
+  </div>` : '';
 
   const streak     = _calcStreak(state);
   const _scoreList = state.weeks.map(w => _weekSuccessScore(w)).filter(s => s.total > 0).map(s => s.pct);
@@ -2155,6 +2159,8 @@ function renderProgressTab(state) {
 
   container.innerHTML = `
   ${weekReviewHtml}
+
+  ${erkenntnisseHtml}
 
   ${insightHtml}
 
@@ -4737,7 +4743,7 @@ function _buildScaffold(root) {
 
 <section id="page-coach" class="page" role="tabpanel" aria-label="Coach">
   <h1 class="page-title">Coach</h1>
-  <p class="page-subtitle">Erkenntnisse & Trends</p>
+  <p class="page-subtitle">Dein wöchentlicher Fokus</p>
   <div id="coach-tab-content"></div>
 </section>
 
@@ -4745,7 +4751,7 @@ function _buildScaffold(root) {
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--sp-4)">
     <div>
       <h1 class="page-title">Fortschritt</h1>
-      <p class="page-subtitle">Wochenrückblick, Übungen & Muster</p>
+      <p class="page-subtitle">Wochenrückblick, Beobachtungen & Muster</p>
     </div>
     <button class="btn btn--accent btn--sm" data-action="open-export"
       aria-label="Daten exportieren">${ic.download()} Export</button>
