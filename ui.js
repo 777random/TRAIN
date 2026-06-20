@@ -2064,13 +2064,62 @@ function renderCoachTab(state) {
     return;
   }
 
+  // ── 1. Plateau-Statuskarte — nutzt detectPlateaus() (unverändert). Bei
+  // mehreren aktiven Plateaus: nur die mit der längsten Stagnation zeigen.
+  const plateaus = detectPlateaus(state.weeks, state.favoriteExercises ?? [], state.settings?.rpeEnabled ?? true);
+  const plateauCardHtml = plateaus.length > 0 ? (() => {
+    const longest = plateaus.reduce((a, b) => (b.plateauWeeks > a.plateauWeeks ? b : a));
+    const others  = plateaus.length - 1;
+    return `<div class="chart-card coach-status-card">
+      <div class="chart-card__title">⚠️ Plateau erkannt: ${h(longest.exerciseName)}</div>
+      <p class="coach-status-desc">${longest.plateauWeeks} Wochen ohne Steigerung${others > 0 ? ` · +${others} weitere` : ''}</p>
+      <button type="button" class="btn btn--ghost btn--sm" data-action="coach-view-plateau-strategy">Strategie ansehen</button>
+    </div>`;
+  })() : '';
+
+  // ── 2. Wiedereinstieg-Statuskarte — nutzt state.lastReentryHandled +
+  // _isInRecoveryWindow() (unverändert). Aktiv nur in den ersten 2 Wochen
+  // nach einem bestätigten Wiedereinstieg.
+  const reentryCardHtml = (() => {
+    if (!state.lastReentryHandled) return '';
+    const daysSince = Math.floor((Date.now() - state.lastReentryHandled) / 86_400_000);
+    if (daysSince < 0 || daysSince >= 14) return '';
+    const weekNum = Math.floor(daysSince / 7) + 1;
+    const inRecovery = _isInRecoveryWindow(state);
+    return `<div class="chart-card coach-status-card">
+      <div class="chart-card__title">🔄 Wiedereinstieg aktiv</div>
+      <p class="coach-status-desc">Woche ${weekNum} nach Pause</p>
+      ${inRecovery ? `<p class="coach-status-desc coach-status-desc--accent">Du erholst dich schnell — größere Steigerung wird vorgeschlagen</p>` : ''}
+    </div>`;
+  })();
+
+  // ── 3. Steigerungs-Vorschau — reiner Hinweis, nutzt isReadyForAutoSelect()/
+  // getWeightRecommendation() read-only über _countReadyForIncrease() (kein
+  // Dispatch). Bestätigung bleibt ausschließlich im Neue-Woche-Modal.
+  const readyCount = _countReadyForIncrease(state);
+  const previewCardHtml = readyCount > 0 ? `<div class="chart-card coach-status-card">
+      <div class="chart-card__title">💪 ${readyCount} ${readyCount === 1 ? 'Übung' : 'Übungen'} bereit für eine Steigerung</div>
+      <p class="coach-status-desc">Wird beim Erstellen der nächsten Woche vorgeschlagen</p>
+      <button type="button" class="btn btn--ghost btn--sm" data-action="open-new-week">Ansehen</button>
+    </div>` : '';
+
   // ── Gesamt-Trend / Fokus der Woche — Platzhalter, Inhalt folgt in einem
-  // späteren Sprint. Coach-Tab ist dadurch aktuell fast leer — neutraler,
-  // dezenter Hinweis statt leerer Fläche. overall-trend-placeholder bleibt
-  // als unsichtbarer Einsatzpunkt für den künftigen Inhalt erhalten.
-  container.innerHTML = `
+  // späteren Sprint. overall-trend-placeholder bleibt als unsichtbarer
+  // Einsatzpunkt für den künftigen Inhalt erhalten.
+  const overallTrendHtml = `<div id="overall-trend-placeholder" style="display:none"></div>`;
+
+  const anyCardActive = plateauCardHtml || reentryCardHtml || previewCardHtml;
+
+  container.innerHTML = anyCardActive ? `
+  ${plateauCardHtml}
+
+  ${reentryCardHtml}
+
+  ${previewCardHtml}
+
+  ${overallTrendHtml}` : `
   <p class="coach-placeholder">Hier entsteht dein wöchentlicher Fokus</p>
-  <div id="overall-trend-placeholder" style="display:none"></div>`;
+  ${overallTrendHtml}`;
 }
 
 // ─── Fortschritt tab: Wochenrückblick, Beobachtungen, Übungsfortschritt, Bestleistungen, Bewegungsmuster, Streak+Abzeichen ──
@@ -3084,6 +3133,17 @@ function _handleClick(e) {
       break;
 
     // ── Analysis insights toggle (3.2) ─────────────────────────────────────
+    // ── Coach-Tab Plateau-Statuskarte: kein eigenes Modal vorhanden — die
+    // einzige bestehende Oberfläche, die Plateau-Details bereits zeigt, ist
+    // der Wochenrückblick (buildWeekReview). Dorthin navigieren statt etwas
+    // Neues zu bauen.
+    case 'coach-view-plateau-strategy':
+      _switchToTab('progress');
+      requestAnimationFrame(() => {
+        document.getElementById('week-review-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+      break;
+
     case 'toggle-insights':
       if (!_insightsTooltipShown) {
         _insightsTooltipShown = true;
@@ -4401,6 +4461,36 @@ function _renderRecChip(r, rpeEnabled) {
       </div>
       <div class="nw-rec-subline">${h(_recSubline(r, rpeEnabled))}</div>
     </button>`;
+}
+
+/**
+ * Read-only Vorschau-Zähler für den Coach-Tab: wie viele Übungen der
+ * aktuellen Woche eine Steigerungsempfehlung hätten (rec.delta > 0),
+ * unabhängig davon ob automatisch vorausgewählt. Spiegelt exakt die
+ * Filterlogik aus _prepNewWeekModal() (curWk bewusst nicht ausgeschlossen),
+ * aber OHNE jeden Seiteneffekt — kein Dispatch, kein State-Schreiben.
+ */
+function _countReadyForIncrease(state) {
+  const curWk = getLatestWeek(state.weeks);
+  if (!curWk) return 0;
+  const calcWeeks = state.weeks
+    .filter(w => w.mode !== 'deload' && w.mode !== 'vacation')
+    .filter(w => w.days.some(d => d.exercises.some(ex => ex.sets.some(s => s.status === 'success'))));
+  if (calcWeeks.length < 2) return 0;
+  const seen = new Set();
+  const plateStep = state.settings?.plateStep ?? 2.5;
+  let count = 0;
+  curWk.days.forEach(day => {
+    (day.exercises ?? []).forEach(ex => {
+      if (seen.has(ex.name)) return;
+      if (ex.substituteFor) return;
+      if ((ex.progressionType ?? 'weight') === 'reps') return;
+      seen.add(ex.name);
+      const rec = getWeightRecommendation(ex.name, calcWeeks, plateStep);
+      if (rec && rec.delta > 0) count++;
+    });
+  });
+  return count;
 }
 
 function _prepNewWeekModal() {
