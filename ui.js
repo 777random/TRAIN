@@ -4247,11 +4247,18 @@ function _prepNewWeekModal() {
   const curWkIdx = curWk ? state.weeks.indexOf(curWk) : -1;
 
   // KI-Gewichtsempfehlungen (basierend auf RPE + Erfolgsquote)
+  // curWk wird bewusst NICHT ausgeschlossen: sobald der Nutzer die Sätze der
+  // aktuellen (curWk) Woche bestätigt hat, ist das die zuletzt trainierte
+  // Woche und MUSS als Basis für die nächste Empfehlung zählen — sonst hinkt
+  // die Empfehlung systematisch eine Woche hinterher (zeigt "+2.5kg" auf ein
+  // Gewicht, das schon in curWk erreicht wurde). Eine frisch erstellte, noch
+  // nicht trainierte curWk hat ohnehin keine success-Sätze und wird durch
+  // den zweiten Filter unten automatisch ausgeschlossen.
   const aiRecs = [];
   const inRecoveryWindow = _isInRecoveryWindow(state);
   if (curWk) {
     const calcWeeks = state.weeks
-      .filter(w => w.mode !== 'deload' && w.mode !== 'vacation' && w !== curWk)
+      .filter(w => w.mode !== 'deload' && w.mode !== 'vacation')
       .filter(w => w.days.some(d => d.exercises.some(ex => ex.sets.some(s => s.status === 'success'))));
     if (calcWeeks.length >= 2) {
       const seen = new Set();
