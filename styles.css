@@ -896,6 +896,23 @@ exercise { position: unset; }
 .custom-ex-row__name { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .custom-ex-row__meta { font-size: 11px; color: var(--c-text-3); }
 
+/* Übungsnamen-Bereinigung (Duplikate + Tippfehler-Kandidaten) */
+.name-dup-section { margin-bottom: var(--sp-3); }
+.name-dup-section__title {
+  font-size: 10px; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--c-warn, #FFB400); margin-bottom: var(--sp-2);
+}
+.name-dup-card {
+  background: var(--c-surface2); border: 1px solid var(--c-border);
+  border-radius: var(--r-md); padding: var(--sp-3); margin-bottom: var(--sp-2);
+}
+.name-dup-variant { font-size: 13px; color: var(--c-text); }
+.name-dup-hint { font-size: 12px; color: var(--c-text-2); margin-top: 2px; }
+.name-dup-merge-row { display: flex; align-items: center; gap: var(--sp-2); margin-top: var(--sp-2); }
+.name-dup-merge-label { font-size: 12px; color: var(--c-text-3); white-space: nowrap; }
+.name-dup-select { flex: 1; }
+.name-dup-actions { display: flex; gap: var(--sp-2); margin-top: var(--sp-2); flex-wrap: wrap; }
+
 .complete-btn {
   width: 100%; margin-top: var(--sp-3); padding: 0 var(--sp-4); height: var(--touch);
   border-radius: var(--r-md); border: 1px solid var(--c-border);

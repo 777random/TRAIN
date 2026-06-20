@@ -30,6 +30,7 @@ import { renderProgressChart, renderBodyWeightChart } from './progressChart.js';
 import { buildWeekReview }        from './weekReview.js';
 import { showWeekReviewModal, renderWeekReviewHtml } from './weekReviewModal.js';
 import { detectPlateaus }         from './plateauDetector.js';
+import { findExactDuplicates, findSimilarCandidates } from './exerciseNameCleanup.js';
 
 // ─── Module-level UI state (transient, never persisted) ──────────────────────
 
@@ -2556,6 +2557,53 @@ function _shouldShowBackupReminder(state) {
   return days > 14;
 }
 
+function _renderMergeGroupCard(variants, { hint, mergeAttrs, extraButton } = {}) {
+  return `
+  <div class="name-dup-card">
+    ${variants.map(v => `<div class="name-dup-variant">"${h(v.name)}" (${v.setCount} ${v.setCount === 1 ? 'Satz' : 'Sätze'})</div>`).join('')}
+    ${hint ? `<div class="name-dup-hint">${hint}</div>` : ''}
+    <div class="name-dup-merge-row">
+      <span class="name-dup-merge-label">Zusammenführen zu:</span>
+      <select class="form-input name-dup-select">
+        ${variants.map((v, i) => `<option value="${h(v.name)}"${i === 0 ? ' selected' : ''}>${h(v.name)}</option>`).join('')}
+      </select>
+    </div>
+    <div class="name-dup-actions">
+      <button type="button" class="btn btn--accent btn--sm" data-action="merge-ex-names" ${mergeAttrs}>Zusammenführen</button>
+      ${extraButton ?? ''}
+    </div>
+  </div>`;
+}
+
+function _renderNameCleanupSections(state) {
+  const dupGroups  = findExactDuplicates(state);
+  const candidates = findSimilarCandidates(state);
+
+  const dupHtml = dupGroups.length > 0 ? `
+  <div class="name-dup-section">
+    <div class="name-dup-section__title">⚠️ Mögliche Duplikate gefunden</div>
+    ${dupGroups.map(g => _renderMergeGroupCard(g.variants, {
+      mergeAttrs: `data-merge-key="${h(g.key)}"`,
+    })).join('')}
+  </div>` : '';
+
+  const candHtml = candidates.length > 0 ? `
+  <div class="name-dup-section">
+    <div class="name-dup-section__title">💡 Mögliche Tippfehler</div>
+    ${candidates.map(c => _renderMergeGroupCard(
+      [{ name: c.a, setCount: c.setCountA }, { name: c.b, setCount: c.setCountB }]
+        .sort((x, y) => y.setCount - x.setCount),
+      {
+        hint: '→ Gleiche Übung, Tippfehler?',
+        mergeAttrs: `data-merge-a="${h(c.a)}" data-merge-b="${h(c.b)}"`,
+        extraButton: `<button type="button" class="btn btn--ghost btn--sm" data-action="dismiss-name-pair" data-a="${h(c.a)}" data-b="${h(c.b)}">Sind unterschiedliche Übungen</button>`,
+      }
+    )).join('')}
+  </div>` : '';
+
+  return dupHtml + candHtml;
+}
+
 function renderSettingsTab(state) {
   const container = document.getElementById('settings-tab-content');
   if (!container) return;
@@ -2762,6 +2810,7 @@ function renderSettingsTab(state) {
   <!-- Meine Übungen -->
   <div class="settings-section">
     <div class="settings-section__title">Meine Übungen</div>
+    ${_renderNameCleanupSections(state)}
     ${(state.customExercises ?? []).length === 0 ? `
     <p class="settings-row__desc">Noch keine eigenen Übungen — beim Hinzufügen einer Übung über "+ anlegen" erstellt.</p>` : (state.customExercises ?? []).map(ce => `
     <div class="custom-ex-row">
@@ -3284,10 +3333,10 @@ function _handleClick(e) {
         break;
       }
       const lcName = name.toLowerCase();
-      const isDup = _STANDARD_EXERCISES.some(n => n.toLowerCase() === lcName) ||
+      const isDup = _STANDARD_EXERCISES.some(n => n.trim().toLowerCase() === lcName) ||
         (getState().customExercises ?? []).some(c =>
-          c.name.toLowerCase() === lcName &&
-          c.name.toLowerCase() !== (_exFormOriginalName ?? '').toLowerCase()
+          c.name.trim().toLowerCase() === lcName &&
+          c.name.trim().toLowerCase() !== (_exFormOriginalName ?? '').trim().toLowerCase()
         );
       if (isDup) {
         if (errEl) errEl.textContent = 'Diese Übung existiert bereits.';
@@ -3874,6 +3923,39 @@ function _handleClick(e) {
         showToast('Übung gelöscht', 'info');
         if (_activeTab === 'settings') renderSettingsTab(getState());
       }
+      break;
+    }
+
+    // ── Übungsnamen-Bereinigung ──────────────────────────────────────────────
+    case 'merge-ex-names': {
+      const card = el.closest('.name-dup-card');
+      const finalName = card?.querySelector('.name-dup-select')?.value;
+      if (!finalName) break;
+
+      let variantNames;
+      if (el.dataset.mergeKey != null) {
+        const group = findExactDuplicates(getState()).find(g => g.key === el.dataset.mergeKey);
+        variantNames = group?.variants.map(v => v.name) ?? [];
+      } else {
+        variantNames = [el.dataset.mergeA, el.dataset.mergeB].filter(Boolean);
+      }
+      if (variantNames.length === 0) break;
+
+      const setCount = variantNames.reduce((sum, name) => {
+        for (const wk of getState().weeks) for (const day of wk.days) for (const ex of day.exercises)
+          if (ex.name === name) sum += ex.sets.length;
+        return sum;
+      }, 0);
+
+      dispatch(A.EX_MERGE_NAMES, { variantNames, finalName });
+      showToast(`✓ Zusammengeführt zu "${finalName}" — ${setCount} ${setCount === 1 ? 'Satz' : 'Sätze'} betroffen`, 'ok');
+      if (_activeTab === 'settings') renderSettingsTab(getState());
+      break;
+    }
+
+    case 'dismiss-name-pair': {
+      dispatch(A.DISMISS_NAME_PAIR, { a: el.dataset.a, b: el.dataset.b });
+      if (_activeTab === 'settings') renderSettingsTab(getState());
       break;
     }
 

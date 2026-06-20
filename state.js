@@ -24,7 +24,7 @@
 
 export const STORAGE_KEY        = 'train_v6';
 export const STORAGE_KEY_SHADOW = 'train_v6_shadow';
-export const SCHEMA_VERSION     = 23;
+export const SCHEMA_VERSION     = 24;
 
 export const BADGE_THRESHOLDS = [
   { id: 'badge_4',   weeks: 4,   title: 'Erster Schritt' },
@@ -192,6 +192,7 @@ function buildDefaultState() {
       weeksSinceLastBackupReminder:   0,
       maxSessionMs:                   10800000, // 3h default
       autoStartPauseTimer:            true,
+      dismissedNamePairs:             [], // [nameA, nameB][] – sortiert, getrimmt, lowercase
     },
   };
 }
@@ -668,12 +669,19 @@ function migrate(raw) {
     raw.meta = { ...raw.meta, schemaVersion: 23 };
   }
 
+  // v23 → v24: add state.settings.dismissedNamePairs
+  if ((raw.meta?.schemaVersion ?? 0) < 24) {
+    if (!Array.isArray(raw.settings.dismissedNamePairs)) raw.settings.dismissedNamePairs = [];
+    raw.meta = { ...raw.meta, schemaVersion: 24 };
+  }
+
   // Always-apply defaults for settings added in later versions
   if (raw.settings.vibrationEnabled               === undefined) raw.settings.vibrationEnabled               = true;
   if (raw.settings.rpeEnabled                     === undefined) raw.settings.rpeEnabled                     = true;
   if (raw.settings.weeksSinceLastBackupReminder   === undefined) raw.settings.weeksSinceLastBackupReminder   = 0;
   if (raw.settings.maxSessionMs                   === undefined) raw.settings.maxSessionMs                   = 10800000;
   if (raw.settings.autoStartPauseTimer            === undefined) raw.settings.autoStartPauseTimer            = true;
+  if (!Array.isArray(raw.settings.dismissedNamePairs)) raw.settings.dismissedNamePairs = [];
 
   // Always-apply: week label (optional user-set name, no schema bump needed)
   (raw.weeks ?? []).forEach(wk => { if (!('label' in wk)) wk.label = ''; });
@@ -858,6 +866,8 @@ export const A = Object.freeze({
   CUSTOM_EX_ADD:        'CUSTOM_EX_ADD',        // { name, metric, category }
   CUSTOM_EX_UPDATE:     'CUSTOM_EX_UPDATE',     // { oldName, name, metric, category }
   CUSTOM_EX_DELETE:     'CUSTOM_EX_DELETE',     // { name }
+  EX_MERGE_NAMES:       'EX_MERGE_NAMES',       // { variantNames: string[], finalName } – Übungsnamen-Bereinigung
+  DISMISS_NAME_PAIR:    'DISMISS_NAME_PAIR',    // { a, b } – Ähnlichkeits-Kandidat dauerhaft verwerfen
   REENTRY_HANDLED:      'REENTRY_HANDLED',      // {} – marks current pause as handled (Ja/Nein)
   EX_APPLY_REENTRY_REDUCTION: 'EX_APPLY_REENTRY_REDUCTION', // { factor } – reduces weights/targets in current week
   EX_REMOVE:           'EX_REMOVE',           // { di, ei }
@@ -1744,6 +1754,40 @@ function reduce(state, action) {
     }
     case A.CUSTOM_EX_DELETE: {
       state.customExercises = (state.customExercises ?? []).filter(c => c.name !== p.name);
+      break;
+    }
+    case A.EX_MERGE_NAMES: {
+      const variantNames = p.variantNames ?? [];
+      const finalName    = String(p.finalName ?? '').trim();
+      if (!finalName || variantNames.length === 0) break;
+      const variantSet = new Set(variantNames);
+
+      state.weeks.forEach(wk => wk.days.forEach(day => day.exercises.forEach(ex => {
+        if (variantSet.has(ex.name)) ex.name = finalName;
+      })));
+      state.customTemplate.forEach(day => day.exercises.forEach(ex => {
+        if (variantSet.has(ex.name)) ex.name = finalName;
+      }));
+      state.favoriteExercises = [...new Set(
+        (state.favoriteExercises ?? []).map(fav => variantSet.has(fav) ? finalName : fav)
+      )];
+
+      // Mehrere customExercises-Einträge derselben Übung zu einem zusammenführen.
+      if (Array.isArray(state.customExercises)) {
+        const matches = state.customExercises.filter(c => variantSet.has(c.name));
+        if (matches.length > 0) {
+          const keep = matches.find(c => c.name === finalName) ?? matches[0];
+          keep.name = finalName;
+          state.customExercises = state.customExercises.filter(c => !variantSet.has(c.name) || c === keep);
+        }
+      }
+      break;
+    }
+    case A.DISMISS_NAME_PAIR: {
+      if (!Array.isArray(state.settings.dismissedNamePairs)) state.settings.dismissedNamePairs = [];
+      const key = [String(p.a ?? '').trim().toLowerCase(), String(p.b ?? '').trim().toLowerCase()].sort();
+      const exists = state.settings.dismissedNamePairs.some(pair => pair[0] === key[0] && pair[1] === key[1]);
+      if (!exists) state.settings.dismissedNamePairs.push(key);
       break;
     }
 
