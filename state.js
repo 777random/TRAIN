@@ -1413,14 +1413,20 @@ function reduce(state, action) {
       break;
     }
     case A.SET_TOGGLE_DONE: {
-      const s = _currentWeek()?.days[p.di]?.exercises[p.ei]?.sets[p.si]; if (!s) break;
+      const exForToggle = _currentWeek()?.days[p.di]?.exercises[p.ei]; if (!exForToggle) break;
+      const s = exForToggle.sets[p.si]; if (!s) break;
       const order = ['pending', 'success', 'fail'];
       let cur = s.status;
       if (cur !== 'pending' && cur !== 'success' && cur !== 'fail') {
         cur = s.done ? 'success' : 'pending';
       }
       const i = Math.max(0, order.indexOf(cur));
-      const canSuccess = (parseFloat(s.reps) || 0) > 0;
+      // Ein Satz darf nur 'success' werden wenn die Wdh das Ziel erreichen —
+      // ohne definiertes targetReps gilt weiterhin nur reps > 0 (kein Blockieren).
+      const targetReps = parseFloat(exForToggle.targetReps) || 0;
+      const canSuccess = targetReps > 0
+        ? (parseFloat(s.reps) || 0) >= targetReps
+        : (parseFloat(s.reps) || 0) > 0;
       let next = order[(i + 1) % 3];
       if (next === 'success' && !canSuccess) next = 'fail';
       s.status = next;
@@ -1428,7 +1434,7 @@ function reduce(state, action) {
 
       // Update PRs when a set is newly marked success in a non-deload week
       if (next === 'success' && _currentWeek()?.mode !== 'deload') {
-        const ex     = _currentWeek()?.days[p.di]?.exercises[p.ei];
+        const ex     = exForToggle;
         const weight = parseFloat(s.weight) || 0;
         const reps   = parseFloat(s.reps)   || 0;
         if (ex && reps > 0) {

@@ -132,11 +132,21 @@ export function isReadyForAutoSelect(exerciseName, weeks) {
     const success = [], fail = [];
     for (const d of wk.days)
       for (const ex of d.exercises)
-        if (ex.name === exerciseName)
+        if (ex.name === exerciseName) {
+          const targetReps = parseFloat(ex.targetReps) || 0;
           for (const s of ex.sets) {
-            if (s.status === 'success') success.push(s);
+            if (s.status === 'success') {
+              // Defensiv: ein als 'success' markierter Satz zählt hier nur
+              // als echter Erfolg, wenn die Wdh das targetReps der Übung
+              // erreichen — fängt bereits fehlerhaft markierte Altdaten ab,
+              // ohne dass eine Migration nötig ist (siehe SET_TOGGLE_DONE-Fix).
+              const reps = parseFloat(s.reps) || 0;
+              if (targetReps > 0 && reps < targetReps) fail.push(s);
+              else success.push(s);
+            }
             else if (s.status === 'fail') fail.push(s);
           }
+        }
     if (success.length + fail.length > 0) weeksWithData.push({ success, fail });
   }
 
