@@ -1000,24 +1000,39 @@ function _nextGoalText(ex) {
   const target = parseFloat(ex.targetReps) || 0;
   if (!target) return null; // Zustand D: kein Zielwert definiert
 
-  const allSetsHitTarget = ex.sets.length > 0
-    && ex.sets.every(s => (parseFloat(s.reps) || 0) >= target);
+  const unit = ex.metric === 'sec' ? 'Sek' : ex.metric === 'm' ? 'm' : 'Wdh';
+  const nextOpenIdx = ex.sets.findIndex(s => s.status === 'pending');
 
-  if (!allSetsHitTarget) {
-    const successReps = ex.sets
-      .filter(s => s.status === 'success')
-      .map(s => parseFloat(s.reps) || 0);
-    const maxReps    = successReps.length > 0 ? Math.max(...successReps) : 0;
-    const remaining  = Math.max(0, target - maxReps);
-    return `Noch ${remaining} Wdh bis zum Wochenziel`;
+  if (nextOpenIdx !== -1) {
+    // Zustand A: noch mind. 1 offener Satz — bezieht sich auf den nächsten
+    // (ersten pending) Satz, nicht auf eine Gesamtbilanz über die Woche.
+    const enteredReps = parseFloat(ex.sets[nextOpenIdx].reps) || 0;
+    const missing = Math.max(0, target - enteredReps);
+    return missing > 0
+      ? `Noch ${missing} ${unit} im aktuellen Satz`
+      : 'Ziel im aktuellen Satz erreicht';
   }
 
-  if (!ex.nextWeekPlan) return 'Ziel erreicht — Steigerung über den ⚙️-Button planen';
+  // Alle Sätze abgeschlossen (kein pending mehr) — exakt dieselbe Ist/Soll-
+  // Berechnung wie die bestehende fulfill-meter-Zeile weiter unten, nicht neu erfunden.
+  const nSets = ex.sets.length;
+  const soll  = nSets * target;
+  const ist   = ex.sets.filter(s => s.status === 'success').reduce((sum, s) => sum + (parseFloat(s.reps) || 0), 0);
+
+  if (ist < soll) {
+    // Zustand A-fertig: alle Sätze durch, aber Gesamt-Soll verfehlt
+    return `${ist} von ${soll} ${unit} erreicht`;
+  }
 
   const pt = ex.progressionType ?? 'weight';
+  if (!ex.nextWeekPlan) {
+    const btnLabel = pt === 'reps' ? `+${unit}` : pt === 'sets' ? '+Satz' : '+kg';
+    return `Ziel erreicht — Steigerung über den ${btnLabel}-Button planen`;
+  }
+
   let newValueText;
   if (pt === 'reps') {
-    newValueText = `${target + ex.nextWeekPlan} Wdh`;
+    newValueText = `${target + ex.nextWeekPlan} ${unit}`;
   } else if (pt === 'sets') {
     newValueText = `${ex.sets.length + ex.nextWeekPlan} Sätze`;
   } else {
