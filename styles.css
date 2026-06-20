@@ -156,6 +156,12 @@ button, input, select, textarea { font: inherit; }
 .nav__tab:hover { background: var(--c-surface2); color: var(--c-text-2); }
 .nav__tab.is-active { background: var(--c-surface2); color: var(--c-text); }
 
+/* 5 Tabs auf sehr schmalen Screens: Label-Schrift verkleinern statt ausblenden */
+@media (max-width: 359px) {
+  .nav__tab { font-size: 11px; padding: 0 6px; gap: 4px; }
+  .nav__tab svg { width: 16px; height: 16px; }
+}
+
 /* ── Week navigation ───────────────────────────────────────── */
 .week-nav {
   display: flex; align-items: center; justify-content: space-between;

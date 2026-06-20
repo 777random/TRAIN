@@ -2037,30 +2037,31 @@ function _renderAnalysis1RM(name, state) {
   return `<div class="orm-hint orm-hint--analysis">~${best.est.toFixed(1)} kg geschätzter 1RM <span class="orm-hint__basis">(Epley · ${best.w} kg × ${best.r} Wdh)</span></div>`;
 }
 
-function renderAnalysisTab(state) {
-  const container = document.getElementById('analysis-tab-content');
-  if (!container) return;
-
-  const hasTrainingData = state.weeks.some(w =>
-    w.days.some(d => d.exercises.some(ex => ex.sets.some(s => s.status === 'success' || s.status === 'fail')))
-  );
-  if (!hasTrainingData) {
-    container.innerHTML = `
+function _noAnalysisDataHtml() {
+  return `
     <div class="empty-state">
       <div class="empty-state__icon">📊</div>
       <p class="empty-state__text">Noch keine Daten vorhanden.<br>Schließe deine erste Trainingswoche ab um hier Auswertungen zu sehen.</p>
     </div>`;
+}
+
+function _hasAnyTrainingData(state) {
+  return state.weeks.some(w =>
+    w.days.some(d => d.exercises.some(ex => ex.sets.some(s => s.status === 'success' || s.status === 'fail')))
+  );
+}
+
+// ─── Coach tab: Wochenrückblick, Deine Erkenntnisse, Gesamt-Trend (Platzhalter) ──
+function renderCoachTab(state) {
+  const container = document.getElementById('coach-tab-content');
+  if (!container) return;
+
+  if (!_hasAnyTrainingData(state)) {
+    container.innerHTML = _noAnalysisDataHtml();
     return;
   }
 
-  const streak     = _calcStreak(state);
-  const sorted     = [...state.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
-  const _scoreList = state.weeks.map(w => _weekSuccessScore(w)).filter(s => s.total > 0).map(s => s.pct);
-  const avgScore   = _scoreList.length > 0 ? Math.round(_scoreList.reduce((a, b) => a + b, 0) / _scoreList.length) : null;
-  const allExNames = [...new Set(
-    state.weeks.flatMap(w => w.days.flatMap(d => d.exercises.map(e => e.name)))
-  )].sort();
-  const insights = state.insights ?? [];
+  const sorted = [...state.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
 
   // ── 1. Wochenrückblick-Auswahl ─────────────────────────────────────────────
   const reviewableWeeks = [...sorted].filter(w => w.days.some(d => d.markedDone)).reverse();
@@ -2077,7 +2078,52 @@ function renderAnalysisTab(state) {
     </div>`;
   })() : '';
 
-  // ── 3. Bestleistungen ──────────────────────────────────────────────────────
+  // ── "Deine Erkenntnisse" — dauerhafte Sektion, bei jedem Render frisch
+  // berechnet (nicht event-getrieben wie state.insights/Toast-System).
+  const erkenntnisLines = computeErkenntnisLines(state);
+  const erkenntnisseHtml = erkenntnisLines.length > 0 ? `
+  <div class="chart-card">
+    <div class="chart-card__title">💡 Deine Erkenntnisse</div>
+    ${erkenntnisLines.map(line => `<p class="erkenntnis-line">${h(line)}</p>`).join('')}
+  </div>` : '';
+
+  // ── Gesamt-Trend — Platzhalter, Inhalt folgt im nächsten Sprint ─────────────
+  const overallTrendHtml = `<div id="overall-trend-placeholder" style="display:none"></div>`;
+
+  container.innerHTML = `
+  ${weekReviewHtml}
+
+  ${erkenntnisseHtml}
+
+  ${overallTrendHtml}`;
+
+  requestAnimationFrame(() => {
+    _updateInlineReview(getState());
+    document.getElementById('week-review-select')?.addEventListener('change', () => {
+      _updateInlineReview(getState());
+    });
+  });
+}
+
+// ─── Fortschritt tab: Übungsfortschritt, Bestleistungen, Bewegungsmuster, Streak+Abzeichen ──
+function renderProgressTab(state) {
+  const container = document.getElementById('progress-tab-content');
+  if (!container) return;
+
+  if (!_hasAnyTrainingData(state)) {
+    container.innerHTML = _noAnalysisDataHtml();
+    return;
+  }
+
+  const streak     = _calcStreak(state);
+  const _scoreList = state.weeks.map(w => _weekSuccessScore(w)).filter(s => s.total > 0).map(s => s.pct);
+  const avgScore   = _scoreList.length > 0 ? Math.round(_scoreList.reduce((a, b) => a + b, 0) / _scoreList.length) : null;
+  const allExNames = [...new Set(
+    state.weeks.flatMap(w => w.days.flatMap(d => d.exercises.map(e => e.name)))
+  )].sort();
+  const insights = state.insights ?? [];
+
+  // ── Bestleistungen ──────────────────────────────────────────────────────────
   const bestleistungenHtml = (() => {
     const prs = state.prs ?? {};
     const favSet = new Set(state.favoriteExercises ?? []);
@@ -2103,7 +2149,7 @@ function renderAnalysisTab(state) {
     </div>`;
   })();
 
-  // ── Insights ────────────────────────────────────────────────────────────────
+  // ── Insights (bestehendes event-getriebenes Toggle-System, unverändert) ────
   const _typeColor = { progression:'var(--c-accent)', stagnation:'var(--c-warn)', recovery:'var(--c-blue)', balance:'var(--c-deload)', goal:'var(--c-accent)', consistency:'var(--c-ok)', warning:'var(--c-danger)', motivation:'var(--c-accent)' };
   const insightHtml = _showInsights && insights.length > 0
     ? insights.map(ins => `
@@ -2117,21 +2163,8 @@ function renderAnalysisTab(state) {
       </div>`).join('')
     : '';
 
-  // ── "Deine Erkenntnisse" — dauerhafte Sektion, bei jedem Render frisch
-  // berechnet (nicht event-getrieben wie state.insights/Toast-System).
-  const erkenntnisLines = computeErkenntnisLines(state);
-  const erkenntnisseHtml = erkenntnisLines.length > 0 ? `
-  <div class="chart-card">
-    <div class="chart-card__title">💡 Deine Erkenntnisse</div>
-    ${erkenntnisLines.map(line => `<p class="erkenntnis-line">${h(line)}</p>`).join('')}
-  </div>` : '';
-
   container.innerHTML = `
   ${insightHtml}
-
-  ${weekReviewHtml}
-
-  ${erkenntnisseHtml}
 
   <div class="chart-card">
     <div class="chart-card__title">Übungsfortschritt</div>
@@ -2178,10 +2211,6 @@ function renderAnalysisTab(state) {
     _attachStreakChainTooltips();
     document.getElementById('chart-ex-select')?.addEventListener('change', () => {
       _updateExChart(getState());
-    });
-    _updateInlineReview(getState());
-    document.getElementById('week-review-select')?.addEventListener('change', () => {
-      _updateInlineReview(getState());
     });
   });
 }
@@ -4583,9 +4612,13 @@ function _switchToTab(tab) {
       _maybeShowTip('tip-12', '1× = dein Körpergewicht. Je höher, desto stärker bist du relativ zu deinem Gewicht.');
     }
   }
-  if (tab === 'analysis') {
+  if (tab === 'coach') {
     document.getElementById('app').scrollTop = 0;
-    renderAnalysisTab(state);
+    renderCoachTab(state);
+  }
+  if (tab === 'progress') {
+    document.getElementById('app').scrollTop = 0;
+    renderProgressTab(state);
     const _completedWks = state.weeks.filter(w => w.days?.some(d => d.markedDone)).length;
     if (_completedWks >= 2) {
       _maybeShowTip('tip-05', 'Jeder Punkt = eine Woche. Blau = Training · Amber = Urlaub · Grau = Pause.');
@@ -4652,7 +4685,8 @@ function scheduleRender() {
     renderWeekHeader(state);
     renderDayList(state);
     if (_activeTab === 'body')     renderBodyTab(state);
-    if (_activeTab === 'analysis') renderAnalysisTab(state);
+    if (_activeTab === 'coach')    renderCoachTab(state);
+    if (_activeTab === 'progress') renderProgressTab(state);
     if (_activeTab === 'settings') renderSettingsTab(state);
     _positionFloating();
   });
@@ -4671,17 +4705,21 @@ function _buildScaffold(root) {
       aria-selected="true" aria-controls="page-workout">
       ${ic.dumbbell()}<span class="sr-only">Training</span><span aria-hidden="true">Training</span>
     </button>
+    <button class="nav__tab" role="tab" data-tab="coach"
+      aria-selected="false" aria-controls="page-coach">
+      ${ic.compass()}<span class="sr-only">Coach</span><span aria-hidden="true">Coach</span>
+    </button>
+    <button class="nav__tab" role="tab" data-tab="progress"
+      aria-selected="false" aria-controls="page-progress">
+      ${ic.barChart()}<span class="sr-only">Fortschritt</span><span aria-hidden="true">Fortschritt</span>
+    </button>
     <button class="nav__tab" role="tab" data-tab="body"
       aria-selected="false" aria-controls="page-body">
       ${ic.person()}<span class="sr-only">Körper</span><span aria-hidden="true">Körper</span>
     </button>
-    <button class="nav__tab" role="tab" data-tab="analysis"
-      aria-selected="false" aria-controls="page-analysis">
-      ${ic.barChart()}<span class="sr-only">Analyse</span><span aria-hidden="true">Analyse</span>
-    </button>
     <button class="nav__tab" role="tab" data-tab="settings"
       aria-selected="false" aria-controls="page-settings">
-      ${ic.settings()}<span class="sr-only">Einstellungen</span>
+      ${ic.settings()}<span class="sr-only">Einstellungen</span><span aria-hidden="true">Einstellungen</span>
     </button>
   </div>
 </nav>
@@ -4701,22 +4739,28 @@ function _buildScaffold(root) {
   <div id="days-container" aria-label="Trainingstage"></div>
 </main>
 
-<section id="page-body" class="page" role="tabpanel" aria-label="Körper und Wohlbefinden">
-  <h1 class="page-title">Körper</h1>
-  <p class="page-subtitle">Optional · Fließt in CSV-Analyse ein</p>
-  <div id="body-tab-content"></div>
+<section id="page-coach" class="page" role="tabpanel" aria-label="Coach">
+  <h1 class="page-title">Coach</h1>
+  <p class="page-subtitle">Wochenrückblick & Erkenntnisse</p>
+  <div id="coach-tab-content"></div>
 </section>
 
-<section id="page-analysis" class="page" role="tabpanel" aria-label="Fortschrittsanalyse">
+<section id="page-progress" class="page" role="tabpanel" aria-label="Fortschrittsanalyse">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--sp-4)">
     <div>
-      <h1 class="page-title">Analyse</h1>
-      <p class="page-subtitle">Fortschritt & Statistiken</p>
+      <h1 class="page-title">Fortschritt</h1>
+      <p class="page-subtitle">Übungen & Muster</p>
     </div>
     <button class="btn btn--accent btn--sm" data-action="open-export"
       aria-label="Daten exportieren">${ic.download()} Export</button>
   </div>
-  <div id="analysis-tab-content"></div>
+  <div id="progress-tab-content"></div>
+</section>
+
+<section id="page-body" class="page" role="tabpanel" aria-label="Körper und Wohlbefinden">
+  <h1 class="page-title">Körper</h1>
+  <p class="page-subtitle">Optional · Fließt in CSV-Analyse ein</p>
+  <div id="body-tab-content"></div>
 </section>
 
 <section id="page-settings" class="page" role="tabpanel" aria-label="Einstellungen">

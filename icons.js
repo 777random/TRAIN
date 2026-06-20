@@ -112,9 +112,13 @@ export const dumbbell = () =>
 export const person = () =>
   SVG('<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>');
 
-/** Chart / bar chart (analysis tab) */
+/** Chart / bar chart (progress tab) */
 export const barChart = () =>
   SVG('<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/>');
+
+/** Compass / direction (coach tab) */
+export const compass = () =>
+  SVG('<circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>');
 
 /** Calendar */
 export const calendar = () =>
