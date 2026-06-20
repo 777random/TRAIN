@@ -196,7 +196,10 @@ export const INSIGHTS = [
     },
   },
 
-  // ── K-02: Return after >14-day gap ────────────────────────────────────────
+  // ── K-02: Return after >56-day gap ────────────────────────────────────────
+  // Threshold sits above the reentry popup's full range (7/14/28/56-day tiers
+  // in ui.js _detectReentryPause) so this only fires for gaps so extreme that
+  // a second nudge alongside the structured popup is still worth showing.
   {
     id: 'K-02', priority: 2, type: 'consistency',
     trigger: ['NEUE_WOCHE_ERSTELLT', 'APP_GEÖFFNET'],
@@ -204,7 +207,7 @@ export const INSIGHTS = [
       const sorted = getSortedWeeks(state);
       if (sorted.length < 2) return null;
       const gap = daysBetween(sorted[sorted.length - 2].startDate, sorted[sorted.length - 1].startDate);
-      if (gap <= 14) return null;
+      if (gap <= 56) return null;
       const weeks = Math.round(gap / 7);
       return {
         id: 'K-02', type: 'consistency', priority: 2, immediate: true,
