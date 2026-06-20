@@ -31,6 +31,7 @@ import { buildWeekReview }        from './weekReview.js';
 import { showWeekReviewModal, renderWeekReviewHtml } from './weekReviewModal.js';
 import { detectPlateaus }         from './plateauDetector.js';
 import { findExactDuplicates, findSimilarCandidates } from './exerciseNameCleanup.js';
+import { computeErkenntnisLines } from './progressInsights.js';
 
 // ─── Module-level UI state (transient, never persisted) ──────────────────────
 
@@ -2116,10 +2117,21 @@ function renderAnalysisTab(state) {
       </div>`).join('')
     : '';
 
+  // ── "Deine Erkenntnisse" — dauerhafte Sektion, bei jedem Render frisch
+  // berechnet (nicht event-getrieben wie state.insights/Toast-System).
+  const erkenntnisLines = computeErkenntnisLines(state);
+  const erkenntnisseHtml = erkenntnisLines.length > 0 ? `
+  <div class="chart-card">
+    <div class="chart-card__title">💡 Deine Erkenntnisse</div>
+    ${erkenntnisLines.map(line => `<p class="erkenntnis-line">${h(line)}</p>`).join('')}
+  </div>` : '';
+
   container.innerHTML = `
   ${insightHtml}
 
   ${weekReviewHtml}
+
+  ${erkenntnisseHtml}
 
   <div class="chart-card">
     <div class="chart-card__title">Übungsfortschritt</div>

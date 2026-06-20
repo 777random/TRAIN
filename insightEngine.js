@@ -16,11 +16,13 @@ import { detectPlateaus } from './plateauDetector.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function getSortedWeeks(state) {
+// Exportiert für progressInsights.js (dauerhafte "Deine Erkenntnisse"-Sektion) —
+// dieselbe Logik, keine zweite Implementierung.
+export function getSortedWeeks(state) {
   return [...state.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
 }
 
-function getCompletionRate(wk) {
+export function getCompletionRate(wk) {
   let total = 0, done = 0;
   for (const d of wk.days)
     for (const ex of d.exercises)
@@ -44,7 +46,7 @@ function daysBetween(a, b) {
 }
 
 // Max success-set weight per week for a named exercise (0 if absent)
-function exWeightHistory(sortedWeeks, exName) {
+export function exWeightHistory(sortedWeeks, exName) {
   return sortedWeeks.map(wk => {
     let max = 0;
     for (const d of wk.days)
@@ -87,6 +89,33 @@ function countTagSets(wk, tag) {
       if ((ex.tags ?? []).includes(tag))
         n += ex.sets.filter(s => s.status === 'success').length;
   return n;
+}
+
+/**
+ * Schlaf↔Abschlussquote-Korrelation. Exportiert und von E-02 UNTEN sowie von
+ * progressInsights.js (dauerhafte "Deine Erkenntnisse"-Sektion) genutzt —
+ * eine einzige Implementierung dieser Formel, keine Duplikate.
+ * @returns {{ threshold: number, avgWith: number, avgWithout: number } | null}
+ */
+export function computeSleepCorrelation(state) {
+  const threshold = 7;
+  // Prefer per-day sleepHours (averaged over done days), fall back to weekly bodyData.sleep
+  const sleepMap = new Map();
+  const all = getSortedWeeks(state);
+  all.forEach(wk => {
+    const daySleeps = wk.days.filter(d => d.sleepHours != null).map(d => d.sleepHours);
+    const avgDay = daySleeps.length > 0 ? daySleeps.reduce((a, b) => a + b, 0) / daySleeps.length : null;
+    sleepMap.set(wk, avgDay ?? wk.bodyData?.sleep ?? null);
+  });
+  const sorted = all.filter(wk => sleepMap.get(wk) != null);
+  if (sorted.length < 6) return null;
+  const withS    = sorted.filter(w => sleepMap.get(w) >= threshold);
+  const withoutS = sorted.filter(w => sleepMap.get(w) < threshold);
+  if (withS.length < 2 || withoutS.length < 2) return null;
+  const avgWith    = withS.reduce((s, w) => s + getCompletionRate(w), 0) / withS.length;
+  const avgWithout = withoutS.reduce((s, w) => s + getCompletionRate(w), 0) / withoutS.length;
+  if (Math.abs(avgWith - avgWithout) < 0.1) return null;
+  return { threshold, avgWith, avgWithout };
 }
 
 // ─── Insight definitions ──────────────────────────────────────────────────────
@@ -505,27 +534,12 @@ export const INSIGHTS = [
     id: 'E-02', priority: 16, type: 'recovery',
     trigger: ['WOCHE_ABGESCHLOSSEN'],
     evaluate(state) {
-      const threshold = 7;
-      // Prefer per-day sleepHours (averaged over done days), fall back to weekly bodyData.sleep
-      const sleepMap = new Map();
-      const all = getSortedWeeks(state);
-      all.forEach(wk => {
-        const daySleeps = wk.days.filter(d => d.sleepHours != null).map(d => d.sleepHours);
-        const avgDay = daySleeps.length > 0 ? daySleeps.reduce((a, b) => a + b, 0) / daySleeps.length : null;
-        sleepMap.set(wk, avgDay ?? wk.bodyData?.sleep ?? null);
-      });
-      const sorted = all.filter(wk => sleepMap.get(wk) != null);
-      if (sorted.length < 6) return null;
-      const withS    = sorted.filter(w => sleepMap.get(w) >= threshold);
-      const withoutS = sorted.filter(w => sleepMap.get(w) < threshold);
-      if (withS.length < 2 || withoutS.length < 2) return null;
-      const avgWith    = withS.reduce((s, w) => s + getCompletionRate(w), 0) / withS.length;
-      const avgWithout = withoutS.reduce((s, w) => s + getCompletionRate(w), 0) / withoutS.length;
-      if (Math.abs(avgWith - avgWithout) < 0.1) return null;
+      const r = computeSleepCorrelation(state);
+      if (!r) return null;
       return {
         id: 'E-02', type: 'recovery', priority: 16,
         title: 'Schlaf & Leistung',
-        message: `In Wochen mit ${threshold}h+ Schlaf lag deine Abschlussquote bei ${Math.round(avgWith*100)}%, sonst bei ${Math.round(avgWithout*100)}%.`,
+        message: `In Wochen mit ${r.threshold}h+ Schlaf lag deine Abschlussquote bei ${Math.round(r.avgWith*100)}%, sonst bei ${Math.round(r.avgWithout*100)}%.`,
         recommendation: null,
       };
     },
