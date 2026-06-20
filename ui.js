@@ -991,6 +991,42 @@ function renderInfoBlock(type, label, value, di, disabled) {
 </div>`;
 }
 
+/**
+ * "Nächstes Ziel" — reine Anzeige bestehender Werte (targetReps, ex.nextWeekPlan,
+ * Satz-Daten), keine neue Empfehlungslogik. Ersetzt das frühere freie Notizfeld.
+ * Gibt null zurück wenn nichts anzuzeigen ist (kein targetReps definiert).
+ */
+function _nextGoalText(ex) {
+  const target = parseFloat(ex.targetReps) || 0;
+  if (!target) return null; // Zustand D: kein Zielwert definiert
+
+  const allSetsHitTarget = ex.sets.length > 0
+    && ex.sets.every(s => (parseFloat(s.reps) || 0) >= target);
+
+  if (!allSetsHitTarget) {
+    const successReps = ex.sets
+      .filter(s => s.status === 'success')
+      .map(s => parseFloat(s.reps) || 0);
+    const maxReps    = successReps.length > 0 ? Math.max(...successReps) : 0;
+    const remaining  = Math.max(0, target - maxReps);
+    return `Noch ${remaining} Wdh bis zum Wochenziel`;
+  }
+
+  if (!ex.nextWeekPlan) return 'Ziel erreicht — Steigerung über den ⚙️-Button planen';
+
+  const pt = ex.progressionType ?? 'weight';
+  let newValueText;
+  if (pt === 'reps') {
+    newValueText = `${target + ex.nextWeekPlan} Wdh`;
+  } else if (pt === 'sets') {
+    newValueText = `${ex.sets.length + ex.nextWeekPlan} Sätze`;
+  } else {
+    const curWeight = Math.max(...ex.sets.map(s => s.weight ?? 0));
+    newValueText = `${curWeight + ex.nextWeekPlan}kg`;
+  }
+  return `Nächste Steigerung: +${ex.nextWeekPlan} → ${newValueText}`;
+}
+
 // ─── Exercise ─────────────────────────────────────────────────────────────────
 function renderExercise(wk, di, ei, state) {
   const ex     = wk.days[di].exercises[ei];
@@ -1315,16 +1351,10 @@ function renderExercise(wk, di, ei, state) {
 
   <div class="ex-chart-wrap" data-chart-di="${di}" data-chart-ei="${ei}"></div>
 
-  <input
-    class="exercise__note"
-    type="text"
-    value="${h(ex.note ?? '')}"
-    placeholder="Notiz …"
-    ${locked ? 'disabled' : ''}
-    data-action="ex-note" data-di="${di}" data-ei="${ei}"
-    aria-label="Notiz zu ${h(ex.name)}"
-    maxlength="120"
-  />
+  ${(() => {
+    const goalText = _nextGoalText(ex);
+    return goalText ? `<div class="exercise__next-goal">${h(goalText)}</div>` : '';
+  })()}
 
   <!-- 1RM estimator hint (3.7) -->
   ${(() => {
@@ -4018,8 +4048,6 @@ function _handleChange(e) {
   switch (action) {
     case 'ex-name':
       dispatch(A.EX_UPDATE, { di: +di, ei: +ei, field: 'name', value: el.value }); break;
-    case 'ex-note':
-      dispatch(A.EX_UPDATE, { di: +di, ei: +ei, field: 'note', value: el.value }); break;
     case 'day-field':
       dispatch(A.DAY_SET_FIELD, { di: +di, field, value: el.value }); break;
     case 'set-weight':

@@ -516,15 +516,11 @@ exercise { position: unset; }
   align-items: center;
 }
 
-.exercise__note {
-  width: 100%; background: none; border: none; border-bottom: 1px solid var(--c-border);
-  color: var(--c-text-3); font-size: 12px; font-style: italic;
+.exercise__next-goal {
+  width: 100%; color: var(--c-text-3); font-size: 12px; font-style: italic;
   padding: var(--sp-1) 0; margin-bottom: var(--sp-2);
-  transition: border-color var(--t-fast), color var(--t-fast);
+  border-bottom: 1px solid var(--c-border);
 }
-.exercise__note::placeholder { color: var(--c-border); }
-.exercise__note:focus { border-color: var(--c-accent); color: var(--c-text); outline: none; }
-.exercise__note:disabled { opacity: .6; }
 
 /* Set grid: #idx | kg | reps | rpe | done | remove | note */
 .set-header, .set-row {
