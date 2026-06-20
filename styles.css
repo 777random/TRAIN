@@ -1302,8 +1302,8 @@ exercise { position: unset; }
   transition: opacity var(--t-fast), background var(--t-fast);
 }
 .nw-weight-rec-chip:hover { background: var(--c-surface3, #232D42); }
-.nw-weight-rec-chip.is-adopted {
-  opacity: 0.35; pointer-events: none; text-decoration: line-through;
+.nw-weight-rec-chip--confirmed {
+  border-color: var(--c-ok); box-shadow: 0 0 0 1px var(--c-ok);
 }
 .nw-rec-top    { display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 8px; }
 .nw-rec-name   { font-weight: 600; flex: 1; min-width: 0; color: var(--c-text); }
@@ -1311,6 +1311,7 @@ exercise { position: unset; }
 .nw-rec-reasons { display: flex; flex-direction: column; gap: 2px; width: 100%; }
 .nw-rec-reason-row { font-size: 11px; color: var(--c-text-2); }
 .nw-rec-tap    { font-size: 10px; color: var(--c-text-3); }
+.nw-rec-auto-hint { font-size: 10px; color: var(--c-ok); }
 
 .export-option {
   display: flex; align-items: flex-start; gap: var(--sp-3);

@@ -205,6 +205,7 @@ const _MAX_UNDO  = 20;
 const _NO_UNDO = new Set([
   'UNDO', 'WEEK_NAVIGATE', 'STATE_IMPORT', 'SESSION_START', 'SESSION_RESET', 'SESSION_STOP',
   'INSIGHTS_SET', 'ONBOARDING_DONE', 'MARK_TIP_SEEN', 'REENTRY_HANDLED',
+  'EX_AUTO_PRESELECT_NEXT_WEEK_PLAN',
 ]);
 
 /** Returns true when there is at least one undo snapshot available. */
@@ -821,6 +822,7 @@ export const A = Object.freeze({
   EX_INC_WEIGHT:       'EX_INC_WEIGHT',       // { di, ei, amount } – erhöht alle Sätze sofort
   EX_SET_NEXT_WEEK_PLAN:'EX_SET_NEXT_WEEK_PLAN',// { di, ei, value }  – setzt nextWeekPlan + confirmed=true
   EX_TOGGLE_NEXT_WEEK_CONFIRMED: 'EX_TOGGLE_NEXT_WEEK_CONFIRMED', // { di, ei } – toggelt confirmed
+  EX_AUTO_PRESELECT_NEXT_WEEK_PLAN: 'EX_AUTO_PRESELECT_NEXT_WEEK_PLAN', // { selections: [{di, ei, value}] } – Coach-Chip Vorauswahl, kein User-Tap
   EX_SET_STEP:         'EX_SET_STEP',         // { di, ei, step }  – speichert Steigerungsrate
   EX_SET_TARGETS:      'EX_SET_TARGETS',      // { di, ei, targetReps }
   EX_SET_METRIC:       'EX_SET_METRIC',       // { di, ei, metric: 'reps'|'sec'|'m' }
@@ -1292,6 +1294,15 @@ function reduce(state, action) {
     case A.EX_TOGGLE_NEXT_WEEK_CONFIRMED: {
       const ex = _currentWeek()?.days[p.di]?.exercises[p.ei]; if (!ex) break;
       ex.nextWeekPlanConfirmed = !ex.nextWeekPlanConfirmed;
+      break;
+    }
+    case A.EX_AUTO_PRESELECT_NEXT_WEEK_PLAN: {
+      const wk = _currentWeek(); if (!wk) break;
+      for (const sel of p.selections ?? []) {
+        const ex = wk.days[sel.di]?.exercises[sel.ei]; if (!ex) continue;
+        ex.nextWeekPlan = sel.value;
+        ex.nextWeekPlanConfirmed = true;
+      }
       break;
     }
     case A.EX_SET_TARGETS: {

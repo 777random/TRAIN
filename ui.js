@@ -25,7 +25,7 @@ import {
 } from './backup.js';
 import * as ic from './icons.js';
 import { fireTrigger } from './triggerEngine.js';
-import { getWeightRecommendation, roundToPlate } from './weightRecommendation.js';
+import { getWeightRecommendation, roundToPlate, isReadyForAutoSelect } from './weightRecommendation.js';
 import { renderProgressChart, renderBodyWeightChart } from './progressChart.js';
 import { buildWeekReview }        from './weekReview.js';
 import { showWeekReviewModal, renderWeekReviewHtml } from './weekReviewModal.js';
@@ -3110,22 +3110,32 @@ function _handleClick(e) {
       showToast('Woche als Standard-Vorlage gespeichert ✓', 'ok');
       break;
 
-    // ── KI-Gewichtsempfehlung übernehmen (Modal-Chip) ─────────────────────
+    // ── KI-Gewichtsempfehlung übernehmen/ablehnen (Modal-Chip) ─────────────
     case 'toggle-weight-rec': {
       const recName  = el.dataset.name;
       const recDelta = parseFloat(el.dataset.delta ?? '0');
       const _recSt   = getState();
       const _recWk   = _recSt.weeks[_recSt.curIdx];
       if (!_recWk) break;
+      let _nowConfirmed = false;
       (_recWk.days ?? []).forEach((day, _rdi) => {
         (day.exercises ?? []).forEach((ex, _rei) => {
-          if (ex.name === recName) {
+          if (ex.name !== recName) return;
+          const wasConfirmed = ex.nextWeekPlanConfirmed && ex.nextWeekPlan === recDelta;
+          if (wasConfirmed) {
+            dispatch(A.EX_TOGGLE_NEXT_WEEK_CONFIRMED, { di: _rdi, ei: _rei });
+          } else {
             dispatch(A.EX_SET_NEXT_WEEK_PLAN, { di: _rdi, ei: _rei, value: recDelta });
           }
+          _nowConfirmed = !wasConfirmed;
         });
       });
-      el.classList.add('is-adopted');
-      el.setAttribute('aria-pressed', 'true');
+      el.classList.toggle('nw-weight-rec-chip--confirmed', _nowConfirmed);
+      el.setAttribute('aria-pressed', String(_nowConfirmed));
+      const _hintEl = el.querySelector('.nw-rec-auto-hint, .nw-rec-tap');
+      if (_hintEl) _hintEl.outerHTML = _nowConfirmed
+        ? '<div class="nw-rec-tap">✓ Übernommen — Tap zum Ändern</div>'
+        : '<div class="nw-rec-tap">→ Tap zum Bestätigen</div>';
       break;
     }
 
@@ -4219,11 +4229,12 @@ function _prepNewWeekModal() {
     if (calcWeeks.length >= 2) {
       const seen = new Set();
       const plateStep = state.settings?.plateStep ?? 2.5;
-      for (const day of curWk.days) {
-        for (const ex of day.exercises) {
-          if (seen.has(ex.name)) continue;
-          if (ex.substituteFor) continue;
-          if ((ex.progressionType ?? 'weight') === 'reps') continue;
+      const _autoSelections = [];
+      curWk.days.forEach((day, di) => {
+        (day.exercises ?? []).forEach((ex, ei) => {
+          if (seen.has(ex.name)) return;
+          if (ex.substituteFor) return;
+          if ((ex.progressionType ?? 'weight') === 'reps') return;
           seen.add(ex.name);
           const rec = getWeightRecommendation(ex.name, calcWeeks, plateStep);
           if (rec) {
@@ -4232,9 +4243,17 @@ function _prepNewWeekModal() {
               rec.recommendedWeight = roundToPlate(rec.lastWeight + rec.delta, plateStep);
               rec.boosted = true;
             }
-            aiRecs.push({ name: ex.name, rec });
+            const autoSelected = rec.delta > 0 && isReadyForAutoSelect(ex.name, calcWeeks);
+            const alreadyConfirmedSame = ex.nextWeekPlanConfirmed && ex.nextWeekPlan === rec.delta;
+            if (autoSelected && !alreadyConfirmedSame) {
+              _autoSelections.push({ di, ei, value: rec.delta });
+            }
+            aiRecs.push({ name: ex.name, rec, autoSelected, confirmed: autoSelected || alreadyConfirmedSame });
           }
-        }
+        });
+      });
+      if (_autoSelections.length > 0) {
+        dispatch(A.EX_AUTO_PRESELECT_NEXT_WEEK_PLAN, { selections: _autoSelections });
       }
     }
   }
@@ -4261,18 +4280,23 @@ function _prepNewWeekModal() {
         ? `💡 +${r.rec.delta} kg empfohlen`
         : `💡 Gewicht halten (${r.rec.recommendedWeight} kg)`;
       return `
-    <button type="button" class="nw-weight-rec-chip"
+    <button type="button" class="nw-weight-rec-chip${r.confirmed ? ' nw-weight-rec-chip--confirmed' : ''}"
       data-action="toggle-weight-rec"
       data-name="${h(r.name)}"
       data-weight="${r.rec.recommendedWeight}"
       data-delta="${r.rec.delta}"
+      aria-pressed="${r.confirmed}"
       aria-label="Empfehlung für ${h(r.name)} übernehmen">
       <div class="nw-rec-top">
         <span class="nw-rec-name">${h(r.name)}</span>
         <span class="nw-rec-action">${_action}</span>
       </div>
       ${_filtReasons.length > 0 ? `<div class="nw-rec-reasons">${_filtReasons.map(rs => `<div class="nw-rec-reason-row">${rs.icon} ${h(rs.text)}</div>`).join('')}</div>` : ''}
-      <div class="nw-rec-tap">→ Tap zum Bestätigen</div>
+      ${r.autoSelected
+        ? `<div class="nw-rec-auto-hint">✓ Automatisch vorausgewählt — du kannst das ändern</div>`
+        : r.confirmed
+          ? `<div class="nw-rec-tap">✓ Übernommen — Tap zum Ändern</div>`
+          : `<div class="nw-rec-tap">→ Tap zum Bestätigen</div>`}
     </button>`;
     }).join('')}
   </div>` : '';

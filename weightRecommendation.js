@@ -115,3 +115,39 @@ export function getWeightRecommendation(exerciseName, weeks, plateStep = 2.5) {
     lastWeight,
   };
 }
+
+/**
+ * Prüft, ob eine Übung automatisch für die Steigerung vorausgewählt werden
+ * soll: in den letzten 2-3 Nicht-Deload/Nicht-Urlaub-Wochen mit Daten für
+ * diese Übung durchgehend 100% Erfolgsquote (keine fail-Sätze) und eine
+ * Ø RPE über diese Wochen von höchstens 8.
+ *
+ * @param {string} exerciseName
+ * @param {Array}  weeks – bereits auf Nicht-Deload/Nicht-Urlaub gefilterte Wochen
+ * @returns {boolean}
+ */
+export function isReadyForAutoSelect(exerciseName, weeks) {
+  const weeksWithData = [];
+  for (const wk of weeks) {
+    const success = [], fail = [];
+    for (const d of wk.days)
+      for (const ex of d.exercises)
+        if (ex.name === exerciseName)
+          for (const s of ex.sets) {
+            if (s.status === 'success') success.push(s);
+            else if (s.status === 'fail') fail.push(s);
+          }
+    if (success.length + fail.length > 0) weeksWithData.push({ success, fail });
+  }
+
+  const lastWeeks = weeksWithData.slice(-3);
+  if (lastWeeks.length < 2) return false;
+
+  const allPerfect = lastWeeks.every(w => w.fail.length === 0 && w.success.length > 0);
+  if (!allPerfect) return false;
+
+  const rpeValues = lastWeeks.flatMap(w => w.success.filter(s => s.rpe != null).map(s => s.rpe));
+  if (rpeValues.length === 0) return true;
+  const avgRpe = rpeValues.reduce((a, b) => a + b, 0) / rpeValues.length;
+  return avgRpe <= 8;
+}
