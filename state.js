@@ -710,8 +710,10 @@ export function loadState() {
       if (STATE.onboardingDone === undefined)       STATE.onboardingDone = false;
       // Defensive bounds check — only restore missing week when onboarding is already done
       if (!STATE.weeks.length && STATE.onboardingDone) _appendDefaultWeek();
-      if (STATE.curIdx >= STATE.weeks.length) STATE.curIdx = STATE.weeks.length - 1;
-      if (STATE.curIdx < 0)                   STATE.curIdx = 0;
+      // Persisted data may predate the sort invariant (or be hand-edited/imported
+      // out of order) — enforce it on every load, keeping curIdx on the same week.
+      if (STATE.curIdx < 0 || STATE.curIdx >= STATE.weeks.length) STATE.curIdx = 0;
+      _resortWeeksKeepingCurrent(STATE, STATE.weeks[STATE.curIdx]);
       _recalcExercisePRs(STATE);
       _checkAndGrantBadges(STATE);
       console.log('[TRAIN] streak:', _calcCurrentStreak(STATE.weeks), 'badges:', STATE.badges);
@@ -774,9 +776,39 @@ export function getLatestWeek(weeks) {
   return [...weeks].sort((a, b) => a.startDate.localeCompare(b.startDate))[weeks.length - 1];
 }
 
+/**
+ * INVARIANT: state.weeks must always be sorted chronologically by startDate.
+ * Every piece of code that does "curIdx - 1" / "curIdx + 1" / "weeks.length-1"
+ * to mean "the previous/next/latest week" (WEEK_COPY_PREV, the Next-button
+ * disable check, prevDay/prevEx/prevWk lookups, etc.) relies on array
+ * position == chronological position. Any reducer case that pushes,
+ * splices, or replaces state.weeks MUST call _resortWeeksKeepingCurrent()
+ * (or _sortWeeksChrono() directly for read-only helpers) immediately after,
+ * or this invariant silently breaks and those lookups return wrong weeks.
+ */
+function _sortWeeksChrono(weeks) {
+  return [...weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
+}
+
+/**
+ * Sorts state.weeks chronologically and re-points state.curIdx at the same
+ * logical week (by object reference) it pointed to before the mutation —
+ * sorting must never silently shift "the week being viewed" to a different
+ * one. If refWeek is no longer present (e.g. it was just deleted), falls
+ * back to clamping curIdx within bounds.
+ */
+function _resortWeeksKeepingCurrent(state, refWeek) {
+  state.weeks = _sortWeeksChrono(state.weeks);
+  if (refWeek) {
+    const idx = state.weeks.indexOf(refWeek);
+    if (idx >= 0) { state.curIdx = idx; return; }
+  }
+  if (state.curIdx >= state.weeks.length) state.curIdx = Math.max(0, state.weeks.length - 1);
+}
+
 function _appendDefaultWeek(startDate) {
   const days = clone(STATE.customTemplate ?? FACTORY_TEMPLATE);
-  STATE.weeks.push({
+  const newWk = {
     id:         Date.now(),
     startDate:  startDate ?? _nextMonday(),
     note:       '',
@@ -785,8 +817,9 @@ function _appendDefaultWeek(startDate) {
     sessionLog: [],
     bodyData:   {},
     restDays:   [],
-  });
-  STATE.curIdx = STATE.weeks.length - 1;
+  };
+  STATE.weeks.push(newWk);
+  _resortWeeksKeepingCurrent(STATE, newWk);
 }
 
 function _nextMonday() {
@@ -983,12 +1016,12 @@ function reduce(state, action) {
 
       _resetClonedDays(days);
 
-      state.weeks.push({
+      const newWeek = {
         id: Date.now(), startDate: p.startDate, note: p.note ?? '',
         mode: 'standard', days, sessionLog: [], bodyData: {}, restDays: [],
-      });
-      state.weeks.sort((a, b) => a.startDate.localeCompare(b.startDate));
-      state.curIdx = state.weeks.findIndex(w => w.startDate === p.startDate);
+      };
+      state.weeks.push(newWeek);
+      _resortWeeksKeepingCurrent(state, newWeek);
       _checkAndGrantBadges(state);
       break;
     }
@@ -997,8 +1030,13 @@ function reduce(state, action) {
       const _delIdx = (p.weekIdx !== undefined && p.weekIdx >= 0 && p.weekIdx < state.weeks.length)
         ? p.weekIdx
         : state.curIdx;
+      // Capture the currently-viewed week by reference BEFORE splicing — if an
+      // earlier week is deleted (not the one curIdx points to), curIdx must
+      // still resolve to the SAME logical week after indices shift, not
+      // silently drift to whatever week now occupies the old numeric index.
+      const _curWeekRef = state.weeks[state.curIdx];
       state.weeks.splice(_delIdx, 1);
-      if (state.curIdx >= state.weeks.length) state.curIdx = state.weeks.length - 1;
+      _resortWeeksKeepingCurrent(state, _curWeekRef);
       break;
     }
     case A.WEEK_COPY_PREV: {
@@ -1567,18 +1605,21 @@ function reduce(state, action) {
     case A.STATE_IMPORT: {
       const imported = migrate(p.imported);
       if (!Array.isArray(imported?.weeks)) break;
+      // Capture the week the IMPORTED curIdx points to (in imported.weeks'
+      // own, possibly-unsorted order) before Object.assign + resort — an
+      // external JSON import is not guaranteed to already be chronological.
+      const _importRefWeek = imported.weeks[imported.curIdx];
       Object.assign(state, imported);
       if (!state.prs)                        state.prs       = {};
       if (!state.templates)                  state.templates = [];
       if (!Array.isArray(state.badges))      state.badges    = [];
       if (!state.weeks.length) _appendDefaultWeek();
-      if (state.curIdx >= state.weeks.length) state.curIdx = state.weeks.length - 1;
+      _resortWeeksKeepingCurrent(state, _importRefWeek);
       _checkAndGrantBadges(state);
       const _streak = (() => {
-        const sorted = [...state.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
         let cur = 0;
-        for (let i = sorted.length - 1; i >= 0; i--) {
-          const status = _isWeekDoneForStreak(sorted[i]);
+        for (let i = state.weeks.length - 1; i >= 0; i--) {
+          const status = _isWeekDoneForStreak(state.weeks[i]);
           if (status === null) continue;
           if (status) cur++;
           else break;
@@ -1616,12 +1657,13 @@ function reduce(state, action) {
     case A.UNDO: {
       const prev = _undoStack.pop();
       if (!prev) return; // nothing to undo — skip persist+notify
-      state.curIdx            = prev.curIdx;
+      const _undoRefWeek      = prev.weeks[prev.curIdx];
       state.weeks             = prev.weeks;
       state.customTemplate    = prev.customTemplate;
       state.settings          = prev.settings;
       state.favoriteExercises = prev.favoriteExercises ?? [];
       state.customExercises   = prev.customExercises ?? [];
+      _resortWeeksKeepingCurrent(state, _undoRefWeek);
       break;
     }
 
@@ -1739,12 +1781,12 @@ function reduce(state, action) {
     case A.ONBOARDING_WEEK_CREATE: {
       if (!p.startDate || !Array.isArray(p.days)) break;
       if (state.weeks.find(w => w.startDate === p.startDate)) break;
-      state.weeks.push({
+      const _obNewWeek = {
         id: Date.now(), startDate: p.startDate, note: p.note ?? '',
         mode: 'standard', days: p.days, sessionLog: [], bodyData: {}, restDays: [],
-      });
-      state.weeks.sort((a, b) => a.startDate.localeCompare(b.startDate));
-      state.curIdx = state.weeks.findIndex(w => w.startDate === p.startDate);
+      };
+      state.weeks.push(_obNewWeek);
+      _resortWeeksKeepingCurrent(state, _obNewWeek);
       _checkAndGrantBadges(state);
       break;
     }
