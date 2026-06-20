@@ -2061,23 +2061,6 @@ function renderCoachTab(state) {
     return;
   }
 
-  const sorted = [...state.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
-
-  // ── 1. Wochenrückblick-Auswahl ─────────────────────────────────────────────
-  const reviewableWeeks = [...sorted].filter(w => w.days.some(d => d.markedDone)).reverse();
-
-  const weekReviewHtml = reviewableWeeks.length ? (() => {
-    const opts = reviewableWeeks.map((wk, i) => {
-      const lbl = `${_relDate(wk.startDate)} · ${wkRange(wk.startDate)}${wk.note ? ' · ' + wk.note : ''}`;
-      return `<option value="${i}">${h(lbl)}</option>`;
-    }).join('');
-    return `<div class="chart-card" id="week-review-card">
-      <div class="chart-card__title">📋 Wochenrückblick</div>
-      <select class="chart-select" id="week-review-select" aria-label="Woche für Rückblick auswählen">${opts}</select>
-      <div id="week-review-inline" style="margin-top:var(--sp-3)"></div>
-    </div>`;
-  })() : '';
-
   // ── "Deine Erkenntnisse" — dauerhafte Sektion, bei jedem Render frisch
   // berechnet (nicht event-getrieben wie state.insights/Toast-System).
   const erkenntnisLines = computeErkenntnisLines(state);
@@ -2091,18 +2074,9 @@ function renderCoachTab(state) {
   const overallTrendHtml = `<div id="overall-trend-placeholder" style="display:none"></div>`;
 
   container.innerHTML = `
-  ${weekReviewHtml}
-
   ${erkenntnisseHtml}
 
   ${overallTrendHtml}`;
-
-  requestAnimationFrame(() => {
-    _updateInlineReview(getState());
-    document.getElementById('week-review-select')?.addEventListener('change', () => {
-      _updateInlineReview(getState());
-    });
-  });
 }
 
 // ─── Fortschritt tab: Übungsfortschritt, Bestleistungen, Bewegungsmuster, Streak+Abzeichen ──
@@ -2114,6 +2088,22 @@ function renderProgressTab(state) {
     container.innerHTML = _noAnalysisDataHtml();
     return;
   }
+
+  const sorted = [...state.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
+
+  // ── Wochenrückblick-Auswahl ───────────────────────────────────────────────
+  const reviewableWeeks = [...sorted].filter(w => w.days.some(d => d.markedDone)).reverse();
+  const weekReviewHtml = reviewableWeeks.length ? (() => {
+    const opts = reviewableWeeks.map((wk, i) => {
+      const lbl = `${_relDate(wk.startDate)} · ${wkRange(wk.startDate)}${wk.note ? ' · ' + wk.note : ''}`;
+      return `<option value="${i}">${h(lbl)}</option>`;
+    }).join('');
+    return `<div class="chart-card" id="week-review-card">
+      <div class="chart-card__title">📋 Wochenrückblick</div>
+      <select class="chart-select" id="week-review-select" aria-label="Woche für Rückblick auswählen">${opts}</select>
+      <div id="week-review-inline" style="margin-top:var(--sp-3)"></div>
+    </div>`;
+  })() : '';
 
   const streak     = _calcStreak(state);
   const _scoreList = state.weeks.map(w => _weekSuccessScore(w)).filter(s => s.total > 0).map(s => s.pct);
@@ -2164,6 +2154,8 @@ function renderProgressTab(state) {
     : '';
 
   container.innerHTML = `
+  ${weekReviewHtml}
+
   ${insightHtml}
 
   <div class="chart-card">
@@ -2211,6 +2203,10 @@ function renderProgressTab(state) {
     _attachStreakChainTooltips();
     document.getElementById('chart-ex-select')?.addEventListener('change', () => {
       _updateExChart(getState());
+    });
+    _updateInlineReview(getState());
+    document.getElementById('week-review-select')?.addEventListener('change', () => {
+      _updateInlineReview(getState());
     });
   });
 }
@@ -4741,7 +4737,7 @@ function _buildScaffold(root) {
 
 <section id="page-coach" class="page" role="tabpanel" aria-label="Coach">
   <h1 class="page-title">Coach</h1>
-  <p class="page-subtitle">Wochenrückblick & Erkenntnisse</p>
+  <p class="page-subtitle">Erkenntnisse & Trends</p>
   <div id="coach-tab-content"></div>
 </section>
 
@@ -4749,7 +4745,7 @@ function _buildScaffold(root) {
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--sp-4)">
     <div>
       <h1 class="page-title">Fortschritt</h1>
-      <p class="page-subtitle">Übungen & Muster</p>
+      <p class="page-subtitle">Wochenrückblick, Übungen & Muster</p>
     </div>
     <button class="btn btn--accent btn--sm" data-action="open-export"
       aria-label="Daten exportieren">${ic.download()} Export</button>
