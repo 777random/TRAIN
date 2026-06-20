@@ -15,19 +15,19 @@ function _fmtVol(v) {
   return v >= 1000 ? (v / 1000).toFixed(1) + 't' : v + ' kg';
 }
 
-function _summaryGrid({ streak, totalSets, completedDays, plannedDays, avgSessionDuration, goalFulfillment }) {
+function _summaryRow({ streak, totalSets, completedDays, plannedDays, avgSessionDuration, goalFulfillment }) {
   const goalColor = goalFulfillment != null
     ? (goalFulfillment >= 90 ? 'var(--c-ok)' : goalFulfillment >= 70 ? 'var(--c-warn)' : 'var(--c-danger)')
     : '';
-  const tiles = [
-    { num: streak ?? 0,          sub: '', label: 'Streak' },
-    { num: totalSets,            sub: '', label: 'Sätze ✓' },
-    { num: `${completedDays}/${plannedDays}`, sub: '', label: 'Tage' },
-    { num: avgSessionDuration != null ? `${avgSessionDuration}′` : '—', sub: '', label: 'Ø Session' },
-    { num: goalFulfillment != null ? `${goalFulfillment}%` : '—', sub: '', label: 'Ziel', color: goalColor },
+  const items = [
+    `🔥 ${streak ?? 0}`,
+    `✓ ${totalSets} Sätze`,
+    `${completedDays}/${plannedDays} Tage`,
+    avgSessionDuration != null ? `${avgSessionDuration}′ Ø Session` : '— Ø Session',
+    `<span${goalColor ? ` style="color:${goalColor}"` : ''}>${goalFulfillment != null ? `${goalFulfillment}%` : '—'} Ziel</span>`,
   ];
-  return `<div class="wr-grid">
-    ${tiles.map(t => `<div class="wr-tile"><div class="wr-tile__num"${t.color ? ` style="color:${t.color}"` : ''}>${t.num}${t.sub}</div><div class="wr-tile__lbl">${t.label}</div></div>`).join('')}
+  return `<div class="wr-metrics-row">
+    ${items.map(i => `<span class="wr-metric">${i}</span>`).join('<span class="wr-metric-sep">·</span>')}
   </div>`;
 }
 
@@ -56,7 +56,7 @@ export function renderWeekReviewHtml(reviewData) {
   </div>
 
   <div class="wr-section-title">Zusammenfassung</div>
-  ${_summaryGrid(summary)}
+  ${_summaryRow(summary)}
 
   ${highlights.length ? `
   <div class="wr-section-title">✅ Was gut lief</div>
