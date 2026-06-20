@@ -30,6 +30,7 @@ import { renderProgressChart, renderBodyWeightChart } from './progressChart.js';
 import { buildWeekReview }        from './weekReview.js';
 import { showWeekReviewModal, renderWeekReviewHtml } from './weekReviewModal.js';
 import { detectPlateaus }         from './plateauDetector.js';
+import { computeWeeklyFocus, isInRecoveryWindow } from './weeklyFocus.js';
 import { findExactDuplicates, findSimilarCandidates } from './exerciseNameCleanup.js';
 import { computeErkenntnisLines } from './progressInsights.js';
 
@@ -2051,12 +2052,20 @@ function _hasAnyTrainingData(state) {
   );
 }
 
-// ─── Coach tab: Wiedereinstieg-Statuskarte, Steigerungs-Vorschau, Gesamt-
-// Trend/Fokus-Platzhalter — jeweils nur sichtbar wenn aktuell relevant.
-// Plateau-Erkennung bewusst NICHT hier (lebt bereits im Wochenrückblick
-// unter "Was nicht gut lief", keine Duplizierung). "Deine Erkenntnisse"/
-// "Beobachtungen" wohnt im Fortschritt-Tab — reine Feststellungen ohne
-// Handlungsaufforderung gehören zum Accounting, nicht zum Controlling/Coach.
+const _FOCUS_ICONS = {
+  reentry:     '🔄',
+  overload:    '🔋',
+  plateau:     '⚠️',
+  progression: '💪',
+  onTrack:     '✅',
+};
+
+// ─── Coach tab: einzige Komponente ist die "Fokus der Woche"-Karte. Sie
+// verdichtet Wiedereinstieg/Überlastung/Plateau/Progression (in dieser
+// Priorität, siehe weeklyFocus.js) zu EINER Aussage. Plateau-Erkennung wird
+// hier nicht zusätzlich/dupliziert dargestellt — computeWeeklyFocus() ruft
+// detectPlateaus() 1:1 wiederverwendet auf, dieselbe Funktion die auch der
+// Wochenrückblick nutzt.
 function renderCoachTab(state) {
   const container = document.getElementById('coach-tab-content');
   if (!container) return;
@@ -2066,47 +2075,16 @@ function renderCoachTab(state) {
     return;
   }
 
-  // ── 1. Wiedereinstieg-Statuskarte — nutzt state.lastReentryHandled +
-  // _isInRecoveryWindow() (unverändert). Aktiv nur in den ersten 2 Wochen
-  // nach einem bestätigten Wiedereinstieg.
-  const reentryCardHtml = (() => {
-    if (!state.lastReentryHandled) return '';
-    const daysSince = Math.floor((Date.now() - state.lastReentryHandled) / 86_400_000);
-    if (daysSince < 0 || daysSince >= 14) return '';
-    const weekNum = Math.floor(daysSince / 7) + 1;
-    const inRecovery = _isInRecoveryWindow(state);
-    return `<div class="chart-card coach-status-card">
-      <div class="chart-card__title">🔄 Wiedereinstieg aktiv</div>
-      <p class="coach-status-desc">Woche ${weekNum} nach Pause</p>
-      ${inRecovery ? `<p class="coach-status-desc coach-status-desc--accent">Du erholst dich schnell — größere Steigerung wird vorgeschlagen</p>` : ''}
-    </div>`;
-  })();
+  const focus = computeWeeklyFocus(state);
+  const icon  = _FOCUS_ICONS[focus.status] ?? _FOCUS_ICONS.onTrack;
 
-  // ── 2. Steigerungs-Vorschau — reiner Hinweis, nutzt isReadyForAutoSelect()/
-  // getWeightRecommendation() read-only über _countReadyForIncrease() (kein
-  // Dispatch). Bestätigung bleibt ausschließlich im Neue-Woche-Modal.
-  const readyCount = _countReadyForIncrease(state);
-  const previewCardHtml = readyCount > 0 ? `<div class="chart-card coach-status-card">
-      <div class="chart-card__title">💪 ${readyCount} ${readyCount === 1 ? 'Übung' : 'Übungen'} bereit für eine Steigerung</div>
-      <p class="coach-status-desc">Wird beim Erstellen der nächsten Woche vorgeschlagen</p>
-      <button type="button" class="btn btn--ghost btn--sm" data-action="open-new-week">Ansehen</button>
-    </div>` : '';
-
-  // ── Gesamt-Trend / Fokus der Woche — Platzhalter, Inhalt folgt in einem
-  // späteren Sprint. overall-trend-placeholder bleibt als unsichtbarer
-  // Einsatzpunkt für den künftigen Inhalt erhalten.
-  const overallTrendHtml = `<div id="overall-trend-placeholder" style="display:none"></div>`;
-
-  const anyCardActive = reentryCardHtml || previewCardHtml;
-
-  container.innerHTML = anyCardActive ? `
-  ${reentryCardHtml}
-
-  ${previewCardHtml}
-
-  ${overallTrendHtml}` : `
-  <p class="coach-placeholder">Hier entsteht dein wöchentlicher Fokus</p>
-  ${overallTrendHtml}`;
+  container.innerHTML = `
+  <div class="chart-card coach-focus-card">
+    <div class="chart-card__title">📋 Fokus der Woche</div>
+    <div class="coach-focus-status">${icon} ${h(focus.headline)}</div>
+    <p class="coach-focus-reasoning">${h(focus.reasoning)}</p>
+    ${focus.recommendation ? `<p class="coach-focus-recommendation">${h(focus.recommendation)}</p>` : ''}
+  </div>`;
 }
 
 // ─── Fortschritt tab: Wochenrückblick, Beobachtungen, Übungsfortschritt, Bestleistungen, Bewegungsmuster, Streak+Abzeichen ──
@@ -2635,42 +2613,6 @@ function _showReentryPopup(pauseDays, factor) {
     dispatch(A.REENTRY_HANDLED, {});
     overlay.remove();
   });
-}
-
-/**
- * Aufholphase: true when, within the first 2 weeks after a handled
- * Wiedereinstieg, success rate > 85% and average RPE < 7.
- */
-function _isInRecoveryWindow(state) {
-  if (!state.lastReentryHandled) return false;
-  const startMs = state.lastReentryHandled;
-  const endMs   = startMs + 14 * 86_400_000;
-  const relevantWeeks = state.weeks.filter(w => {
-    const ms = new Date(w.startDate + 'T00:00:00').getTime();
-    return ms >= startMs && ms < endMs;
-  });
-  if (!relevantWeeks.length) return false;
-
-  let succ = 0, fail = 0, rpeSum = 0, rpeCount = 0;
-  for (const wk of relevantWeeks) {
-    for (const day of wk.days) {
-      for (const ex of day.exercises) {
-        for (const s of ex.sets) {
-          if (s.status === 'success') {
-            succ++;
-            if (s.rpe != null) { rpeSum += s.rpe; rpeCount++; }
-          } else if (s.status === 'fail') {
-            fail++;
-          }
-        }
-      }
-    }
-  }
-  const total = succ + fail;
-  if (total === 0) return false;
-  const successRate = succ / total;
-  const avgRpe = rpeCount > 0 ? rpeSum / rpeCount : null;
-  return successRate > 0.85 && avgRpe !== null && avgRpe < 7;
 }
 
 function _shouldShowBackupReminder(state) {
@@ -4439,36 +4381,6 @@ function _renderRecChip(r, rpeEnabled) {
     </button>`;
 }
 
-/**
- * Read-only Vorschau-Zähler für den Coach-Tab: wie viele Übungen der
- * aktuellen Woche eine Steigerungsempfehlung hätten (rec.delta > 0),
- * unabhängig davon ob automatisch vorausgewählt. Spiegelt exakt die
- * Filterlogik aus _prepNewWeekModal() (curWk bewusst nicht ausgeschlossen),
- * aber OHNE jeden Seiteneffekt — kein Dispatch, kein State-Schreiben.
- */
-function _countReadyForIncrease(state) {
-  const curWk = getLatestWeek(state.weeks);
-  if (!curWk) return 0;
-  const calcWeeks = state.weeks
-    .filter(w => w.mode !== 'deload' && w.mode !== 'vacation')
-    .filter(w => w.days.some(d => d.exercises.some(ex => ex.sets.some(s => s.status === 'success'))));
-  if (calcWeeks.length < 2) return 0;
-  const seen = new Set();
-  const plateStep = state.settings?.plateStep ?? 2.5;
-  let count = 0;
-  curWk.days.forEach(day => {
-    (day.exercises ?? []).forEach(ex => {
-      if (seen.has(ex.name)) return;
-      if (ex.substituteFor) return;
-      if ((ex.progressionType ?? 'weight') === 'reps') return;
-      seen.add(ex.name);
-      const rec = getWeightRecommendation(ex.name, calcWeeks, plateStep);
-      if (rec && rec.delta > 0) count++;
-    });
-  });
-  return count;
-}
-
 function _prepNewWeekModal() {
   const state = getState();
   const body  = document.getElementById('new-week-modal-body');
@@ -4489,7 +4401,7 @@ function _prepNewWeekModal() {
   // nicht trainierte curWk hat ohnehin keine success-Sätze und wird durch
   // den zweiten Filter unten automatisch ausgeschlossen.
   const aiRecs = [];
-  const inRecoveryWindow = _isInRecoveryWindow(state);
+  const inRecoveryWindow = isInRecoveryWindow(state);
   if (curWk) {
     const calcWeeks = state.weeks
       .filter(w => w.mode !== 'deload' && w.mode !== 'vacation')

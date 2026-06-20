@@ -1000,11 +1000,10 @@ exercise { position: unset; }
 .chart-card__title svg { width: 18px; height: 18px; flex-shrink: 0; }
 .erkenntnis-line { font-size: 13px; color: var(--c-text-2); margin: 0 0 var(--sp-2); }
 .erkenntnis-line:last-child { margin-bottom: 0; }
-.coach-placeholder { font-size: 13px; color: var(--c-text-3); text-align: center; padding: var(--sp-5) 0; }
-.coach-status-card { border-left: 3px solid var(--c-accent); }
-.coach-status-desc { font-size: 13px; color: var(--c-text-2); margin: var(--sp-1) 0 var(--sp-3); }
-.coach-status-desc--accent { color: var(--c-accent); }
-.coach-status-card .btn { width: 100%; }
+.coach-focus-card { border-left: 3px solid var(--c-accent); }
+.coach-focus-status { font-family: var(--font-display); font-size: 20px; letter-spacing: .04em; margin-bottom: var(--sp-3); }
+.coach-focus-reasoning { font-size: 13px; color: var(--c-text-2); margin: 0 0 var(--sp-3); }
+.coach-focus-recommendation { font-size: 14px; font-weight: 600; color: var(--c-text); margin: 0; }
 .chart-wrap { position: relative; min-height: 60px; }
 .chart-wrap canvas { width: 100% !important; }
 #chart-ex-wrap svg { display: block; }
