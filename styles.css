@@ -1312,6 +1312,12 @@ exercise { position: unset; }
 .nw-rec-reason-row { font-size: 11px; color: var(--c-text-2); }
 .nw-rec-tap    { font-size: 10px; color: var(--c-text-3); }
 .nw-rec-auto-hint { font-size: 10px; color: var(--c-ok); }
+.nw-more-recs-toggle {
+  width: 100%; text-align: center; background: none; border: none;
+  color: var(--c-text-2); font-size: 11px; padding: var(--sp-2) 0;
+  cursor: pointer;
+}
+.nw-more-recs-toggle:hover { color: var(--c-text); }
 
 .export-option {
   display: flex; align-items: flex-start; gap: var(--sp-3);

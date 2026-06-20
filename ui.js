@@ -18,7 +18,7 @@
 
 import {
   getState, dispatch, subscribe, A, canUndo, BADGE_THRESHOLDS, VACATION_PLANS,
-  calcCurrentStreak, calcLongestStreakEver, isWeekDoneForStreak,
+  calcCurrentStreak, calcLongestStreakEver, isWeekDoneForStreak, getLatestWeek,
 } from './state.js';
 import {
   exportJSON, importJSON, exportCSV,
@@ -3054,9 +3054,9 @@ function _handleClick(e) {
 
     case 'open-new-week': {
       const _st = getState();
-      const _sortedWks = [..._st.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
-      const _lastWk = _sortedWks[_sortedWks.length - 1];
+      const _lastWk = getLatestWeek(_st.weeks);
       const _hasCompleted = _lastWk?.days.some(d => d.markedDone);
+      _moreRecsOpen = false;
       if (_hasCompleted) {
         const _plateaus = detectPlateaus(_st.weeks, _st.favoriteExercises ?? []);
         const _review = buildWeekReview(_lastWk, _st.weeks, _st.favoriteExercises ?? [], _plateaus);
@@ -3115,17 +3115,18 @@ function _handleClick(e) {
       const recName  = el.dataset.name;
       const recDelta = parseFloat(el.dataset.delta ?? '0');
       const _recSt   = getState();
-      const _recWk   = _recSt.weeks[_recSt.curIdx];
+      const _recWk   = getLatestWeek(_recSt.weeks);
       if (!_recWk) break;
+      const _recWkIdx = _recSt.weeks.indexOf(_recWk);
       let _nowConfirmed = false;
       (_recWk.days ?? []).forEach((day, _rdi) => {
         (day.exercises ?? []).forEach((ex, _rei) => {
           if (ex.name !== recName) return;
           const wasConfirmed = ex.nextWeekPlanConfirmed && ex.nextWeekPlan === recDelta;
           if (wasConfirmed) {
-            dispatch(A.EX_TOGGLE_NEXT_WEEK_CONFIRMED, { di: _rdi, ei: _rei });
+            dispatch(A.EX_TOGGLE_NEXT_WEEK_CONFIRMED, { di: _rdi, ei: _rei, weekIdx: _recWkIdx });
           } else {
-            dispatch(A.EX_SET_NEXT_WEEK_PLAN, { di: _rdi, ei: _rei, value: recDelta });
+            dispatch(A.EX_SET_NEXT_WEEK_PLAN, { di: _rdi, ei: _rei, value: recDelta, weekIdx: _recWkIdx });
           }
           _nowConfirmed = !wasConfirmed;
         });
@@ -3138,6 +3139,12 @@ function _handleClick(e) {
         : '<div class="nw-rec-tap">→ Tap zum Bestätigen</div>';
       break;
     }
+
+    // ── "Weitere Übungen anzeigen" Toggle (KI-Empfehlungen) ────────────────
+    case 'toggle-more-recs':
+      _moreRecsOpen = !_moreRecsOpen;
+      _prepNewWeekModal();
+      break;
 
     // ── Export options (previously role=button without data-action) ────────
     case 'export-current':
@@ -4185,13 +4192,45 @@ function _renderExFormModal(name) {
 }
 
 // ─── New week modal (2.3) ─────────────────────────────────────────────────────
+let _moreRecsOpen = false; // collapsible "weitere Übungen" state, reset on modal open
+
+function _renderRecChip(r, rpeEnabled) {
+  const _filtReasons = (r.rec.reasons ?? []).filter(rs => !rs.isRpe || rpeEnabled).slice(0, 2);
+  const _action = r.rec.delta > 0
+    ? `💡 +${r.rec.delta} kg empfohlen`
+    : `💡 Gewicht halten (${r.rec.recommendedWeight} kg)`;
+  return `
+    <button type="button" class="nw-weight-rec-chip${r.confirmed ? ' nw-weight-rec-chip--confirmed' : ''}"
+      data-action="toggle-weight-rec"
+      data-name="${h(r.name)}"
+      data-weight="${r.rec.recommendedWeight}"
+      data-delta="${r.rec.delta}"
+      aria-pressed="${r.confirmed}"
+      aria-label="Empfehlung für ${h(r.name)} übernehmen">
+      <div class="nw-rec-top">
+        <span class="nw-rec-name">${h(r.name)}</span>
+        <span class="nw-rec-action">${_action}</span>
+      </div>
+      ${_filtReasons.length > 0 ? `<div class="nw-rec-reasons">${_filtReasons.map(rs => `<div class="nw-rec-reason-row">${rs.icon} ${h(rs.text)}</div>`).join('')}</div>` : ''}
+      ${r.autoSelected
+        ? `<div class="nw-rec-auto-hint">✓ Automatisch vorausgewählt — du kannst das ändern</div>`
+        : r.confirmed
+          ? `<div class="nw-rec-tap">✓ Übernommen — Tap zum Ändern</div>`
+          : `<div class="nw-rec-tap">→ Tap zum Bestätigen</div>`}
+    </button>`;
+}
+
 function _prepNewWeekModal() {
   const state = getState();
   const body  = document.getElementById('new-week-modal-body');
   if (!body) return;
 
   // Progression suggestions: which exercises are ready for weight increase?
-  const curWk   = state.weeks[state.curIdx];
+  // Uses the chronologically latest week — the one WEEK_CREATE(source='prev')
+  // will actually clone — NOT state.curIdx, which can point elsewhere (e.g.
+  // after navigating to an older week, or once future-dated weeks exist).
+  const curWk    = getLatestWeek(state.weeks);
+  const curWkIdx = curWk ? state.weeks.indexOf(curWk) : -1;
   const suggestions = [];
   if (curWk) {
     for (const day of curWk.days) {
@@ -4253,52 +4292,33 @@ function _prepNewWeekModal() {
         });
       });
       if (_autoSelections.length > 0) {
-        dispatch(A.EX_AUTO_PRESELECT_NEXT_WEEK_PLAN, { selections: _autoSelections });
+        dispatch(A.EX_AUTO_PRESELECT_NEXT_WEEK_PLAN, { selections: _autoSelections, weekIdx: curWkIdx });
       }
     }
   }
 
-  // Favoriten zuerst, dann delta absteigend; max. 5 Chips
-  const _favSet = new Set(state.favoriteExercises ?? []);
-  aiRecs.sort((a, b) => {
-    const af = _favSet.has(a.name) ? 0 : 1;
-    const bf = _favSet.has(b.name) ? 0 : 1;
-    if (af !== bf) return af - bf;
-    return b.rec.delta - a.rec.delta;
-  });
-  const _displayRecs = aiRecs.slice(0, 5);
+  // Favoriten mit Empfehlung: immer sichtbar oben. Rest: aufklappbar,
+  // eingeklappt by default. Ohne Favoriten: Top 3 nach Delta direkt sichtbar.
+  const _favSet     = new Set(state.favoriteExercises ?? []);
+  const _favRecs    = aiRecs.filter(r => _favSet.has(r.name)).sort((a, b) => b.rec.delta - a.rec.delta);
+  const _nonFavRecs = aiRecs.filter(r => !_favSet.has(r.name)).sort((a, b) => b.rec.delta - a.rec.delta);
+  const _alwaysVisible = _favRecs.length > 0 ? _favRecs : _nonFavRecs.slice(0, 3);
+  const _collapsible   = _favRecs.length > 0 ? _nonFavRecs : _nonFavRecs.slice(3);
 
   const _rpeEnabled = state.settings?.rpeEnabled ?? true;
-  const _anyBoosted = _displayRecs.some(r => r.rec.boosted);
-  const aiRecHtml = _displayRecs.length > 0 ? `
+  const _anyBoosted = aiRecs.some(r => r.rec.boosted);
+  const aiRecHtml = aiRecs.length > 0 ? `
   <div class="nw-weight-recs">
     <div class="nw-weight-recs__title" style="display:flex;align-items:center;gap:6px">💡 KI-Empfehlung</div>
     ${_anyBoosted ? `<div class="movement-warning" style="background:rgba(200,255,0,.1);border-color:rgba(200,255,0,.3);color:var(--c-accent)">Du erholst dich schnell — TRAIN empfiehlt eine größere Steigerung als üblich.</div>` : ''}
-    ${_displayRecs.map(r => {
-      const _filtReasons = (r.rec.reasons ?? []).filter(rs => !rs.isRpe || _rpeEnabled).slice(0, 2);
-      const _action = r.rec.delta > 0
-        ? `💡 +${r.rec.delta} kg empfohlen`
-        : `💡 Gewicht halten (${r.rec.recommendedWeight} kg)`;
-      return `
-    <button type="button" class="nw-weight-rec-chip${r.confirmed ? ' nw-weight-rec-chip--confirmed' : ''}"
-      data-action="toggle-weight-rec"
-      data-name="${h(r.name)}"
-      data-weight="${r.rec.recommendedWeight}"
-      data-delta="${r.rec.delta}"
-      aria-pressed="${r.confirmed}"
-      aria-label="Empfehlung für ${h(r.name)} übernehmen">
-      <div class="nw-rec-top">
-        <span class="nw-rec-name">${h(r.name)}</span>
-        <span class="nw-rec-action">${_action}</span>
-      </div>
-      ${_filtReasons.length > 0 ? `<div class="nw-rec-reasons">${_filtReasons.map(rs => `<div class="nw-rec-reason-row">${rs.icon} ${h(rs.text)}</div>`).join('')}</div>` : ''}
-      ${r.autoSelected
-        ? `<div class="nw-rec-auto-hint">✓ Automatisch vorausgewählt — du kannst das ändern</div>`
-        : r.confirmed
-          ? `<div class="nw-rec-tap">✓ Übernommen — Tap zum Ändern</div>`
-          : `<div class="nw-rec-tap">→ Tap zum Bestätigen</div>`}
-    </button>`;
-    }).join('')}
+    ${_alwaysVisible.map(r => _renderRecChip(r, _rpeEnabled)).join('')}
+    ${_collapsible.length > 0 ? `
+    <button type="button" class="nw-more-recs-toggle" data-action="toggle-more-recs" aria-expanded="${_moreRecsOpen}">
+      ${_moreRecsOpen ? 'Weniger anzeigen' : `Weitere ${_collapsible.length} Übungen anzeigen`} ${_moreRecsOpen ? '▲' : '▼'}
+    </button>
+    <div class="nw-more-recs"${_moreRecsOpen ? '' : ' style="display:none"'}>
+      ${_collapsible.map(r => _renderRecChip(r, _rpeEnabled)).join('')}
+    </div>` : ''}
   </div>` : '';
 
   // Named templates from state.templates[]

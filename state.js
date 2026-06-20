@@ -762,6 +762,18 @@ function _currentWeek() {
   return STATE.weeks[STATE.curIdx] ?? null;
 }
 
+/**
+ * Chronologically latest week by startDate — NOT curIdx (the week being
+ * viewed) and NOT weeks[weeks.length-1] (array order, which can drift from
+ * chronological order once future-dated test/placeholder weeks exist).
+ * This is "the week that WEEK_CREATE(source='prev') will actually clone" —
+ * any code planning next-week progression must agree on this same week.
+ */
+export function getLatestWeek(weeks) {
+  if (!weeks?.length) return null;
+  return [...weeks].sort((a, b) => a.startDate.localeCompare(b.startDate))[weeks.length - 1];
+}
+
 function _appendDefaultWeek(startDate) {
   const days = clone(STATE.customTemplate ?? FACTORY_TEMPLATE);
   STATE.weeks.push({
@@ -820,9 +832,9 @@ export const A = Object.freeze({
   EX_MOVE:             'EX_MOVE',             // { di, fromEi, toEi }
   EX_TOGGLE_CFG:       'EX_TOGGLE_CFG',       // { di, ei }
   EX_INC_WEIGHT:       'EX_INC_WEIGHT',       // { di, ei, amount } – erhöht alle Sätze sofort
-  EX_SET_NEXT_WEEK_PLAN:'EX_SET_NEXT_WEEK_PLAN',// { di, ei, value }  – setzt nextWeekPlan + confirmed=true
-  EX_TOGGLE_NEXT_WEEK_CONFIRMED: 'EX_TOGGLE_NEXT_WEEK_CONFIRMED', // { di, ei } – toggelt confirmed
-  EX_AUTO_PRESELECT_NEXT_WEEK_PLAN: 'EX_AUTO_PRESELECT_NEXT_WEEK_PLAN', // { selections: [{di, ei, value}] } – Coach-Chip Vorauswahl, kein User-Tap
+  EX_SET_NEXT_WEEK_PLAN:'EX_SET_NEXT_WEEK_PLAN',// { di, ei, value, weekIdx? }  – setzt nextWeekPlan + confirmed=true; weekIdx default = curIdx
+  EX_TOGGLE_NEXT_WEEK_CONFIRMED: 'EX_TOGGLE_NEXT_WEEK_CONFIRMED', // { di, ei, weekIdx? } – toggelt confirmed; weekIdx default = curIdx
+  EX_AUTO_PRESELECT_NEXT_WEEK_PLAN: 'EX_AUTO_PRESELECT_NEXT_WEEK_PLAN', // { selections: [{di, ei, value}], weekIdx? } – Coach-Chip Vorauswahl, kein User-Tap; weekIdx default = curIdx
   EX_SET_STEP:         'EX_SET_STEP',         // { di, ei, step }  – speichert Steigerungsrate
   EX_SET_TARGETS:      'EX_SET_TARGETS',      // { di, ei, targetReps }
   EX_SET_METRIC:       'EX_SET_METRIC',       // { di, ei, metric: 'reps'|'sec'|'m' }
@@ -959,7 +971,7 @@ function reduce(state, action) {
 
       let days;
       if (source === 'prev' && state.weeks.length > 0) {
-        const lastWeek = state.weeks[state.weeks.length - 1];
+        const lastWeek = getLatestWeek(state.weeks);
         days = clone(lastWeek.days);
         _applyPlannedProgression(days);
       } else {
@@ -1286,18 +1298,20 @@ function reduce(state, action) {
       break;
     }
     case A.EX_SET_NEXT_WEEK_PLAN: {
-      const ex = _currentWeek()?.days[p.di]?.exercises[p.ei]; if (!ex) break;
+      const wk = p.weekIdx != null ? state.weeks[p.weekIdx] : _currentWeek();
+      const ex = wk?.days[p.di]?.exercises[p.ei]; if (!ex) break;
       ex.nextWeekPlan = p.value ?? 0;
       ex.nextWeekPlanConfirmed = true;
       break;
     }
     case A.EX_TOGGLE_NEXT_WEEK_CONFIRMED: {
-      const ex = _currentWeek()?.days[p.di]?.exercises[p.ei]; if (!ex) break;
+      const wk = p.weekIdx != null ? state.weeks[p.weekIdx] : _currentWeek();
+      const ex = wk?.days[p.di]?.exercises[p.ei]; if (!ex) break;
       ex.nextWeekPlanConfirmed = !ex.nextWeekPlanConfirmed;
       break;
     }
     case A.EX_AUTO_PRESELECT_NEXT_WEEK_PLAN: {
-      const wk = _currentWeek(); if (!wk) break;
+      const wk = p.weekIdx != null ? state.weeks[p.weekIdx] : _currentWeek(); if (!wk) break;
       for (const sel of p.selections ?? []) {
         const ex = wk.days[sel.di]?.exercises[sel.ei]; if (!ex) continue;
         ex.nextWeekPlan = sel.value;
