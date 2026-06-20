@@ -2051,10 +2051,12 @@ function _hasAnyTrainingData(state) {
   );
 }
 
-// ─── Coach tab: vorerst nur der Gesamt-Trend/Fokus-Platzhalter ───────────────
-// ("Deine Erkenntnisse"/"Beobachtungen" wohnt jetzt im Fortschritt-Tab —
-// reine Feststellungen ohne Handlungsaufforderung gehören zum Accounting,
-// nicht zum Controlling/Coach.)
+// ─── Coach tab: Wiedereinstieg-Statuskarte, Steigerungs-Vorschau, Gesamt-
+// Trend/Fokus-Platzhalter — jeweils nur sichtbar wenn aktuell relevant.
+// Plateau-Erkennung bewusst NICHT hier (lebt bereits im Wochenrückblick
+// unter "Was nicht gut lief", keine Duplizierung). "Deine Erkenntnisse"/
+// "Beobachtungen" wohnt im Fortschritt-Tab — reine Feststellungen ohne
+// Handlungsaufforderung gehören zum Accounting, nicht zum Controlling/Coach.
 function renderCoachTab(state) {
   const container = document.getElementById('coach-tab-content');
   if (!container) return;
@@ -2064,20 +2066,7 @@ function renderCoachTab(state) {
     return;
   }
 
-  // ── 1. Plateau-Statuskarte — nutzt detectPlateaus() (unverändert). Bei
-  // mehreren aktiven Plateaus: nur die mit der längsten Stagnation zeigen.
-  const plateaus = detectPlateaus(state.weeks, state.favoriteExercises ?? [], state.settings?.rpeEnabled ?? true);
-  const plateauCardHtml = plateaus.length > 0 ? (() => {
-    const longest = plateaus.reduce((a, b) => (b.plateauWeeks > a.plateauWeeks ? b : a));
-    const others  = plateaus.length - 1;
-    return `<div class="chart-card coach-status-card">
-      <div class="chart-card__title">⚠️ Plateau erkannt: ${h(longest.exerciseName)}</div>
-      <p class="coach-status-desc">${longest.plateauWeeks} Wochen ohne Steigerung${others > 0 ? ` · +${others} weitere` : ''}</p>
-      <button type="button" class="btn btn--ghost btn--sm" data-action="coach-view-plateau-strategy">Strategie ansehen</button>
-    </div>`;
-  })() : '';
-
-  // ── 2. Wiedereinstieg-Statuskarte — nutzt state.lastReentryHandled +
+  // ── 1. Wiedereinstieg-Statuskarte — nutzt state.lastReentryHandled +
   // _isInRecoveryWindow() (unverändert). Aktiv nur in den ersten 2 Wochen
   // nach einem bestätigten Wiedereinstieg.
   const reentryCardHtml = (() => {
@@ -2093,7 +2082,7 @@ function renderCoachTab(state) {
     </div>`;
   })();
 
-  // ── 3. Steigerungs-Vorschau — reiner Hinweis, nutzt isReadyForAutoSelect()/
+  // ── 2. Steigerungs-Vorschau — reiner Hinweis, nutzt isReadyForAutoSelect()/
   // getWeightRecommendation() read-only über _countReadyForIncrease() (kein
   // Dispatch). Bestätigung bleibt ausschließlich im Neue-Woche-Modal.
   const readyCount = _countReadyForIncrease(state);
@@ -2108,11 +2097,9 @@ function renderCoachTab(state) {
   // Einsatzpunkt für den künftigen Inhalt erhalten.
   const overallTrendHtml = `<div id="overall-trend-placeholder" style="display:none"></div>`;
 
-  const anyCardActive = plateauCardHtml || reentryCardHtml || previewCardHtml;
+  const anyCardActive = reentryCardHtml || previewCardHtml;
 
   container.innerHTML = anyCardActive ? `
-  ${plateauCardHtml}
-
   ${reentryCardHtml}
 
   ${previewCardHtml}
@@ -3133,17 +3120,6 @@ function _handleClick(e) {
       break;
 
     // ── Analysis insights toggle (3.2) ─────────────────────────────────────
-    // ── Coach-Tab Plateau-Statuskarte: kein eigenes Modal vorhanden — die
-    // einzige bestehende Oberfläche, die Plateau-Details bereits zeigt, ist
-    // der Wochenrückblick (buildWeekReview). Dorthin navigieren statt etwas
-    // Neues zu bauen.
-    case 'coach-view-plateau-strategy':
-      _switchToTab('progress');
-      requestAnimationFrame(() => {
-        document.getElementById('week-review-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      });
-      break;
-
     case 'toggle-insights':
       if (!_insightsTooltipShown) {
         _insightsTooltipShown = true;
