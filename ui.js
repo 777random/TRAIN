@@ -2424,27 +2424,48 @@ function _backupStatusHtml(settings) {
 
 // ─── Wiedereinstieg nach Pause ───────────────────────────────────────────────
 
+/** End of a week's 7-day span, as a timestamp. */
+function _reentryWeekEndMs(wk) {
+  return new Date(wk.startDate + 'T00:00:00').getTime() + 6 * 86_400_000;
+}
+
 /**
  * Detects an unmarked training pause > 7 days and computes the suggested
  * reduction factor. Returns null when no pause is detected or it was
  * already handled (state.lastReentryHandled is more recent than the pause
  * start, i.e. the user already decided Ja/Nein for this specific gap).
+ *
+ * Covers two cases:
+ *  - the pause is still ongoing (no training since the last active week)
+ *  - the user already resumed (marked a day done this week) before the app
+ *    ever got a chance to surface the popup — without this, the gap that
+ *    led up to that resumption would silently vanish forever once any day
+ *    in the new week gets marked done.
  */
 function _detectReentryPause(state) {
   if (!state.weeks?.length) return null;
   const sorted = [...state.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
-  let lastActiveWk = null;
+
+  let lastActiveWk = null, prevActiveWk = null;
   for (let i = sorted.length - 1; i >= 0; i--) {
-    if (sorted[i].days.some(d => d.markedDone || d.isVacation)) { lastActiveWk = sorted[i]; break; }
+    if (!sorted[i].days.some(d => d.markedDone || d.isVacation)) continue;
+    if (!lastActiveWk) { lastActiveWk = sorted[i]; continue; }
+    prevActiveWk = sorted[i];
+    break;
   }
   if (!lastActiveWk) return null;
 
-  const weekEndMs = new Date(lastActiveWk.startDate + 'T00:00:00').getTime() + 6 * 86_400_000;
-  const pauseDays = Math.floor((Date.now() - weekEndMs) / 86_400_000);
+  const lastActiveStartMs = new Date(lastActiveWk.startDate + 'T00:00:00').getTime();
+
+  const ongoingPauseDays    = Math.floor((Date.now() - _reentryWeekEndMs(lastActiveWk)) / 86_400_000);
+  const resumptionPauseDays = prevActiveWk
+    ? Math.floor((lastActiveStartMs - _reentryWeekEndMs(prevActiveWk)) / 86_400_000)
+    : -Infinity;
+  const pauseDays = Math.max(ongoingPauseDays, resumptionPauseDays);
   if (pauseDays <= 7) return null;
 
   const alreadyHandled = state.lastReentryHandled != null
-    && state.lastReentryHandled > new Date(lastActiveWk.startDate + 'T00:00:00').getTime();
+    && state.lastReentryHandled > lastActiveStartMs;
   if (alreadyHandled) return null;
 
   const activeDays = lastActiveWk.days.filter(d => d.markedDone || d.isVacation);
