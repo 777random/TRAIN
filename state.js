@@ -24,7 +24,7 @@
 
 export const STORAGE_KEY        = 'train_v6';
 export const STORAGE_KEY_SHADOW = 'train_v6_shadow';
-export const SCHEMA_VERSION     = 22;
+export const SCHEMA_VERSION     = 23;
 
 export const BADGE_THRESHOLDS = [
   { id: 'badge_4',   weeks: 4,   title: 'Erster Schritt' },
@@ -170,6 +170,8 @@ function buildDefaultState() {
     insights: [],             // Insight[] – populated by triggerEngine, transient coaching feedback
     favoriteExercises: [],    // String[] – Übungsnamen, max 5
     customExercises: [],      // { name, metric: 'reps'|'sec'|'m', category: 'Push'|'Pull'|'Squat'|'Hinge'|'Carry'|'Core'|null }[]
+    lastReentryHandled: null, // Timestamp | null — set once the Wiedereinstieg popup decision is made
+    longestStreakEver: 0,     // Number — historical max streak (weeks), survives deletion of old weeks
     badges: [],               // { id, unlockedAt }[] – earned badges
     onboardingDone: false,    // true after first-run flow completed
     seenTips: [],             // string[] – tip IDs the user has already seen
@@ -202,11 +204,18 @@ const _MAX_UNDO  = 20;
 // Actions that are pure navigation or external events — not worth undoing.
 const _NO_UNDO = new Set([
   'UNDO', 'WEEK_NAVIGATE', 'STATE_IMPORT', 'SESSION_START', 'SESSION_RESET', 'SESSION_STOP',
-  'INSIGHTS_SET', 'ONBOARDING_DONE', 'MARK_TIP_SEEN',
+  'INSIGHTS_SET', 'ONBOARDING_DONE', 'MARK_TIP_SEEN', 'REENTRY_HANDLED',
 ]);
 
 /** Returns true when there is at least one undo snapshot available. */
 export function canUndo() { return _undoStack.length > 0; }
+
+/** Public wrapper: gap-aware current streak (in weeks) across the given weeks array. */
+export function calcCurrentStreak(weeks) { return _calcCurrentStreak(weeks); }
+/** Public wrapper: gap-aware longest-ever streak (in weeks) across the given weeks array. */
+export function calcLongestStreakEver(weeks) { return _calcLongestStreakEver(weeks); }
+/** Public wrapper: per-week streak status — true (counts) | false (breaks) | null (skip, all-rest). */
+export function isWeekDoneForStreak(w) { return _isWeekDoneForStreak(w); }
 
 // ─── Internal STATE + subscriber registry ────────────────────────────────────
 
@@ -300,20 +309,58 @@ function _isWeekDoneForStreak(w) {
   return active.every(d => d.markedDone || d.isVacation);
 }
 
+/** End of a week's 7-day span, as a timestamp. */
+function _weekEndMs(wk) {
+  return new Date(wk.startDate + 'T00:00:00').getTime() + 6 * 86_400_000;
+}
+
+/**
+ * True when more than 7 untracked days lie between the end of `prevWk`
+ * (chronologically earlier, already-counted week) and the start of `wk`
+ * (chronologically later week being evaluated). An unmarked pause this
+ * long breaks the streak even if both weeks are individually "done".
+ */
+function _streakGapBreaks(wk, prevWk) {
+  if (!prevWk) return false;
+  const gapDays = (new Date(wk.startDate + 'T00:00:00').getTime() - _weekEndMs(prevWk)) / 86_400_000;
+  return gapDays > 7;
+}
+
 function _calcCurrentStreak(weeks) {
   const sorted = [...weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
   let cur = 0;
+  let lastCountedWk = null; // chronologically-later week already counted
   for (let i = sorted.length - 1; i >= 0; i--) {
-    const status = _isWeekDoneForStreak(sorted[i]);
+    const wk     = sorted[i];
+    const status = _isWeekDoneForStreak(wk);
     if (status === null) continue; // all-rest week: skip, don't break
-    if (status)          cur++;
-    else                 break;
+    if (!status) break;
+    if (lastCountedWk && _streakGapBreaks(lastCountedWk, wk)) break;
+    cur++;
+    lastCountedWk = wk;
   }
   return cur;
 }
 
+/** Longest streak ever achieved anywhere in the week history (gap-aware). */
+function _calcLongestStreakEver(weeks) {
+  const sorted = [...weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
+  let best = 0, run = 0, lastTrueWk = null;
+  for (const wk of sorted) {
+    const status = _isWeekDoneForStreak(wk);
+    if (status === null) continue;
+    if (status === false) { run = 0; lastTrueWk = null; continue; }
+    if (lastTrueWk && _streakGapBreaks(wk, lastTrueWk)) run = 0;
+    run++;
+    best = Math.max(best, run);
+    lastTrueWk = wk;
+  }
+  return best;
+}
+
 function _checkAndGrantBadges(state) {
   const streak  = _calcCurrentStreak(state.weeks);
+  state.longestStreakEver = Math.max(state.longestStreakEver ?? 0, _calcLongestStreakEver(state.weeks));
   const now     = new Date().toISOString();
   const newOnes = [];
   for (const thr of BADGE_THRESHOLDS) {
@@ -613,6 +660,13 @@ function migrate(raw) {
     raw.meta = { ...raw.meta, schemaVersion: 22 };
   }
 
+  // v22 → v23: add state.lastReentryHandled + state.longestStreakEver
+  if ((raw.meta?.schemaVersion ?? 0) < 23) {
+    if (raw.lastReentryHandled === undefined) raw.lastReentryHandled = null;
+    raw.longestStreakEver = _calcLongestStreakEver(raw.weeks ?? []);
+    raw.meta = { ...raw.meta, schemaVersion: 23 };
+  }
+
   // Always-apply defaults for settings added in later versions
   if (raw.settings.vibrationEnabled               === undefined) raw.settings.vibrationEnabled               = true;
   if (raw.settings.rpeEnabled                     === undefined) raw.settings.rpeEnabled                     = true;
@@ -648,6 +702,8 @@ export function loadState() {
       STATE = migrate(parsed);
       if (!Array.isArray(STATE.favoriteExercises)) STATE.favoriteExercises = [];
       if (!Array.isArray(STATE.customExercises))   STATE.customExercises   = [];
+      if (STATE.lastReentryHandled === undefined)  STATE.lastReentryHandled = null;
+      if (typeof STATE.longestStreakEver !== 'number') STATE.longestStreakEver = _calcLongestStreakEver(STATE.weeks);
       if (!Array.isArray(STATE.badges))            STATE.badges = [];
       if (!Array.isArray(STATE.seenTips))          STATE.seenTips = [];
       if (STATE.onboardingDone === undefined)       STATE.onboardingDone = false;
@@ -756,6 +812,8 @@ export const A = Object.freeze({
   CUSTOM_EX_ADD:        'CUSTOM_EX_ADD',        // { name, metric, category }
   CUSTOM_EX_UPDATE:     'CUSTOM_EX_UPDATE',     // { oldName, name, metric, category }
   CUSTOM_EX_DELETE:     'CUSTOM_EX_DELETE',     // { name }
+  REENTRY_HANDLED:      'REENTRY_HANDLED',      // {} – marks current pause as handled (Ja/Nein)
+  EX_APPLY_REENTRY_REDUCTION: 'EX_APPLY_REENTRY_REDUCTION', // { factor } – reduces weights/targets in current week
   EX_REMOVE:           'EX_REMOVE',           // { di, ei }
   EX_UPDATE:           'EX_UPDATE',           // { di, ei, field, value }
   EX_MOVE:             'EX_MOVE',             // { di, fromEi, toEi }
@@ -1613,6 +1671,29 @@ function reduce(state, action) {
     }
     case A.CUSTOM_EX_DELETE: {
       state.customExercises = (state.customExercises ?? []).filter(c => c.name !== p.name);
+      break;
+    }
+
+    // ── Wiedereinstieg nach Pause ────────────────────────────────────────────
+    case A.REENTRY_HANDLED: {
+      state.lastReentryHandled = Date.now();
+      break;
+    }
+    case A.EX_APPLY_REENTRY_REDUCTION: {
+      const wk = _currentWeek(); if (!wk) break;
+      const factor = p.factor ?? 0;
+      if (factor <= 0) break;
+      wk.days.forEach(day => (day.exercises ?? []).forEach(ex => {
+        const hasWeight = ex.metric === 'reps' && ex.sets.some(s => (s.weight ?? 0) > 0);
+        if (hasWeight) {
+          const step = ex.weightStep ?? 2.5;
+          ex.sets.forEach(s => {
+            if ((s.weight ?? 0) > 0) s.weight = Math.round((s.weight * (1 - factor)) / step) * step;
+          });
+        } else if (ex.targetReps) {
+          ex.targetReps = Math.max(1, Math.round(ex.targetReps * (1 - factor)));
+        }
+      }));
       break;
     }
 

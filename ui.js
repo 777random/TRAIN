@@ -18,13 +18,14 @@
 
 import {
   getState, dispatch, subscribe, A, canUndo, BADGE_THRESHOLDS, VACATION_PLANS,
+  calcCurrentStreak, calcLongestStreakEver, isWeekDoneForStreak,
 } from './state.js';
 import {
   exportJSON, importJSON, exportCSV,
 } from './backup.js';
 import * as ic from './icons.js';
 import { fireTrigger } from './triggerEngine.js';
-import { getWeightRecommendation } from './weightRecommendation.js';
+import { getWeightRecommendation, roundToPlate } from './weightRecommendation.js';
 import { renderProgressChart, renderBodyWeightChart } from './progressChart.js';
 import { buildWeekReview }        from './weekReview.js';
 import { showWeekReviewModal, renderWeekReviewHtml } from './weekReviewModal.js';
@@ -2142,27 +2143,9 @@ function _updateInlineReview(state) {
   wrap.innerHTML = renderWeekReviewHtml(review);
 }
 
-function _isWeekDoneForStreak(w) {
-  const active = w.days.filter(d => !(d.isVacation && d.vacationPlan === 'rest'));
-  if (active.length === 0) return null;
-  return active.every(d => d.markedDone || d.isVacation);
-}
-
 function _calcStreak(state) {
-  const sorted = [...state.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
-  let cur = 0, best = 0, tmp = 0;
-  sorted.forEach(w => {
-    const status = _isWeekDoneForStreak(w);
-    if (status === null) return; // skip rest-only weeks
-    if (status) { tmp++; best = Math.max(best, tmp); }
-    else tmp = 0;
-  });
-  for (let i = sorted.length - 1; i >= 0; i--) {
-    const status = _isWeekDoneForStreak(sorted[i]);
-    if (status === null) continue;
-    if (status) cur++;
-    else break;
-  }
+  const cur  = calcCurrentStreak(state.weeks);
+  const best = Math.max(state.longestStreakEver ?? 0, calcLongestStreakEver(state.weeks));
   return { cur, best };
 }
 
@@ -2177,7 +2160,7 @@ function _renderStreakChain(state) {
   const dots = last8.map((wk, i) => {
     const cx       = PAD + i * GAP;
     const score    = _weekSuccessScore(wk);
-    const streakStatus = _isWeekDoneForStreak(wk); // true=done, false=broken, null=rest-only
+    const streakStatus = isWeekDoneForStreak(wk); // true=done, false=broken, null=rest-only
     const isRestOnly = streakStatus === null;
     const done     = streakStatus === true;
     const ss       = score.total > 0 ? score.pct : 0;
@@ -2437,6 +2420,111 @@ function _backupStatusHtml(settings) {
   if (days === 0)    return '<span class="bk-status bk-status--ok">✓ Heute gesichert</span>';
   if (days <= 14)    return `<span class="bk-status bk-status--ok">✓ Vor ${days} ${days === 1 ? 'Tag' : 'Tagen'}</span>`;
   return `<span class="bk-status bk-status--warn">⚠️ Vor ${days} Tagen — zu alt</span>`;
+}
+
+// ─── Wiedereinstieg nach Pause ───────────────────────────────────────────────
+
+/**
+ * Detects an unmarked training pause > 7 days and computes the suggested
+ * reduction factor. Returns null when no pause is detected or it was
+ * already handled (state.lastReentryHandled is more recent than the pause
+ * start, i.e. the user already decided Ja/Nein for this specific gap).
+ */
+function _detectReentryPause(state) {
+  if (!state.weeks?.length) return null;
+  const sorted = [...state.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
+  let lastActiveWk = null;
+  for (let i = sorted.length - 1; i >= 0; i--) {
+    if (sorted[i].days.some(d => d.markedDone || d.isVacation)) { lastActiveWk = sorted[i]; break; }
+  }
+  if (!lastActiveWk) return null;
+
+  const weekEndMs = new Date(lastActiveWk.startDate + 'T00:00:00').getTime() + 6 * 86_400_000;
+  const pauseDays = Math.floor((Date.now() - weekEndMs) / 86_400_000);
+  if (pauseDays <= 7) return null;
+
+  const alreadyHandled = state.lastReentryHandled != null
+    && state.lastReentryHandled > new Date(lastActiveWk.startDate + 'T00:00:00').getTime();
+  if (alreadyHandled) return null;
+
+  const activeDays = lastActiveWk.days.filter(d => d.markedDone || d.isVacation);
+  const vacTrainingDays = activeDays.filter(d => d.isVacation && d.vacationPlan !== 'rest' && d.vacationPlan !== null);
+  const isVacationOverride = vacTrainingDays.length > activeDays.length / 2;
+
+  let factor;
+  if (isVacationOverride)    factor = 0.05;
+  else if (pauseDays <= 14)  factor = 0.10;
+  else if (pauseDays <= 28)  factor = 0.15;
+  else if (pauseDays <= 56)  factor = 0.20;
+  else                       factor = 0.25;
+
+  return { pauseDays, factor };
+}
+
+function _showReentryPopup(pauseDays, factor) {
+  document.getElementById('reentry-modal')?.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'reentry-modal';
+  overlay.className = 'vac-plan-modal-overlay';
+  const pct = Math.round(factor * 100);
+  overlay.innerHTML = `
+    <div class="vac-plan-modal">
+      <div class="vac-plan-modal__title">🔄 Willkommen zurück</div>
+      <p class="vac-plan-modal__sub">Du warst ${pauseDays} Tage weg.<br>TRAIN empfiehlt einen sanften Wiedereinstieg: -${pct}%</p>
+      <button class="btn btn--accent" data-reentry="adjust" style="width:100%;min-height:var(--touch)">Ja, angepasst starten</button>
+      <button class="btn btn--ghost" data-reentry="full" style="width:100%;min-height:var(--touch)">Nein, volles Gewicht</button>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) return; // require explicit choice, no backdrop-dismiss
+    const btn = e.target.closest('[data-reentry]');
+    if (!btn) return;
+    if (btn.dataset.reentry === 'adjust') {
+      dispatch(A.EX_APPLY_REENTRY_REDUCTION, { factor });
+      showToast(`Wiedereinstieg angepasst: -${pct}% ✓`, 'ok');
+    } else {
+      showToast('Volles Gewicht — viel Erfolg!', 'ok');
+    }
+    dispatch(A.REENTRY_HANDLED, {});
+    overlay.remove();
+  });
+}
+
+/**
+ * Aufholphase: true when, within the first 2 weeks after a handled
+ * Wiedereinstieg, success rate > 85% and average RPE < 7.
+ */
+function _isInRecoveryWindow(state) {
+  if (!state.lastReentryHandled) return false;
+  const startMs = state.lastReentryHandled;
+  const endMs   = startMs + 14 * 86_400_000;
+  const relevantWeeks = state.weeks.filter(w => {
+    const ms = new Date(w.startDate + 'T00:00:00').getTime();
+    return ms >= startMs && ms < endMs;
+  });
+  if (!relevantWeeks.length) return false;
+
+  let succ = 0, fail = 0, rpeSum = 0, rpeCount = 0;
+  for (const wk of relevantWeeks) {
+    for (const day of wk.days) {
+      for (const ex of day.exercises) {
+        for (const s of ex.sets) {
+          if (s.status === 'success') {
+            succ++;
+            if (s.rpe != null) { rpeSum += s.rpe; rpeCount++; }
+          } else if (s.status === 'fail') {
+            fail++;
+          }
+        }
+      }
+    }
+  }
+  const total = succ + fail;
+  if (total === 0) return false;
+  const successRate = succ / total;
+  const avgRpe = rpeCount > 0 ? rpeSum / rpeCount : null;
+  return successRate > 0.85 && avgRpe !== null && avgRpe < 7;
 }
 
 function _shouldShowBackupReminder(state) {
@@ -4102,20 +4190,29 @@ function _prepNewWeekModal() {
 
   // KI-Gewichtsempfehlungen (basierend auf RPE + Erfolgsquote)
   const aiRecs = [];
+  const inRecoveryWindow = _isInRecoveryWindow(state);
   if (curWk) {
     const calcWeeks = state.weeks
       .filter(w => w.mode !== 'deload' && w.mode !== 'vacation' && w !== curWk)
       .filter(w => w.days.some(d => d.exercises.some(ex => ex.sets.some(s => s.status === 'success'))));
     if (calcWeeks.length >= 2) {
       const seen = new Set();
+      const plateStep = state.settings?.plateStep ?? 2.5;
       for (const day of curWk.days) {
         for (const ex of day.exercises) {
           if (seen.has(ex.name)) continue;
           if (ex.substituteFor) continue;
           if ((ex.progressionType ?? 'weight') === 'reps') continue;
           seen.add(ex.name);
-          const rec = getWeightRecommendation(ex.name, calcWeeks, state.settings?.plateStep ?? 2.5);
-          if (rec) aiRecs.push({ name: ex.name, rec });
+          const rec = getWeightRecommendation(ex.name, calcWeeks, plateStep);
+          if (rec) {
+            if (inRecoveryWindow && rec.delta > 0) {
+              rec.delta = rec.delta * 1.5;
+              rec.recommendedWeight = roundToPlate(rec.lastWeight + rec.delta, plateStep);
+              rec.boosted = true;
+            }
+            aiRecs.push({ name: ex.name, rec });
+          }
         }
       }
     }
@@ -4132,9 +4229,11 @@ function _prepNewWeekModal() {
   const _displayRecs = aiRecs.slice(0, 5);
 
   const _rpeEnabled = state.settings?.rpeEnabled ?? true;
+  const _anyBoosted = _displayRecs.some(r => r.rec.boosted);
   const aiRecHtml = _displayRecs.length > 0 ? `
   <div class="nw-weight-recs">
     <div class="nw-weight-recs__title" style="display:flex;align-items:center;gap:6px">💡 KI-Empfehlung</div>
+    ${_anyBoosted ? `<div class="movement-warning" style="background:rgba(200,255,0,.1);border-color:rgba(200,255,0,.3);color:var(--c-accent)">Du erholst dich schnell — TRAIN empfiehlt eine größere Steigerung als üblich.</div>` : ''}
     ${_displayRecs.map(r => {
       const _filtReasons = (r.rec.reasons ?? []).filter(rs => !rs.isRpe || _rpeEnabled).slice(0, 2);
       const _action = r.rec.delta > 0
@@ -4592,7 +4691,10 @@ export function mountApp(root) {
     }
 
     const st = getState();
-    if (_shouldShowBackupReminder(st)) {
+    const pause = _detectReentryPause(st);
+    if (pause) {
+      _showReentryPopup(pause.pauseDays, pause.factor);
+    } else if (_shouldShowBackupReminder(st)) {
       _showBackupReminderToast();
     }
   }, 2000);
@@ -4900,17 +5002,7 @@ function _showBadgeOverlay(badge) {
 
 function _renderBadgeGallery(state) {
   const badges  = state.badges ?? [];
-  const streak  = (() => {
-    const sorted = [...state.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
-    let cur = 0;
-    for (let i = sorted.length - 1; i >= 0; i--) {
-      const status = _isWeekDoneForStreak(sorted[i]);
-      if (status === null) continue;
-      if (status) cur++;
-      else break;
-    }
-    return cur;
-  })();
+  const streak  = calcCurrentStreak(state.weeks);
   const items = BADGE_THRESHOLDS.map(thr => {
     const earned = badges.find(b => b.id === thr.id);
     if (earned) {
