@@ -413,6 +413,16 @@ button, input, select, textarea { font: inherit; }
   border-radius: var(--r-md); padding: var(--sp-2) var(--sp-3); margin-bottom: var(--sp-2);
 }
 
+/* Streak prominenter im sticky Bereich + Vorwoche-Banner nebeneinander —
+   hält die sticky-Höhe niedriger als ein gestapeltes Layout. */
+.day-tab-bar__streak-row { display: flex; align-items: center; gap: var(--sp-2); }
+.day-tab-bar__streak-row .prev-banner { flex: 1; margin-bottom: 0; min-width: 0; }
+.streak-badge {
+  display: flex; align-items: center; gap: 4px; flex-shrink: 0;
+  font-size: 15px; font-weight: 600; color: var(--c-text); white-space: nowrap;
+}
+.streak-badge__num { font-family: var(--font-display); font-size: 17px; }
+
 /* Trainings-Ritual: dezenter Kontext-Anker vor der ersten Übung — bewusst
    kein Card-Rahmen, wirkt wie ein Sub-Header direkt unter dem Tagestitel. */
 .training-context-anchor {

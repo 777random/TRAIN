@@ -706,7 +706,11 @@ function renderDayList(state) {
     }).join('')}
   </div>
   ${progressHtml}
-  ${(!_overviewMode && _activeDayIdx !== null) ? _prevWeekBanner(state, wk, _activeDayIdx) : ''}
+  ${(!_overviewMode && _activeDayIdx !== null) ? `
+  <div class="day-tab-bar__streak-row">
+    ${_renderStreakBadge(state)}
+    ${_prevWeekBanner(state, wk, _activeDayIdx)}
+  </div>` : ''}
 </div>`;
 
   // ── Content: overview grid or single active panel ─────────────────────────
@@ -903,8 +907,7 @@ function _trainingContextAnchor(state, wk, di) {
     if (total > 0) successRate = Math.round(succ / total * 100);
   }
 
-  const streakDays = _calcStreak(state).cur * 7;
-  return { timeText, successRate, streakDays };
+  return { timeText, successRate };
 }
 
 function _renderTrainingContextAnchor(state, wk, di) {
@@ -912,8 +915,18 @@ function _renderTrainingContextAnchor(state, wk, di) {
   if (!ctx) return '';
   const parts = [`Letztes Training: ${ctx.timeText}`];
   if (ctx.successRate !== null) parts.push(`Erfolgsquote: ${ctx.successRate}%`);
-  parts.push(`Streak: ${ctx.streakDays} Tage`);
   return `<div class="training-context-anchor">${h(parts.join(' · '))}</div>`;
+}
+
+/**
+ * Prominente Streak-Anzeige im sticky Tag-Pillen-Bereich — gleiche Quelle
+ * wie der bestehende Flammen-Zusatz im Vorwoche-Banner (_calcStreak(state).cur,
+ * ×7 für Tage), keine neue Berechnung. Immer sichtbar sobald ein Tag aktiv
+ * ist, auch bei Streak=0 (ehrliche Darstellung, kein Sonderfall).
+ */
+function _renderStreakBadge(state) {
+  const streakDays = _calcStreak(state).cur * 7;
+  return `<div class="streak-badge" role="status" aria-label="${streakDays} Tage Streak">🔥 <span class="streak-badge__num">${streakDays}</span> Tage</div>`;
 }
 
 /**
