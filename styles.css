@@ -684,27 +684,23 @@ exercise { position: unset; }
   color: var(--c-accent);
 }
 
-/* Done button – same height as inputs for grid alignment */
-.set-done-wrap { display: flex; flex-direction: column; gap: 2px; }
-.set-done-btn {
+/* Status indicator (read-only — status now derives automatically from reps,
+   no longer a tappable button). Same footprint as the old done button for
+   grid alignment. */
+.set-done-wrap { display: flex; flex-direction: column; gap: 2px; position: relative; }
+.set-status-indicator {
   width: 36px; height: 34px; border-radius: var(--r-full);
   border: 2px solid var(--c-border); background: none; color: transparent;
-  cursor: pointer; display: flex; align-items: center; justify-content: center;
-  transition: all var(--t-fast);
+  display: flex; align-items: center; justify-content: center;
+  position: relative;
 }
-.set-done-btn svg { width: 16px; height: 16px; }
-.set-done-btn:hover:not(.is-done):not(.is-fail) { border-color: var(--c-accent); }
-.set-done-btn.is-done { background: var(--c-accent); border-color: var(--c-accent); color: #000; }
-.set-done-btn.is-fail {
-  background: var(--c-danger);
-  border-color: var(--c-danger);
-  color: #fff;
+.set-status-indicator svg { width: 16px; height: 16px; }
+.set-status-indicator.is-done { background: var(--c-accent); border-color: var(--c-accent); color: #000; }
+.set-status-indicator.is-fail { background: var(--c-danger); border-color: var(--c-danger); color: #fff; }
+.set-anomaly-hint {
+  position: absolute; top: -6px; right: -6px; font-size: 12px;
+  line-height: 1; filter: drop-shadow(0 0 1px rgba(0,0,0,.6));
 }
-.set-done-btn.is-fail:hover:not(:disabled) {
-  background: #e53935;
-  border-color: #e53935;
-}
-.set-done-btn:disabled { opacity: .5; cursor: not-allowed; }
 
 .set-remove-btn {
   width: 28px; height: 34px; background: none; border: none;
@@ -754,10 +750,11 @@ exercise { position: unset; }
 .fulfill-meter__bar      { height: 100%; border-radius: var(--r-full); transition: width .3s; }
 .fulfill-meter__label    { font-size: 10px; white-space: nowrap; }
 
+.confirm-set-row { display: flex; gap: var(--sp-2); margin: var(--sp-2) 0; }
 .confirm-set-btn {
-  display: block; width: 100%; background: var(--c-accent); color: #000;
+  display: block; flex: 1; background: var(--c-accent); color: #000;
   border: none; border-radius: var(--r-sm); padding: var(--sp-2) var(--sp-3);
-  font-size: 14px; font-weight: 600; cursor: pointer; margin: var(--sp-2) 0;
+  font-size: 14px; font-weight: 600; cursor: pointer;
   min-height: 40px; transition: opacity var(--t-fast);
 }
 .confirm-set-btn:hover { opacity: .88; }
@@ -770,6 +767,17 @@ exercise { position: unset; }
   100% { background: var(--c-accent); }
 }
 .confirm-set-btn.is-flashing { animation: confirm-pulse 350ms ease-out forwards; }
+.fail-set-btn {
+  display: block; flex: 0 0 auto; width: 48px; background: none; color: var(--c-danger);
+  border: 1px solid var(--c-danger); border-radius: var(--r-sm);
+  font-size: 16px; font-weight: 600; cursor: pointer;
+  min-height: 40px; transition: opacity var(--t-fast), background var(--t-fast);
+}
+.fail-set-btn:hover { background: rgba(229,57,53,.12); }
+.fail-set-btn:active { opacity: .75; }
+.fail-set-btn.is-done, .fail-set-btn:disabled {
+  background: var(--c-surface2); color: var(--c-text-3); border-color: var(--c-border); cursor: not-allowed; opacity: 1;
+}
 .confirm-set-no-target {
   background: var(--c-surface2); border: 1px solid var(--c-border-hi);
   border-radius: var(--r-md); color: var(--c-text-2); font-size: 12px;
@@ -1078,8 +1086,8 @@ exercise { position: unset; }
 .hm-cell--3    { background: rgba(200,255,0,.85); }
 
 /* ── PR (3.1) ──────────────────────────────────────────────── */
-.set-done-btn.is-pr { color: #FFD700; border-color: rgba(255,215,0,.4); }
-.set-done-btn.is-pr svg { color: #FFD700; }
+.set-status-indicator.is-pr { color: #FFD700; border-color: rgba(255,215,0,.4); }
+.set-status-indicator.is-pr svg { color: #FFD700; }
 .pr-badge { display: flex; justify-content: center; line-height: 0; }
 .pr-badge svg { width: 16px; height: 16px; color: #FFD700; }
 .pr-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--c-border); font-size: 13px; }
