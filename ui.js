@@ -1854,6 +1854,10 @@ function renderBodyTab(state) {
   </div>`;
 
   // ── Sektion 2: Relative Stärke (Pound-for-Pound) ─────────────────────────
+  // EIN Chart, Übung per Dropdown gewählt (analog Übungsfortschritt-Dropdown
+  // im Fortschritt-Tab) — ersetzt die vorige "mehrere Charts gleichzeitig"-
+  // Struktur komplett. Berechnungslogik (Woche/All-Time-PR/Kontext-Satz/
+  // 30-Tage-Regel) unverändert aus dem vorigen Sprint.
   let relativeStrengthHtml = '';
   if (last) {
     const exercises = _relativeStrengthExercises(state);
@@ -1864,56 +1868,38 @@ function renderBodyTab(state) {
       const favSet = new Set(state.favoriteExercises ?? []);
       const withRatio = exercises.map(e => ({ ...e, ratio: e.prWeight / currentBodyWeight }))
         .sort((a, b) => b.ratio - a.ratio);
+      // Favoriten zuerst (in der Dropdown-Liste) — KEIN bestehender Mechanismus
+      // hierfür gefunden (das Übungsfortschritt-Dropdown sortiert rein
+      // alphabetisch, keine Favoriten-Priorisierung, keine "Standard auf ersten
+      // Favoriten"-Logik — Diagnose ergab beide Annahmen aus der Spec treffen
+      // auf den bestehenden Code nicht zu). Neu für dieses Dropdown gebaut;
+      // da Favoriten zuerst im <select> stehen, wählt der Browser per
+      // Default-Verhalten (erstes <option>) automatisch den ersten Favoriten.
       const favEntries  = withRatio.filter(e => favSet.has(e.name));
       const restEntries = withRatio.filter(e => !favSet.has(e.name));
-      const avgSource = favEntries.length ? favEntries : withRatio;
-      const avgRatio  = avgSource.reduce((s, e) => s + e.ratio, 0) / avgSource.length;
-      const bwHistory = history; // bereits berechnet oben (Sektion 1)
+      const orderedEntries = [...favEntries, ...restEntries];
 
-      // Ein Switch für die gesamte Sektion (gilt für alle Übungs-Charts).
-      const modeSwitchHtml = `
-        <div class="weight-step-opts" style="margin-bottom:var(--sp-3)">
+      const exOptionsHtml = orderedEntries.map(e =>
+        `<option value="${h(e.name)}">${h(e.name)}${favSet.has(e.name) ? ' ⭐' : ''}</option>`
+      ).join('');
+
+      relativeStrengthHtml = `
+      <div class="chart-card">
+        <div class="chart-card__title">${ic.trophy()} Relative Stärke</div>
+        ${isStale ? `<div class="movement-warning">Aktualisiere dein Körpergewicht für genaue Werte.</div>` : ''}
+        <select class="chart-select" id="rs-ex-select" aria-label="Übung für relative Stärke wählen">
+          ${exOptionsHtml}
+        </select>
+        <div class="weight-step-opts" style="margin:var(--sp-3) 0">
           <button type="button" class="weight-step-btn${_p4pMode === 'woche' ? ' is-selected' : ''}"
             data-action="set-p4p-mode" data-mode="woche" aria-pressed="${_p4pMode === 'woche'}"
           >Woche</button>
           <button type="button" class="weight-step-btn${_p4pMode === 'alltime' ? ' is-selected' : ''}"
             data-action="set-p4p-mode" data-mode="alltime" aria-pressed="${_p4pMode === 'alltime'}"
           >All-Time-PR</button>
-        </div>`;
-
-      const renderExBlock = (e, isFav) => {
-        const series = _p4pMode === 'alltime'
-          ? _allTimePRSeries(state, e.name, bwHistory)
-          : _weeklyP4PSeries(state, e.name, bwHistory);
-        const chartSvg = renderRelativeStrengthChart(
-          series.map(p => ({ label: wkLabel(p.date), ratio: p.ratio })),
-          { stepped: _p4pMode === 'alltime' }
-        );
-        const contextSentence = _p4pContextSentence(e.name, series);
-        return `
-        <div class="rs-ex-block${isFav ? ' rs-ex-block--fav' : ''}">
-          <div class="pr-row${isFav ? ' pr-row--fav' : ''}">
-            <span class="pr-name">${isFav ? '⭐ ' : ''}${h(e.name)}</span>
-            <span class="pr-val">${e.prWeight} kg</span>
-            <span class="pr-val" style="color:var(--c-text-3);font-size:13px">${e.ratio.toFixed(2)}×</span>
-          </div>
-          ${chartSvg ? `<div style="margin-top:var(--sp-2)">${chartSvg}</div>` : `<p class="empty-state__hint">Noch nicht genug Datenpunkte für einen Verlauf.</p>`}
-          ${contextSentence ? `<p class="rs-context">${h(contextSentence)}</p>` : ''}
-        </div>`;
-      };
-      const restHtml = restEntries.length ? `
-        <details class="pr-collapse">
-          <summary class="pr-collapse__summary">Alle Übungen (${restEntries.length}) ▼</summary>
-          <div class="pr-collapse__body">${restEntries.map(e => renderExBlock(e, false)).join('')}</div>
-        </details>` : '';
-      relativeStrengthHtml = `
-      <div class="chart-card">
-        <div class="chart-card__title">${ic.trophy()} Relative Stärke</div>
-        ${isStale ? `<div class="movement-warning">Aktualisiere dein Körpergewicht für genaue Werte.</div>` : ''}
-        ${modeSwitchHtml}
-        ${favEntries.map(e => renderExBlock(e, true)).join('')}
-        <div class="rs-avg">Ø Relative Stärke: <strong>${avgRatio.toFixed(2)}×</strong></div>
-        ${restHtml}
+        </div>
+        <div class="chart-wrap" id="rs-chart-wrap"></div>
+        <div id="rs-context-wrap"></div>
       </div>`;
     }
   }
@@ -1968,6 +1954,38 @@ function renderBodyTab(state) {
   </div>`;
 
   container.innerHTML = bodyweightSectionHtml + relativeStrengthHtml + sleepEnergyHtml;
+
+  // Synchron statt requestAnimationFrame: #rs-* Elemente existieren bereits
+  // nach der innerHTML-Zuweisung, keine Layout-Messung nötig (deklaratives
+  // SVG mit viewBox). Vermeidet zudem unnötige rAF-Latenz beim Modus-/
+  // Dropdown-Wechsel.
+  _updateP4PChart(state);
+  document.getElementById('rs-ex-select')?.addEventListener('change', () => {
+    _updateP4PChart(getState());
+  });
+}
+
+/** Aktualisiert Chart + Kontext-Satz für die im Dropdown gewählte Übung,
+ * ohne den Rest des Körper-Tabs neu zu rendern (analog _updateExChart). */
+function _updateP4PChart(state) {
+  const sel        = document.getElementById('rs-ex-select');
+  const chartWrap  = document.getElementById('rs-chart-wrap');
+  const contextWrap = document.getElementById('rs-context-wrap');
+  if (!sel || !chartWrap || !contextWrap) return;
+  const name = sel.value;
+  const bwHistory = _bodyWeightHistory(state);
+  const series = _p4pMode === 'alltime'
+    ? _allTimePRSeries(state, name, bwHistory)
+    : _weeklyP4PSeries(state, name, bwHistory);
+  const chartSvg = renderRelativeStrengthChart(
+    series.map(p => ({ label: wkLabel(p.date), ratio: p.ratio })),
+    { stepped: _p4pMode === 'alltime' }
+  );
+  chartWrap.innerHTML = chartSvg
+    ? chartSvg
+    : '<p class="empty-state__hint">Noch nicht genug Datenpunkte für einen Verlauf.</p>';
+  const contextSentence = _p4pContextSentence(name, series);
+  contextWrap.innerHTML = contextSentence ? `<p class="rs-context">${h(contextSentence)}</p>` : '';
 }
 
 // ─── Tatsächliches Volumen helper (only success sets) ────────────────────────
@@ -4060,7 +4078,15 @@ function _handleClick(e) {
 
     case 'set-p4p-mode':
       _p4pMode = el.dataset.mode === 'alltime' ? 'alltime' : 'woche';
-      renderBodyTab(getState());
+      // Nur die Switch-Buttons + den Chart aktualisieren (nicht den ganzen
+      // Tab neu rendern) — sonst würde die Dropdown-Auswahl beim Umschalten
+      // auf die erste Option zurückspringen.
+      document.querySelectorAll('.weight-step-btn[data-action="set-p4p-mode"]').forEach(btn => {
+        const isSel = btn.dataset.mode === _p4pMode;
+        btn.classList.toggle('is-selected', isSel);
+        btn.setAttribute('aria-pressed', String(isSel));
+      });
+      _updateP4PChart(getState());
       break;
 
     // ── Settings rows (previously role=button, now data-action on the div) ─
