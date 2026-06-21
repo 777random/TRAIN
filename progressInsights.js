@@ -100,30 +100,59 @@ export function mostSuccessfulWeekday(state) {
  * deutlich (≥1.5x) über ihrer eigenen historischen Durchschnittsrate liegt.
  * @returns {{ name: string, curRate: number, histRate: number, diff: number } | null}
  */
+/**
+ * Geteilte Basis für progressTrendOutlier() UND die Korridor-Kalibrierung im
+ * Übungsfortschritt-Chart (siehe getProgressCorridorCalibration() unten) —
+ * gleiche Mindest-Historie (6 Wochen mit Gewichtsdaten) und gleiche
+ * Fensterlogik (Ø-Delta letzte 4 Wochen vs. Ø-Delta Gesamt-Historie).
+ * @returns {{ history: number[], histRate: number, curRate: number, lastWeight: number } | null}
+ */
+function _exerciseRateWindow(sortedWeeks, exName) {
+  const history = exWeightHistory(sortedWeeks, exName).filter(w => w > 0); // chronologisch, nur Wochen mit Gewichtsdaten
+  if (history.length < 6) return null;
+
+  const deltas = [];
+  for (let i = 1; i < history.length; i++) deltas.push((history[i] - history[i - 1]) / history[i - 1]);
+  if (deltas.length < 5) return null;
+
+  const histRate = deltas.reduce((a, b) => a + b, 0) / deltas.length;
+  const recentDeltas = deltas.slice(-4);
+  const curRate = recentDeltas.reduce((a, b) => a + b, 0) / recentDeltas.length;
+
+  return { history, histRate, curRate, lastWeight: history[history.length - 1] };
+}
+
 export function progressTrendOutlier(state) {
   const sorted = _relevantWeeks(state);
   const exNames = [...new Set(sorted.flatMap(w => w.days.flatMap(d => d.exercises.map(e => e.name))))];
 
   let best = null;
   for (const name of exNames) {
-    const history = exWeightHistory(sorted, name).filter(w => w > 0); // chronologisch, nur Wochen mit Gewichtsdaten
-    if (history.length < 6) continue;
+    const rw = _exerciseRateWindow(sorted, name);
+    if (!rw) continue;
+    if (rw.histRate <= 0) continue; // nur sinnvoll bei grundsätzlich positivem historischem Trend
+    if (rw.curRate <= rw.histRate * 1.5) continue;
 
-    const deltas = [];
-    for (let i = 1; i < history.length; i++) deltas.push((history[i] - history[i - 1]) / history[i - 1]);
-    if (deltas.length < 5) continue;
-
-    const histRate = deltas.reduce((a, b) => a + b, 0) / deltas.length;
-    if (histRate <= 0) continue; // nur sinnvoll bei grundsätzlich positivem historischem Trend
-
-    const recentDeltas = deltas.slice(-4);
-    const curRate = recentDeltas.reduce((a, b) => a + b, 0) / recentDeltas.length;
-    if (curRate <= histRate * 1.5) continue;
-
-    const diff = curRate - histRate;
-    if (!best || diff > best.diff) best = { name, curRate, histRate, diff };
+    const diff = rw.curRate - rw.histRate;
+    if (!best || diff > best.diff) best = { name, curRate: rw.curRate, histRate: rw.histRate, diff };
   }
   return best;
+}
+
+/**
+ * Kalibrierungs-Basis für den Zielkorridor im Übungsfortschritt-Chart.
+ * Kalibrierungs-Rate = Ø-Delta der letzten 4 Wochen (identisch zu curRate in
+ * progressTrendOutlier() — bewusst NICHT histRate, da der Korridor sich an
+ * der jüngsten, nicht der gesamten historischen Rate orientieren soll).
+ * Liefert null wenn < 6 Wochen Historie ODER Kalibrierungs-Rate <= 0 — in
+ * beiden Fällen zeigt der Chart keinen Korridor (siehe AC1/AC3).
+ * @returns {{ calibrationRate: number, startWeight: number } | null}
+ */
+export function getProgressCorridorCalibration(sortedWeeks, exName) {
+  const rw = _exerciseRateWindow(sortedWeeks, exName);
+  if (!rw) return null;
+  if (rw.curRate <= 0) return null;
+  return { calibrationRate: rw.curRate, startWeight: rw.lastWeight };
 }
 
 /**

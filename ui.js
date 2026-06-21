@@ -32,7 +32,7 @@ import { showWeekReviewModal, renderWeekReviewHtml } from './weekReviewModal.js'
 import { detectPlateaus }         from './plateauDetector.js';
 import { computeWeeklyFocus, isInRecoveryWindow, buildDecisionalBalance } from './weeklyFocus.js';
 import { findExactDuplicates, findSimilarCandidates } from './exerciseNameCleanup.js';
-import { computeErkenntnisLines } from './progressInsights.js';
+import { computeErkenntnisLines, getProgressCorridorCalibration } from './progressInsights.js';
 
 // ─── Module-level UI state (transient, never persisted) ──────────────────────
 
@@ -2577,9 +2577,10 @@ function _insertOpenCharts(state) {
     if (!ex) return;
     const wrap = document.querySelector(`[data-chart-di="${di}"][data-chart-ei="${ei}"]`);
     if (!wrap) return;
-    const svg = renderProgressChart(ex.name, calcWeeks, { compact: true });
+    const corridor = _corridorFor(state, ex.name);
+    const svg = renderProgressChart(ex.name, calcWeeks, { compact: true, corridor });
     if (svg) {
-      wrap.innerHTML = svg;
+      wrap.innerHTML = svg + _corridorHintHtml(corridor);
       _attachChartTooltips(wrap);
     }
   });
@@ -2616,6 +2617,27 @@ function _attachChartTooltips(container) {
   });
 }
 
+/**
+ * Korridor-Kalibrierung für eine Übung im Übungsfortschritt-Chart — gleiche
+ * Wochen-Filterung (kein Deload, kein Urlaub) wie progressTrendOutlier()'s
+ * _relevantWeeks(state), bewusst NICHT auf 16 Wochen gecappt (Korridor-
+ * Kalibrierung soll die gesamte verfügbare Historie für die Rate nutzen,
+ * unabhängig vom Anzeige-Cap des Charts). Wird bei jedem Aufruf neu
+ * berechnet, kein gespeicherter Zustand.
+ */
+function _corridorFor(state, exName) {
+  const sortedWeeks = [...state.weeks]
+    .filter(w => w.mode !== 'deload' && w.mode !== 'vacation')
+    .sort((a, b) => a.startDate.localeCompare(b.startDate));
+  return getProgressCorridorCalibration(sortedWeeks, exName);
+}
+
+function _corridorHintHtml(corridor) {
+  return corridor
+    ? '<p class="chart-corridor-hint">Schattierter Bereich: erwartete Entwicklung basierend auf deiner Steigerungsrate der letzten Wochen.</p>'
+    : '';
+}
+
 function _updateExChart(state) {
   const sel  = document.getElementById('chart-ex-select');
   const wrap = document.getElementById('chart-ex-wrap');
@@ -2625,9 +2647,10 @@ function _updateExChart(state) {
     .filter(w => w.mode !== 'deload')
     .sort((a, b) => a.startDate.localeCompare(b.startDate))
     .slice(-16);
-  const svg = renderProgressChart(name, calcWeeks, { compact: false });
+  const corridor = _corridorFor(state, name);
+  const svg = renderProgressChart(name, calcWeeks, { compact: false, corridor });
   if (svg) {
-    wrap.innerHTML = svg;
+    wrap.innerHTML = svg + _corridorHintHtml(corridor);
     _attachChartTooltips(wrap);
   } else {
     wrap.innerHTML = '<p class="empty-state__hint">Wähle eine Übung und trainiere mindestens 2 Wochen um den Verlauf zu sehen.</p>';
@@ -3720,8 +3743,9 @@ function _handleClick(e) {
             .sort((a, b) => a.startDate.localeCompare(b.startDate))
             .slice(-16);
           const exName = wk?.days[+di]?.exercises[+ei]?.name;
-          const svg = exName ? renderProgressChart(exName, calcWeeks, { compact: true }) : null;
-          if (svg) { wrap.innerHTML = svg; _attachChartTooltips(wrap); }
+          const corridor = exName ? _corridorFor(getState(), exName) : null;
+          const svg = exName ? renderProgressChart(exName, calcWeeks, { compact: true, corridor }) : null;
+          if (svg) { wrap.innerHTML = svg + _corridorHintHtml(corridor); _attachChartTooltips(wrap); }
           else wrap.innerHTML = '<p style="font-size:12px;color:var(--c-text-3);padding:8px 0">Noch zu wenig Daten — ab 2 Trainingswochen sichtbar.</p>';
         }
       }

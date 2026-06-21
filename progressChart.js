@@ -11,6 +11,9 @@ function _kw(sd) {
   return Math.ceil(((d - jan) / 86_400_000 + jan.getDay() + 1) / 7);
 }
 
+const CORRIDOR_FUTURE_WEEKS = 8;
+const CORRIDOR_BAND = 0.10;
+
 /**
  * Rendert einen SVG-Inline-Chart für die Gewichtsentwicklung einer Übung.
  *
@@ -18,6 +21,11 @@ function _kw(sd) {
  * @param {Array}  weeks   Bereits gefiltert (kein Deload, max 16, aufsteigend sortiert)
  * @param {Object} [options]
  * @param {boolean} [options.compact=false]  true → viewBox 400×120 (Training), false → 400×180 (Analyse)
+ * @param {{calibrationRate: number, startWeight: number}|null} [options.corridor]
+ *   Bereits berechnete Kalibrierung (siehe getProgressCorridorCalibration()
+ *   in progressInsights.js) — diese Funktion bleibt absichtlich import-frei
+ *   (siehe Datei-Kopfkommentar) und rendert nur, was ihr übergeben wird.
+ *   null/undefined → kein Korridor (Chart unverändert wie bisher).
  * @returns {string|null}  SVG-Markup-String oder null wenn < 2 Datenpunkte
  */
 export function renderProgressChart(exerciseName, weeks, options = {}) {
@@ -40,6 +48,16 @@ export function renderProgressChart(exerciseName, weeks, options = {}) {
 
   if (points.length < 2) return null;
 
+  // ── Korridor: erwartete, abflachende Kurve für zukünftige Wochen ────────────
+  // erwartet(n) = startWeight × (1 + calibrationRate × √(n+1)), n=0..7.
+  // Nur additiv — beeinflusst weder die Sammlung noch die Werte der echten
+  // Datenpunkte oben.
+  const corridor = options.corridor ?? null;
+  const corridorWeeks = corridor ? Array.from({ length: CORRIDOR_FUTURE_WEEKS }, (_, n) => {
+    const expected = corridor.startWeight * (1 + corridor.calibrationRate * Math.sqrt(n + 1));
+    return { upper: expected * (1 + CORRIDOR_BAND), lower: expected * (1 - CORRIDOR_BAND) };
+  }) : [];
+
   // ── Layout ───────────────────────────────────────────────────────────────────
   const compact = options.compact ?? false;
   const VBW = 400, VBH = compact ? 120 : 180;
@@ -48,7 +66,9 @@ export function renderProgressChart(exerciseName, weeks, options = {}) {
   const gH  = VBH - pad.t - pad.b;
 
   // ── Skalierung ───────────────────────────────────────────────────────────────
-  const allW   = points.flatMap(p => [p.maxW, p.avgW]);
+  // Korridor-Oberband fließt in die Y-Skalierung ein, damit die Fläche nicht
+  // oben abgeschnitten wird.
+  const allW   = points.flatMap(p => [p.maxW, p.avgW]).concat(corridorWeeks.map(c => c.upper));
   const rawMin = Math.min(...allW);
   const rawMax = Math.max(...allW);
   const margin = (rawMax - rawMin) * 0.12 || rawMax * 0.06 || 5;
@@ -56,8 +76,13 @@ export function renderProgressChart(exerciseName, weeks, options = {}) {
   const yMax   = rawMax + margin;
   const yRange = yMax - yMin || 1;
 
-  const n    = points.length;
-  const xOf  = i => pad.l + (n === 1 ? gW / 2 : i * gW / (n - 1));
+  // nTotal erweitert die X-Skala um die Korridor-Wochen, damit echte und
+  // projizierte Wochen denselben Pixel-pro-Woche-Abstand teilen (komprimiert
+  // die Historie etwas nach links, macht Platz für die Projektion nach rechts
+  // — fester viewBox, kein Scrollen).
+  const n      = points.length;
+  const nTotal = corridorWeeks.length ? n + CORRIDOR_FUTURE_WEEKS : n;
+  const xOf  = i => pad.l + (nTotal === 1 ? gW / 2 : i * gW / (nTotal - 1));
   const yOf  = v => pad.t + gH - ((v - yMin) / yRange) * gH;
 
   // ── Pfade ────────────────────────────────────────────────────────────────────
@@ -86,6 +111,25 @@ export function renderProgressChart(exerciseName, weeks, options = {}) {
     const gy = (pad.t + gH * f).toFixed(1);
     return `<line x1="${pad.l}" y1="${gy}" x2="${pad.l + gW}" y2="${gy}" stroke="#2E2E35" stroke-width="1"/>`;
   }).join('');
+
+  // ── Korridor-Fläche ──────────────────────────────────────────────────────────
+  // Fächert von einem Ankerpunkt am letzten echten Datenpunkt (Breite 0) nach
+  // vorne auf — nicht rückwirkend über die Historie gelegt. Vor den Linien
+  // platziert, damit maxPath/avgPath sichtbar darüber liegen (AC8).
+  let corridorFill = '';
+  if (corridorWeeks.length) {
+    const anchorX = xOf(n - 1);
+    const anchorY = yOf(corridor.startWeight);
+    const upperPts = corridorWeeks.map((c, i) => [xOf(n + i), yOf(c.upper)]);
+    const lowerPts = corridorWeeks.map((c, i) => [xOf(n + i), yOf(c.lower)]);
+    const d = [
+      `M${anchorX.toFixed(1)},${anchorY.toFixed(1)}`,
+      ...upperPts.map(p => `L${p[0].toFixed(1)},${p[1].toFixed(1)}`),
+      ...lowerPts.slice().reverse().map(p => `L${p[0].toFixed(1)},${p[1].toFixed(1)}`),
+      'Z',
+    ].join(' ');
+    corridorFill = `<path d="${d}" fill="#C8FF00" fill-opacity="0.12" stroke="none"/>`;
+  }
 
   // ── Y-Labels ─────────────────────────────────────────────────────────────────
   const yLabels = yLbls.map(lbl =>
@@ -122,6 +166,7 @@ export function renderProgressChart(exerciseName, weeks, options = {}) {
 
   return `<svg viewBox="0 0 ${VBW} ${VBH}" width="100%" height="auto" role="img" aria-label="Gewichtsprogression ${exerciseName}" style="display:block;overflow:visible">
   ${gridLines}
+  ${corridorFill}
   ${yLabels}
   ${avgPath}
   ${maxPath}
