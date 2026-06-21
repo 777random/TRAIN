@@ -4109,8 +4109,19 @@ function _handleClick(e) {
       // Echte eingetragene Wdh verwenden, NICHT targetReps — sonst überschreibt
       // dieser Button stillschweigend die tatsächliche Nutzereingabe und der
       // Reducer kann nie canSuccess korrekt gegen das Ziel prüfen (siehe Diagnose).
-      const _rInp = document.querySelector(`[data-action="set-reps"][data-di="${di}"][data-ei="${ei}"][data-si="${_csi}"]`);
-      const _repsVal = _rInp?.value ?? '';
+      // Ausnahme: ein wirklich LEERES Feld (kein Zeichen, auch keine "0") löst
+      // den ursprünglichen Komfort-Schnellweg aus — targetReps eintragen statt
+      // einen leeren Satz als 'fail' zu werten. "0" zählt bewusst NICHT als
+      // leer (sonst genau der ursprüngliche Überschreib-Bug erneut).
+      const _rInp   = document.querySelector(`[data-action="set-reps"][data-di="${di}"][data-ei="${ei}"][data-si="${_csi}"]`);
+      const _rawVal = _rInp?.value ?? '';
+      let _repsVal;
+      if (_rawVal === '') {
+        _repsVal = String(_cex.targetReps);
+        if (_rInp) _rInp.value = _repsVal; // Feld visuell mit dem gespeicherten Wert synchron halten
+      } else {
+        _repsVal = _rawVal;
+      }
 
       // Set flash key before dispatch so the re-render includes the class
       _confirmFlashKey = `${di}-${ei}`;
