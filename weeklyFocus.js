@@ -166,6 +166,10 @@ function _buildOverloadResult(signal) {
     headline: 'Erholung priorisieren',
     reasoning,
     recommendation: 'Diese Woche keine Gewichtssteigerungen.',
+    // Rohes Signal zusätzlich offengelegt (bereits oben berechnet, keine neue
+    // Logik) — für die Decisional-Balance, die wissen muss WELCHES der 3
+    // Signale zutraf, ohne die reasoning-Prosa zu parsen.
+    signalType: signal.signal,
   };
 }
 
@@ -228,6 +232,9 @@ function _checkConsistencyGap(state) {
     headline: 'Konsistenz vor Intensität',
     reasoning,
     recommendation: 'Mehr Gewicht würde aktuell weniger bringen als mehr Regelmäßigkeit. Plane diese Woche bewusst feste Trainingszeiten.',
+    // avgPct bereits oben berechnet, hier zusätzlich offengelegt für die
+    // Decisional-Balance (keine neue Logik, nur Wiederverwendung).
+    avgPct,
   };
 }
 
@@ -329,4 +336,85 @@ export function computeWeeklyFocus(state) {
     ?? _checkPlateau(state)
     ?? _checkProgression(state)
     ?? _fallback(state);
+}
+
+// ─── Decisional Balance ─────────────────────────────────────────────────────
+// Nur für Überlastung/Konsistenz-Engpass/Plateau (siehe Sprint-Spec: bei
+// Wiedereinstieg ist die Lage eindeutig, Progression hat keine echte
+// Gegenoption). Nutzt ausschließlich bereits in computeWeeklyFocus()
+// berechnete, echte Werte — keine neue Berechnungslogik, reine
+// Text-Strukturierung der vorhandenen Daten für die Gegenüberstellung.
+
+const _OVERLOAD_SIGNAL_LABEL = {
+  sleep: 'Schlafdefizit',
+  rpe: 'RPE-Trend',
+  completion: 'sinkender Erfolgsquote',
+};
+const _OVERLOAD_SIGNAL_VALUE_LABEL = {
+  sleep: 'dein Schlaf',
+  rpe: 'der RPE-Trend',
+  completion: 'deine Erfolgsquote',
+};
+
+function _balanceForOverload(focus) {
+  const signalLabel = _OVERLOAD_SIGNAL_LABEL[focus.signalType] ?? 'anhaltender Überlastung';
+  const valueLabel  = _OVERLOAD_SIGNAL_VALUE_LABEL[focus.signalType] ?? 'das Signal';
+  return {
+    stayOption: {
+      label: 'Weiter wie bisher trainieren',
+      pros: ['Plan bleibt eingehalten'],
+      cons: [`Verletzungsrisiko steigt bei anhaltendem ${signalLabel}`],
+    },
+    changeOption: {
+      label: 'Diese Woche konservativer trainieren',
+      pros: ['Regeneration bekommt Vorrang'],
+      cons: ['Geplante Steigerung verschiebt sich'],
+    },
+    closing: `Die Daten sprechen für die zweite Option, solange sich ${valueLabel} nicht verbessert.`,
+  };
+}
+
+function _balanceForConsistencyGap(focus) {
+  return {
+    stayOption: {
+      label: 'Pensum/Intensität trotzdem erhöhen',
+      pros: ['Schnellerer potenzieller Fortschritt'],
+      cons: ['Bringt wenig, wenn Trainingstage ohnehin ausfallen'],
+    },
+    changeOption: {
+      label: 'Erst Konsistenz stabilisieren',
+      pros: ['Realistischere Grundlage für nachhaltigen Fortschritt'],
+      cons: ['Fühlt sich kurzfristig "langsamer" an'],
+    },
+    closing: `Bei ${focus.avgPct}% absolvierten Trainingstagen über die letzten 6 Wochen bringt mehr Pensum aktuell wenig.`,
+  };
+}
+
+function _balanceForPlateau(focus) {
+  const p = focus.plateau;
+  return {
+    stayOption: {
+      label: 'Weiter wie bisher (gleiche Strategie/Gewicht beibehalten)',
+      pros: ['Kein Wechsel nötig, gewohnte Übung bleibt'],
+      cons: ['Stagnation hält wahrscheinlich an'],
+    },
+    changeOption: {
+      label: `Strategie wechseln: ${p.actionText}`,
+      pros: ['Neuer Reiz kann das Plateau durchbrechen'],
+      cons: ['Kurzfristig andere Belastung als gewohnt'],
+    },
+    closing: `Bei ${p.plateauWeeks} Wochen ohne Steigerung spricht mehr für einen Wechsel.`,
+  };
+}
+
+/**
+ * @param {Object} focus  Rückgabe von computeWeeklyFocus()
+ * @returns {{ stayOption: Object, changeOption: Object, closing: string } | null}
+ *   null für reentry/progression/onTrack — keine Decisional Balance dafür.
+ */
+export function buildDecisionalBalance(focus) {
+  if (focus.status === 'overload') return _balanceForOverload(focus);
+  if (focus.status === 'consistencyGap') return _balanceForConsistencyGap(focus);
+  if (focus.status === 'plateau') return _balanceForPlateau(focus);
+  return null;
 }

@@ -30,7 +30,7 @@ import { renderProgressChart, renderBodyWeightChart, renderRelativeStrengthChart
 import { buildWeekReview }        from './weekReview.js';
 import { showWeekReviewModal, renderWeekReviewHtml } from './weekReviewModal.js';
 import { detectPlateaus }         from './plateauDetector.js';
-import { computeWeeklyFocus, isInRecoveryWindow } from './weeklyFocus.js';
+import { computeWeeklyFocus, isInRecoveryWindow, buildDecisionalBalance } from './weeklyFocus.js';
 import { findExactDuplicates, findSimilarCandidates } from './exerciseNameCleanup.js';
 import { computeErkenntnisLines } from './progressInsights.js';
 
@@ -2299,8 +2299,29 @@ function renderCoachTab(state) {
     return;
   }
 
-  const focus = computeWeeklyFocus(state);
-  const icon  = _FOCUS_ICONS[focus.status] ?? _FOCUS_ICONS.onTrack;
+  const focus   = computeWeeklyFocus(state);
+  const icon    = _FOCUS_ICONS[focus.status] ?? _FOCUS_ICONS.onTrack;
+  const balance = buildDecisionalBalance(focus);
+
+  const _renderOption = (opt) => `
+    <div class="coach-balance-option">
+      <div class="coach-balance-option__label">${h(opt.label)}</div>
+      ${opt.pros.map(p => `<div class="coach-balance-pro">+ ${h(p)}</div>`).join('')}
+      ${opt.cons.map(c => `<div class="coach-balance-con">− ${h(c)}</div>`).join('')}
+    </div>`;
+
+  // Wiederverwendung des bestehenden <details>/<summary>-Aufklapp-Musters
+  // (identisch zu "Alle Übungen ▼" bei Bestleistungen/Relative Stärke) —
+  // kein neues UI-Pattern. Eingeklappt per Default (natives <details>-Verhalten).
+  const balanceHtml = balance ? `
+    <details class="pr-collapse coach-balance-collapse">
+      <summary class="pr-collapse__summary">Abwägung anzeigen ▾</summary>
+      <div class="pr-collapse__body">
+        ${_renderOption(balance.stayOption)}
+        ${_renderOption(balance.changeOption)}
+        <p class="coach-balance-closing">${h(balance.closing)}</p>
+      </div>
+    </details>` : '';
 
   container.innerHTML = `
   <div class="chart-card coach-focus-card">
@@ -2308,6 +2329,7 @@ function renderCoachTab(state) {
     <div class="coach-focus-status">${icon} ${h(focus.headline)}</div>
     <p class="coach-focus-reasoning">${h(focus.reasoning)}</p>
     ${focus.recommendation ? `<p class="coach-focus-recommendation">${h(focus.recommendation)}</p>` : ''}
+    ${balanceHtml}
   </div>`;
 }
 
