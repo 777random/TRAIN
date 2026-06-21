@@ -5336,6 +5336,10 @@ function _showOnboarding() {
 
   let _step   = 1;
   let _selTpl = null;
+  // Beide optional, keine Vorauswahl, nicht persistiert — wirken nur einmalig
+  // auf Anzeige/Anwendung der Vorlage in diesem Onboarding-Durchlauf.
+  let _expLevel = null; // 'anfaenger' | 'fortgeschritten' | 'erfahren' | null
+  let _mainGoal = null; // 'kraftaufbau' | 'muskelaufbau' | 'fitness' | null
 
   const el = document.createElement('div');
   el.id = 'onboarding';
@@ -5374,19 +5378,52 @@ function _showOnboarding() {
           <button class="btn btn--accent ob-btn" data-ob="next">Weiter →</button>
         </div>`;
     } else if (_step === 2) {
+      // Empfehlung nach Hauptziel — rein visuell, beeinflusst keine Auswahl/
+      // Anwendung. null wenn kein Ziel gewählt wurde (AC12).
+      const _recommendedIdx = _mainGoal === 'kraftaufbau'
+        ? (_expLevel === 'fortgeschritten' || _expLevel === 'erfahren' ? 1 : 0)
+        : _mainGoal === 'muskelaufbau' ? 1
+        : _mainGoal === 'fitness' ? 2
+        : null;
+
+      const _expOptions  = [['anfaenger', 'Anfänger'], ['fortgeschritten', 'Fortgeschritten'], ['erfahren', 'Erfahren']];
+      const _goalOptions = [['kraftaufbau', 'Kraftaufbau'], ['muskelaufbau', 'Muskelaufbau'], ['fitness', 'Allgemeine Fitness']];
+
+      const expRow = `
+        <div class="ob-choice-block">
+          <div class="ob-choice-label">Wie viel Erfahrung hast du?</div>
+          <div class="ob-choice-row">
+            ${_expOptions.map(([val, label]) => `
+              <button type="button" class="ob-choice-btn${_expLevel === val ? ' is-selected' : ''}"
+                data-ob="select-exp" data-exp="${val}">${label}</button>`).join('')}
+          </div>
+        </div>`;
+      const goalRow = `
+        <div class="ob-choice-block">
+          <div class="ob-choice-label">Was ist dein Hauptziel?</div>
+          <div class="ob-choice-row">
+            ${_goalOptions.map(([val, label]) => `
+              <button type="button" class="ob-choice-btn${_mainGoal === val ? ' is-selected' : ''}"
+                data-ob="select-goal" data-goal="${val}">${label}</button>`).join('')}
+          </div>
+        </div>`;
+
       const cards = _ONBOARDING_TEMPLATES.map((t, i) => `
-        <div class="ob-tpl-card${_selTpl === i ? ' is-selected' : ''}" data-ob="select" data-tpl="${i}">
+        <div class="ob-tpl-card${_selTpl === i ? ' is-selected' : ''}${_recommendedIdx === i ? ' ob-tpl-card--recommended' : ''}" data-ob="select" data-tpl="${i}">
           <span class="ob-tpl-icon">${t.icon}</span>
           <div class="ob-tpl-info">
             <div class="ob-tpl-title">${t.title}</div>
             <div class="ob-tpl-meta">${t.meta}</div>
             <div class="ob-tpl-sub">${t.sub}</div>
+            ${_recommendedIdx === i ? '<div class="ob-tpl-recommended">✓ Empfohlen für dich</div>' : ''}
           </div>
         </div>`).join('');
       el.innerHTML = `
         <div class="ob-screen">
           <div class="ob-indicator">${_dots()}</div>
           <h2 class="ob-title ob-title--sm">Womit möchtest du starten?</h2>
+          ${expRow}
+          ${goalRow}
           <div class="ob-tpl-list">${cards}</div>
           <button class="btn btn--accent ob-btn" data-ob="load"${_selTpl === null ? ' disabled' : ''}>Vorlage laden →</button>
           <button class="btn btn--ghost ob-btn ob-btn--sm" data-ob="skip">Ohne Vorlage starten</button>
@@ -5418,6 +5455,8 @@ function _showOnboarding() {
     switch (btn.dataset.ob) {
       case 'next':   _step = 2; _render(); break;
       case 'select': _selTpl = +btn.dataset.tpl; _render(); break;
+      case 'select-exp':  _expLevel = _expLevel === btn.dataset.exp ? null : btn.dataset.exp; _render(); break;
+      case 'select-goal': _mainGoal = _mainGoal === btn.dataset.goal ? null : btn.dataset.goal; _render(); break;
       case 'load':   if (_selTpl !== null) _applyTpl(_selTpl); _advance(); break;
       case 'skip':   _applyBlank(); _advance(); break;
       case 'done':   _finish(); break;
@@ -5428,6 +5467,21 @@ function _showOnboarding() {
     if (_isInstalled()) { _finish(); return; }
     _step = 3;
     _render();
+  }
+
+  // Laufzeit-Anpassung von Sätzen/Pause nach gewählter Erfahrungsstufe.
+  // _ONBOARDING_TEMPLATES selbst bleibt unverändert — nur die beim Erstellen
+  // tatsächlich übernommenen Werte (n, ps) werden hier situativ modifiziert.
+  // Fortgeschritten: keine Anpassung (implizite Referenz-Stufe). targetReps
+  // wird in KEINEM Fall verändert (Technik-Fokus, siehe Sprint-Spec).
+  function _adjustedSetsAndPause(ex) {
+    if (_expLevel === 'anfaenger') {
+      return { n: Math.max(2, ex.n - 1), ps: ex.ps + 15 };
+    }
+    if (_expLevel === 'erfahren') {
+      return { n: ex.n <= 3 ? ex.n + 1 : ex.n, ps: ex.ps };
+    }
+    return { n: ex.n, ps: ex.ps };
   }
 
   function _applyTpl(idx) {
@@ -5441,16 +5495,19 @@ function _showOnboarding() {
       title: ds.title, subtitle: '',
       warmup: ds.warmup, cooldown: ds.cooldown,
       locked: false, markedDone: false,
-      exercises: ds.exercises.map(ex => ({
-        name: ex.name, note: '', pauseSec: ex.ps, metric: ex.m,
-        sets: Array.from({ length: ex.n }, () => ({
-          weight: 0, reps: ex.tr, rpe: null, status: 'pending', done: false, note: '',
-        })),
-        weightStep: 2.5, nextWeekPlan: 0, nextWeekPlanConfirmed: false,
-        targetSets: ex.n, targetReps: ex.tr,
-        _showCfg: false, setType: 'standard',
-        tags: [], showPlates: false, progressionType: 'weight', substituteFor: null,
-      })),
+      exercises: ds.exercises.map(ex => {
+        const { n, ps } = _adjustedSetsAndPause(ex);
+        return {
+          name: ex.name, note: '', pauseSec: ps, metric: ex.m,
+          sets: Array.from({ length: n }, () => ({
+            weight: 0, reps: ex.tr, rpe: null, status: 'pending', done: false, note: '',
+          })),
+          weightStep: 2.5, nextWeekPlan: 0, nextWeekPlanConfirmed: false,
+          targetSets: n, targetReps: ex.tr,
+          _showCfg: false, setType: 'standard',
+          tags: [], showPlates: false, progressionType: 'weight', substituteFor: null,
+        };
+      }),
     }));
     dispatch(A.ONBOARDING_WEEK_CREATE, { startDate, days, note: tpl.weekTitle });
   }

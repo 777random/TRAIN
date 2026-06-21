@@ -18,7 +18,7 @@
  *   asset conflicts.
  */
 
-const CACHE_VERSION  = 'train-v87';
+const CACHE_VERSION  = 'train-v88';
 const FONT_CACHE     = 'train-fonts-v1';
 
 /**
