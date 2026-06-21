@@ -1503,16 +1503,25 @@ function reduce(state, action) {
     }
     case A.CONFIRM_SET: {
       const wk = _currentWeek(); if (!wk) break;
-      const s = wk.days[p.di]?.exercises[p.ei]?.sets[p.si];
+      const ex = wk.days[p.di]?.exercises[p.ei]; if (!ex) break;
+      const s  = ex.sets[p.si];
       if (!s || s.status === 'success') break;
       if (p.reps != null) s.reps = p.reps;
-      s.status = 'success';
-      s.done   = true;
-      if (wk.mode !== 'deload') {
-        const ex     = wk.days[p.di]?.exercises[p.ei];
+      // Gleiche canSuccess-Logik wie SET_TOGGLE_DONE: ein Satz wird nur
+      // 'success' wenn die Wdh das Ziel erreichen — ohne definiertes
+      // targetReps gilt weiterhin nur reps > 0 (kein Blockieren).
+      const targetReps = parseFloat(ex.targetReps) || 0;
+      const repsVal     = parseFloat(s.reps) || 0;
+      const canSuccess  = targetReps > 0 ? repsVal >= targetReps : repsVal > 0;
+      s.status = canSuccess ? 'success' : 'fail';
+      // s.done bleibt an status===success gekoppelt (wie überall sonst im
+      // Code — _normSt, doneSets-Zähler, SET_TOGGLE_DONE), NICHT bedingungslos
+      // true, sonst würden Fail-Sätze fälschlich als "done" mitgezählt.
+      s.done   = canSuccess;
+      if (canSuccess && wk.mode !== 'deload') {
         const weight = parseFloat(s.weight) || 0;
         const reps   = parseFloat(s.reps)   || 0;
-        if (ex && reps > 0) {
+        if (reps > 0) {
           if (weight > 0) {
             const volume   = weight * reps;
             const est1RM   = reps <= 10 ? weight * (1 + reps / 30) : 0;

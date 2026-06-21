@@ -3173,6 +3173,7 @@ function _handleClick(e) {
       const _lastWk = getLatestWeek(_st.weeks);
       const _hasCompleted = _lastWk?.days.some(d => d.markedDone);
       _moreRecsOpen = false;
+      _userDismissedAutoSelect = new Set();
       if (_hasCompleted) {
         const _plateaus = detectPlateaus(_st.weeks, _st.favoriteExercises ?? []);
         const _review = buildWeekReview(_lastWk, _st.weeks, _st.favoriteExercises ?? [], _plateaus);
@@ -3239,6 +3240,10 @@ function _handleClick(e) {
           if (ex.name !== recName) return;
           const wasConfirmed = ex.nextWeekPlanConfirmed && ex.nextWeekPlan === recDelta;
           if (wasConfirmed) {
+            // Nutzer wählt GERADE ab — merken, bevor der Re-Render unten die
+            // Auto-Vorauswahl-Berechnung erneut ausführt (sonst snapt der
+            // Chip im selben Klick sofort wieder zurück, siehe Diagnose).
+            _userDismissedAutoSelect.add(recName);
             dispatch(A.EX_TOGGLE_NEXT_WEEK_CONFIRMED, { di: _rdi, ei: _rei, weekIdx: _recWkIdx });
           } else {
             dispatch(A.EX_SET_NEXT_WEEK_PLAN, { di: _rdi, ei: _rei, value: recDelta, weekIdx: _recWkIdx });
@@ -3819,9 +3824,15 @@ function _handleClick(e) {
       const _wInp = document.querySelector(`[data-action="set-weight"][data-di="${di}"][data-ei="${ei}"][data-si="${_csi}"]`);
       if (_wInp) dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: _csi, field: 'weight', value: _wInp.value });
 
+      // Echte eingetragene Wdh verwenden, NICHT targetReps — sonst überschreibt
+      // dieser Button stillschweigend die tatsächliche Nutzereingabe und der
+      // Reducer kann nie canSuccess korrekt gegen das Ziel prüfen (siehe Diagnose).
+      const _rInp = document.querySelector(`[data-action="set-reps"][data-di="${di}"][data-ei="${ei}"][data-si="${_csi}"]`);
+      const _repsVal = _rInp?.value ?? '';
+
       // Set flash key before dispatch so the re-render includes the class
       _confirmFlashKey = `${di}-${ei}`;
-      dispatch(A.CONFIRM_SET, { di: +di, ei: +ei, si: _csi, reps: _cex.targetReps });
+      dispatch(A.CONFIRM_SET, { di: +di, ei: +ei, si: _csi, reps: _repsVal });
       setTimeout(() => { _confirmFlashKey = null; scheduleRender(); }, 350);
 
       const _aft = getState();
@@ -4333,6 +4344,14 @@ function _renderExFormModal(name) {
 
 // ─── New week modal (2.3) ─────────────────────────────────────────────────────
 let _moreRecsOpen = false; // collapsible "weitere Übungen" state, reset on modal open
+// Übungsnamen, die der Nutzer in DIESER Modal-Sitzung manuell abgewählt hat.
+// Verhindert dass die Auto-Vorauswahl-Berechnung in _prepNewWeekModal() einen
+// gerade abgewählten Chip im selben Klick (re-render via toggle-weight-rec)
+// sofort wieder bestätigt. Reset bei jedem frischen Öffnen des Modals (siehe
+// 'open-new-week'), NICHT bei jedem _prepNewWeekModal()-Aufruf, da diese
+// Funktion auch für In-Session-Re-Renders (toggle-weight-rec, toggle-more-recs)
+// genutzt wird.
+let _userDismissedAutoSelect = new Set();
 
 /**
  * Extracts the numeric RPE/Erfolgsquote values from rec.reasons[] (already
@@ -4424,7 +4443,13 @@ function _prepNewWeekModal() {
               rec.recommendedWeight = roundToPlate(rec.lastWeight + rec.delta, plateStep);
               rec.boosted = true;
             }
-            const autoSelected = rec.delta > 0 && isReadyForAutoSelect(ex.name, calcWeeks);
+            // Vom Nutzer in dieser Sitzung bereits abgewählte Übungen werden
+            // nicht erneut als autoSelected gewertet — sonst zeigt der Chip
+            // trotz state.nextWeekPlanConfirmed===false einen "bestätigt"-
+            // Zustand (visueller Mismatch) und _autoSelections würde sie
+            // ohnehin sofort wieder bestätigen (der eigentliche Snap-Back-Bug).
+            const autoSelected = !_userDismissedAutoSelect.has(ex.name)
+              && rec.delta > 0 && isReadyForAutoSelect(ex.name, calcWeeks);
             const alreadyConfirmedSame = ex.nextWeekPlanConfirmed && ex.nextWeekPlan === rec.delta;
             if (autoSelected && !alreadyConfirmedSame) {
               _autoSelections.push({ di, ei, value: rec.delta });
