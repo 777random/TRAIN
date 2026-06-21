@@ -706,6 +706,8 @@ function renderDayList(state) {
     }).join('')}
   </div>
   ${progressHtml}
+  ${(!_overviewMode && _activeDayIdx !== null) ? _renderTrainingContextAnchor(state, wk, _activeDayIdx) : ''}
+  ${(!_overviewMode && _activeDayIdx !== null) ? _prevWeekBanner(state, wk, _activeDayIdx) : ''}
 </div>`;
 
   // ── Content: overview grid or single active panel ─────────────────────────
@@ -915,30 +917,36 @@ function _renderTrainingContextAnchor(state, wk, di) {
   return `<div class="training-context-anchor">${h(parts.join(' · '))}</div>`;
 }
 
+/**
+ * Vorwoche-Banner — exakt dieselbe Berechnung wie vormals inline in
+ * renderDayBody() (Erfolgsquote + Sätze-Summe über alle Übungen desselben
+ * Tag-Slots der Vorwoche, plus Streak-Zusatz ab streak.cur>=2), nur in eine
+ * eigenständige Funktion ausgelagert, analog zu _trainingContextAnchor().
+ * Bedingung unverändert: nur ab state.curIdx>0 und wenn prevDay existiert.
+ */
+function _prevWeekBanner(state, wk, di) {
+  if (!(state.curIdx > 0)) return '';
+  const prevDay = state.weeks[state.curIdx - 1]?.days?.[di];
+  if (!prevDay) return '';
+  let _pbSucc = 0, _pbFail = 0;
+  prevDay.exercises.forEach(ex => ex.sets.forEach(s => {
+    if (s.status === 'success') _pbSucc++;
+    else if (s.status === 'fail') _pbFail++;
+  }));
+  const _pbTotal   = _pbSucc + _pbFail;
+  const _pbScore   = _pbTotal > 0 ? Math.round(_pbSucc / _pbTotal * 100) : 0;
+  const streak     = _calcStreak(state);
+  const streakPart = streak.cur >= 2 ? `&nbsp;&nbsp;🔥 ${streak.cur * 7} Tage in Folge` : '';
+  return `<div class="prev-banner" role="status">
+    ${ic.barChart()}<span>Vorwoche: ${_pbScore}% · ${_pbSucc}/${_pbTotal} Sätze ✓${streakPart}</span>
+  </div>`;
+}
+
 function renderDayBody(wk, di, state) {
   const day      = wk.days[di];
   const locked   = !!day.locked;
   const done     = !!day.markedDone;
   const isVacDay = !!day.isVacation;
-
-  let prevBanner = '';
-  if (state.curIdx > 0) {
-    const prevDay = state.weeks[state.curIdx - 1]?.days?.[di];
-    if (prevDay) {
-      let _pbSucc = 0, _pbFail = 0;
-      prevDay.exercises.forEach(ex => ex.sets.forEach(s => {
-        if (s.status === 'success') _pbSucc++;
-        else if (s.status === 'fail') _pbFail++;
-      }));
-      const _pbTotal    = _pbSucc + _pbFail;
-      const _pbScore    = _pbTotal > 0 ? Math.round(_pbSucc / _pbTotal * 100) : 0;
-      const streak      = _calcStreak(state);
-      const streakPart  = streak.cur >= 2 ? `&nbsp;&nbsp;🔥 ${streak.cur * 7} Tage in Folge` : '';
-      prevBanner = `<div class="prev-banner" role="status">
-        ${ic.barChart()}<span>Vorwoche: ${_pbScore}% · ${_pbSucc}/${_pbTotal} Sätze ✓${streakPart}</span>
-      </div>`;
-    }
-  }
 
   const exHtml       = day.exercises.map((ex, ei) => renderExercise(wk, di, ei, state)).join('');
   const lockBtnLabel = done ? 'Tag entsperren' : 'Tag als abgeschlossen markieren und sperren';
@@ -1007,9 +1015,7 @@ function renderDayBody(wk, di, state) {
 </div>`;
 
   return `
-    ${_renderTrainingContextAnchor(state, wk, di)}
     ${isVacDay ? '<div class="day-vacation-banner">🏖 Urlaubstag — Streak läuft weiter</div>' : ''}
-    ${prevBanner}
     ${noteBlock}
     ${warmupBlock}
     <div data-ex-list="${di}">${exHtml}</div>
