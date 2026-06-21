@@ -2053,19 +2053,20 @@ function _hasAnyTrainingData(state) {
 }
 
 const _FOCUS_ICONS = {
-  reentry:     '🔄',
-  overload:    '🔋',
-  plateau:     '⚠️',
-  progression: '💪',
-  onTrack:     '✅',
+  reentry:        '🔄',
+  overload:       '🔋',
+  consistencyGap: '📅',
+  plateau:        '⚠️',
+  progression:    '💪',
+  onTrack:        '✅',
 };
 
 // ─── Coach tab: einzige Komponente ist die "Fokus der Woche"-Karte. Sie
-// verdichtet Wiedereinstieg/Überlastung/Plateau/Progression (in dieser
-// Priorität, siehe weeklyFocus.js) zu EINER Aussage. Plateau-Erkennung wird
-// hier nicht zusätzlich/dupliziert dargestellt — computeWeeklyFocus() ruft
-// detectPlateaus() 1:1 wiederverwendet auf, dieselbe Funktion die auch der
-// Wochenrückblick nutzt.
+// verdichtet Wiedereinstieg/Überlastung/Konsistenz-Engpass/Plateau/
+// Progression (in dieser Priorität, siehe weeklyFocus.js) zu EINER Aussage.
+// Plateau-Erkennung wird hier nicht zusätzlich/dupliziert dargestellt —
+// computeWeeklyFocus() ruft detectPlateaus() 1:1 wiederverwendet auf,
+// dieselbe Funktion die auch der Wochenrückblick nutzt.
 function renderCoachTab(state) {
   const container = document.getElementById('coach-tab-content');
   if (!container) return;

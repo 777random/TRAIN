@@ -1,15 +1,21 @@
 /**
  * weeklyFocus.js – "Fokus der Woche"-Karte: verdichtet mehrere bestehende
- * Signale (Wiedereinstieg, Überlastung, Plateau, Progression) zu EINER
- * priorisierten Aussage. Pure Funktionen, keine Seiteneffekte.
+ * Signale (Wiedereinstieg, Überlastung, Konsistenz, Plateau, Progression) zu
+ * EINER priorisierten Aussage. Pure Funktionen, keine Seiteneffekte.
  *
  * Priorität (erstes zutreffendes Signal gewinnt):
  *   1. Wiedereinstieg   – state.lastReentryHandled (bestehend, 1:1 wiederverwendet)
  *   2. Überlastung       – Schlaf / RPE-Trend / Erfolgsquote (neue, aber an
  *                          S-02/S-04 angelehnte Schwellenwerte – keine Duplizierung
  *                          von insightEngine.js, eigenständige Implementierung)
- *   3. Plateau           – detectPlateaus() aus plateauDetector.js, 1:1 wiederverwendet
- *   4. Progression       – isReadyForAutoSelect()/getWeightRecommendation() aus
+ *   3. Konsistenz-Engpass – Anteil absolvierter Trainingstage über 6 Wochen,
+ *                          gleiche Urlaubstage-Ausschluss-Logik wie state.js'
+ *                          isWeekDoneForStreak() (deren exportierte Variante
+ *                          aber nur ein Boolean liefert, kein Verhältnis —
+ *                          hier daher dieselbe Filterregel auf Tagesebene
+ *                          gespiegelt, um die rohen Zähler zu erhalten)
+ *   4. Plateau           – detectPlateaus() aus plateauDetector.js, 1:1 wiederverwendet
+ *   5. Progression       – isReadyForAutoSelect()/getWeightRecommendation() aus
  *                          weightRecommendation.js, 1:1 wiederverwendet
  *   Fallback: "Auf Kurs"
  */
@@ -173,7 +179,59 @@ function _checkOverload(state) {
   return null;
 }
 
-// ─── Prio 3: Plateau ────────────────────────────────────────────────────────
+// ─── Prio 3: Konsistenz-Engpass ─────────────────────────────────────────────
+// Anteil absolvierter Trainingstage pro Woche, gleiche Urlaubstage-
+// Ausschlussregel wie state.js' isWeekDoneForStreak()/_isWeekDoneForStreak:
+// Tage mit isVacation && vacationPlan==='rest' fliegen aus dem Nenner, ein
+// verbleibender Urlaubstag (isVacation, aber mit Training) zählt als erledigt.
+
+function _weekConsistencyRatio(wk) {
+  const active = wk.days.filter(d => !(d.isVacation && d.vacationPlan === 'rest'));
+  if (active.length === 0) return null; // reine Ruhewoche, nicht auswertbar
+  const done = active.filter(d => d.markedDone || d.isVacation).length;
+  return done / active.length;
+}
+
+function _consistencyEligibleWeeks(state) {
+  return _sortedWeeks(state)
+    .filter(w => w.mode !== 'deload')
+    .map(wk => ({ wk, ratio: _weekConsistencyRatio(wk) }))
+    .filter(r => r.ratio !== null);
+}
+
+function _evaluateConsistencyWindow(windowWeeks) {
+  const avg = windowWeeks.reduce((s, r) => s + r.ratio, 0) / windowWeeks.length;
+  const belowCount = windowWeeks.filter(r => r.ratio < 0.7).length;
+  return avg < 0.7 && belowCount >= 4;
+}
+
+function _checkConsistencyGap(state) {
+  const eligible = _consistencyEligibleWeeks(state);
+  if (eligible.length < 6) return null; // zu wenig Historie -> nicht auswertbar
+
+  const last6 = eligible.slice(-6);
+  if (!_evaluateConsistencyWindow(last6)) return null;
+
+  const avgPct = Math.round((last6.reduce((s, r) => s + r.ratio, 0) / 6) * 100);
+
+  // Varianz: war der Engpass schon im UNMITTELBAR VORHERGEHENDEN 6-Wochen-
+  // Fenster (eine Woche früher) ebenfalls aktiv? Rein laufzeitberechnet,
+  // keine Persistierung.
+  const wasActiveBefore = eligible.length >= 7 && _evaluateConsistencyWindow(eligible.slice(-7, -1));
+
+  const reasoning = wasActiveBefore
+    ? `Der Trend hält an: du hast in den letzten 6 Wochen weiterhin nur ${avgPct}% deiner geplanten Trainingstage absolviert.`
+    : `Du hast in den letzten 6 Wochen ${avgPct}% deiner geplanten Trainingstage absolviert.`;
+
+  return {
+    status: 'consistencyGap',
+    headline: 'Konsistenz vor Intensität',
+    reasoning,
+    recommendation: 'Mehr Gewicht würde aktuell weniger bringen als mehr Regelmäßigkeit. Plane diese Woche bewusst feste Trainingszeiten.',
+  };
+}
+
+// ─── Prio 4: Plateau ────────────────────────────────────────────────────────
 // detectPlateaus() 1:1 wiederverwendet, NICHT neu implementiert.
 
 function _checkPlateau(state) {
@@ -195,7 +253,7 @@ function _checkPlateau(state) {
   };
 }
 
-// ─── Prio 4: Progression ────────────────────────────────────────────────────
+// ─── Prio 5: Progression ────────────────────────────────────────────────────
 // isReadyForAutoSelect()/getWeightRecommendation() 1:1 wiederverwendet.
 
 function _qualificationStreak(name, calcWeeks) {
@@ -267,6 +325,7 @@ function _fallback(state) {
 export function computeWeeklyFocus(state) {
   return _checkReentry(state)
     ?? _checkOverload(state)
+    ?? _checkConsistencyGap(state)
     ?? _checkPlateau(state)
     ?? _checkProgression(state)
     ?? _fallback(state);
