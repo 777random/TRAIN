@@ -850,6 +850,71 @@ function renderDayCard(wk, di, state) {
 </article>`;
 }
 
+/** Kalenderdatum eines Tags innerhalb einer Woche — Tag-Index = Tage-Offset
+ * ab week.startDate (gleiche Konvention wie _weekdayName() in progressInsights.js). */
+function _dayDate(wk, dayIdx) {
+  const d = new Date(wk.startDate + 'T12:00:00');
+  d.setDate(d.getDate() + dayIdx);
+  return d;
+}
+
+/**
+ * Trainings-Ritual-Kontext: findet den chronologisch letzten Tag VOR (wk, di)
+ * mit Aktivität (abgeschlossen ODER mindestens ein bewerteter Satz) — über
+ * Wochengrenzen hinweg, unabhängig vom Wochenindex (NICHT dasselbe wie der
+ * bestehende prevBanner-Lookup, der gezielt denselben Tag-Slot der Vorwoche
+ * vergleicht). Streak wird aus der bestehenden _calcStreak()-Quelle übernommen,
+ * nicht neu berechnet. Liefert null wenn kein vorheriger aktiver Tag existiert.
+ */
+function _trainingContextAnchor(state, wk, di) {
+  const sortedWeeks = [...state.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
+  const curWeekIdx = sortedWeeks.indexOf(wk);
+  if (curWeekIdx === -1) return null;
+
+  let found = null;
+  for (let wi = curWeekIdx; wi >= 0 && !found; wi--) {
+    const w = sortedWeeks[wi];
+    const startDi = (wi === curWeekIdx) ? di - 1 : w.days.length - 1;
+    for (let d = startDi; d >= 0; d--) {
+      const day = w.days[d];
+      if (!day) continue;
+      const hasEvaluated = day.exercises.some(ex => ex.sets.some(s => s.status === 'success' || s.status === 'fail'));
+      if (day.markedDone || hasEvaluated) {
+        found = { week: w, dayIdx: d, day, hasEvaluated };
+        break;
+      }
+    }
+  }
+  if (!found) return null;
+
+  const daysAgo = Math.max(0, Math.round((_dayDate(wk, di) - _dayDate(found.week, found.dayIdx)) / 86_400_000));
+  const timeText = daysAgo === 0 ? 'heute' : daysAgo === 1 ? 'gestern' : `vor ${daysAgo} Tagen`;
+
+  // Erfolgsquote nur wenn der gefundene Tag tatsächlich bewertete Sätze hat —
+  // sonst fälschliches "0%" für einen leeren/übersprungenen Tag vermeiden.
+  let successRate = null;
+  if (found.hasEvaluated) {
+    let succ = 0, total = 0;
+    found.day.exercises.forEach(ex => ex.sets.forEach(s => {
+      if (s.status === 'success') { succ++; total++; }
+      else if (s.status === 'fail') { total++; }
+    }));
+    if (total > 0) successRate = Math.round(succ / total * 100);
+  }
+
+  const streakDays = _calcStreak(state).cur * 7;
+  return { timeText, successRate, streakDays };
+}
+
+function _renderTrainingContextAnchor(state, wk, di) {
+  const ctx = _trainingContextAnchor(state, wk, di);
+  if (!ctx) return '';
+  const parts = [`Letztes Training: ${ctx.timeText}`];
+  if (ctx.successRate !== null) parts.push(`Erfolgsquote: ${ctx.successRate}%`);
+  parts.push(`Streak: ${ctx.streakDays} Tage`);
+  return `<div class="training-context-anchor">${h(parts.join(' · '))}</div>`;
+}
+
 function renderDayBody(wk, di, state) {
   const day      = wk.days[di];
   const locked   = !!day.locked;
@@ -942,6 +1007,7 @@ function renderDayBody(wk, di, state) {
 </div>`;
 
   return `
+    ${_renderTrainingContextAnchor(state, wk, di)}
     ${isVacDay ? '<div class="day-vacation-banner">🏖 Urlaubstag — Streak läuft weiter</div>' : ''}
     ${prevBanner}
     ${noteBlock}
