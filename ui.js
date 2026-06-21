@@ -1402,20 +1402,12 @@ function renderExercise(wk, di, ei, state) {
     const _nudgePrefix = `${di}-${ei}-`;
     const _nudgeSi = (_rpeNudgeKey?.startsWith(_nudgePrefix)) ? +_rpeNudgeKey.split('-')[2] : null;
     return `<div class="confirm-set-wrap">
-      <div class="confirm-set-row">
-        <button
-          class="confirm-set-btn${allDone ? ' is-done' : ''}${_confirmFlashKey === `${di}-${ei}` ? ' is-flashing' : ''}"
-          ${allDone ? 'disabled' : ''}
-          data-action="confirm-set" data-di="${di}" data-ei="${ei}"
-          aria-label="Nächsten Satz bestätigen"
-        >✓ Satz bestätigen</button>
-        <button
-          class="fail-set-btn${allDone ? ' is-done' : ''}"
-          ${allDone ? 'disabled' : ''}
-          data-action="set-fail" data-di="${di}" data-ei="${ei}"
-          aria-label="Nächsten Satz als nicht geschafft markieren"
-        >✗</button>
-      </div>
+      <button
+        class="confirm-set-btn${allDone ? ' is-done' : ''}${_confirmFlashKey === `${di}-${ei}` ? ' is-flashing' : ''}"
+        ${allDone ? 'disabled' : ''}
+        data-action="confirm-set" data-di="${di}" data-ei="${ei}"
+        aria-label="Nächsten Satz bestätigen"
+      >✓ Satz bestätigen</button>
       ${_nudgeSi != null ? `
       <div class="rpe-nudge" role="group" aria-label="RPE eingeben">
         <span class="rpe-nudge__label">Wie anstrengend?</span>
@@ -1457,34 +1449,6 @@ function renderExercise(wk, di, ei, state) {
   >${ic.plus()}<span>Satz hinzufügen</span></button>` : ''}
 </div>`;
 }
-/**
- * Tippfehler-Schutz (Auffälligkeits-Hinweis): true wenn ein automatisch als
- * 'fail' bewerteter Satz deutlich unter dem liegt, was für denselben Satz-
- * Index dieser Übung in den letzten bis zu 3 nicht-Deload/Urlaubs-Wochen
- * (vor der aktuellen Woche) typisch war. Rein informativ, kein Blocker.
- */
-function _isAnomalousFail(state, exName, si, repsVal, targetReps) {
-  const weeks = [...state.weeks]
-    .sort((a, b) => a.startDate.localeCompare(b.startDate))
-    .filter(w => w.mode !== 'deload' && w.mode !== 'vacation');
-  const past = weeks.slice(0, -1).slice(-3); // letzte bis zu 3 Wochen VOR der aktuellen
-  const vals = [];
-  for (const wk of past) {
-    for (const day of wk.days) {
-      for (const e of day.exercises) {
-        if (e.name !== exName) continue;
-        const hist = e.sets[si];
-        if (hist && hist.status === 'success' && hist.reps != null && hist.reps !== '') {
-          vals.push(parseFloat(hist.reps) || 0);
-        }
-      }
-    }
-  }
-  if (vals.length === 0) return false;
-  const histAvg = vals.reduce((a, b) => a + b, 0) / vals.length;
-  return histAvg >= (targetReps || 0) && repsVal < histAvg * 0.5;
-}
-
 // ─── Set row ─────────────────────────────────────────────────────────────────
 function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true) {
   const prevSet    = prevEx?.sets?.[si] ?? null;
@@ -1533,11 +1497,6 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
   }
   const doneClass = st === 'success' ? ' is-done' : st === 'fail' ? ' is-fail' : '';
   const stLabel   = st === 'success' ? 'erfolgreich' : st === 'fail' ? 'nicht geschafft' : 'offen';
-
-  // Auffälligkeits-Hinweis: nur bei einem echten, automatisch bewerteten Fail
-  // (nicht bei pending) und deutlicher Abweichung vom historischen Schnitt.
-  const showAnomalyHint = st === 'fail' && !locked && s.reps != null && s.reps !== ''
-    && _isAnomalousFail(getState(), ex.name, si, parseFloat(s.reps) || 0, parseFloat(ex.targetReps) || 0);
 
   // PR indicators: 🏆 weight PR (gold) | 🔄 reps PR (green)
   const isWeightPR = st === 'success' && ex.prWeight !== null &&
@@ -1639,11 +1598,12 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
   </div>
 
   <div class="set-done-wrap">
-    <div
-      class="set-status-indicator${doneClass}${isPR ? ' is-pr' : ''}"
-      aria-hidden="true"
-    >${doneIcon}${showAnomalyHint ? `<span class="set-anomaly-hint" title="Deutlich unter deinem bisherigen Schnitt für diesen Satz — Tippfehler?">⚠️</span>` : ''}</div>
-    <span class="sr-only">Satz ${si + 1}: ${stLabel}${isPR ? ' – Bestleistung!' : ''}${showAnomalyHint ? '. Deutlich unter deinem bisherigen Schnitt — bitte prüfen.' : ''}</span>
+    <button
+      class="set-done-btn${doneClass}${isPR ? ' is-pr' : ''}"
+      ${locked ? 'disabled' : ''}
+      data-action="toggle-done" data-di="${di}" data-ei="${ei}" data-si="${si}"
+      aria-label="Satz ${si + 1}: ${stLabel}${isPR ? ' – Bestleistung!' : ''}. Tippen für nächsten Status (offen → erfolgreich → nicht geschafft)."
+    >${doneIcon}</button>
     <span class="prev-hint" aria-hidden="true"></span>
   </div>
 
@@ -2999,108 +2959,10 @@ function renderTemplateEditor(state) {
 // ════════════════════════════════════════════════════════════════════════════
 
 function _bindEvents(root) {
-  root.addEventListener('click',    _handleClick);
-  root.addEventListener('change',   _handleChange);
-  root.addEventListener('input',    _handleInput);
-  root.addEventListener('keydown',  _handleKeydown);
-  root.addEventListener('focusin',  _handleFocusIn);
-  root.addEventListener('focusout', _handleFocusOut);
-}
-
-// ─── Automatische Satz-Bewertung aus Wdh-Eingabe ──────────────────────────────
-// Einziges Wdh-Feld, das fokussiert ist aber noch nicht ausgewertet wurde.
-// Primärer Trigger ist focusout (blur-Äquivalent, bubble-fähig für die
-// Delegation). _flushPendingRepsEval() ist das Sicherheitsnetz: wird vor
-// JEDER anderen Klick-Aktion aufgerufen, falls focusout aus irgendeinem
-// Grund (unzuverlässiges Timing auf manchen Mobile-Browsern) noch nicht
-// gefeuert hat.
-let _pendingRepsEval = null;
-
-function _handleFocusIn(e) {
-  const el = e.target;
-  if (el?.dataset?.action !== 'set-reps') return;
-  if (_pendingRepsEval && _pendingRepsEval !== el) _evaluateRepsInput(_pendingRepsEval);
-  _pendingRepsEval = el;
-}
-
-function _handleFocusOut(e) {
-  const el = e.target;
-  if (el !== _pendingRepsEval) return;
-  _pendingRepsEval = null;
-  _evaluateRepsInput(el);
-}
-
-function _flushPendingRepsEval() {
-  if (!_pendingRepsEval) return;
-  const el = _pendingRepsEval;
-  _pendingRepsEval = null;
-  _evaluateRepsInput(el);
-}
-
-/** Persistiert den Live-Wert des Wdh-Feldes und leitet den Status daraus ab. */
-function _evaluateRepsInput(inp) {
-  const { di, ei, si } = inp.dataset;
-  dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'reps', value: inp.value });
-  dispatch(A.SET_EVALUATE_FROM_REPS, { di: +di, ei: +ei, si: +si });
-  _afterSetEvaluated(di, ei, si);
-}
-
-/**
- * Gemeinsame Post-Bewertungs-UX nach JEDER automatischen Statusableitung
- * (blur, ✗-Button, "Satz bestätigen", Pfeil-Autofill) — ein einziger Ort an
- * dem Insight-Trigger und RPE-Nudge ausgelöst werden, unabhängig vom
- * Auslöser. PR-/Insight-Trigger nur bei 'success' (siehe AC15); Tipp-03 und
- * Pause-Timer-Start unabhängig vom Ergebnis (spiegelt die vorherige
- * confirm-set-Struktur, die diese außerhalb der success-Prüfung hatte).
- */
-function _afterSetEvaluated(di, ei, si) {
-  const st = getState();
-  const ex = st.weeks[st.curIdx]?.days[+di]?.exercises[+ei];
-  const s  = ex?.sets[+si];
-  if (!ex || !s) return;
-
-  if (s.status === 'success') {
-    const triggered = fireTrigger('SATZ_ABGEHAKT', { di: +di, ei: +ei, si: +si });
-    for (const ins of triggered) {
-      if (ins.immediate) showToast(ins.message, ins.type === 'warning' ? 'warn' : 'ok', ins.id === 'P-05' ? 4000 : 3000);
-    }
-    if (st.settings?.rpeEnabled !== false && s.rpe == null) {
-      clearTimeout(_rpeNudgeTimer);
-      _rpeNudgeKey  = `${di}-${ei}-${si}`;
-      scheduleRender();
-      _rpeNudgeTimer = setTimeout(() => { _rpeNudgeKey = null; _rpeNudgeTimer = null; scheduleRender(); }, 4000);
-      _maybeShowTip('tip-02', 'RPE = wie anstrengend war der Satz? 7 = leicht · 8 = moderat · 9 = schwer · 10 = Maximum');
-    }
-  }
-
-  if (ex.targetReps) {
-    const doneSets = (ex.sets ?? []).filter(s2 => s2.status === 'success');
-    const totalAch = doneSets.reduce((sum, s2) => sum + (s2.reps ?? 0), 0);
-    const totalTgt = (ex.sets?.length ?? 0) * ex.targetReps;
-    if (totalTgt > 0 && totalAch > 0) {
-      _maybeShowTip('tip-03', 'Effort-Score: wie viel % deines Ziels du erreicht hast. Über 100% = mehr als geplant.');
-    }
-  }
-
-  const isLastSet = +si === (ex.sets?.length ?? 0) - 1;
-  if (s.status !== 'pending' && !isLastSet && st.settings?.autoStartPauseTimer) {
-    window.dispatchEvent(new CustomEvent('train:set-done', { detail: { pauseSec: ex.pauseSec ?? 90, di: +di } }));
-  }
-
-  scheduleRender();
-}
-
-/** Scrollt zum nächsten offenen Satz — nur für die expliziten Quick-Action-
- * Buttons (Satz bestätigen / ✗), nicht bei direkter Feld-Eingabe (würde dort
- * die eigene Navigation des Nutzers stören). */
-function _scrollToNextPendingSet(di, ei) {
-  const st = getState();
-  const ex = st.weeks[st.curIdx]?.days[+di]?.exercises[+ei];
-  const nextPending = (ex?.sets ?? []).findIndex(s => s.status === 'pending');
-  if (nextPending === -1) return;
-  const nextRow = document.querySelector(`[data-action="set-reps"][data-di="${di}"][data-ei="${ei}"][data-si="${nextPending}"]`)
-    ?.closest('.set-row');
-  nextRow?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  root.addEventListener('click',   _handleClick);
+  root.addEventListener('change',  _handleChange);
+  root.addEventListener('input',   _handleInput);
+  root.addEventListener('keydown', _handleKeydown);
 }
 
 /**
@@ -3118,12 +2980,6 @@ function _scrollToNextPendingSet(di, ei) {
  *   4. Template editor actions [data-tpl-action]   → uses closest('[data-tpl-action]')
  */
 function _handleClick(e) {
-
-  // Sicherheitsnetz: falls ein Wdh-Feld fokussiert war und focusout (blur-
-  // Äquivalent) aus irgendeinem Grund noch nicht verarbeitet wurde, jetzt
-  // nachholen — BEVOR die eigentliche neue Aktion dieses Klicks verarbeitet
-  // wird (Tap auf anderes Feld, ✗, Satz bestätigen, RPE-Picker, Pfeil, ...).
-  _flushPendingRepsEval();
 
   // Close RPE popover when clicking outside it (2.2)
   if (_rpePopoverKey !== null
@@ -3907,6 +3763,38 @@ function _handleClick(e) {
       if (s) { s._showNote = !s._showNote; scheduleRender(); }
       break;
     }
+    case 'toggle-done': {
+      const _s = getState().weeks[getState().curIdx]?.days[+di]?.exercises[+ei]?.sets[+si];
+      if (_s && _s.status === 'pending') {
+        const _wInp = document.querySelector(`[data-action="set-weight"][data-di="${di}"][data-ei="${ei}"][data-si="${si}"]`);
+        const _rInp = document.querySelector(`[data-action="set-reps"][data-di="${di}"][data-ei="${ei}"][data-si="${si}"]`);
+        const _rVal = parseFloat(_rInp?.value ?? _s.reps);
+        const _wVal = parseFloat(_wInp?.value ?? _s.weight);
+        const canSuccess = Number.isFinite(_rVal) && _rVal > 0;
+        if (!canSuccess) {
+          // Fail is always allowed — go directly to fail when success criteria not met
+          dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'status', value: 'fail' });
+          break;
+        }
+        // Flush uncommitted input values to state before marking success
+        if (_wInp) dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'weight', value: _wInp.value });
+        if (_rInp) dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'reps',   value: _rInp.value });
+      }
+      dispatch(A.SET_TOGGLE_DONE, { di: +di, ei: +ei, si: +si });
+      // Fire insight trigger when set is checked success
+      {
+        const afterSt  = getState();
+        const afterSet = afterSt.weeks[afterSt.curIdx]?.days[+di]?.exercises[+ei]?.sets[+si];
+        if (afterSet?.status === 'success') {
+          const triggered = fireTrigger('SATZ_ABGEHAKT', { di: +di, ei: +ei, si: +si });
+          for (const ins of triggered) {
+            if (ins.immediate) showToast(ins.message, ins.type === 'warning' ? 'warn' : 'ok', ins.id === 'P-05' ? 4000 : 3000);
+          }
+        }
+      }
+      break;
+    }
+
     case 'confirm-set': {
       const _cst = getState();
       const _cwk = _cst.weeks[_cst.curIdx];
@@ -3936,36 +3824,52 @@ function _handleClick(e) {
       const _wInp = document.querySelector(`[data-action="set-weight"][data-di="${di}"][data-ei="${ei}"][data-si="${_csi}"]`);
       if (_wInp) dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: _csi, field: 'weight', value: _wInp.value });
 
-      // Trägt targetReps ein -> dieselbe Ableitungslogik wie überall sonst
-      // ergibt automatisch status='success' (reps===targetReps). Kein
-      // separater ungeprüfter Pfad mehr (siehe Diagnose zu CONFIRM_SET).
+      // Echte eingetragene Wdh verwenden, NICHT targetReps — sonst überschreibt
+      // dieser Button stillschweigend die tatsächliche Nutzereingabe und der
+      // Reducer kann nie canSuccess korrekt gegen das Ziel prüfen (siehe Diagnose).
+      const _rInp = document.querySelector(`[data-action="set-reps"][data-di="${di}"][data-ei="${ei}"][data-si="${_csi}"]`);
+      const _repsVal = _rInp?.value ?? '';
+
+      // Set flash key before dispatch so the re-render includes the class
       _confirmFlashKey = `${di}-${ei}`;
-      dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: _csi, field: 'reps', value: _cex.targetReps });
-      dispatch(A.SET_EVALUATE_FROM_REPS, { di: +di, ei: +ei, si: _csi });
+      dispatch(A.CONFIRM_SET, { di: +di, ei: +ei, si: _csi, reps: _repsVal });
       setTimeout(() => { _confirmFlashKey = null; scheduleRender(); }, 350);
-      _afterSetEvaluated(di, ei, _csi);
-      _scrollToNextPendingSet(di, ei);
-      break;
-    }
 
-    case 'set-fail': {
-      const _fst = getState();
-      const _fwk = _fst.weeks[_fst.curIdx];
-      const _fex = _fwk?.days[+di]?.exercises[+ei];
-      if (!_fex) break;
-      const _fsi = _fex.sets.findIndex(s => {
-        const st = s.status;
-        return st === 'pending' || (st !== 'success' && st !== 'fail' && !s.done);
-      });
-      if (_fsi === -1) break;
-
-      // Trägt "0" ein -> dieselbe Ableitungslogik ergibt automatisch
-      // status='fail' (0 < targetReps in praktisch jedem Fall; ohne
-      // targetReps ist reps>0 nötig, 0 erfüllt das ohnehin nie).
-      dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: _fsi, field: 'reps', value: '0' });
-      dispatch(A.SET_EVALUATE_FROM_REPS, { di: +di, ei: +ei, si: _fsi });
-      _afterSetEvaluated(di, ei, _fsi);
-      _scrollToNextPendingSet(di, ei);
+      const _aft = getState();
+      const _aftSet = _aft.weeks[_aft.curIdx]?.days[+di]?.exercises[+ei]?.sets[_csi];
+      if (_aftSet?.status === 'success') {
+        const triggered = fireTrigger('SATZ_ABGEHAKT', { di: +di, ei: +ei, si: _csi });
+        for (const ins of triggered) {
+          if (ins.immediate) showToast(ins.message, ins.type === 'warning' ? 'warn' : 'ok', ins.id === 'P-05' ? 4000 : 3000);
+        }
+        // RPE nudge — only if rpeEnabled
+        if (_aft.settings?.rpeEnabled !== false && _aftSet.rpe == null) {
+          clearTimeout(_rpeNudgeTimer);
+          _rpeNudgeKey  = `${di}-${ei}-${_csi}`;
+          scheduleRender();
+          _rpeNudgeTimer = setTimeout(() => { _rpeNudgeKey = null; _rpeNudgeTimer = null; scheduleRender(); }, 4000);
+          _maybeShowTip('tip-02', 'RPE = wie anstrengend war der Satz? 7 = leicht · 8 = moderat · 9 = schwer · 10 = Maximum');
+        }
+      }
+      const _aftEx = getState().weeks[getState().curIdx]?.days[+di]?.exercises[+ei];
+      if (_aftEx?.targetReps) {
+        const _doneSets = (_aftEx.sets ?? []).filter(s => s.status === 'success');
+        const _totalAch = _doneSets.reduce((sum, s) => sum + (s.reps ?? 0), 0);
+        const _totalTgt = (_aftEx.sets?.length ?? 0) * _aftEx.targetReps;
+        if (_totalTgt > 0 && _totalAch > 0) {
+          _maybeShowTip('tip-03', 'Effort-Score: wie viel % deines Ziels du erreicht hast. Über 100% = mehr als geplant.');
+        }
+      }
+      const isLastSet = _csi === (_aftEx?.sets?.length ?? 0) - 1;
+      if (!isLastSet && _aft.settings?.autoStartPauseTimer) {
+        window.dispatchEvent(new CustomEvent('train:set-done', { detail: { pauseSec: _cex.pauseSec ?? 90, di: +di } }));
+      }
+      const nextPending = (_aftEx?.sets ?? []).findIndex(s => s.status === 'pending');
+      if (nextPending !== -1) {
+        const nextRow = document.querySelector(`[data-action="toggle-done"][data-di="${di}"][data-ei="${ei}"][data-si="${nextPending}"]`)
+          ?.closest('.set-row');
+        nextRow?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
       break;
     }
 
@@ -4008,10 +3912,6 @@ function _handleClick(e) {
       const _rInp = document.querySelector(`[data-action="set-reps"][data-di="${di}"][data-ei="${ei}"][data-si="${si}"]`);
       const repsVal = _rInp?.value ?? '';
       dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si + 1, field: 'reps', value: repsVal });
-      // Pfeil triggert die Bewertungs-Logik direkt, wie jede andere Eingabe
-      // (kein Sonderfall — blur-Äquivalent unmittelbar nach dem Eintragen).
-      dispatch(A.SET_EVALUATE_FROM_REPS, { di: +di, ei: +ei, si: +si + 1 });
-      _afterSetEvaluated(di, ei, +si + 1);
       showToast('Wdh in nächsten Satz übernommen', 'ok');
       break;
     }

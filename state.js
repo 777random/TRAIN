@@ -885,9 +885,10 @@ export const A = Object.freeze({
   SET_ADD:             'SET_ADD',             // { di, ei }
   SET_REMOVE:          'SET_REMOVE',          // { di, ei, si }
   SET_UPDATE:          'SET_UPDATE',          // { di, ei, si, field, value }
-  SET_EVALUATE_FROM_REPS: 'SET_EVALUATE_FROM_REPS', // { di, ei, si } — leitet status aus s.reps vs ex.targetReps ab (einziger Ort an dem status gesetzt wird)
+  SET_TOGGLE_DONE:     'SET_TOGGLE_DONE',     // { di, ei, si }
   SET_AUTOFILL_DOWN:   'SET_AUTOFILL_DOWN',   // { di, ei, si } — weight (all) + reps (next)
   SET_AUTOFILL_RPE:    'SET_AUTOFILL_RPE',    // { di, ei, si } — rpe → next set only
+  CONFIRM_SET:         'CONFIRM_SET',          // { di, ei, si, reps } — quick-confirm next pending set
   SET_RPE:             'SET_RPE',             // { di, ei, si, rpe: number }
   EX_SET_SUBSTITUTE:   'EX_SET_SUBSTITUTE',   // { di, ei, substituteFor: string|null }
   // Session log
@@ -1406,14 +1407,8 @@ function reduce(state, action) {
       let v = p.value;
       if      (p.field === 'weight') v = parseFloat(v) || 0;
       else if (p.field === 'reps') {
-        // Leerstring bewusst NICHT zu 0 koerzieren — SET_EVALUATE_FROM_REPS
-        // unterscheidet "Feld leer" (-> pending) von "echte 0 eingetragen"
-        // (-> fail, z.B. via ✗-Button) anhand genau dieser Unterscheidung.
-        if (v === '' || v == null) v = '';
-        else {
-          const n = parseFloat(v);
-          v = Math.max(0, Number.isFinite(n) ? n : 0);
-        }
+        const n = parseFloat(v);
+        v = Math.max(0, Number.isFinite(n) ? n : 0);
       }
       else if (p.field === 'rpe')  v = (v === '' || v === null) ? null : Math.min(10, Math.max(1, +v));
       else if (p.field === 'note') v = String(v ?? '').slice(0, 120);
@@ -1427,39 +1422,32 @@ function reduce(state, action) {
       }
       break;
     }
-    // Einziger Ort an dem ein Satz-Status gesetzt wird — abgeleitet aus der
-    // eingetragenen Wdh-Zahl, ausgelöst von blur/✗-Button/"Satz bestätigen"/
-    // Pfeil-Autofill (siehe ui.js). Ersetzt die vormals getrennten SET_TOGGLE_
-    // DONE (Tap-Zyklus) und CONFIRM_SET (separater, ungeprüfter Pfad) — beide
-    // entfernt, damit canSuccess nur noch an einer Stelle berechnet wird.
-    case A.SET_EVALUATE_FROM_REPS: {
-      const ex = _currentWeek()?.days[p.di]?.exercises[p.ei]; if (!ex) break;
-      const s  = ex.sets[p.si]; if (!s) break;
-
-      // Feld leer -> keine Bewertung, zurück zu 'pending' (frei korrigierbar:
-      // Zahl löschen setzt den Satz explizit zurück).
-      if (s.reps === '' || s.reps == null) {
-        s.status = 'pending';
-        s.done   = false;
-        break;
+    case A.SET_TOGGLE_DONE: {
+      const exForToggle = _currentWeek()?.days[p.di]?.exercises[p.ei]; if (!exForToggle) break;
+      const s = exForToggle.sets[p.si]; if (!s) break;
+      const order = ['pending', 'success', 'fail'];
+      let cur = s.status;
+      if (cur !== 'pending' && cur !== 'success' && cur !== 'fail') {
+        cur = s.done ? 'success' : 'pending';
       }
-
-      // Ein Satz wird nur 'success' wenn die Wdh das Ziel erreichen — ohne
-      // definiertes targetReps gilt weiterhin nur reps > 0 (kein Blockieren).
-      const reps       = parseFloat(s.reps) || 0;
-      const targetReps = parseFloat(ex.targetReps) || 0;
-      const canSuccess = targetReps > 0 ? reps >= targetReps : reps > 0;
-      const next       = canSuccess ? 'success' : 'fail';
+      const i = Math.max(0, order.indexOf(cur));
+      // Ein Satz darf nur 'success' werden wenn die Wdh das Ziel erreichen —
+      // ohne definiertes targetReps gilt weiterhin nur reps > 0 (kein Blockieren).
+      const targetReps = parseFloat(exForToggle.targetReps) || 0;
+      const canSuccess = targetReps > 0
+        ? (parseFloat(s.reps) || 0) >= targetReps
+        : (parseFloat(s.reps) || 0) > 0;
+      let next = order[(i + 1) % 3];
+      if (next === 'success' && !canSuccess) next = 'fail';
       s.status = next;
-      // s.done bleibt an status==='success' gekoppelt (wie überall sonst im
-      // Code — _normSt, doneSets-Zähler) statt bedingungslos true, sonst
-      // würden Fail-Sätze fälschlich als "done" mitgezählt.
       s.done   = next === 'success';
 
       // Update PRs when a set is newly marked success in a non-deload week
       if (next === 'success' && _currentWeek()?.mode !== 'deload') {
+        const ex     = exForToggle;
         const weight = parseFloat(s.weight) || 0;
-        if (reps > 0) {
+        const reps   = parseFloat(s.reps)   || 0;
+        if (ex && reps > 0) {
           if (weight > 0) {
             const volume   = weight * reps;
             const est1RM   = reps <= 10 ? weight * (1 + reps / 30) : 0;
@@ -1472,9 +1460,6 @@ function reduce(state, action) {
             const newMaxRMW = weight > prev.maxWeight ? reps : (weight === prev.maxWeight ? Math.max(prev.maxRepsAtMaxWeight ?? 0, reps) : prev.maxRepsAtMaxWeight ?? 0);
             if (newMaxW > prev.maxWeight || newMaxV > prev.maxVolume || newMaxE > prev.maxEstimated1RM) {
               state.prs[name] = { maxWeight: newMaxW, maxVolume: newMaxV, maxEstimated1RM: newMaxE, maxRepsAtMaxWeight: newMaxRMW, date: new Date().toISOString().split('T')[0] };
-            }
-            if (est1RM > 0 && (ex.oneRM == null || est1RM > ex.oneRM)) {
-              ex.oneRM = Math.round(est1RM * 10) / 10;
             }
           }
           if (ex.prWeight === null || weight > ex.prWeight) {
@@ -1514,6 +1499,53 @@ function reduce(state, action) {
       if (si < 0 || si >= sets.length - 1) break;
       const src = sets[si]; if (!src || src.rpe == null) break;
       sets[si + 1].rpe = src.rpe;
+      break;
+    }
+    case A.CONFIRM_SET: {
+      const wk = _currentWeek(); if (!wk) break;
+      const ex = wk.days[p.di]?.exercises[p.ei]; if (!ex) break;
+      const s  = ex.sets[p.si];
+      if (!s || s.status === 'success') break;
+      if (p.reps != null) s.reps = p.reps;
+      // Gleiche canSuccess-Logik wie SET_TOGGLE_DONE: ein Satz wird nur
+      // 'success' wenn die Wdh das Ziel erreichen — ohne definiertes
+      // targetReps gilt weiterhin nur reps > 0 (kein Blockieren).
+      const targetReps = parseFloat(ex.targetReps) || 0;
+      const repsVal     = parseFloat(s.reps) || 0;
+      const canSuccess  = targetReps > 0 ? repsVal >= targetReps : repsVal > 0;
+      s.status = canSuccess ? 'success' : 'fail';
+      // s.done bleibt an status===success gekoppelt (wie überall sonst im
+      // Code — _normSt, doneSets-Zähler, SET_TOGGLE_DONE), NICHT bedingungslos
+      // true, sonst würden Fail-Sätze fälschlich als "done" mitgezählt.
+      s.done   = canSuccess;
+      if (canSuccess && wk.mode !== 'deload') {
+        const weight = parseFloat(s.weight) || 0;
+        const reps   = parseFloat(s.reps)   || 0;
+        if (reps > 0) {
+          if (weight > 0) {
+            const volume   = weight * reps;
+            const est1RM   = reps <= 10 ? weight * (1 + reps / 30) : 0;
+            const name     = ex.name;
+            if (!state.prs) state.prs = {};
+            const prev     = state.prs[name] ?? { maxWeight: 0, maxVolume: 0, maxEstimated1RM: 0, maxRepsAtMaxWeight: 0, date: null };
+            const newMaxW  = Math.max(prev.maxWeight,       weight);
+            const newMaxV  = Math.max(prev.maxVolume,       volume);
+            const newMaxE  = Math.max(prev.maxEstimated1RM, est1RM);
+            const newMaxRMW = weight > prev.maxWeight ? reps : (weight === prev.maxWeight ? Math.max(prev.maxRepsAtMaxWeight ?? 0, reps) : prev.maxRepsAtMaxWeight ?? 0);
+            if (newMaxW > prev.maxWeight || newMaxV > prev.maxVolume || newMaxE > prev.maxEstimated1RM) {
+              state.prs[name] = { maxWeight: newMaxW, maxVolume: newMaxV, maxEstimated1RM: newMaxE, maxRepsAtMaxWeight: newMaxRMW, date: new Date().toISOString().split('T')[0] };
+            }
+            if (est1RM > 0 && (ex.oneRM == null || est1RM > ex.oneRM)) {
+              ex.oneRM = Math.round(est1RM * 10) / 10;
+            }
+          }
+          if (ex.prWeight === null || weight > ex.prWeight) {
+            ex.prWeight = weight; ex.prRepsAtMaxWeight = reps;
+          } else if (weight >= ex.prWeight && reps > (ex.prRepsAtMaxWeight ?? 0)) {
+            ex.prRepsAtMaxWeight = reps;
+          }
+        }
+      }
       break;
     }
 
