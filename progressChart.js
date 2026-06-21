@@ -202,6 +202,89 @@ export function renderBodyWeightChart(points) {
 </svg>`;
 }
 
+/**
+ * Rendert einen SVG-Inline-Chart für die relative Stärke (Pound-for-Pound)
+ * über Zeit — gleicher visueller Stil wie renderBodyWeightChart().
+ *
+ * @param {Array<{label: string, ratio: number}>} points  aufsteigend sortiert
+ * @param {Object} [options]
+ * @param {boolean} [options.stepped=false]  true → Treppenstufen-Linie
+ *   (horizontal bis zum nächsten Punkt, dann Sprung) statt linearem Übergang
+ *   — für den All-Time-PR-Modus, visuell unterscheidbar vom Woche-Modus.
+ * @returns {string|null}  SVG-Markup-String oder null wenn < 2 Datenpunkte
+ */
+export function renderRelativeStrengthChart(points, options = {}) {
+  if (points.length < 2) return null;
+  const stepped = options.stepped ?? false;
+
+  const VBW = 400, VBH = 140;
+  const pad = { l: 40, r: 16, t: 14, b: 26 };
+  const gW  = VBW - pad.l - pad.r;
+  const gH  = VBH - pad.t - pad.b;
+
+  const ratios  = points.map(p => p.ratio);
+  const rawMin  = Math.min(...ratios);
+  const rawMax  = Math.max(...ratios);
+  const margin  = (rawMax - rawMin) * 0.12 || rawMax * 0.06 || 0.1;
+  const yMin    = Math.max(0, rawMin - margin);
+  const yMax    = rawMax + margin;
+  const yRange  = yMax - yMin || 1;
+
+  const n   = points.length;
+  const xOf = i => pad.l + (n === 1 ? gW / 2 : i * gW / (n - 1));
+  const yOf = v => pad.t + gH - ((v - yMin) / yRange) * gH;
+
+  const linePts = points.map((p, i) => [xOf(i), yOf(p.ratio)]);
+
+  const pathD = stepped
+    ? linePts.map((p, i) => {
+        if (i === 0) return `M${p[0].toFixed(1)},${p[1].toFixed(1)}`;
+        const prev = linePts[i - 1];
+        return `L${p[0].toFixed(1)},${prev[1].toFixed(1)} L${p[0].toFixed(1)},${p[1].toFixed(1)}`;
+      }).join(' ')
+    : linePts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
+
+  const yLbls = [0, 0.5, 1].map(f => ({
+    v: Math.round((yMin + yRange * f) * 100) / 100,
+    y: (pad.t + gH * (1 - f)).toFixed(1),
+  }));
+
+  const maxXLabels = 6;
+  const xStep = Math.max(1, Math.ceil(n / maxXLabels));
+  const xIdxs = points.reduce((acc, _, i) => {
+    if (i % xStep === 0 || i === n - 1) acc.push(i);
+    return acc;
+  }, []);
+
+  const gridLines = [0, 0.5, 1].map(f => {
+    const gy = (pad.t + gH * f).toFixed(1);
+    return `<line x1="${pad.l}" y1="${gy}" x2="${pad.l + gW}" y2="${gy}" stroke="#2E2E35" stroke-width="1"/>`;
+  }).join('');
+
+  const yLabels = yLbls.map(lbl =>
+    `<text x="${pad.l - 4}" y="${(+lbl.y + 4).toFixed(0)}" text-anchor="end" font-size="10" fill="#6B7280">${lbl.v}×</text>`
+  ).join('');
+
+  const linePath = `<path d="${pathD}" fill="none" stroke="#C8FF00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
+
+  const dots = points.map((p, i) =>
+    `<circle cx="${xOf(i).toFixed(1)}" cy="${yOf(p.ratio).toFixed(1)}" r="3" fill="#C8FF00"><title>${h(p.label)}: ${p.ratio.toFixed(2)}×</title></circle>`
+  ).join('');
+
+  const xLabels = xIdxs.map(i => {
+    const anchor = i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle';
+    return `<text x="${xOf(i).toFixed(1)}" y="${VBH - 4}" text-anchor="${anchor}" font-size="10" fill="#6B7280">${h(points[i].label)}</text>`;
+  }).join('');
+
+  return `<svg viewBox="0 0 ${VBW} ${VBH}" width="100%" height="auto" role="img" aria-label="Relative Stärke Verlauf" style="display:block;overflow:visible">
+  ${gridLines}
+  ${yLabels}
+  ${linePath}
+  ${dots}
+  ${xLabels}
+</svg>`;
+}
+
 function h(s) {
   return String(s)
     .replace(/&/g, '&amp;')

@@ -26,7 +26,7 @@ import {
 import * as ic from './icons.js';
 import { fireTrigger } from './triggerEngine.js';
 import { getWeightRecommendation, roundToPlate, isReadyForAutoSelect } from './weightRecommendation.js';
-import { renderProgressChart, renderBodyWeightChart } from './progressChart.js';
+import { renderProgressChart, renderBodyWeightChart, renderRelativeStrengthChart } from './progressChart.js';
 import { buildWeekReview }        from './weekReview.js';
 import { showWeekReviewModal, renderWeekReviewHtml } from './weekReviewModal.js';
 import { detectPlateaus }         from './plateauDetector.js';
@@ -54,6 +54,9 @@ let _insightsTooltipShown = false;
 
 /** Insights visible in body tab (2.2). */
 let _showBodyInsights = false;
+
+/** Relative-Stärke Chart-Modus: 'woche' (Standard) | 'alltime'. Ein Switch für die ganze Sektion. */
+let _p4pMode = 'woche';
 
 /** Show custom deload input even when current factor is a preset (1.4). */
 let _showCustomDeload = false;
@@ -1665,6 +1668,108 @@ function _relativeStrengthExercises(state) {
   return [...map.entries()].map(([name, prWeight]) => ({ name, prWeight }));
 }
 
+/**
+ * Nächstgelegener Körpergewichts-Eintrag zu einem Datum, max. 30 Tage
+ * Abstand (sonst null — "zu weit weg, nicht mit veraltetem Gewicht rechnen").
+ */
+function _nearestBodyWeight(history, dateStr, maxDays = 30) {
+  if (!history.length) return null;
+  const target = new Date(dateStr + 'T12:00:00').getTime();
+  let best = null, bestDiff = Infinity;
+  for (const h of history) {
+    const diff = Math.abs(new Date(h.startDate + 'T12:00:00').getTime() - target);
+    if (diff < bestDiff) { bestDiff = diff; best = h; }
+  }
+  if (!best || bestDiff > maxDays * 86_400_000) return null;
+  return best.weight;
+}
+
+/**
+ * "Woche"-Modus: pro nicht-Deload/Urlaubs-Woche mit Erfolgs-Sätzen für diese
+ * Übung das höchste erfolgreiche Gewicht / nächstgelegenes Körpergewicht.
+ * Wochen ohne zumutbar nahes Körpergewicht (>30 Tage) werden ausgelassen.
+ * @returns {Array<{date: string, ratio: number, bodyWeight: number}>}
+ */
+function _weeklyP4PSeries(state, exName, bwHistory) {
+  const weeks = [...state.weeks]
+    .filter(w => w.mode !== 'deload' && w.mode !== 'vacation')
+    .sort((a, b) => a.startDate.localeCompare(b.startDate));
+  const series = [];
+  for (const wk of weeks) {
+    let maxW = 0;
+    for (const day of wk.days) {
+      for (const ex of day.exercises) {
+        if (ex.name !== exName) continue;
+        for (const s of ex.sets) {
+          if (s.status === 'success' && (s.weight ?? 0) > maxW) maxW = s.weight;
+        }
+      }
+    }
+    if (maxW <= 0) continue;
+    const bw = _nearestBodyWeight(bwHistory, wk.startDate);
+    if (bw == null || bw <= 0) continue; // kein zumutbar nahes Körpergewicht -> Lücke
+    series.push({ date: wk.startDate, ratio: maxW / bw, bodyWeight: bw });
+  }
+  return series;
+}
+
+/**
+ * "All-Time-PR"-Modus: nur echte PR-Ereignisse (kumulatives Höchstgewicht
+ * steigt) erzeugen einen Datenpunkt — rekonstruiert aus den Wochendaten
+ * selbst (state.prs speichert nur den AKTUELLEN PR, keine Historie aller
+ * PR-Ereignisse über Zeit). Treppenstufen-Charakter ergibt sich aus der
+ * Chart-Darstellung (stepped:true), nicht aus den Datenpunkten selbst.
+ * @returns {Array<{date: string, ratio: number, bodyWeight: number}>}
+ */
+function _allTimePRSeries(state, exName, bwHistory) {
+  const weeks = [...state.weeks]
+    .filter(w => w.mode !== 'deload' && w.mode !== 'vacation')
+    .sort((a, b) => a.startDate.localeCompare(b.startDate));
+  const series = [];
+  let runningMax = 0;
+  for (const wk of weeks) {
+    let maxW = 0;
+    for (const day of wk.days) {
+      for (const ex of day.exercises) {
+        if (ex.name !== exName) continue;
+        for (const s of ex.sets) {
+          if (s.status === 'success' && (s.weight ?? 0) > maxW) maxW = s.weight;
+        }
+      }
+    }
+    if (maxW <= runningMax) continue; // kein neuer PR diese Woche
+    runningMax = maxW;
+    const bw = _nearestBodyWeight(bwHistory, wk.startDate);
+    if (bw == null || bw <= 0) continue; // PR ohne zumutbar nahes Körpergewicht -> dieses Ereignis auslassen
+    series.push({ date: wk.startDate, ratio: maxW / bw, bodyWeight: bw });
+  }
+  return series;
+}
+
+/**
+ * Dynamischer Kontext-Satz unter dem Chart — Formulierung je nach Kombination
+ * aus P4P-Trend und Körpergewichts-Trend im selben Zeitraum (siehe Sprint-Spec).
+ * null wenn < 2 Datenpunkte.
+ */
+function _p4pContextSentence(name, series) {
+  if (series.length < 2) return null;
+  const first = series[0], last = series[series.length - 1];
+  const ratioChangePct = Math.round((last.ratio - first.ratio) / first.ratio * 1000) / 10;
+  const bwChangeKg = Math.round((last.bodyWeight - first.bodyWeight) * 10) / 10;
+  const days = Math.round((new Date(last.date + 'T12:00:00') - new Date(first.date + 'T12:00:00')) / 86_400_000);
+  const weeks = Math.max(1, Math.round(days / 7));
+  const zeitraum = `${weeks} ${weeks === 1 ? 'Woche' : 'Wochen'}`;
+  const pctStr = `${ratioChangePct > 0 ? '+' : ''}${ratioChangePct}%`;
+
+  if (ratioChangePct > 0 && bwChangeKg > 0) {
+    return `Relative Stärke ${name}: ${pctStr} in ${zeitraum} — trotz +${bwChangeKg}kg Körpergewicht spricht das für echten Kraftzuwachs.`;
+  }
+  if (ratioChangePct < 0 && bwChangeKg > 0) {
+    return `Relative Stärke ${name}: ${pctStr} in ${zeitraum} — das bewegte Gewicht stieg langsamer als das Körpergewicht.`;
+  }
+  return `Relative Stärke ${name}: ${pctStr} in ${zeitraum}.`;
+}
+
 function _bodyTabShowsRelativeStrength(state) {
   return _bodyWeightHistory(state).length > 0 && _relativeStrengthExercises(state).length > 0;
 }
@@ -1763,22 +1868,50 @@ function renderBodyTab(state) {
       const restEntries = withRatio.filter(e => !favSet.has(e.name));
       const avgSource = favEntries.length ? favEntries : withRatio;
       const avgRatio  = avgSource.reduce((s, e) => s + e.ratio, 0) / avgSource.length;
-      const renderRow = (e, isFav) => `
-        <div class="pr-row${isFav ? ' pr-row--fav' : ''}">
-          <span class="pr-name">${isFav ? '⭐ ' : ''}${h(e.name)}</span>
-          <span class="pr-val">${e.prWeight} kg</span>
-          <span class="pr-val" style="color:var(--c-text-3);font-size:13px">${e.ratio.toFixed(2)}×</span>
+      const bwHistory = history; // bereits berechnet oben (Sektion 1)
+
+      // Ein Switch für die gesamte Sektion (gilt für alle Übungs-Charts).
+      const modeSwitchHtml = `
+        <div class="weight-step-opts" style="margin-bottom:var(--sp-3)">
+          <button type="button" class="weight-step-btn${_p4pMode === 'woche' ? ' is-selected' : ''}"
+            data-action="set-p4p-mode" data-mode="woche" aria-pressed="${_p4pMode === 'woche'}"
+          >Woche</button>
+          <button type="button" class="weight-step-btn${_p4pMode === 'alltime' ? ' is-selected' : ''}"
+            data-action="set-p4p-mode" data-mode="alltime" aria-pressed="${_p4pMode === 'alltime'}"
+          >All-Time-PR</button>
         </div>`;
+
+      const renderExBlock = (e, isFav) => {
+        const series = _p4pMode === 'alltime'
+          ? _allTimePRSeries(state, e.name, bwHistory)
+          : _weeklyP4PSeries(state, e.name, bwHistory);
+        const chartSvg = renderRelativeStrengthChart(
+          series.map(p => ({ label: wkLabel(p.date), ratio: p.ratio })),
+          { stepped: _p4pMode === 'alltime' }
+        );
+        const contextSentence = _p4pContextSentence(e.name, series);
+        return `
+        <div class="rs-ex-block${isFav ? ' rs-ex-block--fav' : ''}">
+          <div class="pr-row${isFav ? ' pr-row--fav' : ''}">
+            <span class="pr-name">${isFav ? '⭐ ' : ''}${h(e.name)}</span>
+            <span class="pr-val">${e.prWeight} kg</span>
+            <span class="pr-val" style="color:var(--c-text-3);font-size:13px">${e.ratio.toFixed(2)}×</span>
+          </div>
+          ${chartSvg ? `<div style="margin-top:var(--sp-2)">${chartSvg}</div>` : `<p class="empty-state__hint">Noch nicht genug Datenpunkte für einen Verlauf.</p>`}
+          ${contextSentence ? `<p class="rs-context">${h(contextSentence)}</p>` : ''}
+        </div>`;
+      };
       const restHtml = restEntries.length ? `
         <details class="pr-collapse">
           <summary class="pr-collapse__summary">Alle Übungen (${restEntries.length}) ▼</summary>
-          <div class="pr-collapse__body">${restEntries.map(e => renderRow(e, false)).join('')}</div>
+          <div class="pr-collapse__body">${restEntries.map(e => renderExBlock(e, false)).join('')}</div>
         </details>` : '';
       relativeStrengthHtml = `
       <div class="chart-card">
         <div class="chart-card__title">${ic.trophy()} Relative Stärke</div>
         ${isStale ? `<div class="movement-warning">Aktualisiere dein Körpergewicht für genaue Werte.</div>` : ''}
-        ${favEntries.map(e => renderRow(e, true)).join('')}
+        ${modeSwitchHtml}
+        ${favEntries.map(e => renderExBlock(e, true)).join('')}
         <div class="rs-avg">Ø Relative Stärke: <strong>${avgRatio.toFixed(2)}×</strong></div>
         ${restHtml}
       </div>`;
@@ -3924,6 +4057,11 @@ function _handleClick(e) {
       showToast('Körpergewicht eingetragen ✓', 'ok');
       break;
     }
+
+    case 'set-p4p-mode':
+      _p4pMode = el.dataset.mode === 'alltime' ? 'alltime' : 'woche';
+      renderBodyTab(getState());
+      break;
 
     // ── Settings rows (previously role=button, now data-action on the div) ─
     case 'toggle-setting':
