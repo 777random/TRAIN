@@ -706,7 +706,6 @@ function renderDayList(state) {
     }).join('')}
   </div>
   ${progressHtml}
-  ${(!_overviewMode && _activeDayIdx !== null) ? _renderTrainingContextAnchor(state, wk, _activeDayIdx) : ''}
   ${(!_overviewMode && _activeDayIdx !== null) ? _prevWeekBanner(state, wk, _activeDayIdx) : ''}
 </div>`;
 
@@ -1015,6 +1014,7 @@ function renderDayBody(wk, di, state) {
 </div>`;
 
   return `
+    ${_renderTrainingContextAnchor(state, wk, di)}
     ${isVacDay ? '<div class="day-vacation-banner">🏖 Urlaubstag — Streak läuft weiter</div>' : ''}
     ${noteBlock}
     ${warmupBlock}
@@ -4452,6 +4452,13 @@ function _scrollToFirstPending(di) {
     const wk    = state.weeks[state.curIdx];
     const day   = wk?.days[di ?? _activeDayIdx];
     if (!day) return;
+    // Nur scrollen wenn der Tag bereits mindestens einen bewerteten Satz hat
+    // (echte Fortsetzung) — bei komplett unbearbeitetem Tag (alle pending)
+    // bleibt die Ansicht oben, damit Tag-Pillen + Fortschrittsbalken +
+    // Ritual-Anker beim allerersten Öffnen sichtbar bleiben statt sofort
+    // verdeckt zu werden.
+    const hasEvaluatedSet = day.exercises.some(ex => ex.sets.some(s => s.status === 'success' || s.status === 'fail'));
+    if (!hasEvaluatedSet) return;
     const exIdx = day.exercises.findIndex(ex =>
       ex.sets.some(s => (s.status === 'pending') || (s.status !== 'success' && s.status !== 'fail' && !s.done))
     );
