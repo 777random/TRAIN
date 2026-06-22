@@ -19,7 +19,7 @@
 import {
   getState, dispatch, subscribe, A, canUndo, BADGE_THRESHOLDS, VACATION_PLANS,
   calcCurrentStreak, calcLongestStreakEver, isWeekDoneForStreak, getLatestWeek,
-  effectiveStreakFreeze,
+  effectiveStreakFreeze, _quarter, nextQuarterStartLabel,
 } from './state.js';
 import {
   exportJSON, importJSON, exportCSV,
@@ -963,23 +963,25 @@ function _renderStreakBadge(state) {
  * Streak-Freeze-Popup, gleiches dynamisches Overlay-Pattern wie
  * _showReentryPopup() — kein vordeklariertes statisches Modal, da nicht
  * Teil des festen mountApp-Shells. 3 Zustände: verfügbar / aktiv /
- * diesen Monat bereits verbraucht.
+ * dieses Quartal bereits verbraucht.
  */
 function _showStreakFreezePopup(state) {
   document.getElementById('streak-freeze-modal')?.remove();
   const streak  = _calcStreak(state);
   const freeze  = effectiveStreakFreeze(state.streakFreeze);
   const curMonth = new Date().toISOString().slice(0, 7);
+  const lastUsedMonth = state.streakFreeze?.lastUsedMonth ?? null;
+  const usedThisQuarter = lastUsedMonth !== null && _quarter(lastUsedMonth) === _quarter(curMonth);
 
   let body;
   if (freeze.activeUntilWeekStart) {
     body = `<p class="vac-plan-modal__sub">Streak geschützt bis Ende dieser Woche.</p>
       <button class="btn btn--ghost" data-action="close-modal" data-target="streak-freeze-modal" style="width:100%;min-height:var(--touch)">Schließen</button>`;
-  } else if ((state.streakFreeze?.lastUsedMonth ?? null) === curMonth) {
-    body = `<p class="vac-plan-modal__sub">Diesen Monat bereits verwendet.<br>Wieder verfügbar am 1. des nächsten Monats.</p>
+  } else if (usedThisQuarter) {
+    body = `<p class="vac-plan-modal__sub">Dieses Quartal bereits verwendet.<br>Wieder verfügbar ab ${nextQuarterStartLabel(lastUsedMonth)}.</p>
       <button class="btn btn--ghost" data-action="close-modal" data-target="streak-freeze-modal" style="width:100%;min-height:var(--touch)">Schließen</button>`;
   } else {
-    body = `<p class="vac-plan-modal__sub">Schützt deine Streak bei einer verpassten Woche. 1× pro Monat verfügbar.</p>
+    body = `<p class="vac-plan-modal__sub">Schützt deine Streak bei einer verpassten Woche. 1× pro Quartal verfügbar.</p>
       <button class="btn btn--accent" data-action="activate-streak-freeze" style="width:100%;min-height:var(--touch)">Streak schützen</button>
       <button class="btn btn--ghost" data-action="close-modal" data-target="streak-freeze-modal" style="width:100%;min-height:var(--touch)">Abbrechen</button>`;
   }

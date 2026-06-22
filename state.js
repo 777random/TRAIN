@@ -175,7 +175,7 @@ function buildDefaultState() {
     badges: [],               // { id, unlockedAt }[] – earned badges
     onboardingDone: false,    // true after first-run flow completed
     seenTips: [],             // string[] – tip IDs the user has already seen
-    streakFreeze: {            // bewusst manuell aktivierter Streak-Schutz, 1×/Monat
+    streakFreeze: {            // bewusst manuell aktivierter Streak-Schutz, 1×/Quartal
       activeUntilWeekStart: null, // ISO-Wochenstart der geschützten Woche, oder null
       lastUsedMonth: null,        // "YYYY-MM" des letzten Einsatzes, oder null
     },
@@ -241,6 +241,27 @@ export function effectiveStreakFreeze(streakFreeze) {
   const weekEndMs = new Date(streakFreeze.activeUntilWeekStart + 'T00:00:00').getTime() + 7 * 86_400_000;
   if (Date.now() > weekEndMs) return { ...streakFreeze, activeUntilWeekStart: null };
   return streakFreeze;
+}
+
+/**
+ * Maps a "YYYY-MM" string to its calendar quarter, e.g. "2026-08" -> "2026-Q3".
+ * Streak-Freeze limit (1×/Quartal) compares on this, not on the raw month —
+ * lastUsedMonth itself stays "YYYY-MM" (no schema/storage change).
+ */
+export const _quarter = (isoMonth) => {
+  const [y, m] = isoMonth.split('-');
+  return `${y}-Q${Math.ceil(+m / 3)}`;
+};
+
+/** German label ("Oktober 2026") of the first month of the quarter AFTER isoMonth's quarter. */
+export function nextQuarterStartLabel(isoMonth) {
+  const [yStr, mStr] = isoMonth.split('-');
+  const y = +yStr, m = +mStr;
+  const q = Math.ceil(m / 3);
+  const nextQ = (q % 4) + 1;
+  const nextY = q === 4 ? y + 1 : y;
+  const names = ['Januar', 'April', 'Juli', 'Oktober'];
+  return `${names[nextQ - 1]} ${nextY}`;
 }
 
 // ─── Internal STATE + subscriber registry ────────────────────────────────────
@@ -924,7 +945,7 @@ export const A = Object.freeze({
   EX_MERGE_NAMES:       'EX_MERGE_NAMES',       // { variantNames: string[], finalName } – Übungsnamen-Bereinigung
   DISMISS_NAME_PAIR:    'DISMISS_NAME_PAIR',    // { a, b } – Ähnlichkeits-Kandidat dauerhaft verwerfen
   REENTRY_HANDLED:      'REENTRY_HANDLED',      // {} – marks current pause as handled (Ja/Nein)
-  ACTIVATE_STREAK_FREEZE: 'ACTIVATE_STREAK_FREEZE', // {} – bewusste, manuelle Aktivierung, 1×/Monat
+  ACTIVATE_STREAK_FREEZE: 'ACTIVATE_STREAK_FREEZE', // {} – bewusste, manuelle Aktivierung, 1×/Quartal
   RECORD_SURPRISE_SHOWN:  'RECORD_SURPRISE_SHOWN',  // { musterId } – markiert ein Überraschungs-Muster als diesen Monat gezeigt
   EX_APPLY_REENTRY_REDUCTION: 'EX_APPLY_REENTRY_REDUCTION', // { factor } – reduces weights/targets in current week
   EX_REMOVE:           'EX_REMOVE',           // { di, ei }
@@ -1864,12 +1885,14 @@ function reduce(state, action) {
     }
     // Bewusste, manuelle Aktivierung (nie automatisch) — schützt die NÄCHSTE
     // Woche (_nextMonday(), dieselbe Funktion wie WEEK_CREATE's Default-
-    // Startdatum), nicht rückwirkend. 1×/Kalendermonat, kein Stapeln (ein
+    // Startdatum), nicht rückwirkend. 1×/Kalenderquartal, kein Stapeln (ein
     // neuer Aufruf überschreibt activeUntilWeekStart statt es zu addieren).
+    // lastUsedMonth bleibt "YYYY-MM" (kein Feld-Rename) — nur der Vergleich
+    // erfolgt auf Quartalsebene via _quarter().
     case A.ACTIVATE_STREAK_FREEZE: {
       const curMonth = new Date().toISOString().slice(0, 7);
       if (!state.streakFreeze) state.streakFreeze = { activeUntilWeekStart: null, lastUsedMonth: null };
-      if (state.streakFreeze.lastUsedMonth === curMonth) break; // Limit bereits diesen Monat verbraucht
+      if (state.streakFreeze.lastUsedMonth && _quarter(state.streakFreeze.lastUsedMonth) === _quarter(curMonth)) break; // Limit dieses Quartal bereits verbraucht
       state.streakFreeze.activeUntilWeekStart = _nextMonday();
       state.streakFreeze.lastUsedMonth = curMonth;
       break;
