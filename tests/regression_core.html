@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>TRAIN — Regressions-Kernprüfung (10 Punkte)</title>
+  <link rel="stylesheet" href="../styles.css">
+  <style>html,body{margin:0;background:#0E0E10}</style>
+</head>
+<body>
+  <!--
+    TRAIN — wiederverwendbares Regressions-Test-Skript für 10 Kernpfade.
+
+    ZWECK
+    Läuft nach JEDEM Sprint zusätzlich zu den sprintspezifischen
+    Akzeptanzkriterien, BEVOR "Code-Review ✓" gemeldet wird. Deckt
+    Kernfunktionen ab, die in dieser Session bereits mehrfach durch
+    sprintfremde Änderungen kaputtgegangen sind (Satz-Eingabe/-Bestätigung,
+    Wochenerstellung, Auto-Vorauswahl, Übung hinzufügen, Coach-Tab).
+
+    AUSFÜHRUNG
+      Browser:  Datei direkt öffnen (file://.../tests/regression_core.html)
+                oder über einen lokalen HTTP-Server.
+      Headless: chrome --headless=new --disable-gpu --no-sandbox
+                --virtual-time-budget=8000 --dump-dom
+                "http://localhost:PORT/tests/regression_core.html[?raf=sync]"
+                Ergebnis steht im <pre id="result"> im gedumpten DOM.
+
+    rAF-TIMING-MODUS (WICHTIG — siehe Session-Lektion zu automatischer
+    Satz-Bewertung/Fokus-Verlust, die nur unter echtem Timing sichtbar war):
+      Standard (kein Query-Parameter, oder ?raf=real):
+        requestAnimationFrame bleibt UNVERÄNDERT (echtes Browser-Timing).
+        Das ist der einzige Modus, der zeitkritische Bugs wie die
+        Fokus-Verlust-Regression dieser Session überhaupt aufdecken kann.
+        In headless --dump-dom feuert rAF nie (bekannte Werkzeug-Grenze
+        dieser Session) — render-abhängige Prüfpunkte (7-10) können dort
+        unter diesem Modus NICHT korrekt geprüft werden. Für eine echte
+        Browser-Sitzung (nicht --dump-dom) ist das der korrekte Default.
+      ?raf=sync:
+        requestAnimationFrame wird synchron erzwungen (läuft sofort statt
+        im nächsten Frame). Macht render-abhängige Prüfpunkte (7-10) auch
+        unter --dump-dom auswertbar, KANN ABER zeitkritische Bugs maskieren
+        (siehe Session-Vorfall: ein Zwischen-Re-Render mitten in einem
+        Klick-Handler hat in einem früheren Sprint-Testlauf bereits einmal
+        zu einem falschen Ergebnis geführt). Nur für die DOM-Sichtbarkeits-
+        Prüfungen 7-10 in Headless-Umgebungen gedacht, NICHT als
+        genereller Ersatz für eine echte Browser-Verifikation.
+    Der tatsächlich aktive Modus wird im Ergebnis-Header ausgegeben.
+
+    BEKANNTE ABWEICHUNG VON DER URSPRÜNGLICHEN SPEC (Prüfpunkt 5):
+    Es gibt im aktuellen Code KEINEN separaten "✗-Button" — nur den
+    3-Stufen-Zyklus-Button (toggle-done: pending→success/fail→fail→pending)
+    und "✓ Satz bestätigen" (confirm-set). Keine Stelle im Code schreibt
+    jemals automatisch "0" in das Wdh-Feld. Prüfpunkt 5 testet daher die
+    nächstliegende reale Mechanik: toggle-done bis zum 'fail'-Zustand
+    durchklicken, OHNE dass andere Sätze betroffen werden — NICHT das im
+    Sprint-Text beschriebene "0 wird eingetragen" (dafür existiert kein
+    Mechanismus). Siehe Output-Zeile zu Punkt 5 für den expliziten Hinweis.
+  -->
+  <div id="app" aria-live="polite"></div>
+  <pre id="result" style="position:fixed;top:0;left:0;background:#000;color:#0f0;z-index:99999;padding:10px;font-size:12px;max-width:100%;white-space:pre-wrap;max-height:100vh;overflow:auto"></pre>
+  <script type="module">
+    const RAF_MODE = new URLSearchParams(location.search).get('raf') === 'sync' ? 'sync' : 'real';
+    const caughtErrors = [];
+    window.addEventListener('error', e => caughtErrors.push(`${e.message} @ ${e.filename}:${e.lineno}`));
+    window.addEventListener('unhandledrejection', e => caughtErrors.push(`unhandledrejection: ${e.reason}`));
+
+    // WICHTIG: rAF wird NICHT global gepatcht. Ein globaler Patch würde auch
+    // Prüfpunkte 1-6 betreffen, die selbst keine gerenderte DOM brauchen
+    // (sie lesen getState() direkt) — ein synchron erzwungener Re-Render
+    // mitten in einem Klick-Handler (z.B. der Gewichtsfeld-Flush-Dispatch in
+    // confirm-set, oder timer.js' eigener separater 'input'-Listener
+    // _ensureSessionStart, der beim ersten Tastendruck der Sitzung
+    // SESSION_START feuert) baut die gerade getippten Eingabefelder dann
+    // mitten im Handler aus dem noch unveränderten State neu auf und
+    // überschreibt sie wieder — exakt das Test-Artefakt, das in einem
+    // früheren Sprint-Testlauf bereits einmal zu einem Fehlschluss führte.
+    // Reales Browser-Timing (rAF unverändert) vermeidet das vollständig, da
+    // der Re-Render dort erst im NÄCHSTEN Frame passiert, nicht mitten im
+    // synchronen Handler. Nur Prüfpunkte 7-10 (die wirklich gerenderte DOM
+    // brauchen) bekommen bei Bedarf einen LOKAL begrenzten Sync-Patch über
+    // withSyncRaf() — niemals global.
+    const _nativeRAF = window.requestAnimationFrame.bind(window);
+    async function withSyncRaf(fn) {
+      if (RAF_MODE !== 'sync') return fn();
+      window.requestAnimationFrame = (cb) => { cb(); return 0; };
+      try { return await fn(); }
+      finally { window.requestAnimationFrame = _nativeRAF; }
+    }
+
+    function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
+    // Render-abhängige Schritte warten so lange (in 'real'-Modus genug Zeit
+    // für mind. einen echten Frame in einer echten Browser-Sitzung; in
+    // --dump-dom ohne ?raf=sync wird rAF dennoch nie feuern — siehe Kopf-
+    // kommentar).
+    const RENDER_WAIT_MS = 120;
+
+    // ── Seed-Daten ──────────────────────────────────────────────────────────
+    function mkSet(weight, reps, status) { return { weight, reps, rpe: null, status, done: status === 'success', note: '' }; }
+    function ex(name, sets, targetReps, opts = {}) {
+      return { name, note: '', pauseSec: 90, metric: 'reps', sets, weightStep: 2.5,
+        nextWeekPlan: 0, nextWeekPlanConfirmed: false, targetSets: sets.length, targetReps: targetReps ?? 0,
+        _showCfg: false, setType: 'straight', tags: [], showPlates: false, progressionType: 'weight',
+        substituteFor: null, prWeight: null, prRepsAtMaxWeight: null, ...opts };
+    }
+    function day(id, title, exercises, done = false) {
+      return { id, title, subtitle: '', warmup: '', cooldown: '', locked: false, markedDone: done,
+        sleepHours: null, energyLevel: null, sessionRating: null, isVacation: false, vacationPlan: null, exercises };
+    }
+    function week(id, startDate, days, mode = 'standard') {
+      return { id, startDate, note: '', mode, sessionLog: [], restDays: [], bodyData: {}, days };
+    }
+    function mondayOf(n) {
+      const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() - n * 7);
+      const dow = d.getDay(); d.setDate(d.getDate() + (dow === 0 ? -6 : 1 - dow));
+      return d.toISOString().slice(0, 10);
+    }
+
+    // Zwei saubere Vorwochen (clean reps=target, RPE=6) -> qualifiziert
+    // "Auto-Vorauswahl-Übung" für isReadyForAutoSelect() in Prüfpunkt 7.
+    const qualWeeks = [0, 1].map(n => week(n, mondayOf(2 - n), [
+      day(n * 10 + 1, 'Tag A', [ex('Auto-Vorauswahl-Übung',
+        [{ weight: 80, reps: 5, rpe: 6, status: 'success', done: true, note: '' },
+         { weight: 80, reps: 5, rpe: 6, status: 'success', done: true, note: '' }], 5)], true),
+    ]));
+
+    // Aktuelle Woche: 3 Tage (A/B/C) für Tag-Navigation (Prüfpunkt 8) + 5
+    // unabhängige Übungen mit je einem frischen 'pending'-Satz für die
+    // Prüfpunkte 1-5 (keine gegenseitige Beeinflussung zwischen den Checks).
+    const curWeek = week(2, mondayOf(0), [
+      day(21, 'Tag A', [
+        ex('Check1-Erfolg',    [mkSet(80, null, 'pending')], 5),
+        ex('Check2-Fail',      [mkSet(80, null, 'pending')], 5),
+        ex('Check3-Schnellweg',[mkSet(80, null, 'pending')], 5),
+        ex('Check4-Schutz',    [mkSet(80, null, 'pending')], 5),
+        ex('Check5-Toggle',    [mkSet(80, null, 'pending')], 5),
+        // Muss als benannte Übung in der AKTUELLEN Woche vorkommen, sonst wird
+        // sie von _prepNewWeekModal() (iteriert nur curWk.days) nie als
+        // Empfehlungs-Kandidat in Betracht gezogen — unabhängig von ihrer
+        // Qualifikation in den Vorwochen. Pending-Status reicht, kein eigener
+        // Datenpunkt diese Woche nötig.
+        ex('Auto-Vorauswahl-Übung', [mkSet(80, null, 'pending')], 5),
+      ]),
+      day(22, 'Tag B', [ex('Kniebeuge', [mkSet(60, null, 'pending')], 5)]),
+      day(23, 'Tag C', [ex('Rudern',    [mkSet(40, null, 'pending')], 5)]),
+    ]);
+
+    const weeks = [...qualWeeks, curWeek];
+
+    const seed = {
+      meta: { schemaVersion: 24, savedAt: new Date().toISOString(), createdAt: new Date().toISOString() },
+      curIdx: weeks.length - 1, weeks, customTemplate: [], templates: [], prs: {}, insights: [],
+      favoriteExercises: [], customExercises: [], badges: [], onboardingDone: true, seenTips: [],
+      lastReentryHandled: null, longestStreakEver: 0,
+      settings: {
+        swipe: true, drag: true, heightCm: null, targetWeight: null, showBmi: false,
+        deloadFactor: 0.75, deloadFactorCustom: null, barbellWeight: 20, plateStep: 2.5,
+        lastBackupDate: null, activeTags: [], vibrationEnabled: true, rpeEnabled: true,
+        weeksSinceLastBackupReminder: 0, maxSessionMs: 10800000, autoStartPauseTimer: true,
+        dismissedNamePairs: [],
+      },
+    };
+    localStorage.setItem('train_v6', JSON.stringify(seed));
+    localStorage.setItem('train_v6_shadow', JSON.stringify(seed));
+
+    const { loadState, getState, dispatch, A } = await import('../state.js');
+    const { mountApp } = await import('../ui.js');
+    const { mountTimer } = await import('../timer.js');
+
+    loadState();
+    mountApp(document.getElementById('app'));
+    mountTimer();
+    await wait(RENDER_WAIT_MS);
+
+    function isReallyVisible(el) {
+      if (!el) return false;
+      const cs = getComputedStyle(el);
+      if (cs.display === 'none' || cs.visibility === 'hidden') return false;
+      // offsetParent ist für position:fixed-Elemente (z.B. .modal-overlay)
+      // in Chrome spec-bedingt IMMER null, unabhängig von echter Sichtbarkeit
+      // — kein brauchbarer Indikator hier. Tatsächliche Ausdehnung prüfen statt.
+      const r = el.getBoundingClientRect();
+      return r.width > 0 && r.height > 0;
+    }
+    // HINWEIS: bewusst KEIN synthetisches 'input'-Event beim Befüllen von
+    // Eingabefeldern in dieser Suite. _handleInput() in ui.js ist absichtlich
+    // ein No-Op (siehe dortiger Kommentar zur automatischen-Bewertung-
+    // Regression dieser Session); ein dispatchEvent('input') würde aber
+    // AUCH timer.js' separaten, EIGENEN 'input'-Listener (_ensureSessionStart,
+    // feuert SESSION_START beim ersten Tastendruck der Sitzung) auslösen —
+    // das hat in einem früheren Lauf dieses Skripts unter rAF=sync einen
+    // Zwischen-Re-Render ausgelöst, der das gerade gesetzte .value wieder
+    // auf den unveränderten State-Wert zurückgesetzt hat, BEVOR der eigentliche
+    // Klick-Handler es lesen konnte. Reine .value-Zuweisung (kein Event) ist
+    // hier korrekt: toggle-done/confirm-set lesen .value direkt und synchron
+    // im selben Klick, ganz ohne Event nötig.
+    function findExSet(exName) {
+      const wk = getState().weeks[getState().curIdx];
+      for (const d of wk.days) for (const e of d.exercises) if (e.name === exName) return { day: d, ex: e };
+      return null;
+    }
+    function diEiOf(exName) {
+      const wk = getState().weeks[getState().curIdx];
+      for (let di = 0; di < wk.days.length; di++) {
+        const ei = wk.days[di].exercises.findIndex(e => e.name === exName);
+        if (ei !== -1) return { di, ei };
+      }
+      return null;
+    }
+
+    const results = [];
+    // needsRender=true: Prüfpunkt braucht tatsächlich gerenderte DOM (Modal-
+    // Sichtbarkeit, Tab-Inhalt, Tag-Wechsel) -> läuft unter withSyncRaf()
+    // (nur in ?raf=sync wirksam, sonst No-Op). needsRender=false (Default):
+    // Prüfpunkt liest ausschließlich getState() -> läuft IMMER mit echtem,
+    // unverändertem rAF, niemals synchron erzwungen (siehe withSyncRaf()-
+    // Kommentar oben für die Begründung).
+    async function check(id, label, fn, needsRender = false) {
+      const errBefore = caughtErrors.length;
+      let pass = false, detail = '';
+      try {
+        const r = needsRender ? await withSyncRaf(fn) : await fn();
+        pass = r.pass;
+        detail = r.detail ?? '';
+      } catch (err) {
+        pass = false;
+        detail = `Exception: ${err.message}`;
+      }
+      const newErrors = caughtErrors.slice(errBefore);
+      if (newErrors.length) {
+        pass = false;
+        detail += (detail ? ' | ' : '') + `uncaught errors: ${newErrors.join('; ')}`;
+      }
+      results.push({ id, label, pass, detail });
+    }
+
+    // ── Prüfpunkt 1: Satz erfolgreich ────────────────────────────────────────
+    await check(1, 'Satz erfolgreich (targetReps=5, Wdh=5, ✓ setzen)', async () => {
+      const { di, ei } = diEiOf('Check1-Erfolg');
+      const rInp = document.querySelector(`[data-action="set-reps"][data-di="${di}"][data-ei="${ei}"][data-si="0"]`);
+      rInp.value = '5'; // kein 'input'-Event nötig — toggle-done liest .value direkt synchron im selben Klick
+      document.querySelector(`[data-action="toggle-done"][data-di="${di}"][data-ei="${ei}"][data-si="0"]`)?.click();
+      const s = findExSet('Check1-Erfolg').ex.sets[0];
+      return { pass: s.status === 'success', detail: `status=${s.status}, reps=${s.reps}` };
+    });
+
+    // ── Prüfpunkt 2: Satz nicht erfolgreich ──────────────────────────────────
+    await check(2, 'Satz nicht erfolgreich (targetReps=5, Wdh=3)', async () => {
+      const { di, ei } = diEiOf('Check2-Fail');
+      const rInp = document.querySelector(`[data-action="set-reps"][data-di="${di}"][data-ei="${ei}"][data-si="0"]`);
+      rInp.value = '3';
+      document.querySelector(`[data-action="toggle-done"][data-di="${di}"][data-ei="${ei}"][data-si="0"]`)?.click();
+      const s = findExSet('Check2-Fail').ex.sets[0];
+      return { pass: s.status !== 'success', detail: `status=${s.status} (erwartet: nicht 'success')` };
+    });
+
+    // ── Prüfpunkt 3: Satz bestätigen — Schnellweg ────────────────────────────
+    await check(3, 'Satz bestätigen, Feld leer → targetReps + success', async () => {
+      const { di, ei } = diEiOf('Check3-Schnellweg');
+      const rInp = document.querySelector(`[data-action="set-reps"][data-di="${di}"][data-ei="${ei}"][data-si="0"]`);
+      rInp.value = '';
+      document.querySelector(`[data-action="confirm-set"][data-di="${di}"][data-ei="${ei}"]`)?.click();
+      const s = findExSet('Check3-Schnellweg').ex.sets[0];
+      return { pass: s.status === 'success' && String(s.reps) === '5', detail: `status=${s.status}, reps=${s.reps}` };
+    });
+
+    // ── Prüfpunkt 4: Satz bestätigen — Schutz ────────────────────────────────
+    await check(4, 'Satz bestätigen, Feld="3" → bleibt "3", fail', async () => {
+      const { di, ei } = diEiOf('Check4-Schutz');
+      const rInp = document.querySelector(`[data-action="set-reps"][data-di="${di}"][data-ei="${ei}"][data-si="0"]`);
+      rInp.value = '3';
+      document.querySelector(`[data-action="confirm-set"][data-di="${di}"][data-ei="${ei}"]`)?.click();
+      const s = findExSet('Check4-Schutz').ex.sets[0];
+      return { pass: String(s.reps) === '3' && s.status === 'fail', detail: `status=${s.status}, reps=${s.reps}` };
+    });
+
+    // ── Prüfpunkt 5: kein ✗-Button im aktuellen Code (siehe Kopfkommentar) —
+    // nächstliegende reale Mechanik geprüft: toggle-done bis 'fail', andere
+    // Sätze unberührt. ──────────────────────────────────────────────────────
+    await check(5, "[ERSETZT — kein ✗-Button im Code] toggle-done → 'fail', andere Sätze unberührt", async () => {
+      const { di, ei } = diEiOf('Check5-Toggle');
+      const before1 = findExSet('Check1-Erfolg').ex.sets[0].status;
+      const btn = document.querySelector(`[data-action="toggle-done"][data-di="${di}"][data-ei="${ei}"][data-si="0"]`);
+      btn?.click(); // pending -> success/fail (reps leer -> kein canSuccess -> fail)
+      const s1 = findExSet('Check5-Toggle').ex.sets[0];
+      const after1 = findExSet('Check1-Erfolg').ex.sets[0].status;
+      return {
+        pass: s1.status === 'fail' && after1 === before1,
+        detail: `status=${s1.status} (erwartet 'fail'), Check1 unverändert: ${after1 === before1}`,
+      };
+    });
+
+    // ── Prüfpunkt 8: Tag-Navigation ───────────────────────────────────────────
+    await check(8, 'Tag-Navigation (A/B/C) aktualisiert Inhalt', async () => {
+      // Übungsname rendert als <input value="..."> (data-action="ex-name"),
+      // NICHT als Klartext — .textContent würde ihn nie enthalten.
+      const exNameVal = (exListEl) => exListEl?.querySelector('[data-action="ex-name"]')?.value ?? '';
+      const btnB = document.querySelector('.day-tab[data-day-hdr="1"]');
+      btnB?.click();
+      await wait(RENDER_WAIT_MS);
+      const hasKniebeuge = exNameVal(document.querySelector('[data-ex-list="1"]')) === 'Kniebeuge';
+      const btnC = document.querySelector('.day-tab[data-day-hdr="2"]');
+      btnC?.click();
+      await wait(RENDER_WAIT_MS);
+      const hasRudern = exNameVal(document.querySelector('[data-ex-list="2"]')) === 'Rudern';
+      document.querySelector('.day-tab[data-day-hdr="0"]')?.click();
+      await wait(RENDER_WAIT_MS);
+      return {
+        pass: hasKniebeuge && hasRudern,
+        detail: `Tag B zeigt Kniebeuge: ${hasKniebeuge}, Tag C zeigt Rudern: ${hasRudern}`,
+      };
+    }, true);
+
+    // ── Prüfpunkt 9: Übung hinzufügen — Modal sichtbar ───────────────────────
+    await check(9, '"+"-Button öffnet Übung-hinzufügen-Modal sichtbar', async () => {
+      document.querySelector('[data-action="open-ex-search"]')?.click();
+      await wait(RENDER_WAIT_MS);
+      const modal = document.getElementById('modal-ex-search');
+      const visible = isReallyVisible(modal) && modal.classList.contains('is-open');
+      document.querySelector('[data-action="close-modal"]')?.click();
+      await wait(RENDER_WAIT_MS);
+      return { pass: visible, detail: `is-open: ${modal?.classList.contains('is-open')}, sichtbar: ${isReallyVisible(modal)}` };
+    }, true);
+
+    // ── Prüfpunkt 10: Coach-Tab rendert ───────────────────────────────────────
+    await check(10, 'Coach-Tab: "Fokus der Woche" rendert mit gültigem Status', async () => {
+      document.querySelector('[data-tab="coach"]')?.click();
+      await wait(RENDER_WAIT_MS);
+      const statusEl = document.querySelector('#page-coach .coach-focus-status');
+      const text = statusEl?.textContent ?? '';
+      const validHeadlines = ['Wiedereinstieg', 'Erholung priorisieren', 'Konsistenz vor Intensität', 'Plateau überwinden', 'Steigerung sinnvoll', 'Auf Kurs'];
+      const matched = validHeadlines.find(h => text.includes(h));
+      document.querySelector('[data-tab="workout"]')?.click();
+      await wait(RENDER_WAIT_MS);
+      return { pass: !!matched, detail: `Karte zeigt: "${text}" (gültig: ${matched ?? 'KEINER der erwarteten Status'})` };
+    }, true);
+
+    // ── Prüfpunkt 7: Auto-Vorauswahl abwählen, kein Snap-Back ───────────────
+    await check(7, 'Auto-Vorauswahl-Chip abwählen → kein Snap-Back, nach Reopen wieder normal', async () => {
+      document.querySelector('[data-action="open-new-week"]')?.click();
+      await wait(RENDER_WAIT_MS);
+      let chip = document.querySelector('[data-action="toggle-weight-rec"][data-name="Auto-Vorauswahl-Übung"]');
+      if (!chip) {
+        document.querySelector('[data-action="close-modal"]')?.click();
+        return { pass: false, detail: 'Auto-Vorauswahl-Chip nicht gefunden — Übung qualifiziert nicht für isReadyForAutoSelect() (Seed-Problem oder Regression)' };
+      }
+      const wasConfirmedInitially = chip.classList.contains('nw-weight-rec-chip--confirmed');
+      chip.click(); // abwählen
+      await wait(RENDER_WAIT_MS);
+      chip = document.querySelector('[data-action="toggle-weight-rec"][data-name="Auto-Vorauswahl-Übung"]'); // frisch nachgefragt (kein stale DOM)
+      const stillDeselectedSameClick = !chip.classList.contains('nw-weight-rec-chip--confirmed');
+      document.querySelector('[data-action="close-modal"]')?.click();
+      await wait(RENDER_WAIT_MS);
+      document.querySelector('[data-action="open-new-week"]')?.click(); // neue Sitzung
+      await wait(RENDER_WAIT_MS);
+      const chipReopened = document.querySelector('[data-action="toggle-weight-rec"][data-name="Auto-Vorauswahl-Übung"]');
+      const autoSelectAgainAfterReopen = chipReopened?.classList.contains('nw-weight-rec-chip--confirmed') ?? false;
+      document.querySelector('[data-action="close-modal"]')?.click();
+      await wait(RENDER_WAIT_MS);
+      return {
+        pass: wasConfirmedInitially && stillDeselectedSameClick && autoSelectAgainAfterReopen,
+        detail: `initial bestätigt: ${wasConfirmedInitially}, nach Abwahl noch abgewählt (kein Snap-Back): ${stillDeselectedSameClick}, nach Reopen wieder auto-ausgewählt: ${autoSelectAgainAfterReopen}`,
+      };
+    }, true);
+
+    // ── Prüfpunkt 6: Neue Woche erstellen ────────────────────────────────────
+    await check(6, 'Neue Woche erstellen → chronologisch korrekt einsortiert', async () => {
+      const weeksBefore = getState().weeks.length;
+      document.querySelector('[data-action="open-new-week"]')?.click();
+      await wait(RENDER_WAIT_MS);
+      document.querySelector('[data-action="create-week"]')?.click();
+      await wait(RENDER_WAIT_MS);
+      const stAfter = getState();
+      const weeksAfter = stAfter.weeks.length;
+      const sorted = [...stAfter.weeks].map(w => w.startDate).every((d, i, arr) => i === 0 || arr[i - 1] <= d);
+      return {
+        pass: weeksAfter === weeksBefore + 1 && sorted,
+        detail: `Wochen vorher: ${weeksBefore}, nachher: ${weeksAfter}, chronologisch sortiert: ${sorted}`,
+      };
+    }, true);
+
+    // ── Ausgabe ───────────────────────────────────────────────────────────────
+    const order = [1,2,3,4,5,6,7,8,9,10];
+    const byId = new Map(results.map(r => [r.id, r]));
+    const lines = [];
+    lines.push(`TRAIN Regressions-Kernprüfung — rAF-Modus: ${RAF_MODE}${RAF_MODE === 'real' ? ' (echtes Timing — Standard, deckt zeitkritische Bugs auf)' : ' (synchron erzwungen — nur für DOM-Sichtbarkeit in headless --dump-dom, siehe Kopfkommentar)'}`);
+    lines.push('');
+    let passCount = 0;
+    for (const id of order) {
+      const r = byId.get(id);
+      const mark = r.pass ? '✓' : '✗';
+      if (r.pass) passCount++;
+      lines.push(`${mark} [${id}] ${r.label}${r.pass ? '' : `\n     → ${r.detail}`}`);
+    }
+    lines.push('');
+    lines.push(passCount === order.length
+      ? `ERGEBNIS: ${passCount}/10 bestanden — alle Kernprüfungen grün.`
+      : `ERGEBNIS: ${order.length - passCount} von 10 fehlgeschlagen, Details oben.`);
+    lines.push('');
+    lines.push(`Gesamt uncaught errors während des Laufs: ${caughtErrors.length}`);
+    if (caughtErrors.length) lines.push(caughtErrors.map(e => '  - ' + e).join('\n'));
+
+    document.getElementById('result').textContent = lines.join('\n');
+  </script>
+</body>
+</html>
