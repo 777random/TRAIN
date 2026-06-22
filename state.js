@@ -24,7 +24,7 @@
 
 export const STORAGE_KEY        = 'train_v6';
 export const STORAGE_KEY_SHADOW = 'train_v6_shadow';
-export const SCHEMA_VERSION     = 24;
+export const SCHEMA_VERSION     = 25;
 
 export const BADGE_THRESHOLDS = [
   { id: 'badge_4',   weeks: 4,   title: 'Erster Schritt' },
@@ -175,6 +175,11 @@ function buildDefaultState() {
     badges: [],               // { id, unlockedAt }[] – earned badges
     onboardingDone: false,    // true after first-run flow completed
     seenTips: [],             // string[] – tip IDs the user has already seen
+    streakFreeze: {            // bewusst manuell aktivierter Streak-Schutz, 1×/Monat
+      activeUntilWeekStart: null, // ISO-Wochenstart der geschützten Woche, oder null
+      lastUsedMonth: null,        // "YYYY-MM" des letzten Einsatzes, oder null
+    },
+    surpriseLog: {},          // { [musterId]: "YYYY-MM" } – letzter Monat, in dem ein Überraschungs-Muster gezeigt wurde
     settings: {
       swipe:              true,
       drag:               true,
@@ -206,18 +211,37 @@ const _MAX_UNDO  = 20;
 const _NO_UNDO = new Set([
   'UNDO', 'WEEK_NAVIGATE', 'STATE_IMPORT', 'SESSION_START', 'SESSION_RESET', 'SESSION_STOP',
   'INSIGHTS_SET', 'ONBOARDING_DONE', 'MARK_TIP_SEEN', 'REENTRY_HANDLED',
-  'EX_AUTO_PRESELECT_NEXT_WEEK_PLAN',
+  'EX_AUTO_PRESELECT_NEXT_WEEK_PLAN', 'ACTIVATE_STREAK_FREEZE', 'RECORD_SURPRISE_SHOWN',
 ]);
 
 /** Returns true when there is at least one undo snapshot available. */
 export function canUndo() { return _undoStack.length > 0; }
 
-/** Public wrapper: gap-aware current streak (in weeks) across the given weeks array. */
-export function calcCurrentStreak(weeks) { return _calcCurrentStreak(weeks); }
+/**
+ * Public wrapper: gap-aware current streak (in weeks) across the given
+ * weeks array. `freeze` (optional) — pass state.streakFreeze (already run
+ * through effectiveStreakFreeze()) to apply Streak-Freeze protection;
+ * omitting it reproduces the exact pre-Streak-Freeze behaviour.
+ */
+export function calcCurrentStreak(weeks, freeze) { return _calcCurrentStreak(weeks, freeze); }
 /** Public wrapper: gap-aware longest-ever streak (in weeks) across the given weeks array. */
 export function calcLongestStreakEver(weeks) { return _calcLongestStreakEver(weeks); }
 /** Public wrapper: per-week streak status — true (counts) | false (breaks) | null (skip, all-rest). */
 export function isWeekDoneForStreak(w) { return _isWeekDoneForStreak(w); }
+
+/**
+ * Lazily "expires" a Streak-Freeze without needing a dispatch/mutation: if
+ * the protected week's calendar span has already fully passed, returns a
+ * copy with activeUntilWeekStart reset to null. Pure, no side effects —
+ * call this wherever streakFreeze is read (streak calc, popup display)
+ * instead of mutating state on a timer/background check.
+ */
+export function effectiveStreakFreeze(streakFreeze) {
+  if (!streakFreeze?.activeUntilWeekStart) return streakFreeze ?? { activeUntilWeekStart: null, lastUsedMonth: null };
+  const weekEndMs = new Date(streakFreeze.activeUntilWeekStart + 'T00:00:00').getTime() + 7 * 86_400_000;
+  if (Date.now() > weekEndMs) return { ...streakFreeze, activeUntilWeekStart: null };
+  return streakFreeze;
+}
 
 // ─── Internal STATE + subscriber registry ────────────────────────────────────
 
@@ -321,23 +345,42 @@ function _weekEndMs(wk) {
  * (chronologically earlier, already-counted week) and the start of `wk`
  * (chronologically later week being evaluated). An unmarked pause this
  * long breaks the streak even if both weeks are individually "done".
+ *
+ * `freeze` (optional, only passed by the freeze-aware current-streak path —
+ * _calcLongestStreakEver() never passes it, preserving its exact prior
+ * behaviour): if the gap fully contains the protected week's calendar span,
+ * the gap is treated as covered by the freeze and does not break the streak.
  */
-function _streakGapBreaks(wk, prevWk) {
+function _streakGapBreaks(wk, prevWk, freeze) {
   if (!prevWk) return false;
   const gapDays = (new Date(wk.startDate + 'T00:00:00').getTime() - _weekEndMs(prevWk)) / 86_400_000;
-  return gapDays > 7;
+  if (gapDays <= 7) return false;
+  if (freeze?.activeUntilWeekStart) {
+    const frozenStartMs = new Date(freeze.activeUntilWeekStart + 'T00:00:00').getTime();
+    if (frozenStartMs > _weekEndMs(prevWk) && frozenStartMs < new Date(wk.startDate + 'T00:00:00').getTime()) {
+      return false;
+    }
+  }
+  return true;
 }
 
-function _calcCurrentStreak(weeks) {
+/**
+ * `freeze` (optional): { activeUntilWeekStart } — a week whose startDate
+ * matches is treated as protected (does not break the streak even if it
+ * would otherwise count as missed). Omitting `freeze` reproduces the exact
+ * prior (pre-Streak-Freeze) behaviour — see calcCurrentStreak() below.
+ */
+function _calcCurrentStreak(weeks, freeze) {
   const sorted = [...weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
   let cur = 0;
   let lastCountedWk = null; // chronologically-later week already counted
   for (let i = sorted.length - 1; i >= 0; i--) {
-    const wk     = sorted[i];
-    const status = _isWeekDoneForStreak(wk);
+    const wk      = sorted[i];
+    const frozen  = freeze?.activeUntilWeekStart === wk.startDate;
+    const status  = _isWeekDoneForStreak(wk);
     if (status === null) continue; // all-rest week: skip, don't break
-    if (!status) break;
-    if (lastCountedWk && _streakGapBreaks(lastCountedWk, wk)) break;
+    if (!status && !frozen) break;
+    if (lastCountedWk && _streakGapBreaks(lastCountedWk, wk, freeze)) break;
     cur++;
     lastCountedWk = wk;
   }
@@ -361,7 +404,7 @@ function _calcLongestStreakEver(weeks) {
 }
 
 function _checkAndGrantBadges(state) {
-  const streak  = _calcCurrentStreak(state.weeks);
+  const streak  = _calcCurrentStreak(state.weeks, effectiveStreakFreeze(state.streakFreeze));
   state.longestStreakEver = Math.max(state.longestStreakEver ?? 0, _calcLongestStreakEver(state.weeks));
   const now     = new Date().toISOString();
   const newOnes = [];
@@ -675,6 +718,18 @@ function migrate(raw) {
     raw.meta = { ...raw.meta, schemaVersion: 24 };
   }
 
+  // v24 → v25: add state.streakFreeze + state.surpriseLog
+  if ((raw.meta?.schemaVersion ?? 0) < 25) {
+    if (!raw.streakFreeze || typeof raw.streakFreeze !== 'object') {
+      raw.streakFreeze = { activeUntilWeekStart: null, lastUsedMonth: null };
+    } else {
+      if (raw.streakFreeze.activeUntilWeekStart === undefined) raw.streakFreeze.activeUntilWeekStart = null;
+      if (raw.streakFreeze.lastUsedMonth === undefined) raw.streakFreeze.lastUsedMonth = null;
+    }
+    if (!raw.surpriseLog || typeof raw.surpriseLog !== 'object') raw.surpriseLog = {};
+    raw.meta = { ...raw.meta, schemaVersion: 25 };
+  }
+
   // Always-apply defaults for settings added in later versions
   if (raw.settings.vibrationEnabled               === undefined) raw.settings.vibrationEnabled               = true;
   if (raw.settings.rpeEnabled                     === undefined) raw.settings.rpeEnabled                     = true;
@@ -869,6 +924,8 @@ export const A = Object.freeze({
   EX_MERGE_NAMES:       'EX_MERGE_NAMES',       // { variantNames: string[], finalName } – Übungsnamen-Bereinigung
   DISMISS_NAME_PAIR:    'DISMISS_NAME_PAIR',    // { a, b } – Ähnlichkeits-Kandidat dauerhaft verwerfen
   REENTRY_HANDLED:      'REENTRY_HANDLED',      // {} – marks current pause as handled (Ja/Nein)
+  ACTIVATE_STREAK_FREEZE: 'ACTIVATE_STREAK_FREEZE', // {} – bewusste, manuelle Aktivierung, 1×/Monat
+  RECORD_SURPRISE_SHOWN:  'RECORD_SURPRISE_SHOWN',  // { musterId } – markiert ein Überraschungs-Muster als diesen Monat gezeigt
   EX_APPLY_REENTRY_REDUCTION: 'EX_APPLY_REENTRY_REDUCTION', // { factor } – reduces weights/targets in current week
   EX_REMOVE:           'EX_REMOVE',           // { di, ei }
   EX_UPDATE:           'EX_UPDATE',           // { di, ei, field, value }
@@ -1803,6 +1860,24 @@ function reduce(state, action) {
     // ── Wiedereinstieg nach Pause ────────────────────────────────────────────
     case A.REENTRY_HANDLED: {
       state.lastReentryHandled = Date.now();
+      break;
+    }
+    // Bewusste, manuelle Aktivierung (nie automatisch) — schützt die NÄCHSTE
+    // Woche (_nextMonday(), dieselbe Funktion wie WEEK_CREATE's Default-
+    // Startdatum), nicht rückwirkend. 1×/Kalendermonat, kein Stapeln (ein
+    // neuer Aufruf überschreibt activeUntilWeekStart statt es zu addieren).
+    case A.ACTIVATE_STREAK_FREEZE: {
+      const curMonth = new Date().toISOString().slice(0, 7);
+      if (!state.streakFreeze) state.streakFreeze = { activeUntilWeekStart: null, lastUsedMonth: null };
+      if (state.streakFreeze.lastUsedMonth === curMonth) break; // Limit bereits diesen Monat verbraucht
+      state.streakFreeze.activeUntilWeekStart = _nextMonday();
+      state.streakFreeze.lastUsedMonth = curMonth;
+      break;
+    }
+    case A.RECORD_SURPRISE_SHOWN: {
+      if (!p.musterId) break;
+      if (!state.surpriseLog) state.surpriseLog = {};
+      state.surpriseLog[p.musterId] = new Date().toISOString().slice(0, 7);
       break;
     }
     case A.EX_APPLY_REENTRY_REDUCTION: {

@@ -19,6 +19,7 @@
 import {
   getState, dispatch, subscribe, A, canUndo, BADGE_THRESHOLDS, VACATION_PLANS,
   calcCurrentStreak, calcLongestStreakEver, isWeekDoneForStreak, getLatestWeek,
+  effectiveStreakFreeze,
 } from './state.js';
 import {
   exportJSON, importJSON, exportCSV,
@@ -35,6 +36,7 @@ import { findExactDuplicates, findSimilarCandidates } from './exerciseNameCleanu
 import { computeErkenntnisLines, getProgressCorridorCalibration } from './progressInsights.js';
 import { MOVEMENT_MAP } from './movementMap.js';
 import { computeQualityTrend, computeConsistencyTrend, computeVolumeTrend, computeBreadthProgress } from './overallPerformance.js';
+import { checkSurpriseRewards } from './surpriseRewards.js';
 
 // ─── Module-level UI state (transient, never persisted) ──────────────────────
 
@@ -415,6 +417,23 @@ function _showTooltip(text) {
   document.body.appendChild(tip);
   const close = () => tip.remove();
   setTimeout(() => document.addEventListener('click', close, { capture: true, once: true }), 0);
+}
+
+/**
+ * Dezenter, einmaliger Überraschungs-Banner — kein Modal, kein Blocker, kein
+ * Ton. Verschwindet nach 4.5s ODER bei Tap (pointer-events: auto, anders als
+ * .tip-banner).
+ */
+function _showSurpriseBanner(message) {
+  document.getElementById('_train-surprise-banner')?.remove();
+  const el = document.createElement('div');
+  el.id = '_train-surprise-banner';
+  el.className = 'surprise-banner';
+  el.textContent = message;
+  document.body.appendChild(el);
+  const close = () => el.remove();
+  el.addEventListener('click', close, { once: true });
+  setTimeout(close, 4500);
 }
 
 /** Show tip once — skips if already seen, records it, then shows banner. */
@@ -928,7 +947,56 @@ function _renderTrainingContextAnchor(state, wk, di) {
  */
 function _renderStreakBadge(state) {
   const streakDays = _calcStreak(state).cur * 7;
-  return `<div class="streak-badge" role="status" aria-label="${streakDays} Tage Streak">🔥 <span class="streak-badge__num">${streakDays}</span> Tage</div>`;
+  return `<button type="button" class="streak-badge" data-action="open-streak-freeze" aria-label="${streakDays} Tage Streak — Streak-Freeze öffnen">🔥 <span class="streak-badge__num">${streakDays}</span> Tage</button>`;
+}
+
+/**
+ * Streak-Freeze-Popup, gleiches dynamisches Overlay-Pattern wie
+ * _showReentryPopup() — kein vordeklariertes statisches Modal, da nicht
+ * Teil des festen mountApp-Shells. 3 Zustände: verfügbar / aktiv /
+ * diesen Monat bereits verbraucht.
+ */
+function _showStreakFreezePopup(state) {
+  document.getElementById('streak-freeze-modal')?.remove();
+  const streak  = _calcStreak(state);
+  const freeze  = effectiveStreakFreeze(state.streakFreeze);
+  const curMonth = new Date().toISOString().slice(0, 7);
+
+  let body;
+  if (freeze.activeUntilWeekStart) {
+    body = `<p class="vac-plan-modal__sub">Streak geschützt bis Ende dieser Woche.</p>
+      <button class="btn btn--ghost" data-action="close-modal" data-target="streak-freeze-modal" style="width:100%;min-height:var(--touch)">Schließen</button>`;
+  } else if ((state.streakFreeze?.lastUsedMonth ?? null) === curMonth) {
+    body = `<p class="vac-plan-modal__sub">Diesen Monat bereits verwendet.<br>Wieder verfügbar am 1. des nächsten Monats.</p>
+      <button class="btn btn--ghost" data-action="close-modal" data-target="streak-freeze-modal" style="width:100%;min-height:var(--touch)">Schließen</button>`;
+  } else {
+    body = `<p class="vac-plan-modal__sub">Schützt deine Streak bei einer verpassten Woche. 1× pro Monat verfügbar.</p>
+      <button class="btn btn--accent" data-action="activate-streak-freeze" style="width:100%;min-height:var(--touch)">Streak schützen</button>
+      <button class="btn btn--ghost" data-action="close-modal" data-target="streak-freeze-modal" style="width:100%;min-height:var(--touch)">Abbrechen</button>`;
+  }
+
+  const overlay = document.createElement('div');
+  overlay.id = 'streak-freeze-modal';
+  overlay.className = 'vac-plan-modal-overlay';
+  overlay.innerHTML = `
+    <div class="vac-plan-modal">
+      <div class="vac-plan-modal__title">🔥 ${streak.cur * 7} Tage Streak</div>
+      ${body}
+    </div>`;
+  document.body.appendChild(overlay);
+
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) { overlay.remove(); return; }
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    if (btn.dataset.action === 'activate-streak-freeze') {
+      dispatch(A.ACTIVATE_STREAK_FREEZE, {});
+      showToast('Streak geschützt ✓', 'ok');
+      overlay.remove();
+    } else if (btn.dataset.action === 'close-modal') {
+      overlay.remove();
+    }
+  });
 }
 
 /**
@@ -2609,7 +2677,7 @@ function _updateInlineReview(state) {
 }
 
 function _calcStreak(state) {
-  const cur  = calcCurrentStreak(state.weeks);
+  const cur  = calcCurrentStreak(state.weeks, effectiveStreakFreeze(state.streakFreeze));
   const best = Math.max(state.longestStreakEver ?? 0, calcLongestStreakEver(state.weeks));
   return { cur, best };
 }
@@ -3439,6 +3507,10 @@ function _handleClick(e) {
   const { di, ei, si, field, key, val, sec } = el.dataset;
 
   switch (action) {
+
+    case 'open-streak-freeze':
+      _showStreakFreezePopup(getState());
+      break;
 
     // ── Overview mode ─────────────────────────────────────────────────────
     case 'toggle-overview':
@@ -5368,6 +5440,12 @@ export function mountApp(root) {
       _showReentryPopup(pause.pauseDays, pause.factor);
     } else if (_shouldShowBackupReminder(st)) {
       _showBackupReminderToast();
+    }
+
+    const surprise = checkSurpriseRewards(st);
+    if (surprise) {
+      _showSurpriseBanner(surprise.message);
+      dispatch(A.RECORD_SURPRISE_SHOWN, { musterId: surprise.musterId });
     }
   }, 2000);
 }

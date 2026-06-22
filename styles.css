@@ -420,6 +420,7 @@ button, input, select, textarea { font: inherit; }
 .streak-badge {
   display: flex; align-items: center; gap: 4px; flex-shrink: 0;
   font-size: 15px; font-weight: 600; color: var(--c-text); white-space: nowrap;
+  background: none; border: none; padding: 0; font-family: inherit; cursor: pointer;
 }
 .streak-badge__num { font-family: var(--font-display); font-size: 17px; }
 
@@ -2138,6 +2139,22 @@ details[open] > .deload-details__summary::before { content: '▾ '; }
   max-width: min(320px, calc(100vw - 24px));
   box-shadow: var(--shadow-md);
   pointer-events: none;
+  text-align: center;
+}
+
+.surprise-banner {
+  position: fixed; z-index: 9990;
+  top: calc(env(safe-area-inset-top, 0px) + 12px);
+  left: 50%; transform: translateX(-50%);
+  background: var(--c-surface2);
+  border: 1px solid var(--c-accent);
+  color: var(--c-text);
+  font-size: 13px; font-weight: 600; line-height: 1.5;
+  padding: 10px 16px;
+  border-radius: var(--r-md);
+  max-width: min(320px, calc(100vw - 24px));
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
   text-align: center;
 }
 
