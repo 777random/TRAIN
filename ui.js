@@ -736,7 +736,16 @@ function renderDayList(state) {
 
   // ── Content: overview grid or single active panel ─────────────────────────
   let contentHtml = '';
-  if (_overviewMode) {
+  if (wk.days.length === 0) {
+    // Defensiver Empty-State — greift unabhängig davon wie eine Woche ohne
+    // Tage entstanden ist (Onboarding "Ohne Vorlage", manuelles Löschen
+    // aller Tage, etc.). Ohne mindestens einen Tag kann _activeDayIdx nie
+    // gesetzt werden, sonst bliebe der Container sonst komplett leer.
+    contentHtml = `<div class="empty-state">
+      <p class="empty-state__hint">Diese Woche hat noch keine Trainingstage.</p>
+      <button type="button" class="btn btn--accent" data-action="add-day">${ic.plus()} Tag hinzufügen</button>
+    </div>`;
+  } else if (_overviewMode) {
     contentHtml = `<div class="day-overview-grid">
       ${wk.days.map((day, di) => {
         const done   = !!day.markedDone;
@@ -6006,12 +6015,21 @@ function _showOnboarding() {
     dispatch(A.ONBOARDING_WEEK_CREATE, { startDate, days, note: tpl.weekTitle });
   }
 
+  // Seedet einen leeren Starttag statt days:[] — sonst kann _activeDayIdx
+  // nie gesetzt werden (es greift nur bei wk.days.length > 0) und weder
+  // "+Tag"- noch "+Übung"-Button können je gerendert werden (Dead-End).
+  // Tag-Form identisch zu DAY_ADD_CLONE's "Leerer Tag"-Zweig (state.js).
   function _applyBlank() {
     const d = new Date();
     const dow = d.getDay();
     d.setDate(d.getDate() + (dow === 0 ? -6 : 1 - dow));
     const startDate = d.toISOString().slice(0, 10);
-    dispatch(A.ONBOARDING_WEEK_CREATE, { startDate, days: [], note: '' });
+    const days = [{
+      id: Date.now(), title: 'Tag A', subtitle: '', warmup: '', cooldown: '',
+      locked: false, markedDone: false, isVacation: false,
+      sleepHours: null, energyLevel: null, exercises: [],
+    }];
+    dispatch(A.ONBOARDING_WEEK_CREATE, { startDate, days, note: '' });
   }
 
   function _finish() {
