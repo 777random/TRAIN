@@ -33,6 +33,8 @@ import { detectPlateaus }         from './plateauDetector.js';
 import { computeWeeklyFocus, isInRecoveryWindow, buildDecisionalBalance } from './weeklyFocus.js';
 import { findExactDuplicates, findSimilarCandidates } from './exerciseNameCleanup.js';
 import { computeErkenntnisLines, getProgressCorridorCalibration } from './progressInsights.js';
+import { MOVEMENT_MAP } from './movementMap.js';
+import { computeQualityTrend, computeConsistencyTrend, computeVolumeTrend, computeBreadthProgress } from './overallPerformance.js';
 
 // ─── Module-level UI state (transient, never persisted) ──────────────────────
 
@@ -2097,35 +2099,6 @@ function _weekSuccessScore(week) {
 
 // ─── Analysis tab ─────────────────────────────────────────────────────────────
 
-const MOVEMENT_MAP = {
-  'Bankdrücken': 'Push', 'Schrägbankdrücken': 'Push', 'Schrägbankdrücken tief': 'Push',
-  'Schulterdrücken': 'Push', 'Militärpress': 'Push', 'Kurzhanteldrücken': 'Push',
-  'Dips': 'Push', 'Liegestütz': 'Push', 'KB Press': 'Push', 'Push Press': 'Push',
-  'Landmine Press': 'Push', 'Chest Press Maschine': 'Push', 'Shoulder Press Maschine': 'Push',
-  'Trizepsdips': 'Push', 'Trizepsdrücken': 'Push', 'Skull Crushers': 'Push',
-  'KH Flys': 'Push', 'Flys Kabel': 'Push',
-  'Klimmzüge': 'Pull', 'Latziehen': 'Pull', 'Lat Maschine': 'Pull',
-  'Kabelrudern': 'Pull', 'Rudern': 'Pull', 'Rudern Maschine': 'Pull',
-  'KH Rudern': 'Pull', 'T-Bar Rudern': 'Pull', 'Pendlay Row': 'Pull',
-  'Kabelbizeps': 'Pull', 'Bizepscurls': 'Pull', 'Hammercurls': 'Pull',
-  'Konzentrationscurls': 'Pull', 'Butterfly': 'Pull', 'Face Pulls': 'Pull',
-  'Reverse Flys': 'Pull', 'Frontheben': 'Pull', 'Seitheben': 'Pull',
-  'KH Shrugs': 'Pull',
-  'Kniebeuge': 'Squat', 'Frontkniebeuge': 'Squat', 'Bulgarische Kniebeuge': 'Squat',
-  'Beinpresse': 'Squat', 'Hack Squat': 'Squat', 'Smith Maschine Kniebeuge': 'Squat',
-  'Beinstrecker': 'Squat', 'Beinbeuger': 'Squat', 'Ausfallschritte': 'Squat',
-  'Box Jumps': 'Squat', 'KB Goblet Squat': 'Squat',
-  'Kreuzheben': 'Hinge', 'Rumänisches Kreuzheben': 'Hinge', 'Sumo Kreuzheben': 'Hinge',
-  'Hip Thrust': 'Hinge', 'KB Swings': 'Hinge', 'Kettlebell Swings': 'Hinge',
-  'KB Clean': 'Hinge', 'KB Snatch': 'Hinge', 'KB Turkish Get-Up': 'Hinge',
-  'KB Windmill': 'Hinge', 'Wadenheben': 'Hinge',
-  'KB Carry': 'Carry',
-  'Plank': 'Core', 'Crunch': 'Core', 'Situps': 'Core', 'Beinheben': 'Core',
-  'Ab-Wheel': 'Core', 'Cable Crunches': 'Core', 'Russian Twists': 'Core',
-  'Hollow Hold': 'Core', 'Pallof Press': 'Core', 'Battle Ropes': 'Core',
-  'Burpees': 'Core', 'Broad Jumps': 'Core',
-};
-
 function _avgRepsLast4(exName, allWeeks) {
   const sorted = [...allWeeks]
     .filter(w => (w.mode ?? 'standard') !== 'deload')
@@ -2346,6 +2319,77 @@ function renderCoachTab(state) {
   </div>`;
 }
 
+/**
+ * "Gesamtperformance"-Sektion: vier Dimensionen (Qualität, Konsistenz,
+ * Volumen, Breite) als reine Feststellung über ALLE Übungen — keine
+ * Handlungsempfehlung (die bleibt im Coach-Tab). Berechnungslogik in
+ * overallPerformance.js (pure, kein State, keine Persistierung). Liefert
+ * '' wenn keine der vier Dimensionen genug Daten hat (Sektion dann
+ * komplett ausgeblendet, kein leerer Platzhalter-Block).
+ */
+function _renderOverallPerformance(state) {
+  const sortedWeeks = [...state.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
+  const scoredWeeks = sortedWeeks.map(w => _weekSuccessScore(w));
+
+  const quality     = computeQualityTrend(scoredWeeks);
+  const consistency = computeConsistencyTrend(state);
+  const volume      = computeVolumeTrend(state);
+  const breadth     = computeBreadthProgress(state);
+
+  if (!quality && !consistency && !volume && !breadth) return '';
+
+  const paragraphs = [];
+
+  // 1. Qualität
+  if (quality) {
+    const dir = quality.direction === 'up' ? 'gestiegen' : quality.direction === 'down' ? 'gesunken' : 'stabil geblieben';
+    paragraphs.push(quality.prevPct === null
+      ? `Deine Erfolgsquote über alle Übungen liegt aktuell bei ${quality.curPct}%.`
+      : `Deine Erfolgsquote über alle Übungen ist in den letzten 4 Wochen von ${quality.prevPct}% auf ${quality.curPct}% ${dir}.`);
+  }
+
+  // 2. Konsistenz
+  if (consistency) {
+    let line = `Du hast in den letzten 8 Wochen ${consistency.curPct}% deiner geplanten Trainingstage absolviert.`;
+    if (consistency.direction !== null) {
+      const dir = consistency.direction === 'up' ? 'steigend' : consistency.direction === 'down' ? 'sinkend' : 'stabil';
+      line += ` Der Trend ist ${dir}.`;
+    }
+    paragraphs.push(line);
+  }
+
+  // 3. Volumen
+  if (volume) {
+    let line;
+    if (volume.pct === null) {
+      line = `Dein Gesamtvolumen liegt aktuell bei ${Math.round(volume.curVol).toLocaleString('de-DE')}kg pro 4-Wochen-Block.`;
+    } else {
+      const dir  = volume.direction === 'up' ? 'gestiegen' : volume.direction === 'down' ? 'gesunken' : 'stabil geblieben';
+      const sign = volume.pct > 0 ? '+' : '';
+      line = `Dein Gesamtvolumen ist in den letzten 4 Wochen um ${sign}${volume.pct}% ${dir}.`;
+    }
+    if (volume.hasRelative) {
+      line += ` Dazu kommen ${volume.relSetsAvg} Sätze ohne Zusatzgewicht pro Woche im Schnitt.`;
+    }
+    paragraphs.push(line);
+  }
+
+  // 4. Breite
+  if (breadth) {
+    let line = `Du hast in ${breadth.progressedCount} von ${breadth.totalCount} Muskelgruppen messbare Fortschritte erzielt${breadth.progressedCats.length ? ` (${breadth.progressedCats.join(', ')})` : ''}.`;
+    if (breadth.otherCats.length) {
+      line += ` Noch ohne erkennbaren Fortschritt: ${breadth.otherCats.join(', ')}.`;
+    }
+    paragraphs.push(line);
+  }
+
+  return `
+  <div class="chart-card">
+    <div class="chart-card__title">🧭 Gesamtperformance</div>
+    ${paragraphs.map(p => `<p class="erkenntnis-line">${h(p)}</p>`).join('')}
+  </div>`;
+}
+
 // ─── Fortschritt tab: Wochenrückblick, Beobachtungen, Übungsfortschritt, Bestleistungen, Bewegungsmuster, Streak+Abzeichen ──
 function renderProgressTab(state) {
   const container = document.getElementById('progress-tab-content');
@@ -2381,6 +2425,8 @@ function renderProgressTab(state) {
     <div class="chart-card__title">📊 Beobachtungen</div>
     ${erkenntnisLines.map(line => `<p class="erkenntnis-line">${h(line)}</p>`).join('')}
   </div>` : '';
+
+  const overallPerformanceHtml = _renderOverallPerformance(state);
 
   const streak     = _calcStreak(state);
   const _scoreList = state.weeks.map(w => _weekSuccessScore(w)).filter(s => s.total > 0).map(s => s.pct);
@@ -2434,6 +2480,8 @@ function renderProgressTab(state) {
   ${weekReviewHtml}
 
   ${erkenntnisseHtml}
+
+  ${overallPerformanceHtml}
 
   ${insightHtml}
 

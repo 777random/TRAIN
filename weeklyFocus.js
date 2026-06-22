@@ -189,14 +189,19 @@ function _checkOverload(state) {
 // Tage mit isVacation && vacationPlan==='rest' fliegen aus dem Nenner, ein
 // verbleibender Urlaubstag (isVacation, aber mit Training) zählt als erledigt.
 
-function _weekConsistencyRatio(wk) {
+// Exportiert für overallPerformance.js (Konsistenz-Dimension der
+// Gesamtperformance-Sektion) — Logik unverändert, nur zusätzlich von
+// außerhalb dieser Datei aufrufbar. Der Engpass-Check unten
+// (_checkConsistencyGap, eigenes 6-Wochen-Fenster + eigene Schwellenwerte)
+// bleibt komplett unverändert.
+export function _weekConsistencyRatio(wk) {
   const active = wk.days.filter(d => !(d.isVacation && d.vacationPlan === 'rest'));
   if (active.length === 0) return null; // reine Ruhewoche, nicht auswertbar
   const done = active.filter(d => d.markedDone || d.isVacation).length;
   return done / active.length;
 }
 
-function _consistencyEligibleWeeks(state) {
+export function _consistencyEligibleWeeks(state) {
   return _sortedWeeks(state)
     .filter(w => w.mode !== 'deload')
     .map(wk => ({ wk, ratio: _weekConsistencyRatio(wk) }))

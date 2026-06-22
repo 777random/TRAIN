@@ -105,9 +105,11 @@ export function mostSuccessfulWeekday(state) {
  * Übungsfortschritt-Chart (siehe getProgressCorridorCalibration() unten) —
  * gleiche Mindest-Historie (6 Wochen mit Gewichtsdaten) und gleiche
  * Fensterlogik (Ø-Delta letzte 4 Wochen vs. Ø-Delta Gesamt-Historie).
+ * Jetzt zusätzlich exportiert für overallPerformance.js (Breite-Dimension
+ * der Gesamtperformance-Sektion) — Logik unverändert.
  * @returns {{ history: number[], histRate: number, curRate: number, lastWeight: number } | null}
  */
-function _exerciseRateWindow(sortedWeeks, exName) {
+export function _exerciseRateWindow(sortedWeeks, exName) {
   const history = exWeightHistory(sortedWeeks, exName).filter(w => w > 0); // chronologisch, nur Wochen mit Gewichtsdaten
   if (history.length < 6) return null;
 
