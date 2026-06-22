@@ -2320,14 +2320,17 @@ function renderCoachTab(state) {
 }
 
 /**
- * "Gesamtperformance"-Sektion: vier Dimensionen (Qualität, Konsistenz,
- * Volumen, Breite) als reine Feststellung über ALLE Übungen — keine
- * Handlungsempfehlung (die bleibt im Coach-Tab). Berechnungslogik in
- * overallPerformance.js (pure, kein State, keine Persistierung). Liefert
- * '' wenn keine der vier Dimensionen genug Daten hat (Sektion dann
- * komplett ausgeblendet, kein leerer Platzhalter-Block).
+ * Vier Dimensionen (Qualität, Konsistenz, Volumen, Breite) als reine
+ * Feststellung über ALLE Übungen — keine Handlungsempfehlung (die bleibt
+ * im Coach-Tab). Berechnungslogik in overallPerformance.js (pure, kein
+ * State, keine Persistierung) UNVERÄNDERT seit dem Gesamtperformance-
+ * Sprint — diese Funktion liefert seit dem Erkenntnisse-Zusammenführungs-
+ * Sprint nur noch die reinen Absatz-Texte (Array), keinen eigenen
+ * <div class="chart-card">-Wrapper mehr, da die Karte jetzt von der
+ * gemeinsamen Erkenntnisse-Sektion gestellt wird.
+ * @returns {string[]}
  */
-function _renderOverallPerformance(state) {
+function _overallPerformanceParagraphs(state) {
   const sortedWeeks = [...state.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
   const scoredWeeks = sortedWeeks.map(w => _weekSuccessScore(w));
 
@@ -2335,8 +2338,6 @@ function _renderOverallPerformance(state) {
   const consistency = computeConsistencyTrend(state);
   const volume      = computeVolumeTrend(state);
   const breadth     = computeBreadthProgress(state);
-
-  if (!quality && !consistency && !volume && !breadth) return '';
 
   const paragraphs = [];
 
@@ -2383,14 +2384,75 @@ function _renderOverallPerformance(state) {
     paragraphs.push(line);
   }
 
+  return paragraphs;
+}
+
+const _ERKENNTNIS_CATEGORY_ORDER = ['sleep', 'exWeekday', 'trend'];
+
+/**
+ * Rotiert die Reihenfolge der Beobachtungen wöchentlich, basierend auf der
+ * Kalenderwoche von HEUTE (KW % 3) — pragmatische, persistenzfreie
+ * Annäherung an "zuletzt neu aufgetreten", da die Beobachtungen zur
+ * Laufzeit aus den Wochendaten neu berechnet werden und es keine
+ * gespeicherte Historie ihrer früheren Kernaussagen gibt. Gleiche KW-
+ * Berechnung wie wkLabel()/_kw() in progressChart.js, hier auf das
+ * heutige Datum statt einen Wochenstart angewendet.
+ */
+function _rotatedErkenntnisEntries(state) {
+  const entries = computeErkenntnisLines(state);
+  const today = new Date();
+  const jan   = new Date(today.getFullYear(), 0, 1);
+  const todayKW = Math.ceil(((today - jan) / 86_400_000 + jan.getDay() + 1) / 7);
+  const rotation = todayKW % 3;
+  const order = [
+    _ERKENNTNIS_CATEGORY_ORDER[rotation],
+    _ERKENNTNIS_CATEGORY_ORDER[(rotation + 1) % 3],
+    _ERKENNTNIS_CATEGORY_ORDER[(rotation + 2) % 3],
+  ];
+  return [...entries].sort((a, b) => order.indexOf(a.category) - order.indexOf(b.category));
+}
+
+/**
+ * "Erkenntnisse"-Sektion (vormals zwei getrennte Sektionen "Beobachtungen"
+ * und "Gesamtperformance", jetzt zusammengeführt, Variante A): gemeinsamer
+ * Header, oben Gesamtperformance (immer sichtbar), Trennlinie, darunter
+ * Beobachtungen (beste zuerst sichtbar, Rest einklappbar via natives
+ * <details>, gleicher Mechanismus wie die Decisional-Balance-Erweiterung).
+ * Liefert '' wenn WEDER Gesamtperformance NOCH Beobachtungen Daten haben.
+ */
+function _renderErkenntnisseSection(state) {
+  const perfParagraphs = _overallPerformanceParagraphs(state);
+  const obsEntries     = _rotatedErkenntnisEntries(state);
+
+  if (!perfParagraphs.length && !obsEntries.length) return '';
+
+  const perfHtml = perfParagraphs.map(p => `<p class="erkenntnis-line">${h(p)}</p>`).join('');
+
+  let obsHtml = '';
+  if (obsEntries.length > 0) {
+    const [first, ...rest] = obsEntries;
+    obsHtml = `<p class="erkenntnis-line">${h(first.text)}</p>`;
+    if (rest.length > 0) {
+      obsHtml += `
+      <details class="pr-collapse">
+        <summary class="pr-collapse__summary">Weitere Beobachtungen ▾</summary>
+        <div class="pr-collapse__body">${rest.map(e => `<p class="erkenntnis-line">${h(e.text)}</p>`).join('')}</div>
+      </details>`;
+    }
+  }
+
+  const divider = (perfHtml && obsHtml) ? `<hr class="erkenntnisse-divider">` : '';
+
   return `
   <div class="chart-card">
-    <div class="chart-card__title">🧭 Gesamtperformance</div>
-    ${paragraphs.map(p => `<p class="erkenntnis-line">${h(p)}</p>`).join('')}
+    <div class="chart-card__title">📊 Erkenntnisse</div>
+    ${perfHtml}
+    ${divider}
+    ${obsHtml}
   </div>`;
 }
 
-// ─── Fortschritt tab: Wochenrückblick, Beobachtungen, Übungsfortschritt, Bestleistungen, Bewegungsmuster, Streak+Abzeichen ──
+// ─── Fortschritt tab: Wochenrückblick, Erkenntnisse, Übungsfortschritt, Bestleistungen, Bewegungsmuster, Streak+Abzeichen ──
 function renderProgressTab(state) {
   const container = document.getElementById('progress-tab-content');
   if (!container) return;
@@ -2416,17 +2478,12 @@ function renderProgressTab(state) {
     </div>`;
   })() : '';
 
-  // ── Beobachtungen (vormals "Deine Erkenntnisse") — dauerhafte Sektion, bei
-  // jedem Render frisch berechnet (nicht event-getrieben wie state.insights/
-  // Toast-System). Berechnungslogik unverändert, nur Titel/Position geändert.
-  const erkenntnisLines = computeErkenntnisLines(state);
-  const erkenntnisseHtml = erkenntnisLines.length > 0 ? `
-  <div class="chart-card">
-    <div class="chart-card__title">📊 Beobachtungen</div>
-    ${erkenntnisLines.map(line => `<p class="erkenntnis-line">${h(line)}</p>`).join('')}
-  </div>` : '';
-
-  const overallPerformanceHtml = _renderOverallPerformance(state);
+  // ── Erkenntnisse (Gesamtperformance + Beobachtungen zusammengeführt) ────
+  // Dauerhafte Sektion, bei jedem Render frisch berechnet (nicht event-
+  // getrieben wie state.insights/Toast-System). Berechnungslogik beider
+  // vormals getrennten Sektionen unverändert, nur Darstellung/Position
+  // geändert (siehe _renderErkenntnisseSection()).
+  const erkenntnisseHtml = _renderErkenntnisseSection(state);
 
   const streak     = _calcStreak(state);
   const _scoreList = state.weeks.map(w => _weekSuccessScore(w)).filter(s => s.total > 0).map(s => s.pct);
@@ -2480,8 +2537,6 @@ function renderProgressTab(state) {
   ${weekReviewHtml}
 
   ${erkenntnisseHtml}
-
-  ${overallPerformanceHtml}
 
   ${insightHtml}
 

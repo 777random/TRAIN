@@ -158,9 +158,13 @@ export function getProgressCorridorCalibration(sortedWeeks, exName) {
 }
 
 /**
- * Baut bis zu 3 Erkenntnis-Zeilen für die Analyse-Tab-Karte. Reihenfolge:
- * Schlaf, Erfolgreichste/r (Übung ODER Wochentag, nie beide), Trend.
- * @returns {string[]}
+ * Baut bis zu 3 Erkenntnis-Einträge für die Erkenntnisse-Sektion. Kategorien:
+ * 'sleep', 'exWeekday' (Übung ODER Wochentag, nie beide), 'trend' — jeweils
+ * nur enthalten wenn Daten vorliegen. Rückgabe als {category, text}-Objekte
+ * statt reiner Strings (seit dem Erkenntnisse-Zusammenführungs-Sprint) —
+ * ermöglicht die wöchentliche Rotations-Sortierung in ui.js, OHNE die
+ * eigentliche Berechnung der drei Werte (sleep/ex/wd/trend) zu verändern.
+ * @returns {{category: 'sleep'|'exWeekday'|'trend', text: string}[]}
  */
 export function computeErkenntnisLines(state) {
   const lines = [];
@@ -168,7 +172,7 @@ export function computeErkenntnisLines(state) {
   const sleep = computeSleepCorrelation(state);
   if (sleep) {
     const diffPp = Math.round((sleep.avgWith - sleep.avgWithout) * 100);
-    lines.push(`An Tagen mit ${sleep.threshold}h+ Schlaf erreichst du ${diffPp}% mehr deiner Trainingsziele.`);
+    lines.push({ category: 'sleep', text: `An Tagen mit ${sleep.threshold}h+ Schlaf erreichst du ${diffPp}% mehr deiner Trainingsziele.` });
   }
 
   const ex = mostSuccessfulExercise(state);
@@ -176,15 +180,15 @@ export function computeErkenntnisLines(state) {
   if (ex || wd) {
     const useEx = !!ex && (!wd || ex.diff >= wd.diff);
     if (useEx) {
-      lines.push(`${ex.name} läuft bei dir am konstantesten — ${Math.round(ex.rate * 100)}% Erfolgsquote gegenüber ${Math.round(ex.avgAll * 100)}% im Durchschnitt.`);
+      lines.push({ category: 'exWeekday', text: `${ex.name} läuft bei dir am konstantesten — ${Math.round(ex.rate * 100)}% Erfolgsquote gegenüber ${Math.round(ex.avgAll * 100)}% im Durchschnitt.` });
     } else {
-      lines.push(`${wd.name}s trainierst du am konstantesten — ${Math.round(wd.rate * 100)}% Erfolgsquote gegenüber ${Math.round(wd.avgAll * 100)}% im Durchschnitt.`);
+      lines.push({ category: 'exWeekday', text: `${wd.name}s trainierst du am konstantesten — ${Math.round(wd.rate * 100)}% Erfolgsquote gegenüber ${Math.round(wd.avgAll * 100)}% im Durchschnitt.` });
     }
   }
 
   const trend = progressTrendOutlier(state);
   if (trend) {
-    lines.push(`Deine ${trend.name} steigt aktuell schneller als sonst — +${Math.round(trend.curRate * 100)}% in den letzten 4 Wochen statt der üblichen +${Math.round(trend.histRate * 100)}%.`);
+    lines.push({ category: 'trend', text: `Deine ${trend.name} steigt aktuell schneller als sonst — +${Math.round(trend.curRate * 100)}% in den letzten 4 Wochen statt der üblichen +${Math.round(trend.histRate * 100)}%.` });
   }
 
   return lines;
