@@ -520,10 +520,14 @@ function _recalcExercisePRs(state) {
       });
     });
   });
-  // Apply to current week exercises where prWeight is still null
+  // Apply to current week exercises where prWeight is still null/undefined.
+  // Loose != (not strict !==): exercises created before the v20→v21 PR-field
+  // migration, or via a creation site that omitted the field, can have
+  // prWeight===undefined rather than null — undefined !== null is true, so
+  // a strict check would silently skip them forever.
   curWk.days.forEach(day => {
     day.exercises.forEach(ex => {
-      if (ex.prWeight !== null) return;
+      if (ex.prWeight != null) return;
       const name = ex.substituteFor || ex.name;
       const m = prMap[name];
       if (m) {
@@ -1458,6 +1462,7 @@ function reduce(state, action) {
         name: p.name, note: '', pauseSec: 90, metric: p.metric ?? 'reps',
         progressionType: 'weight',
         progressionMode: 'weight_first', targetRepsMax: null, prRepsHistory: {},
+        prWeight: null, prRepsAtMaxWeight: null,
         sets: [mkSet(), mkSet(), mkSet()],
       });
       break;
