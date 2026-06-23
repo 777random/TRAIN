@@ -1576,8 +1576,14 @@ function reduce(state, action) {
       let v = p.value;
       if      (p.field === 'weight') v = parseFloat(v) || 0;
       else if (p.field === 'reps') {
-        const n = parseFloat(v);
-        v = Math.max(0, Number.isFinite(n) ? n : 0);
+        // Leeres Feld bleibt leer (null), wird NICHT auf 0 normalisiert —
+        // sonst liest "Satz bestätigen" eine 0 und wertet fälschlich als
+        // fail, obwohl der Nutzer das Feld nur absichtlich geleert hat.
+        if (v === '' || v === null || v === undefined) v = null;
+        else {
+          const n = parseFloat(v);
+          v = Math.max(0, Number.isFinite(n) ? n : 0);
+        }
       }
       else if (p.field === 'rpe')  v = (v === '' || v === null) ? null : Math.min(10, Math.max(1, +v));
       else if (p.field === 'note') v = String(v ?? '').slice(0, 120);

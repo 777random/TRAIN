@@ -673,6 +673,9 @@ function renderDayList(state) {
         <button class="ex-menu-item" role="menuitem" data-action="copy-prev">
           📋 Vorwoche übernehmen
         </button>
+        <button class="ex-menu-item" role="menuitem" data-action="week-menu-add-day">
+          ${ic.plus()} Trainingstag hinzufügen
+        </button>
         <button class="ex-menu-item ex-menu-item--danger" role="menuitem"
           data-action="open-delete-week">
           ${ic.trash()} Woche löschen
@@ -955,7 +958,7 @@ function _renderTrainingContextAnchor(state, wk, di) {
  * ist, auch bei Streak=0 (ehrliche Darstellung, kein Sonderfall).
  */
 function _renderStreakBadge(state) {
-  const streakDays = _calcStreak(state).cur * 7;
+  const streakDays = (_calcStreak(state)?.cur ?? 0) * 7;
   return `<button type="button" class="streak-badge" data-action="open-streak-freeze" aria-label="${streakDays} Tage Streak — Streak-Freeze öffnen">🔥 <span class="streak-badge__num">${streakDays}</span> Tage</button>`;
 }
 
@@ -1114,6 +1117,16 @@ function renderDayBody(wk, di, state) {
     ${warmupBlock}
     <div data-ex-list="${di}">${exHtml}</div>
     ${cooldownBlock}
+    ${!locked ? `
+    <div class="add-exercise-row">
+      <button
+        class="btn btn--accent btn--sm"
+        data-action="open-ex-search" data-di="${di}"
+        aria-label="Übung hinzufügen"
+        style="width:100%"
+      >${ic.plus()} Übung hinzufügen</button>
+    </div>` : ''}
+
     <div class="day-actions">
       <button
         class="complete-btn${done ? ' is-done' : ''}"
@@ -1133,16 +1146,6 @@ function renderDayBody(wk, di, state) {
       <span class="session-rating__chosen">${[null,'😴','😊','💪'][day.sessionRating] ?? ''}</span>
       ${day.sleepHours  != null ? `<span class="session-rating__meta">🛌 ${day.sleepHours}h</span>` : ''}
       ${day.energyLevel != null ? `<span class="session-rating__meta">⚡ ${day.energyLevel}/5</span>` : ''}
-    </div>` : ''}
-
-    ${!locked ? `
-    <div class="add-exercise-row">
-      <button
-        class="btn btn--accent btn--sm"
-        data-action="open-ex-search" data-di="${di}"
-        aria-label="Übung hinzufügen"
-        style="width:100%"
-      >${ic.plus()} Übung hinzufügen</button>
     </div>` : ''}
   `;
 }
@@ -2737,8 +2740,11 @@ function _updateInlineReview(state) {
 }
 
 function _calcStreak(state) {
-  const cur  = calcCurrentStreak(state.weeks, effectiveStreakFreeze(state.streakFreeze));
-  const best = Math.max(state.longestStreakEver ?? 0, calcLongestStreakEver(state.weeks));
+  // Defensiver Fallback: cur/best müssen IMMER eine Zahl sein, nie null/
+  // undefined — sonst zeigt die 🔥-Badge "null Tage" statt "0 Tage" (siehe
+  // Fix 1, train-v106).
+  const cur  = calcCurrentStreak(state.weeks, effectiveStreakFreeze(state.streakFreeze)) ?? 0;
+  const best = Math.max(state.longestStreakEver ?? 0, calcLongestStreakEver(state.weeks) ?? 0);
   return { cur, best };
 }
 
@@ -3513,6 +3519,14 @@ function _handleClick(e) {
     scheduleRender();
   }
 
+  // Close week ⋮ menu (Timer-Höhe, day-tab-bar__toolbar) when clicking
+  // outside the toggle button — Fix 3, train-v106. Selecting an item also
+  // closes it via this same check, same pattern as the ex-/day-menu above.
+  if (_weekMenuOpen && !e.target.closest('[data-action="toggle-week-menu"]')) {
+    _weekMenuOpen = false;
+    scheduleRender();
+  }
+
   // Close exercise settings panel on outside tap
   if (_cfgOpenKey !== null) {
     const _inSettings = !!e.target.closest('.exercise__settings');
@@ -3816,6 +3830,16 @@ function _handleClick(e) {
       closeModal('modal-add-day');
       showToast('Neuer Trainingstag hinzugefügt', 'ok');
       if (_activeTab === 'settings') renderSettingsTab(getState());
+      break;
+    }
+
+    // Wochen-Menü-Eintrag (Fix 5, train-v106): kein Modal nötig — direkte
+    // Aktion, fügt sofort einen leeren Tag an (gleicher Reducer wie
+    // confirm-add-day mit sourceDi:null, nur ohne den Klon-Auswahl-Dialog).
+    case 'week-menu-add-day': {
+      dispatch(A.DAY_ADD_CLONE, { sourceDi: null });
+      _weekMenuOpen = false;
+      showToast('Neuer Trainingstag hinzugefügt', 'ok');
       break;
     }
 
