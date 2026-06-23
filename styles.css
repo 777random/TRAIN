@@ -272,9 +272,16 @@ button, input, select, textarea { font: inherit; }
   padding: var(--sp-2) var(--sp-3);
   margin: 0 calc(-1 * var(--sp-3));
 }
+/* Sprint B (train-v107): Pillen + 🔥-Badge in EINER Zeile — Badge bleibt
+   immer sichtbar (flex-shrink:0), Pillen-Container schrumpft/scrollt statt
+   den Badge aus dem sichtbaren Bereich zu drängen. */
+.day-tab-pills-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--sp-2);
+}
 .day-tab-pills {
   display: flex; flex-wrap: nowrap; gap: var(--sp-2); align-items: center;
-  overflow-x: hidden;
+  overflow-x: hidden; flex: 1; min-width: 0;
 }
 .day-tab-pills.is-scrollable { overflow-x: auto; scrollbar-width: none; }
 .day-tab-pills.is-scrollable::-webkit-scrollbar { display: none; }
@@ -413,22 +420,31 @@ button, input, select, textarea { font: inherit; }
   border-radius: var(--r-md); padding: var(--sp-2) var(--sp-3); margin-bottom: var(--sp-2);
 }
 
-/* Streak prominenter im sticky Bereich + Vorwoche-Banner nebeneinander —
-   hält die sticky-Höhe niedriger als ein gestapeltes Layout. */
-.day-tab-bar__streak-row { display: flex; align-items: center; gap: var(--sp-2); }
-.day-tab-bar__streak-row .prev-banner { flex: 1; margin-bottom: 0; min-width: 0; }
+/* Sprint B (train-v107): Badge sitzt jetzt rechtsbündig in der
+   Pillen-Zeile (.day-tab-pills-row) statt in einer eigenen sticky-Zeile —
+   .day-tab-bar__streak-row entfällt. */
 .streak-badge {
   display: flex; align-items: center; gap: 4px; flex-shrink: 0;
-  font-size: 15px; font-weight: 600; color: var(--c-text); white-space: nowrap;
+  font-size: 13px; font-weight: 600; color: var(--c-text); white-space: nowrap;
   background: none; border: none; padding: 0; font-family: inherit; cursor: pointer;
 }
-.streak-badge__num { font-family: var(--font-display); font-size: 17px; }
+.streak-badge__num { font-family: var(--font-display); font-size: 15px; }
 
 /* Trainings-Ritual: dezenter Kontext-Anker vor der ersten Übung — bewusst
-   kein Card-Rahmen, wirkt wie ein Sub-Header direkt unter dem Tagestitel. */
+   kein Card-Rahmen, wirkt wie ein Sub-Header direkt unter dem Tagestitel.
+   Sprint B (train-v107): 3 Zeilen statt 1 — Zeile 1+2 (allgemeines
+   Athletenbild) teilen sich Farbe/Abstand, Zeile 3 (tagesbezogen,
+   "Selber Tag letzte Woche") ist mit Trennlinie + gedämpfterer Farbe
+   visuell abgesetzt. */
 .training-context-anchor {
   font-size: 12px; color: var(--c-text-3);
   margin: 0 0 var(--sp-3);
+}
+.ritual-anchor__row { margin-bottom: 2px; }
+.ritual-anchor__row:last-child { margin-bottom: 0; }
+.ritual-anchor__day-row {
+  margin-top: var(--sp-2); padding-top: var(--sp-2);
+  border-top: 1px solid var(--c-border);
 }
 
 /* ══════════════════════════════════════════════════════════════

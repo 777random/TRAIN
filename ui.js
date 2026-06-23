@@ -705,36 +705,34 @@ function renderDayList(state) {
     <button class="toolbar__btn toolbar__btn--accent" data-action="open-new-week"
       aria-label="Neue Trainingswoche erstellen">${ic.plus()}</button>
   </div>
-  <div class="day-tab-pills${wk.days.length >= 4 ? ' is-scrollable' : ''}">
-    <button
-      class="day-overview-toggle${_overviewMode ? ' is-active' : ''}"
-      data-action="toggle-overview"
-      aria-label="${_overviewMode ? 'Einzelansicht' : 'Übersicht'}"
-      aria-pressed="${_overviewMode}"
-      title="${_overviewMode ? 'Einzelansicht' : 'Alle Tage anzeigen'}"
-    >${ic.columns()}</button>
-    ${wk.days.map((day, di) => {
-      const done   = !!day.markedDone;
-      const locked = !!day.locked;
-      const isAct  = !_overviewMode && _activeDayIdx === di;
-      const total  = day.exercises.reduce((s, ex) => s + ex.sets.length, 0);
-      const done_s = day.exercises.reduce((s, ex) => s + ex.sets.filter(st => st.done).length, 0);
-      return `<button
-        class="day-tab${isAct ? ' is-active' : ''}${done ? ' day-tab--done' : ''}${isDl ? ' day-tab--deload' : ''}${day.isVacation ? ' day-tab--vacation' : ''}"
-        data-day-hdr="${di}"
-        role="tab" aria-selected="${isAct}" aria-controls="day-panel-${di}"
-        id="day-tab-${di}"
-        title="${h(day.title)}"
-        aria-label="${h(day.title)} – ${done_s}/${total} Sätze"
-      >${h(day.title)}</button>`;
-    }).join('')}
+  <div class="day-tab-pills-row">
+    <div class="day-tab-pills${wk.days.length >= 4 ? ' is-scrollable' : ''}">
+      <button
+        class="day-overview-toggle${_overviewMode ? ' is-active' : ''}"
+        data-action="toggle-overview"
+        aria-label="${_overviewMode ? 'Einzelansicht' : 'Übersicht'}"
+        aria-pressed="${_overviewMode}"
+        title="${_overviewMode ? 'Einzelansicht' : 'Alle Tage anzeigen'}"
+      >${ic.columns()}</button>
+      ${wk.days.map((day, di) => {
+        const done   = !!day.markedDone;
+        const locked = !!day.locked;
+        const isAct  = !_overviewMode && _activeDayIdx === di;
+        const total  = day.exercises.reduce((s, ex) => s + ex.sets.length, 0);
+        const done_s = day.exercises.reduce((s, ex) => s + ex.sets.filter(st => st.done).length, 0);
+        return `<button
+          class="day-tab${isAct ? ' is-active' : ''}${done ? ' day-tab--done' : ''}${isDl ? ' day-tab--deload' : ''}${day.isVacation ? ' day-tab--vacation' : ''}"
+          data-day-hdr="${di}"
+          role="tab" aria-selected="${isAct}" aria-controls="day-panel-${di}"
+          id="day-tab-${di}"
+          title="${h(day.title)}"
+          aria-label="${h(day.title)} – ${done_s}/${total} Sätze"
+        >${h(day.title)}</button>`;
+      }).join('')}
+    </div>
+    ${_renderStreakBadge(state)}
   </div>
   ${progressHtml}
-  ${(!_overviewMode && _activeDayIdx !== null) ? `
-  <div class="day-tab-bar__streak-row">
-    ${_renderStreakBadge(state)}
-    ${_prevWeekBanner(state, wk, _activeDayIdx)}
-  </div>` : ''}
 </div>`;
 
   // ── Content: overview grid or single active panel ─────────────────────────
@@ -901,8 +899,10 @@ function _dayDate(wk, dayIdx) {
  * mit Aktivität (abgeschlossen ODER mindestens ein bewerteter Satz) — über
  * Wochengrenzen hinweg, unabhängig vom Wochenindex (NICHT dasselbe wie der
  * bestehende prevBanner-Lookup, der gezielt denselben Tag-Slot der Vorwoche
- * vergleicht). Streak wird aus der bestehenden _calcStreak()-Quelle übernommen,
- * nicht neu berechnet. Liefert null wenn kein vorheriger aktiver Tag existiert.
+ * vergleicht). Liefert null wenn kein vorheriger aktiver Tag existiert.
+ * Liefert nur noch timeText — die Erfolgsquote der letzten EINZELNEN Einheit
+ * wurde in Sprint B (train-v107) durch die stabilere "Ø Erfolg (4W)"-Zeile
+ * in _renderRitualAnchor() ersetzt, nicht mehr hier berechnet.
  */
 function _trainingContextAnchor(state, wk, di) {
   const sortedWeeks = [...state.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
@@ -918,7 +918,7 @@ function _trainingContextAnchor(state, wk, di) {
       if (!day) continue;
       const hasEvaluated = day.exercises.some(ex => ex.sets.some(s => s.status === 'success' || s.status === 'fail'));
       if (day.markedDone || hasEvaluated) {
-        found = { week: w, dayIdx: d, day, hasEvaluated };
+        found = { week: w, dayIdx: d };
         break;
       }
     }
@@ -927,28 +927,38 @@ function _trainingContextAnchor(state, wk, di) {
 
   const daysAgo = Math.max(0, Math.round((_dayDate(wk, di) - _dayDate(found.week, found.dayIdx)) / 86_400_000));
   const timeText = daysAgo === 0 ? 'heute' : daysAgo === 1 ? 'gestern' : `vor ${daysAgo} Tagen`;
-
-  // Erfolgsquote nur wenn der gefundene Tag tatsächlich bewertete Sätze hat —
-  // sonst fälschliches "0%" für einen leeren/übersprungenen Tag vermeiden.
-  let successRate = null;
-  if (found.hasEvaluated) {
-    let succ = 0, total = 0;
-    found.day.exercises.forEach(ex => ex.sets.forEach(s => {
-      if (s.status === 'success') { succ++; total++; }
-      else if (s.status === 'fail') { total++; }
-    }));
-    if (total > 0) successRate = Math.round(succ / total * 100);
-  }
-
-  return { timeText, successRate };
+  return { timeText };
 }
 
-function _renderTrainingContextAnchor(state, wk, di) {
-  const ctx = _trainingContextAnchor(state, wk, di);
-  if (!ctx) return '';
-  const parts = [`Letztes Training: ${ctx.timeText}`];
-  if (ctx.successRate !== null) parts.push(`Erfolgsquote: ${ctx.successRate}%`);
-  return `<div class="training-context-anchor">${h(parts.join(' · '))}</div>`;
+/**
+ * Ritual-Anker, 3 klar getrennte Zeilen (Sprint B, train-v107):
+ *   1. Letzte Einheit (zeitlich) — _trainingContextAnchor(), unverändert
+ *   2. Ø Erfolg (4W) (Athleten-Gesamtbild) — NEU, _weekSuccessScore() über
+ *      die letzten 4 Wochen mit bewerteten Sätzen, stabiler als die frühere
+ *      Einzel-Einheit-Erfolgsquote
+ *   3. Selber Tag letzte Woche (tagesbezogen) — _prevWeekBanner(), Berechnung
+ *      unverändert, nur Bezeichnung "Vorwoche:" → "Selber Tag letzte Woche:"
+ * Zeile 1+2 visuell zusammen (gleiche Farbe), Zeile 3 visuell abgesetzt.
+ * Komplett ausgeblendet wenn alle drei leer sind (Fallback unverändert).
+ */
+function _renderRitualAnchor(state, wk, di) {
+  const ctx   = _trainingContextAnchor(state, wk, di);
+  const line1 = ctx ? `Letzte Einheit: ${ctx.timeText}` : null;
+
+  const sortedWeeks = [...state.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
+  const last4  = sortedWeeks.slice(-4).map(w => _weekSuccessScore(w)).filter(s => s.total > 0);
+  const avgPct = last4.length > 0 ? Math.round(last4.reduce((a, s) => a + s.pct, 0) / last4.length) : null;
+  const line2  = avgPct !== null ? `Ø Erfolg (4W): ${avgPct}%` : null;
+
+  const line3Html = _prevWeekBanner(state, wk, di);
+
+  if (!line1 && !line2 && !line3Html) return '';
+
+  return `<div class="training-context-anchor">
+    ${line1 ? `<div class="ritual-anchor__row">${h(line1)}</div>` : ''}
+    ${line2 ? `<div class="ritual-anchor__row">${h(line2)}</div>` : ''}
+    ${line3Html ? `<div class="ritual-anchor__day-row">${line3Html}</div>` : ''}
+  </div>`;
 }
 
 /**
@@ -1014,11 +1024,14 @@ function _showStreakFreezePopup(state) {
 }
 
 /**
- * Vorwoche-Banner — exakt dieselbe Berechnung wie vormals inline in
- * renderDayBody() (Erfolgsquote + Sätze-Summe über alle Übungen desselben
- * Tag-Slots der Vorwoche, plus Streak-Zusatz ab streak.cur>=2), nur in eine
- * eigenständige Funktion ausgelagert, analog zu _trainingContextAnchor().
- * Bedingung unverändert: nur ab state.curIdx>0 und wenn prevDay existiert.
+ * "Selber Tag letzte Woche"-Zeile (Zeile 3 des Ritual-Ankers, vormals
+ * "Vorwoche-Banner") — Berechnung unverändert seit der ursprünglichen
+ * Auslagerung (Erfolgsquote + Sätze-Summe über alle Übungen desselben
+ * Tag-Slots der Vorwoche, plus Streak-Zusatz ab streak.cur>=2). Lebte bis
+ * Sprint B (train-v107) im sticky Bereich, jetzt Teil von
+ * _renderRitualAnchor() im scrollbaren Bereich — nur Bezeichnung + Position
+ * geändert, NICHT die Berechnung. Bedingung unverändert: nur ab
+ * state.curIdx>0 und wenn prevDay existiert.
  */
 function _prevWeekBanner(state, wk, di) {
   if (!(state.curIdx > 0)) return '';
@@ -1034,7 +1047,7 @@ function _prevWeekBanner(state, wk, di) {
   const streak     = _calcStreak(state);
   const streakPart = streak.cur >= 2 ? `&nbsp;&nbsp;🔥 ${streak.cur * 7} Tage in Folge` : '';
   return `<div class="prev-banner" role="status">
-    ${ic.barChart()}<span>Vorwoche: ${_pbScore}% · ${_pbSucc}/${_pbTotal} Sätze ✓${streakPart}</span>
+    ${ic.barChart()}<span>Selber Tag letzte Woche: ${_pbScore}% · ${_pbSucc}/${_pbTotal} Sätze ✓${streakPart}</span>
   </div>`;
 }
 
@@ -1111,7 +1124,7 @@ function renderDayBody(wk, di, state) {
 </div>`;
 
   return `
-    ${_renderTrainingContextAnchor(state, wk, di)}
+    ${_renderRitualAnchor(state, wk, di)}
     ${isVacDay ? '<div class="day-vacation-banner">🏖 Urlaubstag — Streak läuft weiter</div>' : ''}
     ${noteBlock}
     ${warmupBlock}
