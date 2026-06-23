@@ -226,8 +226,8 @@ export function canUndo() { return _undoStack.length > 0; }
 export function calcCurrentStreak(weeks, freeze) { return _calcCurrentStreak(weeks, freeze); }
 /** Public wrapper: gap-aware longest-ever streak (in weeks) across the given weeks array. */
 export function calcLongestStreakEver(weeks) { return _calcLongestStreakEver(weeks); }
-/** Public wrapper: per-week streak status — true (counts) | false (breaks) | null (skip, all-rest). */
-export function isWeekDoneForStreak(w) { return _isWeekDoneForStreak(w); }
+/** Public wrapper: per-week training status — 'completed' | 'attended' | 'missed'. See _weekTrainingStatus(). */
+export function weekTrainingStatus(w) { return _weekTrainingStatus(w); }
 
 /**
  * Lazily "expires" a Streak-Freeze without needing a dispatch/mutation: if
@@ -349,11 +349,49 @@ function _normalizeAllExerciseMetrics(raw) {
   });
 }
 
-function _isWeekDoneForStreak(w) {
-  // Returns true (counts), false (breaks), or null (skip — all-rest week)
-  const active = w.days.filter(d => !(d.isVacation && d.vacationPlan === 'rest'));
-  if (active.length === 0) return null;
-  return active.every(d => d.markedDone || d.isVacation);
+/**
+ * Shared Urlaubstag-Ausschlussregel: ein Tag mit isVacation && vacationPlan
+ * 'rest' ist kein Trainingstag und fliegt aus jedem Tage-Nenner raus.
+ * Einzige Quelle dieser Regel — weeklyFocus.js' _weekConsistencyRatio()
+ * importiert sie ebenfalls, statt sie zu duplizieren.
+ */
+export function isTrainingDay(d) {
+  return !(d.isVacation && d.vacationPlan === 'rest');
+}
+
+/**
+ * Zwei-Klassen-Modell (eigentlich drei: 'completed' | 'attended' | 'missed')
+ * ersetzt die alte binäre markedDone-Prüfung — verhindert "Streak-Faking"
+ * durch bloßes Abschließen ohne tatsächlich bewertete Sätze.
+ *
+ *   'completed': ≥70% der Trainingstage haben ≥50% ihrer Sätze bewertet
+ *                (success/fail, pending ausgeschlossen) → Streak +1
+ *   'attended':  mindestens 1 bewerteter Satz irgendwo in der Woche, aber
+ *                'completed'-Schwelle nicht erreicht → Streak hält, kein +1
+ *   'missed':    0 bewertete Sätze in der ganzen Woche → Streak bricht
+ *
+ * Urlaubs- und Deload-Wochen sind immer 'attended' (neutral, wie zuvor).
+ */
+function _weekTrainingStatus(wk) {
+  if (wk.mode === 'deload') return 'attended';
+  if (wk.mode === 'vacation' || (wk.days.length > 0 && wk.days.every(d => d.isVacation))) return 'attended';
+
+  const trainingDays = wk.days.filter(isTrainingDay);
+  if (trainingDays.length === 0) return 'missed';
+
+  let daysDone = 0, anyEvaluated = false;
+  for (const day of trainingDays) {
+    let evaluated = 0, total = 0;
+    for (const ex of day.exercises) for (const s of ex.sets) {
+      total++;
+      if (s.status === 'success' || s.status === 'fail') evaluated++;
+    }
+    if (evaluated > 0) anyEvaluated = true;
+    if (total > 0 && evaluated / total >= 0.5) daysDone++;
+  }
+  if (daysDone / trainingDays.length >= 0.7) return 'completed';
+  if (daysDone > 0 || anyEvaluated) return 'attended';
+  return 'missed';
 }
 
 /** End of a week's 7-day span, as a timestamp. */
@@ -387,23 +425,30 @@ function _streakGapBreaks(wk, prevWk, freeze) {
 
 /**
  * `freeze` (optional): { activeUntilWeekStart } — a week whose startDate
- * matches is treated as protected (does not break the streak even if it
- * would otherwise count as missed). Omitting `freeze` reproduces the exact
- * prior (pre-Streak-Freeze) behaviour — see calcCurrentStreak() below.
+ * matches is treated as protected: a 'missed' status becomes 'attended'
+ * (no break, no increment — the freeze prevents a break, it doesn't grant
+ * a point). Omitting `freeze` reproduces the exact pre-Streak-Freeze
+ * behaviour.
+ *
+ * `lastWk` tracks the last week PROCESSED (completed OR attended) purely
+ * for gap-detection — both are real, present week records, so a calendar
+ * gap must be measured against whichever is chronologically closest, not
+ * only against the last 'completed' week. Only 'cur' itself is gated to
+ * 'completed' weeks.
  */
 function _calcCurrentStreak(weeks, freeze) {
   const sorted = [...weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
   let cur = 0;
-  let lastCountedWk = null; // chronologically-later week already counted
+  let lastWk = null;
   for (let i = sorted.length - 1; i >= 0; i--) {
-    const wk      = sorted[i];
-    const frozen  = freeze?.activeUntilWeekStart === wk.startDate;
-    const status  = _isWeekDoneForStreak(wk);
-    if (status === null) continue; // all-rest week: skip, don't break
-    if (!status && !frozen) break;
-    if (lastCountedWk && _streakGapBreaks(lastCountedWk, wk, freeze)) break;
-    cur++;
-    lastCountedWk = wk;
+    const wk     = sorted[i];
+    const frozen = freeze?.activeUntilWeekStart === wk.startDate;
+    let status   = _weekTrainingStatus(wk);
+    if (status === 'missed' && frozen) status = 'attended';
+    if (status === 'missed') break;
+    if (lastWk && _streakGapBreaks(lastWk, wk, freeze)) break;
+    if (status === 'completed') cur++;
+    lastWk = wk;
   }
   return cur;
 }
@@ -411,15 +456,16 @@ function _calcCurrentStreak(weeks, freeze) {
 /** Longest streak ever achieved anywhere in the week history (gap-aware). */
 function _calcLongestStreakEver(weeks) {
   const sorted = [...weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
-  let best = 0, run = 0, lastTrueWk = null;
+  let best = 0, run = 0, lastWk = null;
   for (const wk of sorted) {
-    const status = _isWeekDoneForStreak(wk);
-    if (status === null) continue;
-    if (status === false) { run = 0; lastTrueWk = null; continue; }
-    if (lastTrueWk && _streakGapBreaks(wk, lastTrueWk)) run = 0;
-    run++;
-    best = Math.max(best, run);
-    lastTrueWk = wk;
+    const status = _weekTrainingStatus(wk);
+    if (status === 'missed') { run = 0; lastWk = null; continue; }
+    if (lastWk && _streakGapBreaks(wk, lastWk)) run = 0;
+    if (status === 'completed') {
+      run++;
+      best = Math.max(best, run);
+    }
+    lastWk = wk;
   }
   return best;
 }
@@ -1719,17 +1765,7 @@ function reduce(state, action) {
       if (!state.weeks.length) _appendDefaultWeek();
       _resortWeeksKeepingCurrent(state, _importRefWeek);
       _checkAndGrantBadges(state);
-      const _streak = (() => {
-        let cur = 0;
-        for (let i = state.weeks.length - 1; i >= 0; i--) {
-          const status = _isWeekDoneForStreak(state.weeks[i]);
-          if (status === null) continue;
-          if (status) cur++;
-          else break;
-        }
-        return cur;
-      })();
-      console.log('[TRAIN] Post-import streak:', _streak, 'badges:', state.badges);
+      console.log('[TRAIN] Post-import streak:', _calcCurrentStreak(state.weeks, effectiveStreakFreeze(state.streakFreeze)), 'badges:', state.badges);
       break;
     }
 

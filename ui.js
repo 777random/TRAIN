@@ -18,7 +18,7 @@
 
 import {
   getState, dispatch, subscribe, A, canUndo, BADGE_THRESHOLDS, VACATION_PLANS,
-  calcCurrentStreak, calcLongestStreakEver, isWeekDoneForStreak, getLatestWeek,
+  calcCurrentStreak, calcLongestStreakEver, weekTrainingStatus, getLatestWeek,
   effectiveStreakFreeze, _quarter, nextQuarterStartLabel,
 } from './state.js';
 import {
@@ -2704,9 +2704,9 @@ function _renderStreakChain(state) {
   const dots = last8.map((wk, i) => {
     const cx       = PAD + i * GAP;
     const score    = _weekSuccessScore(wk);
-    const streakStatus = isWeekDoneForStreak(wk); // true=done, false=broken, null=rest-only
-    const isRestOnly = streakStatus === null;
-    const done     = streakStatus === true;
+    const streakStatus = weekTrainingStatus(wk); // 'completed' | 'attended' | 'missed'
+    const isRestOnly = streakStatus === 'attended';
+    const done     = streakStatus === 'completed';
     const ss       = score.total > 0 ? score.pct : 0;
     const wkNum = (() => {
       const d = new Date(wk.startDate);
@@ -2724,7 +2724,7 @@ function _renderStreakChain(state) {
   const circles = dots.map(d => {
     const fill   = d.isRestOnly ? '#2E2E35' : d.done ? '#C8FF00' : '#1A1A2E';
     const stroke = d.isRestOnly ? '#444'    : d.done ? '#C8FF00' : '#2E2E35';
-    const tip    = d.isRestOnly ? `KW ${d.wkNum} · 😴 Ruhe` : `KW ${d.wkNum} · ${d.ss}% Erfolg`;
+    const tip    = d.isRestOnly ? `KW ${d.wkNum} · Anwesend` : `KW ${d.wkNum} · ${d.ss}% Erfolg`;
     return `<circle cx="${d.cx}" cy="${cy}" r="${R}" fill="${fill}" stroke="${stroke}" stroke-width="2" data-streak-tip="${tip}" style="cursor:pointer"/>`;
   });
   return `<div class="streak-chain-wrap">

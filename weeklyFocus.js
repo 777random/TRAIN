@@ -9,18 +9,15 @@
  *                          S-02/S-04 angelehnte Schwellenwerte – keine Duplizierung
  *                          von insightEngine.js, eigenständige Implementierung)
  *   3. Konsistenz-Engpass – Anteil absolvierter Trainingstage über 6 Wochen,
- *                          gleiche Urlaubstage-Ausschluss-Logik wie state.js'
- *                          isWeekDoneForStreak() (deren exportierte Variante
- *                          aber nur ein Boolean liefert, kein Verhältnis —
- *                          hier daher dieselbe Filterregel auf Tagesebene
- *                          gespiegelt, um die rohen Zähler zu erhalten)
+ *                          nutzt state.js' isTrainingDay() für die Urlaubstage-
+ *                          Ausschlussregel (einzige Quelle, nicht dupliziert)
  *   4. Plateau           – detectPlateaus() aus plateauDetector.js, 1:1 wiederverwendet
  *   5. Progression       – isReadyForAutoSelect()/getWeightRecommendation() aus
  *                          weightRecommendation.js, 1:1 wiederverwendet
  *   Fallback: "Auf Kurs"
  */
 
-import { getLatestWeek } from './state.js';
+import { getLatestWeek, isTrainingDay } from './state.js';
 import { detectPlateaus } from './plateauDetector.js';
 import { getWeightRecommendation, isReadyForAutoSelect } from './weightRecommendation.js';
 
@@ -184,10 +181,10 @@ function _checkOverload(state) {
 }
 
 // ─── Prio 3: Konsistenz-Engpass ─────────────────────────────────────────────
-// Anteil absolvierter Trainingstage pro Woche, gleiche Urlaubstage-
-// Ausschlussregel wie state.js' isWeekDoneForStreak()/_isWeekDoneForStreak:
-// Tage mit isVacation && vacationPlan==='rest' fliegen aus dem Nenner, ein
-// verbleibender Urlaubstag (isVacation, aber mit Training) zählt als erledigt.
+// Anteil absolvierter Trainingstage pro Woche — Urlaubstage-Ausschlussregel
+// kommt aus state.js' isTrainingDay() (einzige Quelle, siehe Datei-Kopf).
+// Ein verbleibender Urlaubstag (isVacation, aber mit Training) zählt als
+// erledigt.
 
 // Exportiert für overallPerformance.js (Konsistenz-Dimension der
 // Gesamtperformance-Sektion) — Logik unverändert, nur zusätzlich von
@@ -195,7 +192,7 @@ function _checkOverload(state) {
 // (_checkConsistencyGap, eigenes 6-Wochen-Fenster + eigene Schwellenwerte)
 // bleibt komplett unverändert.
 export function _weekConsistencyRatio(wk) {
-  const active = wk.days.filter(d => !(d.isVacation && d.vacationPlan === 'rest'));
+  const active = wk.days.filter(isTrainingDay);
   if (active.length === 0) return null; // reine Ruhewoche, nicht auswertbar
   const done = active.filter(d => d.markedDone || d.isVacation).length;
   return done / active.length;
