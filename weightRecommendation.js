@@ -16,9 +16,12 @@ export function roundToPlate(weight, step = 2.5) {
  * @param {string} exerciseName
  * @param {Array}  weeks      – Wochen-Array (nur Nicht-Deload-Wochen übergeben)
  * @param {number} plateStep  – Rundungsschritt in kg (aus settings.plateStep)
+ * @param {string} progressionMode – 'weight_first' (Standard) | 'double_progression' | 'reps_only'
+ *   ANDERE ACHSE als ex.progressionType (steuert nur den manuellen Plan-Button) — nicht verwechseln.
+ * @param {number|null} targetRepsMax – Wdh-Obergrenze, nur bei 'double_progression' relevant.
  * @returns {{ recommendedWeight: number, reason: string, delta: number, lastWeight: number } | null}
  */
-export function getWeightRecommendation(exerciseName, weeks, plateStep = 2.5) {
+export function getWeightRecommendation(exerciseName, weeks, plateStep = 2.5, progressionMode = 'weight_first', targetRepsMax = null) {
   if (weeks.length < 2) return null;
 
   // Sätze pro Woche für diese Übung sammeln (success + fail getrennt)
@@ -61,6 +64,46 @@ export function getWeightRecommendation(exerciseName, weeks, plateStep = 2.5) {
   }
   const total       = successes + fails;
   const successRate = total > 0 ? successes / total : 1;
+
+  // ── reps_only: nie Gewichtssteigerung empfehlen, Wdh-PRs (separat in ui.js
+  // erkannt) sind hier der einzige Fortschritts-Indikator ────────────────────
+  if (progressionMode === 'reps_only') {
+    return {
+      recommendedWeight: roundToPlate(lastWeight, plateStep),
+      reason: 'Nur Wiederholungen — Gewicht bleibt konstant',
+      reasons: [{ icon: 'ℹ', text: 'Modus "Nur Wiederholungen" — keine Gewichtssteigerung empfohlen', isRpe: false }],
+      delta: 0,
+      lastWeight,
+    };
+  }
+
+  // ── double_progression: Gewichtsempfehlung erst NACH Erreichen der
+  // Wdh-Obergrenze bei guter Erfolgsquote — vorher kein Vorschlag, kein
+  // Auto-Vorauswählen (siehe isReadyForAutoSelect unten) ─────────────────────
+  if (progressionMode === 'double_progression') {
+    const recentWithData = weekSets.filter(w => w.success.length + w.fail.length > 0).slice(-3);
+    const recentReps     = recentWithData.flatMap(w => [...w.success, ...w.fail].map(s => s.reps ?? 0));
+    const avgReps        = recentReps.length > 0 ? recentReps.reduce((a, b) => a + b, 0) / recentReps.length : 0;
+    const recentSucc     = recentWithData.reduce((s, w) => s + w.success.length, 0);
+    const recentFail     = recentWithData.reduce((s, w) => s + w.fail.length, 0);
+    const recentTotal    = recentSucc + recentFail;
+    const recentRate     = recentTotal > 0 ? recentSucc / recentTotal : 0;
+    const ready           = targetRepsMax && avgReps >= targetRepsMax && recentRate >= 0.8;
+
+    if (!ready) {
+      return {
+        recommendedWeight: roundToPlate(lastWeight, plateStep),
+        reason: targetRepsMax
+          ? `Noch nicht bereit: Wdh erst bei Ø ${Math.round(avgReps)} von Ziel ${targetRepsMax}`
+          : 'Keine Wdh-Obergrenze gesetzt — doppelte Progression inaktiv',
+        reasons: [{ icon: 'ℹ', text: targetRepsMax ? `Ø ${Math.round(avgReps)} von ${targetRepsMax} Wdh` : 'Wdh-Obergrenze fehlt', isRpe: false }],
+        delta: 0,
+        lastWeight,
+      };
+    }
+    // bereit (Ø Wdh >= targetRepsMax bei >=80% Erfolg) — fällt durch zur
+    // normalen weight_first-Kaskade unten, identische Gewichtsbemessung.
+  }
 
   // Entscheidungsregeln (Priorität: schlechteste Bedingung zuerst)
   let delta = 0, reason = '';
@@ -124,9 +167,14 @@ export function getWeightRecommendation(exerciseName, weeks, plateStep = 2.5) {
  *
  * @param {string} exerciseName
  * @param {Array}  weeks – bereits auf Nicht-Deload/Nicht-Urlaub gefilterte Wochen
+ * @param {string} progressionMode – 'weight_first' (Standard) | 'double_progression' | 'reps_only'
+ * @param {number|null} targetRepsMax – nur bei 'double_progression' relevant
  * @returns {boolean}
  */
-export function isReadyForAutoSelect(exerciseName, weeks) {
+export function isReadyForAutoSelect(exerciseName, weeks, progressionMode = 'weight_first', targetRepsMax = null) {
+  // reps_only empfiehlt nie eine Gewichtssteigerung — also auch nie Auto-Vorauswahl.
+  if (progressionMode === 'reps_only') return false;
+
   const weeksWithData = [];
   for (const wk of weeks) {
     const success = [], fail = [];
@@ -152,6 +200,17 @@ export function isReadyForAutoSelect(exerciseName, weeks) {
 
   const lastWeeks = weeksWithData.slice(-3);
   if (lastWeeks.length < 2) return false;
+
+  // double_progression: zusätzlich zur normalen Perfekt-Prüfung unten muss
+  // die Wdh-Obergrenze erreicht sein — strengerer Maßstab als die reine
+  // 80%-Schwelle in getWeightRecommendation(), bewusst, da Auto-Vorauswahl
+  // ohne Rückfrage greift.
+  if (progressionMode === 'double_progression') {
+    if (!targetRepsMax) return false;
+    const recentReps = lastWeeks.flatMap(w => [...w.success, ...w.fail].map(s => s.reps ?? 0));
+    const avgReps     = recentReps.length > 0 ? recentReps.reduce((a, b) => a + b, 0) / recentReps.length : 0;
+    if (avgReps < targetRepsMax) return false;
+  }
 
   const allPerfect = lastWeeks.every(w => w.fail.length === 0 && w.success.length > 0);
   if (!allPerfect) return false;

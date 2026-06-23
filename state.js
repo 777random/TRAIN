@@ -24,7 +24,7 @@
 
 export const STORAGE_KEY        = 'train_v6';
 export const STORAGE_KEY_SHADOW = 'train_v6_shadow';
-export const SCHEMA_VERSION     = 25;
+export const SCHEMA_VERSION     = 26;
 
 export const BADGE_THRESHOLDS = [
   { id: 'badge_4',   weeks: 4,   title: 'Erster Schritt' },
@@ -491,7 +491,7 @@ function _checkAndGrantBadges(state) {
 function _recalcExercisePRs(state) {
   const curWk = state.weeks[state.curIdx];
   if (!curWk) return;
-  // Build name → {prWeight, prRepsAtMaxWeight} from all completed sets
+  // Build name → {prWeight, prRepsAtMaxWeight, repsHistory} from all completed sets
   const prMap = {};
   state.weeks.forEach(wk => {
     if (wk.mode === 'deload') return;
@@ -504,13 +504,18 @@ function _recalcExercisePRs(state) {
           const weight = parseFloat(s.weight) || 0;
           const name   = ex.substituteFor || ex.name;
           if (!name) return;
-          if (!prMap[name]) prMap[name] = { prWeight: null, prReps: null };
+          if (!prMap[name]) prMap[name] = { prWeight: null, prReps: null, repsHistory: {} };
           const m = prMap[name];
           if (m.prWeight === null || weight > m.prWeight) {
             m.prWeight = weight; m.prReps = reps;
           } else if (weight === m.prWeight && reps > (m.prReps ?? 0)) {
             m.prReps = reps;
           }
+          // Pro Gewicht die beste je erreichte Wdh-Zahl — unabhängig vom
+          // (an dieser Stelle noch nicht final bekannten) Maximalgewicht;
+          // das Filtern auf "submaximal" passiert erst beim Anwenden unten.
+          const w = String(weight);
+          if (reps > (m.repsHistory[w] ?? 0)) m.repsHistory[w] = reps;
         });
       });
     });
@@ -521,7 +526,12 @@ function _recalcExercisePRs(state) {
       if (ex.prWeight !== null) return;
       const name = ex.substituteFor || ex.name;
       const m = prMap[name];
-      if (m) { ex.prWeight = m.prWeight; ex.prRepsAtMaxWeight = m.prReps; }
+      if (m) {
+        ex.prWeight = m.prWeight; ex.prRepsAtMaxWeight = m.prReps;
+        ex.prRepsHistory = Object.fromEntries(
+          Object.entries(m.repsHistory).filter(([w]) => +w < m.prWeight)
+        );
+      }
     });
   });
 }
@@ -797,6 +807,23 @@ function migrate(raw) {
     raw.meta = { ...raw.meta, schemaVersion: 25 };
   }
 
+  // v25 → v26: add ex.progressionMode + ex.targetRepsMax + ex.prRepsHistory
+  // to all exercises. progressionMode is a SEPARATE axis from the existing
+  // progressionType ('weight'|'reps'|'sets', controls the manual next-week
+  // plan button) — do not confuse the two.
+  if ((raw.meta?.schemaVersion ?? 0) < 26) {
+    const _addProgressionMode = ex => {
+      if (ex.progressionMode === undefined) ex.progressionMode = 'weight_first';
+      if (ex.targetRepsMax   === undefined) ex.targetRepsMax   = null;
+      if (ex.prRepsHistory   === undefined) ex.prRepsHistory   = {};
+    };
+    (raw.weeks ?? []).forEach(wk =>
+      (wk.days ?? []).forEach(day => (day.exercises ?? []).forEach(_addProgressionMode))
+    );
+    (raw.customTemplate ?? []).forEach(day => (day.exercises ?? []).forEach(_addProgressionMode));
+    raw.meta = { ...raw.meta, schemaVersion: 26 };
+  }
+
   // Always-apply defaults for settings added in later versions
   if (raw.settings.vibrationEnabled               === undefined) raw.settings.vibrationEnabled               = true;
   if (raw.settings.rpeEnabled                     === undefined) raw.settings.rpeEnabled                     = true;
@@ -1003,7 +1030,7 @@ export const A = Object.freeze({
   EX_TOGGLE_NEXT_WEEK_CONFIRMED: 'EX_TOGGLE_NEXT_WEEK_CONFIRMED', // { di, ei, weekIdx? } – toggelt confirmed; weekIdx default = curIdx
   EX_AUTO_PRESELECT_NEXT_WEEK_PLAN: 'EX_AUTO_PRESELECT_NEXT_WEEK_PLAN', // { selections: [{di, ei, value}], weekIdx? } – Coach-Chip Vorauswahl, kein User-Tap; weekIdx default = curIdx
   EX_SET_STEP:         'EX_SET_STEP',         // { di, ei, step }  – speichert Steigerungsrate
-  EX_SET_TARGETS:      'EX_SET_TARGETS',      // { di, ei, targetReps }
+  EX_SET_TARGETS:      'EX_SET_TARGETS',      // { di, ei, targetReps?, progressionMode?, targetRepsMax? }
   EX_SET_METRIC:       'EX_SET_METRIC',       // { di, ei, metric: 'reps'|'sec'|'m' }
   // Set
   SET_ADD:             'SET_ADD',             // { di, ei }
@@ -1363,6 +1390,9 @@ function reduce(state, action) {
           pauseSec:              90,
           metric:                t.metric,
           progressionType:       'weight',
+          progressionMode:       'weight_first',
+          targetRepsMax:         null,
+          prRepsHistory:         {},
           setType:               'straight',
           targetReps:            t.reps,
           nextWeekPlan:          0,
@@ -1427,6 +1457,7 @@ function reduce(state, action) {
       day.exercises.push({
         name: p.name, note: '', pauseSec: 90, metric: p.metric ?? 'reps',
         progressionType: 'weight',
+        progressionMode: 'weight_first', targetRepsMax: null, prRepsHistory: {},
         sets: [mkSet(), mkSet(), mkSet()],
       });
       break;
@@ -1494,6 +1525,15 @@ function reduce(state, action) {
     case A.EX_SET_TARGETS: {
       const ex = _currentWeek()?.days[p.di]?.exercises[p.ei]; if (!ex) break;
       if (p.targetReps !== undefined) ex.targetReps = Math.max(1, Math.min(100, +p.targetReps || 0));
+      if (p.progressionMode !== undefined && ['weight_first', 'double_progression', 'reps_only'].includes(p.progressionMode)) {
+        ex.progressionMode = p.progressionMode;
+        // targetRepsMax ist nur bei double_progression relevant — bei jedem
+        // anderen Modus zurücksetzen, kein veralteter Wert bleibt stehen.
+        if (ex.progressionMode !== 'double_progression') ex.targetRepsMax = null;
+      }
+      if (p.targetRepsMax !== undefined) {
+        ex.targetRepsMax = p.targetRepsMax === null ? null : Math.max(1, Math.min(100, +p.targetRepsMax || 0));
+      }
       break;
     }
     case A.EX_SET_STEP: {
@@ -1591,6 +1631,14 @@ function reduce(state, action) {
           } else if (weight >= ex.prWeight && reps > (ex.prRepsAtMaxWeight ?? 0)) {
             ex.prRepsAtMaxWeight = reps;
           }
+          // Wdh-PR an einem submaximalen Gewicht (jenseits des Maximalgewichts
+          // bereits über prRepsAtMaxWeight abgedeckt) — pro Gewicht die beste
+          // je erreichte Wdh-Zahl, würdigt Steigerungen unabhängig vom PR-Gewicht.
+          if (!ex.prRepsHistory) ex.prRepsHistory = {};
+          if (weight < ex.prWeight) {
+            const w = String(weight);
+            if (reps > (ex.prRepsHistory[w] ?? 0)) ex.prRepsHistory[w] = reps;
+          }
         }
       }
       break;
@@ -1667,6 +1715,13 @@ function reduce(state, action) {
             ex.prWeight = weight; ex.prRepsAtMaxWeight = reps;
           } else if (weight >= ex.prWeight && reps > (ex.prRepsAtMaxWeight ?? 0)) {
             ex.prRepsAtMaxWeight = reps;
+          }
+          // Wdh-PR an einem submaximalen Gewicht — identisch zu SET_TOGGLE_DONE,
+          // beide Bestätigungswege müssen konsistent bleiben.
+          if (!ex.prRepsHistory) ex.prRepsHistory = {};
+          if (weight < ex.prWeight) {
+            const w = String(weight);
+            if (reps > (ex.prRepsHistory[w] ?? 0)) ex.prRepsHistory[w] = reps;
           }
         }
       }

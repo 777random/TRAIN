@@ -265,10 +265,10 @@ function _checkPlateau(state) {
 // ─── Prio 5: Progression ────────────────────────────────────────────────────
 // isReadyForAutoSelect()/getWeightRecommendation() 1:1 wiederverwendet.
 
-function _qualificationStreak(name, calcWeeks) {
+function _qualificationStreak(name, calcWeeks, progressionMode, targetRepsMax) {
   let streak = 0;
   for (let end = calcWeeks.length; end >= 2; end--) {
-    if (isReadyForAutoSelect(name, calcWeeks.slice(0, end))) streak++;
+    if (isReadyForAutoSelect(name, calcWeeks.slice(0, end), progressionMode, targetRepsMax)) streak++;
     else break;
   }
   return streak;
@@ -291,8 +291,10 @@ function _checkProgression(state) {
       if (ex.substituteFor) return;
       if ((ex.progressionType ?? 'weight') === 'reps') return;
       seen.add(ex.name);
-      if (!isReadyForAutoSelect(ex.name, calcWeeks)) return;
-      const rec = getWeightRecommendation(ex.name, calcWeeks, plateStep);
+      const exProgressionMode = ex.progressionMode ?? 'weight_first';
+      const exTargetRepsMax   = ex.targetRepsMax ?? null;
+      if (!isReadyForAutoSelect(ex.name, calcWeeks, exProgressionMode, exTargetRepsMax)) return;
+      const rec = getWeightRecommendation(ex.name, calcWeeks, plateStep, exProgressionMode, exTargetRepsMax);
       if (!rec) return;
       if (!best || rec.delta > best.rec.delta) best = { name: ex.name, rec, ex };
     });
@@ -300,7 +302,7 @@ function _checkProgression(state) {
 
   if (!best) return null;
 
-  const streak = _qualificationStreak(best.name, calcWeeks);
+  const streak = _qualificationStreak(best.name, calcWeeks, best.ex.progressionMode ?? 'weight_first', best.ex.targetRepsMax ?? null);
   const alreadyConfirmedSame = best.ex.nextWeekPlanConfirmed && best.ex.nextWeekPlan === best.rec.delta;
   const reasonText = (best.rec.reasons ?? []).map(r => r.text).join(' · ');
   const intro = (streak >= 2 && !alreadyConfirmedSame)

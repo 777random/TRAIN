@@ -1361,6 +1361,42 @@ function renderExercise(wk, di, ei, state) {
           >Satz ↑</button>
         </div>
       </div>` : ''}
+      ${!locked ? `
+      <div class="weight-plan-row" role="group" aria-label="Progressions-Modus">
+        <span class="pause-row__label">Progressions-Modus:</span>
+        <div class="weight-step-opts">
+          <button type="button"
+            class="weight-step-btn${(ex.progressionMode ?? 'weight_first') === 'weight_first' ? ' is-selected' : ''}"
+            data-action="set-progression-mode" data-di="${di}" data-ei="${ei}" data-val="weight_first"
+            aria-pressed="${(ex.progressionMode ?? 'weight_first') === 'weight_first'}"
+          >Gewicht zuerst</button>
+          <button type="button"
+            class="weight-step-btn${ex.progressionMode === 'double_progression' ? ' is-selected' : ''}"
+            data-action="set-progression-mode" data-di="${di}" data-ei="${ei}" data-val="double_progression"
+            aria-pressed="${ex.progressionMode === 'double_progression'}"
+          >Doppelte Progression</button>
+          <button type="button"
+            class="weight-step-btn${ex.progressionMode === 'reps_only' ? ' is-selected' : ''}"
+            data-action="set-progression-mode" data-di="${di}" data-ei="${ei}" data-val="reps_only"
+            aria-pressed="${ex.progressionMode === 'reps_only'}"
+          >Nur Wiederholungen</button>
+        </div>
+      </div>
+      ${ex.progressionMode === 'double_progression' ? `
+      <div class="weight-plan-row" role="group" aria-label="Wdh-Obergrenze">
+        <span class="pause-row__label">Wdh-Obergrenze:</span>
+        <input
+          class="target-input"
+          type="number"
+          inputmode="numeric"
+          min="1" max="100"
+          value="${ex.targetRepsMax ?? ''}"
+          placeholder="z.B. 12"
+          data-action="set-targets" data-field="targetRepsMax"
+          data-di="${di}" data-ei="${ei}"
+          aria-label="Wdh-Obergrenze für doppelte Progression"
+        />
+      </div>` : ''}` : ''}
       <!-- Erweitert-Toggle -->
       <button class="cfg-adv-toggle${isAdvOpen ? ' is-open' : ''}"
         data-action="toggle-cfg-adv" data-di="${di}" data-ei="${ei}"
@@ -1670,10 +1706,23 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
   // PR indicators: 🏆 weight PR (gold) | 🔄 reps PR (green)
   const isWeightPR = st === 'success' && ex.prWeight !== null &&
                      (s.weight ?? 0) > 0 && (s.weight ?? 0) >= ex.prWeight;
-  const isRepsPR   = st === 'success' && ex.prRepsAtMaxWeight != null &&
+  const isRepsPRAtMax = st === 'success' && ex.prRepsAtMaxWeight != null &&
                      ex.prRepsAtMaxWeight > 0 &&
                      (s.weight ?? 0) >= (ex.prWeight ?? 0) &&
                      (s.reps ?? 0) >= ex.prRepsAtMaxWeight;
+  // Wdh-Steigerung an einem submaximalen Gewicht (jenseits des persönlichen
+  // Bestgewichts) würdigt denselben Badge — ex.prRepsHistory[gewicht] hält
+  // pro Gewicht die beste je erreichte Wdh-Zahl.
+  // >= statt > (literal Spec-Text): zum Render-Zeitpunkt hat der Reducer
+  // ex.prRepsHistory[gewicht] bereits auf s.reps aktualisiert (gleiche
+  // Render-nach-Write-Reihenfolge wie isWeightPR/isRepsPRAtMax oben, die
+  // beide ebenfalls >= statt > nutzen) — mit > würde der Badge für genau
+  // den Satz, der den Rekord aufstellt, nie erscheinen.
+  const isRepsPRSubmax = st === 'success' && (s.weight ?? 0) > 0 &&
+                     ex.prWeight != null && (s.weight ?? 0) < ex.prWeight &&
+                     ex.prRepsHistory?.[String(s.weight)] !== undefined &&
+                     (s.reps ?? 0) >= ex.prRepsHistory[String(s.weight)];
+  const isRepsPR   = isRepsPRAtMax || isRepsPRSubmax;
   const isPR = isWeightPR || isRepsPR;
   const effortScore   = (st === 'success' && ex.targetReps) ? Math.round((s.reps ?? 0) / ex.targetReps * 100) : null;
   const isEffortGoal  = effortScore !== null && effortScore >= 100;
@@ -4162,6 +4211,13 @@ function _handleClick(e) {
       break;
     }
 
+    case 'set-progression-mode': {
+      // EX_SET_TARGETS (nicht EX_UPDATE) — löscht targetRepsMax automatisch
+      // wenn der Modus weg von double_progression wechselt.
+      dispatch(A.EX_SET_TARGETS, { di: +di, ei: +ei, progressionMode: el.dataset.val });
+      break;
+    }
+
     case 'set-step': {
       const step = parseFloat(el.dataset.step);
       dispatch(A.EX_SET_STEP, { di: +di, ei: +ei, step });
@@ -4935,7 +4991,9 @@ function _prepNewWeekModal() {
           if (ex.substituteFor) return;
           if ((ex.progressionType ?? 'weight') === 'reps') return;
           seen.add(ex.name);
-          const rec = getWeightRecommendation(ex.name, calcWeeks, plateStep);
+          const exProgressionMode = ex.progressionMode ?? 'weight_first';
+          const exTargetRepsMax   = ex.targetRepsMax ?? null;
+          const rec = getWeightRecommendation(ex.name, calcWeeks, plateStep, exProgressionMode, exTargetRepsMax);
           if (rec) {
             if (inRecoveryWindow && rec.delta > 0) {
               rec.delta = rec.delta * 1.5;
@@ -4948,7 +5006,7 @@ function _prepNewWeekModal() {
             // Zustand (visueller Mismatch) und _autoSelections würde sie
             // ohnehin sofort wieder bestätigen (der eigentliche Snap-Back-Bug).
             const autoSelected = !_userDismissedAutoSelect.has(ex.name)
-              && rec.delta > 0 && isReadyForAutoSelect(ex.name, calcWeeks);
+              && rec.delta > 0 && isReadyForAutoSelect(ex.name, calcWeeks, exProgressionMode, exTargetRepsMax);
             const alreadyConfirmedSame = ex.nextWeekPlanConfirmed && ex.nextWeekPlan === rec.delta;
             if (autoSelected && !alreadyConfirmedSame) {
               _autoSelections.push({ di, ei, value: rec.delta });
@@ -6011,6 +6069,7 @@ function _showOnboarding() {
           targetSets: n, targetReps: ex.tr,
           _showCfg: false, setType: 'standard',
           tags: [], showPlates: false, progressionType: 'weight', substituteFor: null,
+          progressionMode: 'weight_first', targetRepsMax: null, prRepsHistory: {},
         };
       }),
     }));
