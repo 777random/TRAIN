@@ -356,14 +356,24 @@ function _wkRangeFull(sd) {
   } catch (_) { return wkRange(sd); }
 }
 
-/** True when today falls within the 7-day span starting at sd. */
-function _isCurrentWeek(sd) {
-  try {
-    const now   = new Date(); now.setHours(12, 0, 0, 0);
-    const start = new Date(sd + 'T12:00:00');
-    const end   = new Date(start); end.setDate(start.getDate() + 6);
-    return now >= start && now <= end;
-  } catch (_) { return false; }
+/**
+ * Relative Wochen-Bezeichnung (Sprint C1, train-v108) — Abstand in Wochen
+ * zwischen der angezeigten Woche und der chronologisch LETZTEN Woche
+ * (getLatestWeek(), nicht state.curIdx selbst, da curIdx genau die Woche
+ * ist deren Label hier berechnet wird — der Vergleichsanker muss ein vom
+ * Navigieren unabhängiger Fixpunkt sein). Liefert null wenn keine Wochen
+ * existieren.
+ */
+function _relativeWeekLabel(wk, weeks) {
+  const latest = getLatestWeek(weeks);
+  if (!latest) return null;
+  const diffMs    = new Date(wk.startDate + 'T12:00:00').getTime() - new Date(latest.startDate + 'T12:00:00').getTime();
+  const diffWeeks = Math.round(diffMs / (7 * 24 * 60 * 60 * 1000));
+  if (diffWeeks === 0)  return 'Aktuelle Woche';
+  if (diffWeeks === -1) return 'Letzte Woche';
+  if (diffWeeks === -2) return 'Vorletzte Woche';
+  if (diffWeeks < 0)    return `Vor ${-diffWeeks} Wochen`;
+  return `In ${diffWeeks} Wochen`;
 }
 
 /**
@@ -577,18 +587,20 @@ function renderWeekHeader(state) {
 
   if (labelEl) {
     if (wk) {
-      const kw      = _isoWeek(new Date(wk.startDate + 'T12:00:00'));
-      const range   = _wkRangeFull(wk.startDate);
-      const badge    = _isCurrentWeek(wk.startDate) ? ' <span class="wk-badge-current">Aktuell</span>' : '';
+      const kw       = _isoWeek(new Date(wk.startDate + 'T12:00:00'));
+      const range    = _wkRangeFull(wk.startDate);
       const vacBadge = isVac ? ' <span class="wk-badge-vacation">🏖 Urlaub</span>' : '';
-      const rangePart = wk.label ? h(wk.label) : range;
-      labelEl.innerHTML = `KW ${String(kw).padStart(2,'0')} · ${rangePart}${badge}${vacBadge}`;
+      // Bei manuell umbenannter Woche hat der Nutzer-Name Vorrang vor der
+      // relativen Bezeichnung — KW+Datum bleibt in beiden Fällen sekundär.
+      const primary = wk.label ? h(wk.label) : (_relativeWeekLabel(wk, state.weeks) ?? range);
+      labelEl.innerHTML = `${primary}${vacBadge}`;
+      if (rangeEl) rangeEl.textContent = `KW ${String(kw).padStart(2,'0')} · ${range}`;
     } else {
       labelEl.textContent = '–';
+      if (rangeEl) rangeEl.textContent = '';
     }
     labelEl.className = 'week-nav__label' + (isDl ? ' week-nav__label--deload' : '') + (isVac ? ' week-nav__label--vacation' : '');
   }
-  if (rangeEl)  rangeEl.textContent = '';
   if (prevBtn)  prevBtn.disabled    = isFirst;
   if (nextBtn)  nextBtn.disabled    = isLast;
 
@@ -5978,16 +5990,25 @@ function _showOnboarding() {
           <button class="btn btn--accent ob-btn" data-ob="next">Weiter →</button>
         </div>`;
     } else if (_step === 2) {
-      // Empfehlung nach Hauptziel — rein visuell, beeinflusst keine Auswahl/
-      // Anwendung. null wenn kein Ziel gewählt wurde (AC12).
-      const _recommendedIdx = _mainGoal === 'kraftaufbau'
-        ? (_expLevel === 'fortgeschritten' || _expLevel === 'erfahren' ? 1 : 0)
+      // Empfehlung nach Erfahrung + Hauptziel — rein visuell, beeinflusst
+      // keine Auswahl/Anwendung. null wenn weder Erfahrung noch Ziel gewählt
+      // wurde. Priorität (Sprint C1, train-v108, behebt Logik-Fehler der
+      // Vorversion): Fitness-Ziel zuerst (immer Vorlage 3, unabhängig von
+      // Erfahrung) > Anfänger (immer Vorlage 1, unabhängig vom Ziel) >
+      // Muskelaufbau (Vorlage 2) > sonst (Kraftaufbau bei Fortgeschritten/
+      // Erfahren → Vorlage 2).
+      const _recommendedIdx = (!_expLevel && !_mainGoal) ? null
+        : _mainGoal === 'fitness'      ? 2
+        : _expLevel === 'anfaenger'    ? 0
         : _mainGoal === 'muskelaufbau' ? 1
-        : _mainGoal === 'fitness' ? 2
-        : null;
+        : 1;
 
       const _expOptions  = [['anfaenger', 'Anfänger'], ['fortgeschritten', 'Fortgeschritten'], ['erfahren', 'Erfahren']];
-      const _goalOptions = [['kraftaufbau', 'Kraftaufbau'], ['muskelaufbau', 'Muskelaufbau'], ['fitness', 'Allgemeine Fitness']];
+      const _goalOptions = [
+        ['kraftaufbau', 'Ich will stärker werden'],
+        ['muskelaufbau', 'Ich will mehr Muskeln aufbauen'],
+        ['fitness', 'Ich will fitter werden'],
+      ];
 
       const expRow = `
         <div class="ob-choice-block">
@@ -6084,6 +6105,19 @@ function _showOnboarding() {
     return { n: ex.n, ps: ex.ps };
   }
 
+  // Wdh-Ziel-Anpassung nach Hauptziel (Sprint C1, train-v108) — läuft NACH
+  // der Erfahrungs-Anpassung oben (Sätze/Pause), ändert NUR targetReps, NUR
+  // bei Gewichts-Übungen (metric==='reps'). Körpergewicht-Übungen in
+  // Sekunden/Metern (z.B. Plank) bleiben unverändert. _ONBOARDING_TEMPLATES
+  // selbst bleibt unverändert, nur der beim Erstellen übernommene Wert.
+  function _adjustedTargetReps(tr, metric) {
+    if (metric !== 'reps') return tr;
+    if (_mainGoal === 'kraftaufbau')  return tr > 6 ? 5 : tr;
+    if (_mainGoal === 'muskelaufbau') return tr < 8 ? 8 : tr > 12 ? 10 : tr;
+    if (_mainGoal === 'fitness')      return tr < 10 ? 12 : tr;
+    return tr;
+  }
+
   function _applyTpl(idx) {
     const tpl = _ONBOARDING_TEMPLATES[idx];
     const d   = new Date();
@@ -6097,13 +6131,14 @@ function _showOnboarding() {
       locked: false, markedDone: false,
       exercises: ds.exercises.map(ex => {
         const { n, ps } = _adjustedSetsAndPause(ex);
+        const tr = _adjustedTargetReps(ex.tr, ex.m);
         return {
           name: ex.name, note: '', pauseSec: ps, metric: ex.m,
           sets: Array.from({ length: n }, () => ({
-            weight: 0, reps: ex.tr, rpe: null, status: 'pending', done: false, note: '',
+            weight: 0, reps: tr, rpe: null, status: 'pending', done: false, note: '',
           })),
           weightStep: 2.5, nextWeekPlan: 0, nextWeekPlanConfirmed: false,
-          targetSets: n, targetReps: ex.tr,
+          targetSets: n, targetReps: tr,
           _showCfg: false, setType: 'standard',
           tags: [], showPlates: false, progressionType: 'weight', substituteFor: null,
           progressionMode: 'weight_first', targetRepsMax: null, prRepsHistory: {},
