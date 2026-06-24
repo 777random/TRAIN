@@ -1090,6 +1090,7 @@ export const A = Object.freeze({
   CUSTOM_EX_ADD:        'CUSTOM_EX_ADD',        // { name, metric, category }
   CUSTOM_EX_UPDATE:     'CUSTOM_EX_UPDATE',     // { oldName, name, metric, category }
   CUSTOM_EX_DELETE:     'CUSTOM_EX_DELETE',     // { name }
+  EX_SET_CATEGORY_OVERRIDE: 'EX_SET_CATEGORY_OVERRIDE', // { name, category } – Bewegungskategorie-Override für Standardübungen (kein vollwertiger customExercises-Eintrag, kein metric-Feld)
   EX_MERGE_NAMES:       'EX_MERGE_NAMES',       // { variantNames: string[], finalName } – Übungsnamen-Bereinigung
   DISMISS_NAME_PAIR:    'DISMISS_NAME_PAIR',    // { a, b } – Ähnlichkeits-Kandidat dauerhaft verwerfen
   REENTRY_HANDLED:      'REENTRY_HANDLED',      // {} – marks current pause as handled (Ja/Nein)
@@ -2052,6 +2053,19 @@ function reduce(state, action) {
     }
     case A.CUSTOM_EX_DELETE: {
       state.customExercises = (state.customExercises ?? []).filter(c => c.name !== p.name);
+      break;
+    }
+    // Nur für Übungen ohne vollwertigen customExercises-Eintrag (Standardübungen) —
+    // echte eigene Übungen laufen über CUSTOM_EX_UPDATE (Aufrufer in ui.js entscheidet).
+    case A.EX_SET_CATEGORY_OVERRIDE: {
+      if (!Array.isArray(state.customExercises)) state.customExercises = [];
+      const idx = state.customExercises.findIndex(c => c.name === p.name);
+      if (p.category) {
+        if (idx >= 0) state.customExercises[idx].category = p.category;
+        else state.customExercises.push({ name: p.name, category: p.category });
+      } else if (idx >= 0) {
+        state.customExercises.splice(idx, 1);
+      }
       break;
     }
     case A.EX_MERGE_NAMES: {

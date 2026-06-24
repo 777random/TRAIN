@@ -48,13 +48,6 @@ let _overviewMode = false;
 /** Currently active top-level tab id. */
 let _activeTab = 'workout';
 
-/** Insights visible in analysis tab (2.1). */
-let _showInsights = false;
-
-
-/** Whether insights tooltip has been shown (3.2). */
-let _insightsTooltipShown = false;
-
 /** Insights visible in body tab (2.2). */
 let _showBodyInsights = false;
 
@@ -1267,6 +1260,7 @@ function renderExercise(wk, di, ei, state) {
 
   const step = ex.weightStep ?? 2.5;
   const metric = ex.metric === 'sec' || ex.metric === 'm' ? ex.metric : 'reps';
+  const _exCatOverride = (state.customExercises ?? []).find(c => c.name === ex.name)?.category ?? '';
 
   // Vorschlag: Ø erfolgreiche Wiederholungen der gleichen Übung aus der Vorwoche
   let _suggestionHtml = '';
@@ -1367,6 +1361,14 @@ function renderExercise(wk, di, ei, state) {
             >${label}</button>`).join('')}
         </div>
       </div>` : ''}
+      <div class="weight-plan-row" role="group" aria-label="Bewegungskategorie">
+        <span class="pause-row__label">Kategorie:</span>
+        <select class="chart-select" style="margin-bottom:0" data-action="set-ex-category" data-di="${di}" data-ei="${ei}" aria-label="Bewegungskategorie">
+          <option value="">Keine</option>
+          ${['Push', 'Pull', 'Squat', 'Hinge', 'Carry', 'Core'].map(c => `
+            <option value="${c}" ${_exCatOverride === c ? 'selected' : ''}>${c}</option>`).join('')}
+        </select>
+      </div>
       ${!locked ? `
       <div class="weight-plan-row" role="group" aria-label="Steigerungsart">
         <span class="pause-row__label">Steigerung:</span>
@@ -1480,7 +1482,7 @@ function renderExercise(wk, di, ei, state) {
               >${s === 0 ? 'Reset' : s}</button>`).join('')}
           </div>
         </div>` : ''}
-        ${(state.customExercises ?? []).some(c => c.name === ex.name) ? `
+        ${(state.customExercises ?? []).some(c => c.name === ex.name && c.metric != null) ? `
         <button type="button" class="btn btn--ghost btn--sm" data-action="edit-custom-ex" data-di="${di}" data-ei="${ei}" style="margin-top:var(--sp-2)">
           ✏️ Übung bearbeiten
         </button>` : ''}
@@ -2330,7 +2332,7 @@ function _renderMovementPattern(state) {
     for (const day of wk.days) {
       for (const ex of day.exercises) {
         const baseName = ex.substituteFor ?? ex.name;
-        const cat = MOVEMENT_MAP[baseName] ?? customCatMap[baseName] ?? 'Sonstige';
+        const cat = customCatMap[baseName] ?? MOVEMENT_MAP[baseName] ?? 'Sonstige';
         const n = ex.sets.filter(s => s.status === 'success').length;
         if (!n) continue;
         catSets[cat] = (catSets[cat] ?? 0) + n;
@@ -2592,8 +2594,9 @@ function _rotatedErkenntnisEntries(state) {
 function _renderErkenntnisseSection(state) {
   const perfParagraphs = _overallPerformanceParagraphs(state);
   const obsEntries     = _rotatedErkenntnisEntries(state);
+  const insights       = state.insights ?? [];
 
-  if (!perfParagraphs.length && !obsEntries.length) return '';
+  if (!perfParagraphs.length && !obsEntries.length && !insights.length) return '';
 
   const perfHtml = perfParagraphs.map(p => `<p class="erkenntnis-line">${h(p)}</p>`).join('');
 
@@ -2610,14 +2613,28 @@ function _renderErkenntnisseSection(state) {
     }
   }
 
-  const divider = (perfHtml && obsHtml) ? `<hr class="erkenntnisse-divider">` : '';
+  // Insights (insightEngine.js, event-getrieben) als zusätzliche Zeilen,
+  // gleicher Stil wie Beobachtungen, kein eigenes Toggle mehr (ehemals
+  // separater Insights-Button — Positions-Entkopplung Button↔Inhalt
+  // machte den Button de facto wirkungslos).
+  const insightsHtml = insights.length > 0
+    ? insights.map(ins => {
+        const line = ins.recommendation ? `${ins.title}: ${ins.message} ${ins.recommendation}` : `${ins.title}: ${ins.message}`;
+        return `<p class="erkenntnis-line">${h(line)}</p>`;
+      }).join('')
+    : '';
+
+  const dividerTop    = (perfHtml && obsHtml) ? `<hr class="erkenntnisse-divider">` : '';
+  const dividerBottom = ((perfHtml || obsHtml) && insightsHtml) ? `<hr class="erkenntnisse-divider">` : '';
 
   return `
   <div class="chart-card">
     <div class="chart-card__title">📊 Erkenntnisse</div>
     ${perfHtml}
-    ${divider}
+    ${dividerTop}
     ${obsHtml}
+    ${dividerBottom}
+    ${insightsHtml}
   </div>`;
 }
 
@@ -2660,7 +2677,6 @@ function renderProgressTab(state) {
   const allExNames = [...new Set(
     state.weeks.flatMap(w => w.days.flatMap(d => d.exercises.map(e => e.name)))
   )].sort();
-  const insights = state.insights ?? [];
 
   // ── Bestleistungen ──────────────────────────────────────────────────────────
   const bestleistungenHtml = (() => {
@@ -2688,26 +2704,10 @@ function renderProgressTab(state) {
     </div>`;
   })();
 
-  // ── Insights (bestehendes event-getriebenes Toggle-System, unverändert) ────
-  const _typeColor = { progression:'var(--c-accent)', stagnation:'var(--c-warn)', recovery:'var(--c-blue)', balance:'var(--c-deload)', goal:'var(--c-accent)', consistency:'var(--c-ok)', warning:'var(--c-danger)', motivation:'var(--c-accent)' };
-  const insightHtml = _showInsights && insights.length > 0
-    ? insights.map(ins => `
-      <div class="insight-card insight-card--${h(ins.type ?? 'info')}">
-        <div class="insight-card__hdr">
-          <span class="insight-card__badge" style="color:${_typeColor[ins.type] ?? 'var(--c-accent)'}">${h(ins.title)}</span>
-          <span class="insight-card__id">${h(ins.id)}</span>
-        </div>
-        <p class="insight-card__msg">${h(ins.message)}</p>
-        ${ins.recommendation ? `<p class="insight-card__rec">${h(ins.recommendation)}</p>` : ''}
-      </div>`).join('')
-    : '';
-
   container.innerHTML = `
   ${weekReviewHtml}
 
   ${erkenntnisseHtml}
-
-  ${insightHtml}
 
   <div class="chart-card">
     <div class="chart-card__title">Übungsfortschritt</div>
@@ -2738,12 +2738,6 @@ function renderProgressTab(state) {
       ${avgScore !== null ? `<div class="streak-card"><div class="streak-num" style="color:${avgScore>=90?'var(--c-ok)':avgScore>=70?'var(--c-warn)':'var(--c-danger)'}">${avgScore}%</div><div class="streak-lbl">Ø Erfolg</div></div>` : ''}
       ${avgMin != null ? `<div class="streak-card"><div class="streak-num">${fmtMin(avgMin)}</div><div class="streak-lbl">Ø Session</div></div>` : ''}
       ${totalMin != null ? `<div class="streak-card"><div class="streak-num">${fmtMin(totalMin)}</div><div class="streak-lbl">Gesamt</div></div>` : ''}
-      ${state.weeks.length >= 2 ? `
-      <button class="streak-card insight-toggle${_showInsights ? ' is-active' : ''}${insights.length > 0 ? ' has-insights' : ''}"
-        data-action="toggle-insights"
-        aria-pressed="${_showInsights}"
-        aria-label="Insights anzeigen"
-      >${ic.lightbulb()}<div class="streak-lbl">Insights${insights.length > 0 ? ` (${insights.length})` : ''}</div></button>` : ''}
     </div>`;
     })()}
     ${_renderBadgeGallery(state)}
@@ -3474,15 +3468,18 @@ function renderSettingsTab(state) {
   <div class="settings-section">
     <div class="settings-section__title">Meine Übungen</div>
     ${_renderNameCleanupSections(state)}
-    ${(state.customExercises ?? []).length === 0 ? `
-    <p class="settings-row__desc">Noch keine eigenen Übungen — beim Hinzufügen einer Übung über "+ anlegen" erstellt.</p>` : (state.customExercises ?? []).map(ce => `
+    ${(() => {
+      const realCustomEx = (state.customExercises ?? []).filter(ce => ce.metric != null);
+      return realCustomEx.length === 0 ? `
+    <p class="settings-row__desc">Noch keine eigenen Übungen — beim Hinzufügen einer Übung über "+ anlegen" erstellt.</p>` : realCustomEx.map(ce => `
     <div class="custom-ex-row">
       <div class="custom-ex-row__main" data-action="edit-custom-ex-settings" data-name="${h(ce.name)}">
         <span class="custom-ex-row__name">${h(ce.name)}</span>
         <span class="custom-ex-row__meta">${ce.category ? h(ce.category) + ' · ' : ''}${ce.metric === 'sec' ? 'Sek' : ce.metric === 'm' ? 'm' : 'Wdh'}</span>
       </div>
       <button class="btn btn--ghost btn--sm" data-action="delete-custom-ex" data-name="${h(ce.name)}" aria-label="Übung '${h(ce.name)}' löschen">✕</button>
-    </div>`).join('')}
+    </div>`).join('');
+    })()}
   </div>
 
   <!-- Info -->
@@ -3667,21 +3664,6 @@ function _handleClick(e) {
     // ── Overview mode ─────────────────────────────────────────────────────
     case 'toggle-overview':
       _overviewMode = !_overviewMode;
-      scheduleRender();
-      break;
-
-    // ── Analysis insights toggle (3.2) ─────────────────────────────────────
-    case 'toggle-insights':
-      if (!_insightsTooltipShown) {
-        _insightsTooltipShown = true;
-        showToast('Zeigt automatisch erkannte Muster in deinen Trainingsdaten', 'info', 4000);
-        _showInsights = true;
-      } else {
-        _showInsights = !_showInsights;
-      }
-      if (_showInsights && getState().insights.some(i => i.id === 'S-06')) {
-        _maybeShowTip('tip-10', 'TRAIN hat erkannt dass du seit 3 Wochen keine Steigerung mehr machst. Scrolle nach unten für konkrete Strategien.');
-      }
       scheduleRender();
       break;
 
@@ -4085,7 +4067,7 @@ function _handleClick(e) {
     case 'edit-custom-ex': {
       const exToEdit = getState().weeks[getState().curIdx]?.days[+di]?.exercises[+ei];
       if (!exToEdit) break;
-      const ce = (getState().customExercises ?? []).find(c => c.name === exToEdit.name);
+      const ce = (getState().customExercises ?? []).find(c => c.name === exToEdit.name && c.metric != null);
       if (!ce) break;
       _openExFormModal({ mode: 'edit', name: ce.name, metric: ce.metric, category: ce.category, originalName: ce.name });
       break;
@@ -4818,6 +4800,18 @@ function _handleChange(e) {
         field,
         value: el.type === 'text' || isNaN(+el.value) ? el.value : +el.value,
       }); break;
+    case 'set-ex-category': {
+      const exName = getState().weeks[getState().curIdx]?.days[+di]?.exercises[+ei]?.name;
+      if (!exName) break;
+      const newCat = el.value || null;
+      const ce = (getState().customExercises ?? []).find(c => c.name === exName);
+      if (ce && ce.metric != null) {
+        dispatch(A.CUSTOM_EX_UPDATE, { oldName: exName, name: exName, metric: ce.metric, category: newCat });
+      } else {
+        dispatch(A.EX_SET_CATEGORY_OVERRIDE, { name: exName, category: newCat });
+      }
+      break;
+    }
     case 'import-json': {
       const file = el.files?.[0];
       if (!file) break;
@@ -4949,6 +4943,7 @@ function _renderExSearchResults() {
     .filter(n => !q || n.toLowerCase().includes(q))
     .slice(0, 8);
   const custom = (getState().customExercises ?? [])
+    .filter(c => c.metric != null)
     .map(c => c.name)
     .filter(n => !q || n.toLowerCase().includes(q))
     .slice(0, 8);
