@@ -243,10 +243,37 @@ function _checkConsistencyGap(state) {
 // ─── Prio 4: Plateau ────────────────────────────────────────────────────────
 // detectPlateaus() 1:1 wiederverwendet, NICHT neu implementiert.
 
+/**
+ * Sprint C2 (train-v109): "Ignorieren"/"Habe ich umgesetzt" unterdrücken die
+ * Plateau-Karte für eine Übung, solange die Bedingung noch gilt — siehe
+ * state.plateauActions. 'ignored' gilt nur für GENAU dasselbe Plateau (exakt
+ * dieselbe plateauWeeks-Zahl wie beim Ignorieren) — sobald es länger dauert
+ * ODER endet (neue Steigerung), ist die Unterdrückung automatisch aufgehoben.
+ * 'implemented' gilt für 14 Tage ab dem Wochenstart der Aktion, danach
+ * erscheint die Karte wieder falls das Plateau noch besteht.
+ */
+function _isPlateauSuppressed(p, action, curWeekStart) {
+  if (!action) return false;
+  if (action.action === 'ignored') {
+    return action.plateauWeeksAtAction === p.plateauWeeks;
+  }
+  if (action.action === 'implemented') {
+    const sinceMs = new Date(action.since + 'T00:00:00').getTime();
+    const curMs   = new Date(curWeekStart + 'T00:00:00').getTime();
+    return (curMs - sinceMs) < 14 * 86_400_000;
+  }
+  return false;
+}
+
 function _checkPlateau(state) {
   const plateaus = detectPlateaus(state.weeks, state.favoriteExercises ?? [], state.settings?.rpeEnabled ?? true);
   if (!plateaus.length) return null;
-  const longest = plateaus.reduce((a, b) => (b.plateauWeeks > a.plateauWeeks ? b : a));
+  const curWk = getLatestWeek(state.weeks);
+  if (!curWk) return null;
+  const actions = state.plateauActions ?? {};
+  const active  = plateaus.filter(p => !_isPlateauSuppressed(p, actions[p.exerciseName], curWk.startDate));
+  if (!active.length) return null;
+  const longest = active.reduce((a, b) => (b.plateauWeeks > a.plateauWeeks ? b : a));
   // plateauWeeks startet bei 3 (Mindestwert für eine Erkennung) -> detectionAge=1
   // bedeutet "gerade erst erkannt", detectionAge>=3 bedeutet "seit 3+ Wochen bekannt".
   const detectionAge = longest.plateauWeeks - 2;

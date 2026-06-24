@@ -24,7 +24,7 @@
 
 export const STORAGE_KEY        = 'train_v6';
 export const STORAGE_KEY_SHADOW = 'train_v6_shadow';
-export const SCHEMA_VERSION     = 26;
+export const SCHEMA_VERSION     = 27;
 
 export const BADGE_THRESHOLDS = [
   { id: 'badge_4',   weeks: 4,   title: 'Erster Schritt' },
@@ -180,6 +180,7 @@ function buildDefaultState() {
       lastUsedMonth: null,        // "YYYY-MM" des letzten Einsatzes, oder null
     },
     surpriseLog: {},          // { [musterId]: "YYYY-MM" } – letzter Monat, in dem ein Überraschungs-Muster gezeigt wurde
+    plateauActions: {},       // { [exerciseName]: { action: 'ignored'|'implemented', since, plateauWeeksAtAction } }
     settings: {
       swipe:              true,
       drag:               true,
@@ -212,6 +213,7 @@ const _NO_UNDO = new Set([
   'UNDO', 'WEEK_NAVIGATE', 'STATE_IMPORT', 'SESSION_START', 'SESSION_RESET', 'SESSION_STOP',
   'INSIGHTS_SET', 'ONBOARDING_DONE', 'MARK_TIP_SEEN', 'REENTRY_HANDLED',
   'EX_AUTO_PRESELECT_NEXT_WEEK_PLAN', 'ACTIVATE_STREAK_FREEZE', 'RECORD_SURPRISE_SHOWN',
+  'PLATEAU_ACTION',
 ]);
 
 /** Returns true when there is at least one undo snapshot available. */
@@ -828,6 +830,12 @@ function migrate(raw) {
     raw.meta = { ...raw.meta, schemaVersion: 26 };
   }
 
+  // v26 → v27: add state.plateauActions (Sprint C2, train-v109)
+  if ((raw.meta?.schemaVersion ?? 0) < 27) {
+    if (!raw.plateauActions || typeof raw.plateauActions !== 'object') raw.plateauActions = {};
+    raw.meta = { ...raw.meta, schemaVersion: 27 };
+  }
+
   // Always-apply defaults for settings added in later versions
   if (raw.settings.vibrationEnabled               === undefined) raw.settings.vibrationEnabled               = true;
   if (raw.settings.rpeEnabled                     === undefined) raw.settings.rpeEnabled                     = true;
@@ -1024,6 +1032,7 @@ export const A = Object.freeze({
   REENTRY_HANDLED:      'REENTRY_HANDLED',      // {} – marks current pause as handled (Ja/Nein)
   ACTIVATE_STREAK_FREEZE: 'ACTIVATE_STREAK_FREEZE', // {} – bewusste, manuelle Aktivierung, 1×/Quartal
   RECORD_SURPRISE_SHOWN:  'RECORD_SURPRISE_SHOWN',  // { musterId } – markiert ein Überraschungs-Muster als diesen Monat gezeigt
+  PLATEAU_ACTION:         'PLATEAU_ACTION',         // { exerciseName, action: 'ignored'|'implemented', since, plateauWeeksAtAction }
   EX_APPLY_REENTRY_REDUCTION: 'EX_APPLY_REENTRY_REDUCTION', // { factor } – reduces weights/targets in current week
   EX_REMOVE:           'EX_REMOVE',           // { di, ei }
   EX_UPDATE:           'EX_UPDATE',           // { di, ei, field, value }
@@ -2003,6 +2012,17 @@ function reduce(state, action) {
       if (!p.musterId) break;
       if (!state.surpriseLog) state.surpriseLog = {};
       state.surpriseLog[p.musterId] = new Date().toISOString().slice(0, 7);
+      break;
+    }
+    case A.PLATEAU_ACTION: {
+      if (!p.exerciseName || !p.action) break;
+      if (!state.plateauActions) state.plateauActions = {};
+      // Überschreibt immer — letzte Aktion für diese Übung gewinnt.
+      state.plateauActions[p.exerciseName] = {
+        action: p.action,
+        since: p.since,
+        plateauWeeksAtAction: p.plateauWeeksAtAction,
+      };
       break;
     }
     case A.EX_APPLY_REENTRY_REDUCTION: {

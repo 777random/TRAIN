@@ -30,7 +30,6 @@ import { getWeightRecommendation, roundToPlate, isReadyForAutoSelect } from './w
 import { renderProgressChart, renderBodyWeightChart, renderRelativeStrengthChart } from './progressChart.js';
 import { buildWeekReview }        from './weekReview.js';
 import { showWeekReviewModal, renderWeekReviewHtml } from './weekReviewModal.js';
-import { detectPlateaus }         from './plateauDetector.js';
 import { computeWeeklyFocus, isInRecoveryWindow, buildDecisionalBalance } from './weeklyFocus.js';
 import { findExactDuplicates, findSimilarCandidates } from './exerciseNameCleanup.js';
 import { computeErkenntnisLines, getProgressCorridorCalibration } from './progressInsights.js';
@@ -2465,6 +2464,19 @@ function renderCoachTab(state) {
       </div>
     </details>` : '';
 
+  // Plateau-Aktionen (Sprint C2, train-v109): nur bei status==='plateau'.
+  // Dezenter Bestätigungs-Stil (btn--ghost), kein Accent-CTA — die Karte ist
+  // informativ, nicht handlungsdrängend.
+  const plateauActionsHtml = focus.status === 'plateau' ? `
+    <div class="coach-plateau-actions">
+      <button type="button" class="btn btn--ghost btn--sm" data-action="plateau-implemented" data-ex="${h(focus.plateau.exerciseName)}" data-pw="${focus.plateau.plateauWeeks}">
+        ✓ Habe ich umgesetzt
+      </button>
+      <button type="button" class="btn btn--ghost btn--sm" data-action="plateau-ignore" data-ex="${h(focus.plateau.exerciseName)}" data-pw="${focus.plateau.plateauWeeks}">
+        Ignorieren
+      </button>
+    </div>` : '';
+
   container.innerHTML = `
   <div class="chart-card coach-focus-card">
     <div class="chart-card__title">📋 Fokus der Woche</div>
@@ -2472,6 +2484,7 @@ function renderCoachTab(state) {
     <p class="coach-focus-reasoning">${h(focus.reasoning)}</p>
     ${focus.recommendation ? `<p class="coach-focus-recommendation">${h(focus.recommendation)}</p>` : ''}
     ${balanceHtml}
+    ${plateauActionsHtml}
   </div>`;
 }
 
@@ -2759,8 +2772,7 @@ function _updateInlineReview(state) {
     .reverse();
   const wk = reviewable[+sel.value];
   if (!wk) { wrap.innerHTML = ''; return; }
-  const plateaus = detectPlateaus(state.weeks, state.favoriteExercises ?? []);
-  const review = buildWeekReview(wk, state.weeks, state.favoriteExercises ?? [], plateaus);
+  const review = buildWeekReview(wk, state.weeks, state.favoriteExercises ?? []);
   wrap.innerHTML = renderWeekReviewHtml(review);
 }
 
@@ -3730,8 +3742,7 @@ function _handleClick(e) {
       _moreRecsOpen = false;
       _userDismissedAutoSelect = new Set();
       if (_hasCompleted) {
-        const _plateaus = detectPlateaus(_st.weeks, _st.favoriteExercises ?? []);
-        const _review = buildWeekReview(_lastWk, _st.weeks, _st.favoriteExercises ?? [], _plateaus);
+        const _review = buildWeekReview(_lastWk, _st.weeks, _st.favoriteExercises ?? []);
         showWeekReviewModal(_review, () => { _prepNewWeekModal(); openModal('modal-new-week'); });
       } else {
         _prepNewWeekModal();
@@ -3865,6 +3876,24 @@ function _handleClick(e) {
       dispatch(A.DAY_ADD_CLONE, { sourceDi: null });
       _weekMenuOpen = false;
       showToast('Neuer Trainingstag hinzugefügt', 'ok');
+      break;
+    }
+
+    // Plateau-Aktionen im Coach-Tab (Sprint C2, train-v109) — "since" ist der
+    // Wochenstart der chronologisch letzten Woche, dieselbe Anker-Konvention
+    // wie _isPlateauSuppressed()/_relativeWeekLabel() (nicht state.curIdx,
+    // das kann beim Navigieren auf eine andere Woche zeigen).
+    case 'plateau-implemented':
+    case 'plateau-ignore': {
+      const curWk = getLatestWeek(getState().weeks);
+      if (!curWk) break;
+      dispatch(A.PLATEAU_ACTION, {
+        exerciseName: el.dataset.ex,
+        action: action === 'plateau-implemented' ? 'implemented' : 'ignored',
+        since: curWk.startDate,
+        plateauWeeksAtAction: +el.dataset.pw,
+      });
+      showToast(action === 'plateau-implemented' ? '✓ Als umgesetzt markiert' : 'Plateau-Hinweis ausgeblendet', 'ok');
       break;
     }
 

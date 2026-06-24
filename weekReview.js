@@ -171,13 +171,17 @@ function _buildRecommendations(highlights, lowlights, completedDays, plannedDays
 /**
  * Berechnet einen strukturierten Wochenrückblick.
  *
+ * Plateau ist NICHT mehr Teil von "Was nicht gut lief" (Sprint C2,
+ * train-v109) — lebt jetzt ausschließlich im Coach-Tab (Fokus der Woche,
+ * weeklyFocus.js), inkl. eigener Decisional-Balance + Ignorieren/Umgesetzt-
+ * Buttons. Kein plateaus-Parameter mehr nötig.
+ *
  * @param {Object} week               Die zu reviewende Woche
  * @param {Array}  allWeeks           Alle Wochen (für PR-Vergleich und Streak)
  * @param {Array}  [favoriteExercises=[]]  Favorisierte Übungsnamen
- * @param {Array}  [plateaus=[]]      Plateau-Objekte aus detectPlateaus()
  * @returns {{ summary, highlights, lowlights, recommendations, isDeload, week }}
  */
-export function buildWeekReview(week, allWeeks, favoriteExercises = [], plateaus = []) {
+export function buildWeekReview(week, allWeeks, favoriteExercises = []) {
   const isDeload   = week.mode === 'deload';
   const isVacation = week.mode === 'vacation';
   const sorted   = [...allWeeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
@@ -222,17 +226,6 @@ export function buildWeekReview(week, allWeeks, favoriteExercises = [], plateaus
     if (fatigueH) lowlights.push(fatigueH);
   }
 
-  // ── Plateau-Lowlight einfügen ─────────────────────────────────────────────────
-  if (plateaus.length > 0) {
-    const p = plateaus[0];
-    lowlights.push({
-      type:   'plateau',
-      label:  'Plateau erkannt',
-      text:   `${p.exerciseName} — ${p.plateauWeeks} Wochen ohne Steigerung`,
-      exName: p.exerciseName,
-    });
-  }
-
   // ── Favoriten zuerst in highlights + lowlights ───────────────────────────────
   if (favoriteExercises.length > 0) {
     const _fav = name => favoriteExercises.includes(name) ? 0 : 1;
@@ -242,12 +235,6 @@ export function buildWeekReview(week, allWeeks, favoriteExercises = [], plateaus
 
   // ── Recommendations ───────────────────────────────────────────────────────────
   const recommendations = _buildRecommendations(highlights, lowlights, completedDays, plannedDays, isDeload);
-
-  // Replace rec[1] with plateau action when a plateau lowlight is present
-  const hasPlateau = lowlights.some(l => l.type === 'plateau');
-  if (hasPlateau && plateaus.length > 0 && recommendations.length >= 2) {
-    recommendations[1] = { text: plateaus[0].actionText };
-  }
 
   return { summary, highlights, lowlights, recommendations, isDeload, isVacation, week };
 }
