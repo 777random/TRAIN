@@ -60,6 +60,9 @@ let _showCustomDeload = false;
 /** Key of currently open RPE popover: `${di}-${ei}-${si}` or null. */
 let _rpePopoverKey = null;
 
+/** Id of the currently open Kennzahlen-Erklärungstooltip (Fortschritt-Tab) or null. */
+let _metricTooltipKey = null;
+
 /** Key of exercise whose confirm button is flashing green: `${di}-${ei}` or null. */
 let _confirmFlashKey = null;
 
@@ -1024,6 +1027,29 @@ function _showStreakFreezePopup(state) {
     } else if (btn.dataset.action === 'close-modal') {
       overlay.remove();
     }
+  });
+}
+
+/** Abzeichen-Detailansicht (D2) — nur für bereits erreichte Abzeichen, dieselbe disposable-Overlay-Konvention wie _showStreakFreezePopup. */
+function _showBadgeDetail(thr, earned) {
+  document.getElementById('badge-detail-modal')?.remove();
+  const dateStr = new Date(earned.unlockedAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' });
+  const overlay = document.createElement('div');
+  overlay.id = 'badge-detail-modal';
+  overlay.className = 'vac-plan-modal-overlay';
+  overlay.innerHTML = `
+    <div class="vac-plan-modal" style="align-items:center;text-align:center">
+      <img src="./badges/${thr.id}.png" alt="${thr.title}" class="badge-img" width="120" height="120" style="align-self:center">
+      <div class="vac-plan-modal__title">${thr.title}</div>
+      <p class="vac-plan-modal__sub">${thr.weeks} Wochen Training in Folge</p>
+      <p class="vac-plan-modal__sub" style="color:var(--c-ok)">Erreicht am ${dateStr}</p>
+      <button class="btn btn--ghost" data-action="close-modal" data-target="badge-detail-modal" style="width:100%;min-height:var(--touch)">Schließen</button>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) { overlay.remove(); return; }
+    if (e.target.closest('[data-action="close-modal"]')) overlay.remove();
   });
 }
 
@@ -2735,10 +2761,16 @@ function renderProgressTab(state) {
       <div class="streak-card"><div class="streak-num">${streak.cur}</div><div class="streak-lbl">Wo. · ${streak.cur * 7} T.</div></div>
       <div class="streak-card"><div class="streak-num">${streak.best}</div><div class="streak-lbl">Best</div></div>
       <div class="streak-card"><div class="streak-num">${state.weeks.length}</div><div class="streak-lbl">Wochen</div></div>
-      ${avgScore !== null ? `<div class="streak-card"><div class="streak-num" style="color:${avgScore>=90?'var(--c-ok)':avgScore>=70?'var(--c-warn)':'var(--c-danger)'}">${avgScore}%</div><div class="streak-lbl">Ø Erfolg</div></div>` : ''}
+      ${avgScore !== null ? `
+      <button type="button" class="streak-card" data-action="toggle-metric-tooltip" data-metric="avg-score" aria-expanded="${_metricTooltipKey === 'avg-score'}" aria-label="Ø Erfolg erklären">
+        <div class="streak-num" style="color:${avgScore>=90?'var(--c-ok)':avgScore>=70?'var(--c-warn)':'var(--c-danger)'}">${avgScore}%</div>
+        <div class="streak-lbl">Ø Erfolg</div>
+      </button>` : ''}
       ${avgMin != null ? `<div class="streak-card"><div class="streak-num">${fmtMin(avgMin)}</div><div class="streak-lbl">Ø Session</div></div>` : ''}
       ${totalMin != null ? `<div class="streak-card"><div class="streak-num">${fmtMin(totalMin)}</div><div class="streak-lbl">Gesamt</div></div>` : ''}
-    </div>`;
+    </div>
+    ${_metricTooltipKey === 'avg-score' ? `
+    <div class="metric-tooltip">Anteil der Sätze bei denen du dein Wdh-Ziel erreicht hast — gemittelt über alle bisherigen Wochen. Pending-Sätze werden nicht gezählt.</div>` : ''}`;
     })()}
     ${_renderBadgeGallery(state)}
   </div>`;
@@ -3574,6 +3606,14 @@ function _bindEvents(root) {
  */
 function _handleClick(e) {
 
+  // Close Kennzahlen-Erklärungstooltip when clicking outside it (D2)
+  if (_metricTooltipKey !== null
+      && !e.target.closest('.metric-tooltip')
+      && !e.target.closest('[data-action="toggle-metric-tooltip"]')) {
+    _metricTooltipKey = null;
+    scheduleRender();
+  }
+
   // Close RPE popover when clicking outside it (2.2)
   if (_rpePopoverKey !== null
       && !e.target.closest('.rpe-popover')
@@ -3661,6 +3701,13 @@ function _handleClick(e) {
       _showStreakFreezePopup(getState());
       break;
 
+    case 'show-badge-detail': {
+      const thr = BADGE_THRESHOLDS.find(t => t.id === el.dataset.badgeId);
+      const earned = (getState().badges ?? []).find(b => b.id === el.dataset.badgeId);
+      if (thr && earned) _showBadgeDetail(thr, earned);
+      break;
+    }
+
     // ── Overview mode ─────────────────────────────────────────────────────
     case 'toggle-overview':
       _overviewMode = !_overviewMode;
@@ -3672,6 +3719,14 @@ function _handleClick(e) {
       _showBodyInsights = !_showBodyInsights;
       scheduleRender();
       break;
+
+    // ── Kennzahlen-Erklärung (Fortschritt-Tab, D2) ─────────────────────────
+    case 'toggle-metric-tooltip': {
+      const _mKey = el.dataset.metric;
+      _metricTooltipKey = _metricTooltipKey === _mKey ? null : _mKey;
+      scheduleRender();
+      break;
+    }
 
     // ── Session rating / fatigue indicator (3.5) ───────────────────────────
     case 'set-session-rating': {
@@ -5985,11 +6040,11 @@ function _renderBadgeGallery(state) {
     const earned = badges.find(b => b.id === thr.id);
     if (earned) {
       const dateStr = new Date(earned.unlockedAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' });
-      return `<div class="badge-item badge-item--earned">
+      return `<button type="button" class="badge-item badge-item--earned" data-action="show-badge-detail" data-badge-id="${thr.id}" aria-label="${thr.title} — Details">
         <img src="./badges/${thr.id}.png" alt="${thr.title}" class="badge-img" width="80" height="80">
         <div class="badge-item__title">${thr.title}</div>
         <div class="badge-item__sub badge-item__date">${dateStr}</div>
-      </div>`;
+      </button>`;
     }
     const weeksLeft = thr.weeks - streak;
     return `<div class="badge-item">

@@ -1182,6 +1182,13 @@ exercise { position: unset; }
 .streak-card { flex: 0 0 auto; min-width: 56px; background: var(--c-surface2); border-radius: var(--r-md); padding: var(--sp-3); text-align: center; }
 .streak-num { font-family: var(--font-display); font-size: 32px; color: var(--c-accent); line-height: 1; }
 .streak-lbl { font-size: 9px; color: var(--c-text-3); letter-spacing: .1em; text-transform: uppercase; margin-top: 3px; }
+.streak-card[data-action] { cursor: pointer; border: none; font-family: inherit; }
+.metric-tooltip {
+  margin-top: var(--sp-2);
+  background: var(--c-surface); border: 1px solid var(--c-border);
+  border-radius: var(--r-md); padding: var(--sp-3);
+  font-size: 12px; line-height: 1.5; color: var(--c-text-2);
+}
 .diff-up { color: var(--c-ok); } .diff-dn { color: var(--c-danger); }
 .progress-bar-wrap { margin-top: var(--sp-2); background: var(--c-surface2); border-radius: var(--r-full); height: 3px; overflow: hidden; }
 
@@ -2029,6 +2036,9 @@ details[open] > .deload-details__summary::before { content: '▾ '; }
 .badge-item {
   display: flex; flex-direction: column; align-items: center; gap: 4px;
   text-align: center;
+}
+.badge-item--earned {
+  background: none; border: none; font-family: inherit; padding: 0; cursor: pointer;
 }
 .badge-item__img { width: 52px; height: 52px; border-radius: 50%; }
 .badge-img { width: 80px; height: 80px; object-fit: contain; border-radius: 50%; }
