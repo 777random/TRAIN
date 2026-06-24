@@ -24,7 +24,7 @@
 
 export const STORAGE_KEY        = 'train_v6';
 export const STORAGE_KEY_SHADOW = 'train_v6_shadow';
-export const SCHEMA_VERSION     = 27;
+export const SCHEMA_VERSION     = 28;
 
 export const BADGE_THRESHOLDS = [
   { id: 'badge_4',   weeks: 4,   title: 'Erster Schritt' },
@@ -199,6 +199,11 @@ function buildDefaultState() {
       maxSessionMs:                   10800000, // 3h default
       autoStartPauseTimer:            true,
       dismissedNamePairs:             [], // [nameA, nameB][] – sortiert, getrimmt, lowercase
+      autoWeek: {
+        enabled:          false, // Hauptschalter automatische Wochenerstellung
+        suggestProgress:  true,  // Steigerungs-Modal beim ersten Öffnen zeigen?
+        showReview:       true,  // Wochenrückblick der Vorwoche zuerst zeigen?
+      },
     },
   };
 }
@@ -836,6 +841,18 @@ function migrate(raw) {
     raw.meta = { ...raw.meta, schemaVersion: 27 };
   }
 
+  // v27 → v28: add state.settings.autoWeek (Sprint C3, train-v110)
+  if ((raw.meta?.schemaVersion ?? 0) < 28) {
+    if (!raw.settings.autoWeek || typeof raw.settings.autoWeek !== 'object') {
+      raw.settings.autoWeek = { enabled: false, suggestProgress: true, showReview: true };
+    } else {
+      if (raw.settings.autoWeek.enabled         === undefined) raw.settings.autoWeek.enabled         = false;
+      if (raw.settings.autoWeek.suggestProgress === undefined) raw.settings.autoWeek.suggestProgress = true;
+      if (raw.settings.autoWeek.showReview      === undefined) raw.settings.autoWeek.showReview      = true;
+    }
+    raw.meta = { ...raw.meta, schemaVersion: 28 };
+  }
+
   // Always-apply defaults for settings added in later versions
   if (raw.settings.vibrationEnabled               === undefined) raw.settings.vibrationEnabled               = true;
   if (raw.settings.rpeEnabled                     === undefined) raw.settings.rpeEnabled                     = true;
@@ -886,6 +903,13 @@ export function loadState() {
       _recalcExercisePRs(STATE);
       _checkAndGrantBadges(STATE);
       console.log('[TRAIN] streak:', _calcCurrentStreak(STATE.weeks), 'badges:', STATE.badges);
+      // In-Memory-only — nie persistiert (siehe persistState() unten, läuft
+      // VOR diesem Reset). Explizit auf false erzwingen, falls ein früherer
+      // Build es doch einmal mitserialisiert hat: ein stehengebliebenes
+      // "true" aus einer alten Session dürfte sonst beim nächsten
+      // Training-Tab-Öffnen fälschlich den Modal-Flow erneut anstoßen.
+      STATE.autoWeekPending = false;
+      _checkAndAutoCreateWeek(STATE);
       persistState(); // re-write so both keys are in sync
       return true;
     } catch (e) {
@@ -896,6 +920,7 @@ export function loadState() {
   // Nothing recoverable – start fresh; onboarding will create the first week
   console.log('[TRAIN] loadState: fresh start — no saved data');
   STATE = buildDefaultState();
+  STATE.autoWeekPending = false;
   persistState();
   return false;
 }
@@ -925,6 +950,16 @@ function _notify() {
 /** Returns a read-only view of the current state. Never mutate this directly. */
 export function getState() {
   return STATE; // UI reads only; all writes go through dispatch()
+}
+
+/**
+ * Resets the in-memory-only autoWeekPending flow flag (Sprint C3,
+ * train-v110) once the review/suggestion modal sequence is done.
+ * Deliberately bypasses dispatch()/persistState() — this flag must NEVER
+ * be written to localStorage, only loadState() may set it true again.
+ */
+export function clearAutoWeekPending() {
+  STATE.autoWeekPending = false;
 }
 
 // ─── Week helpers (used inside reducers) ─────────────────────────────────────
@@ -998,6 +1033,33 @@ function _nextMonday() {
   return d.toISOString().split('T')[0];
 }
 
+/**
+ * Monday of THIS (current) calendar week, as an ISO date — same calc as
+ * ui.js' onboarding _applyBlank(), deliberately NOT _nextMonday() above
+ * (which computes the UPCOMING Monday, one week later). Used by the
+ * Sprint C3 (train-v110) auto-week-creation trigger.
+ */
+function _currentMonday() {
+  const d   = new Date();
+  const dow = d.getDay(); // 0 = Sunday
+  d.setDate(d.getDate() + (dow === 0 ? -6 : 1 - dow));
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Sprint C3 (train-v110): prüft beim App-Öffnen ob die aktuelle Kalender-
+ * woche automatisch angelegt werden soll. Reine Bedingungsprüfung + Dispatch
+ * — der eigentliche Modal-Flow (Wochenrückblick/Steigerungsvorschläge) lebt
+ * in ui.js und reagiert auf state.autoWeekPending.
+ */
+function _checkAndAutoCreateWeek(state) {
+  if (!state.settings?.autoWeek?.enabled) return;
+  if (!state.weeks.length) return; // Bedingung b: braucht eine Vorwoche als Vorlage
+  const startDate = _currentMonday();
+  if (state.weeks.find(w => w.startDate === startDate)) return; // Bedingung c: existiert schon
+  dispatch(A.AUTO_WEEK_CREATE, { startDate });
+}
+
 // ─── Action type catalogue ────────────────────────────────────────────────────
 
 export const A = Object.freeze({
@@ -1005,6 +1067,7 @@ export const A = Object.freeze({
   WEEK_NAVIGATE:       'WEEK_NAVIGATE',       // { delta: ±1 }
   // Week CRUD
   WEEK_CREATE:         'WEEK_CREATE',         // { startDate, note, source?: 'prev'|'template' }
+  AUTO_WEEK_CREATE:    'AUTO_WEEK_CREATE',    // { startDate } – automatische Wochenerstellung beim App-Öffnen, Steigerungen NIE still angewendet
   WEEK_DELETE:         'WEEK_DELETE',         // { weekIdx?: number }  — omit to delete curIdx
   WEEK_COPY_PREV:      'WEEK_COPY_PREV',      // {}
   WEEK_SET_MODE:       'WEEK_SET_MODE',       // { mode: 'standard'|'deload'|'vacation' }
@@ -1069,6 +1132,7 @@ export const A = Object.freeze({
   // Settings
   SETTING_TOGGLE:      'SETTING_TOGGLE',      // { key }
   SETTING_SET:         'SETTING_SET',         // { key, value }
+  AUTOWEEK_SET:        'AUTOWEEK_SET',        // { key: 'enabled'|'suggestProgress'|'showReview', value: boolean }
   // Backup
   STATE_IMPORT:        'STATE_IMPORT',        // { imported: StateObject }
   // Undo
@@ -1197,6 +1261,35 @@ function reduce(state, action) {
       state.weeks.push(newWeek);
       _resortWeeksKeepingCurrent(state, newWeek);
       _checkAndGrantBadges(state);
+      break;
+    }
+    // Sprint C3 (train-v110): automatische Wochenerstellung beim App-Öffnen.
+    // Identisch zum WEEK_CREATE('prev')-Pfad, ABER bewusst OHNE
+    // _applyPlannedProgression() — Steigerungen dürfen nie still angewendet
+    // werden (Progressive-Overload-Kernprinzip), sie bleiben nur als
+    // Vorschlag fürs Modal erhalten. nextWeekPlan/-Confirmed werden trotzdem
+    // zurückgesetzt, sonst würde eine in der Vorwoche bereits bestätigte
+    // Steigerung optisch "bestätigt" wirken, ohne angewendet worden zu sein.
+    case A.AUTO_WEEK_CREATE: {
+      if (!p.startDate) break;
+      if (state.weeks.find(w => w.startDate === p.startDate)) break; // dedupe
+      if (!state.weeks.length) break; // braucht eine Vorwoche als Vorlage
+      const lastWeek = getLatestWeek(state.weeks);
+      const days = clone(lastWeek.days);
+      days.forEach(d => (d.exercises ?? []).forEach(ex => {
+        ex.nextWeekPlan = 0;
+        ex.nextWeekPlanConfirmed = false;
+      }));
+      _resetClonedDays(days);
+
+      const newWeek = {
+        id: Date.now(), startDate: p.startDate, note: '',
+        mode: 'standard', days, sessionLog: [], bodyData: {}, restDays: [],
+      };
+      state.weeks.push(newWeek);
+      _resortWeeksKeepingCurrent(state, newWeek);
+      _checkAndGrantBadges(state);
+      state.autoWeekPending = true;
       break;
     }
     case A.WEEK_DELETE: {
@@ -1822,6 +1915,13 @@ function reduce(state, action) {
     }
     case A.SETTING_SET: {
       state.settings[p.key] = p.value;
+      break;
+    }
+    case A.AUTOWEEK_SET: {
+      if (!state.settings.autoWeek) state.settings.autoWeek = { enabled: false, suggestProgress: true, showReview: true };
+      if (['enabled', 'suggestProgress', 'showReview'].includes(p.key)) {
+        state.settings.autoWeek[p.key] = !!p.value;
+      }
       break;
     }
 

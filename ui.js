@@ -19,7 +19,7 @@
 import {
   getState, dispatch, subscribe, A, canUndo, BADGE_THRESHOLDS, VACATION_PLANS,
   calcCurrentStreak, calcLongestStreakEver, weekTrainingStatus, getLatestWeek,
-  effectiveStreakFreeze, _quarter, nextQuarterStartLabel,
+  effectiveStreakFreeze, _quarter, nextQuarterStartLabel, clearAutoWeekPending,
 } from './state.js';
 import {
   exportJSON, importJSON, exportCSV,
@@ -3276,6 +3276,47 @@ function renderSettingsTab(state) {
           >${String(ps).replace('.', ',')} kg</button>`).join('')}
       </div>
     </div>
+    ${(() => {
+      const autoWeek = s.autoWeek ?? { enabled: false, suggestProgress: true, showReview: true };
+      const subDisabled = !autoWeek.enabled;
+      return `
+    <div class="settings-row">
+      <div>
+        <div class="settings-row__label">Automatische Wochenerstellung</div>
+        <div class="settings-row__desc">Legt beim App-Öffnen automatisch eine neue Woche an, sobald die aktuelle Kalenderwoche noch fehlt</div>
+      </div>
+      <button
+        class="toggle${autoWeek.enabled ? ' is-on' : ''}"
+        data-action="toggle-autoweek-enabled"
+        role="switch" aria-checked="${!!autoWeek.enabled}"
+        aria-label="Automatische Wochenerstellung"
+      ></button>
+    </div>
+    <div class="settings-row autoweek-sub${subDisabled ? ' is-disabled' : ''}">
+      <div>
+        <div class="settings-row__label">Steigerungen vorschlagen</div>
+        <div class="settings-row__desc">Zeigt das Steigerungs-Modal beim ersten Öffnen der neuen Woche</div>
+      </div>
+      <button
+        class="toggle${autoWeek.suggestProgress ? ' is-on' : ''}"
+        data-action="toggle-autoweek-sub" data-key="suggestProgress"
+        role="switch" aria-checked="${!!autoWeek.suggestProgress}"
+        aria-label="Steigerungen vorschlagen" ${subDisabled ? 'disabled' : ''}
+      ></button>
+    </div>
+    <div class="settings-row autoweek-sub${subDisabled ? ' is-disabled' : ''}">
+      <div>
+        <div class="settings-row__label">Wochenrückblick zuerst zeigen</div>
+        <div class="settings-row__desc">Zeigt den Rückblick der Vorwoche, bevor das Steigerungs-Modal erscheint</div>
+      </div>
+      <button
+        class="toggle${autoWeek.showReview ? ' is-on' : ''}"
+        data-action="toggle-autoweek-sub" data-key="showReview"
+        role="switch" aria-checked="${!!autoWeek.showReview}"
+        aria-label="Wochenrückblick zuerst zeigen" ${subDisabled ? 'disabled' : ''}
+      ></button>
+    </div>`;
+    })()}
     <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:var(--sp-1)">
       <div class="settings-row__label">Stangengewicht (kg)</div>
       <input class="body-input" type="number" step="0.5" min="5" max="50"
@@ -4555,6 +4596,18 @@ function _handleClick(e) {
     case 'toggle-setting':
       dispatch(A.SETTING_TOGGLE, { key }); break;
 
+    case 'toggle-autoweek-enabled': {
+      const cur = getState().settings?.autoWeek?.enabled ?? false;
+      dispatch(A.AUTOWEEK_SET, { key: 'enabled', value: !cur });
+      break;
+    }
+    case 'toggle-autoweek-sub': {
+      const subKey = el.dataset.key;
+      const cur = getState().settings?.autoWeek?.[subKey] ?? false;
+      dispatch(A.AUTOWEEK_SET, { key: subKey, value: !cur });
+      break;
+    }
+
     case 'set-deload-factor': {
       const factor = parseFloat(el.dataset.factor);
       if (Number.isFinite(factor)) {
@@ -5188,6 +5241,37 @@ function _createWeek() {
   }
 }
 
+/**
+ * Sprint C3 (train-v110): die Woche wurde bereits in state.js'
+ * _checkAndAutoCreateWeek()/AUTO_WEEK_CREATE automatisch angelegt (vor
+ * mountApp, beim loadState()) — hier läuft nur noch der optionale Modal-
+ * Flow (Wochenrückblick der Vorwoche, dann Steigerungsvorschläge), exakt
+ * dieselben Funktionen wie im manuellen "open-new-week"-Flow
+ * (showWeekReviewModal()/_prepNewWeekModal()) — kein neues Modal.
+ */
+function _runAutoWeekFlow() {
+  const state = getState();
+  if (!state.autoWeekPending) return;
+  const autoWeek = state.settings?.autoWeek ?? {};
+  const sorted   = [...state.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
+  const prevWeek = sorted[sorted.length - 2] ?? null; // die soeben auto-erstellte Woche ist die letzte
+
+  const step2 = () => {
+    if (autoWeek.suggestProgress) {
+      _prepNewWeekModal();
+      openModal('modal-new-week');
+    }
+    clearAutoWeekPending();
+  };
+
+  if (autoWeek.showReview && prevWeek) {
+    const review = buildWeekReview(prevWeek, state.weeks, state.favoriteExercises ?? []);
+    showWeekReviewModal(review, step2);
+  } else {
+    step2();
+  }
+}
+
 // ─── Template save ────────────────────────────────────────────────────────────
 function _saveTemplate() {
   const tpl = JSON.parse(JSON.stringify(getState().customTemplate));
@@ -5580,6 +5664,8 @@ export function mountApp(root) {
     for (const ins of triggered) {
       if (ins.immediate) showToast(ins.message, ins.type === 'warning' ? 'warn' : 'ok', 5000);
     }
+
+    _runAutoWeekFlow();
 
     const st = getState();
     const pause = _detectReentryPause(st);

@@ -1273,6 +1273,14 @@ exercise { position: unset; }
   background: #fff; box-shadow: var(--shadow-sm); transition: left var(--t-normal);
 }
 .toggle.is-on::after { left: 23px; }
+.toggle:disabled { cursor: not-allowed; opacity: .5; }
+
+/* Sprint C3 (train-v110): eingerückte Suboptionen der automatischen
+   Wochenerstellung — bleiben sichtbar, werden bei deaktiviertem
+   Hauptschalter nur ausgegraut (nicht versteckt). */
+.settings-row.autoweek-sub { padding-left: calc(var(--sp-4) + var(--sp-4)); }
+.settings-row.autoweek-sub.is-disabled { opacity: .45; }
+
 .tpl-day-section { margin-bottom: var(--sp-4); }
 .tpl-day-title { font-family: var(--font-display); font-size: 15px; letter-spacing: .08em; color: var(--c-accent); margin-bottom: var(--sp-2); }
 .tpl-exercise { background: var(--c-surface2); border: 1px solid var(--c-border); border-radius: var(--r-md); padding: var(--sp-3); margin-bottom: var(--sp-2); }
