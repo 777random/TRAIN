@@ -2562,6 +2562,16 @@ function renderCoachTab(state) {
     const historyText = _decisionHistoryConclusion(relevantHistory);
     const historyHtml = historyText
       ? `<p class="coach-decision-history">${h(historyText)}</p>` : '';
+    const activeDecision = (state.decisionLog ?? [])
+      .filter(e => e.type === focus.status && e.outcome === null)
+      .at(-1);
+    const stayClass   = activeDecision?.choice === 'stay'   ? ' is-selected' : activeDecision ? ' is-dimmed' : '';
+    const changeClass = activeDecision?.choice === 'change' ? ' is-selected' : activeDecision ? ' is-dimmed' : '';
+    const hintHtml = activeDecision ? (() => {
+      const dateStr = new Date(activeDecision.decidedWeekStart + 'T00:00:00')
+        .toLocaleDateString('de-DE', { day: 'numeric', month: 'long' });
+      return `<p class="coach-decision-hint">Entscheidung vom ${h(dateStr)} gespeichert — Ergebnis wird nach 2 weiteren Wochen gemessen.</p>`;
+    })() : '';
     return `
     <details class="pr-collapse coach-balance-collapse">
       <summary class="pr-collapse__summary">Abwägung anzeigen ▾</summary>
@@ -2571,15 +2581,16 @@ function renderCoachTab(state) {
         ${_renderOption(balance.changeOption)}
         <p class="coach-balance-closing">${h(balance.closing)}</p>
         <div class="coach-decision-btns">
-          <button type="button" class="btn btn--ghost btn--sm"
+          <button type="button" class="btn btn--ghost btn--sm${stayClass}"
             data-action="decision-log-stay"
             data-type="${h(focus.status)}"
             data-signal="${h(focus.reasoning)}">Weiter wie bisher</button>
-          <button type="button" class="btn btn--ghost btn--sm"
+          <button type="button" class="btn btn--ghost btn--sm${changeClass}"
             data-action="decision-log-change"
             data-type="${h(focus.status)}"
             data-signal="${h(focus.reasoning)}">Empfehlung folgen</button>
         </div>
+        ${hintHtml}
       </div>
     </details>`;
   })() : '';

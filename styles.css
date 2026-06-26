@@ -1042,6 +1042,9 @@ exercise { position: unset; }
 .coach-decision-history { font-size: 12px; color: var(--c-text-3); font-style: italic; margin: 0 0 var(--sp-3); }
 .coach-decision-btns { display: flex; gap: var(--sp-2); margin-top: var(--sp-3); flex-wrap: wrap; }
 .coach-decision-btns .btn { flex: 1; min-width: 130px; }
+.coach-decision-btns .btn.is-selected { border-color: var(--c-accent); background: rgba(200,255,0,.10); color: var(--c-text); }
+.coach-decision-btns .btn.is-dimmed { opacity: 0.45; }
+.coach-decision-hint { font-size: 11px; color: var(--c-text-3); font-style: italic; margin: var(--sp-2) 0 0; }
 
 /* Sprint C2 (train-v109): Plateau-Aktionen — dezent, kein Accent-CTA. */
 .coach-plateau-actions { display: flex; gap: var(--sp-2); margin-top: var(--sp-3); flex-wrap: wrap; }
