@@ -2454,13 +2454,13 @@ const _FOCUS_ICONS = {
 };
 
 // ─── Decision outcome check ───────────────────────────────────────────────────
-// Prüft beim App-Öffnen ob für offene Einträge (outcome===null) bereits 2 Wochen
-// vergangen sind, und befüllt das Ergebnis. Läuft in ui.js weil signalPersisted
-// computeWeeklyFocus() braucht (circular dep verhindert Aufruf aus state.js).
+// Prüft ob für offene Einträge (outcome===null) bereits ≥2 Wochen im State
+// NACH decidedWeekStart vorhanden sind, und befüllt das Ergebnis.
+// Wochen-basiert (nicht Systemzeit) damit die Simulation via Wochen-Anlegen
+// funktioniert. Läuft in ui.js weil signalPersisted computeWeeklyFocus()
+// braucht (circular dep verhindert Aufruf aus state.js).
 function _checkDecisionOutcomes(state) {
   if (!Array.isArray(state.decisionLog)) return;
-  const TWO_WEEKS_MS = 14 * 86_400_000;
-  const now = Date.now();
   const pending = state.decisionLog.filter(e => e.outcome === null);
   if (!pending.length) return;
 
@@ -2472,17 +2472,16 @@ function _checkDecisionOutcomes(state) {
   _d.setDate(_d.getDate() + (_dow === 0 ? -6 : 1 - _dow));
   const measuredWeekStart = _d.toISOString().slice(0, 10);
 
+  const _avg = (weeks) => {
+    const scored = weeks.map(w => _weekSuccessScore(w)).filter(s => s.total > 0);
+    return scored.length > 0 ? Math.round(scored.reduce((a, s) => a + s.pct, 0) / scored.length) : 0;
+  };
+
   for (const entry of pending) {
-    const decidedMs = new Date(entry.decidedWeekStart + 'T00:00:00').getTime();
-    if (now - decidedMs < TWO_WEEKS_MS) continue;
+    const afterWeeks = sorted.filter(w => w.startDate > entry.decidedWeekStart);
+    if (afterWeeks.length < 2) continue;
 
     const beforeWeeks = sorted.filter(w => w.startDate < entry.decidedWeekStart).slice(-2);
-    const afterWeeks  = sorted.filter(w => w.startDate > entry.decidedWeekStart).slice(0, 2);
-
-    const _avg = (weeks) => {
-      const scored = weeks.map(w => _weekSuccessScore(w)).filter(s => s.total > 0);
-      return scored.length > 0 ? Math.round(scored.reduce((a, s) => a + s.pct, 0) / scored.length) : 0;
-    };
 
     dispatch(A.DECISION_LOG_OUTCOME, {
       id: entry.id,
@@ -2490,7 +2489,7 @@ function _checkDecisionOutcomes(state) {
         measuredWeekStart,
         signalPersisted: currentStatus === entry.type,
         successRateBefore: _avg(beforeWeeks),
-        successRateAfter:  _avg(afterWeeks),
+        successRateAfter:  _avg(afterWeeks.slice(0, 2)),
       },
     });
   }
@@ -2540,6 +2539,8 @@ function renderCoachTab(state) {
     container.innerHTML = _noAnalysisDataHtml();
     return;
   }
+
+  _checkDecisionOutcomes(state);
 
   const focus   = computeWeeklyFocus(state);
   const icon    = _FOCUS_ICONS[focus.status] ?? _FOCUS_ICONS.onTrack;
@@ -4079,6 +4080,7 @@ function _handleClick(e) {
         choice: action === 'decision-log-stay' ? 'stay' : 'change',
         decidedWeekStart,
       });
+      _checkDecisionOutcomes(getState());
       showToast('Entscheidung gespeichert', 'ok');
       break;
     }
