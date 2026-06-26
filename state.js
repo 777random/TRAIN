@@ -181,6 +181,7 @@ function buildDefaultState() {
     },
     surpriseLog: {},          // { [musterId]: "YYYY-MM" } – letzter Monat, in dem ein Überraschungs-Muster gezeigt wurde
     plateauActions: {},       // { [exerciseName]: { action: 'ignored'|'implemented', since, plateauWeeksAtAction } }
+    decisionLog: [],          // { id, type, signal, choice, decidedWeekStart, outcome } – Abwägungs-Entscheidungen
     settings: {
       swipe:              true,
       drag:               true,
@@ -218,7 +219,7 @@ const _NO_UNDO = new Set([
   'UNDO', 'WEEK_NAVIGATE', 'STATE_IMPORT', 'SESSION_START', 'SESSION_RESET', 'SESSION_STOP',
   'INSIGHTS_SET', 'ONBOARDING_DONE', 'MARK_TIP_SEEN', 'REENTRY_HANDLED',
   'EX_AUTO_PRESELECT_NEXT_WEEK_PLAN', 'ACTIVATE_STREAK_FREEZE', 'RECORD_SURPRISE_SHOWN',
-  'PLATEAU_ACTION',
+  'PLATEAU_ACTION', 'DECISION_LOG_ADD', 'DECISION_LOG_OUTCOME',
 ]);
 
 /** Returns true when there is at least one undo snapshot available. */
@@ -889,6 +890,7 @@ export function loadState() {
       STATE = migrate(parsed);
       if (!Array.isArray(STATE.favoriteExercises)) STATE.favoriteExercises = [];
       if (!Array.isArray(STATE.customExercises))   STATE.customExercises   = [];
+      if (!Array.isArray(STATE.decisionLog))        STATE.decisionLog       = [];
       if (STATE.lastReentryHandled === undefined)  STATE.lastReentryHandled = null;
       if (typeof STATE.longestStreakEver !== 'number') STATE.longestStreakEver = _calcLongestStreakEver(STATE.weeks);
       if (!Array.isArray(STATE.badges))            STATE.badges = [];
@@ -1153,6 +1155,9 @@ export const A = Object.freeze({
   ONBOARDING_WEEK_CREATE:   'ONBOARDING_WEEK_CREATE',   // { startDate, days[], note? }
   ONBOARDING_DONE:          'ONBOARDING_DONE',          // {}
   MARK_TIP_SEEN:            'MARK_TIP_SEEN',            // { tipId: string }
+  // Decision log (Sprint: Abwägungs-Entscheidungen)
+  DECISION_LOG_ADD:         'DECISION_LOG_ADD',         // { type, signal, choice: 'stay'|'change', decidedWeekStart }
+  DECISION_LOG_OUTCOME:     'DECISION_LOG_OUTCOME',     // { id, outcome: { measuredWeekStart, signalPersisted, successRateBefore, successRateAfter } }
 });
 
 // ─── Reducer ──────────────────────────────────────────────────────────────────
@@ -2193,6 +2198,27 @@ function reduce(state, action) {
     case A.MARK_TIP_SEEN: {
       if (!Array.isArray(state.seenTips)) state.seenTips = [];
       if (!state.seenTips.includes(p.tipId)) state.seenTips.push(p.tipId);
+      break;
+    }
+
+    // ── Decision log ──────────────────────────────────────────────────────────
+    case A.DECISION_LOG_ADD: {
+      if (!Array.isArray(state.decisionLog)) state.decisionLog = [];
+      state.decisionLog.push({
+        id: Date.now(),
+        type: p.type,
+        signal: p.signal,
+        choice: p.choice,
+        decidedWeekStart: p.decidedWeekStart,
+        outcome: null,
+      });
+      if (state.decisionLog.length > 50) state.decisionLog.splice(0, state.decisionLog.length - 50);
+      break;
+    }
+    case A.DECISION_LOG_OUTCOME: {
+      if (!Array.isArray(state.decisionLog)) break;
+      const entry = state.decisionLog.find(e => e.id === p.id);
+      if (entry && entry.outcome === null) entry.outcome = p.outcome;
       break;
     }
 

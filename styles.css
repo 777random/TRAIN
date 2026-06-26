@@ -1039,6 +1039,9 @@ exercise { position: unset; }
 .coach-balance-pro { font-size: 12px; color: var(--c-ok); margin-bottom: 2px; }
 .coach-balance-con { font-size: 12px; color: var(--c-text-3); margin-bottom: 2px; }
 .coach-balance-closing { font-size: 12px; color: var(--c-text-2); font-style: italic; margin: var(--sp-2) 0 0; }
+.coach-decision-history { font-size: 12px; color: var(--c-text-3); font-style: italic; margin: 0 0 var(--sp-3); }
+.coach-decision-btns { display: flex; gap: var(--sp-2); margin-top: var(--sp-3); flex-wrap: wrap; }
+.coach-decision-btns .btn { flex: 1; min-width: 130px; }
 
 /* Sprint C2 (train-v109): Plateau-Aktionen — dezent, kein Accent-CTA. */
 .coach-plateau-actions { display: flex; gap: var(--sp-2); margin-top: var(--sp-3); flex-wrap: wrap; }

@@ -2453,6 +2453,79 @@ const _FOCUS_ICONS = {
   onTrack:        '✅',
 };
 
+// ─── Decision outcome check ───────────────────────────────────────────────────
+// Prüft beim App-Öffnen ob für offene Einträge (outcome===null) bereits 2 Wochen
+// vergangen sind, und befüllt das Ergebnis. Läuft in ui.js weil signalPersisted
+// computeWeeklyFocus() braucht (circular dep verhindert Aufruf aus state.js).
+function _checkDecisionOutcomes(state) {
+  if (!Array.isArray(state.decisionLog)) return;
+  const TWO_WEEKS_MS = 14 * 86_400_000;
+  const now = Date.now();
+  const pending = state.decisionLog.filter(e => e.outcome === null);
+  if (!pending.length) return;
+
+  const currentStatus = computeWeeklyFocus(state).status;
+  const sorted = [...state.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
+
+  const _d = new Date();
+  const _dow = _d.getDay();
+  _d.setDate(_d.getDate() + (_dow === 0 ? -6 : 1 - _dow));
+  const measuredWeekStart = _d.toISOString().slice(0, 10);
+
+  for (const entry of pending) {
+    const decidedMs = new Date(entry.decidedWeekStart + 'T00:00:00').getTime();
+    if (now - decidedMs < TWO_WEEKS_MS) continue;
+
+    const beforeWeeks = sorted.filter(w => w.startDate < entry.decidedWeekStart).slice(-2);
+    const afterWeeks  = sorted.filter(w => w.startDate > entry.decidedWeekStart).slice(0, 2);
+
+    const _avg = (weeks) => {
+      const scored = weeks.map(w => _weekSuccessScore(w)).filter(s => s.total > 0);
+      return scored.length > 0 ? Math.round(scored.reduce((a, s) => a + s.pct, 0) / scored.length) : 0;
+    };
+
+    dispatch(A.DECISION_LOG_OUTCOME, {
+      id: entry.id,
+      outcome: {
+        measuredWeekStart,
+        signalPersisted: currentStatus === entry.type,
+        successRateBefore: _avg(beforeWeeks),
+        successRateAfter:  _avg(afterWeeks),
+      },
+    });
+  }
+}
+
+// ─── Decision history conclusion ──────────────────────────────────────────────
+// Baut den Schlussfolgerungs-Text aus abgeschlossenen Einträgen gleichen Typs.
+// entries: decisionLog-Einträge mit outcome !== null, gefiltert auf denselben Typ.
+function _decisionHistoryConclusion(entries) {
+  if (!entries.length) return '';
+  const N = entries.length;
+  if (N === 1) {
+    const label = entries[0].choice === 'stay' ? 'Weiter wie bisher' : 'der Empfehlung gefolgt';
+    return `Letztes Mal hast du bei diesem Signal ${label}.`;
+  }
+  let stayWorked = 0, stayFailed = 0, changeWorked = 0;
+  for (const e of entries) {
+    const o = e.outcome;
+    if (e.choice === 'stay' && o.signalPersisted === false && o.successRateAfter >= o.successRateBefore) stayWorked++;
+    else if (e.choice === 'stay' && (o.signalPersisted === true || o.successRateAfter < o.successRateBefore - 5)) stayFailed++;
+    else if (e.choice === 'change' && o.signalPersisted === false) changeWorked++;
+  }
+  const majority = N / 2;
+  if (N >= 3) {
+    if (stayWorked > majority) return `Weitertrainieren hat bei dir ${stayWorked}-mal funktioniert — das Signal verschwand danach.`;
+    if (stayFailed > majority) return `Weitertrainieren hat bei dir ${stayFailed}-mal das Signal nicht behoben.`;
+    if (changeWorked > majority) return `Die Empfehlung hat bei dir ${changeWorked}-mal funktioniert.`;
+  } else {
+    if (stayWorked > majority) return `Bei deinen ${stayWorked} bisherigen Malen hat Weitertrainieren funktioniert — das Signal verschwand danach.`;
+    if (stayFailed > majority) return `Bei deinen ${stayFailed} bisherigen Malen hat Weitertrainieren das Signal nicht behoben.`;
+    if (changeWorked > majority) return `Die Empfehlung hat bei dir ${changeWorked}-mal funktioniert.`;
+  }
+  return `Du hast dieses Signal ${N}-mal erlebt — die Ergebnisse waren gemischt.`;
+}
+
 // ─── Coach tab: einzige Komponente ist die "Fokus der Woche"-Karte. Sie
 // verdichtet Wiedereinstieg/Überlastung/Konsistenz-Engpass/Plateau/
 // Progression (in dieser Priorität, siehe weeklyFocus.js) zu EINER Aussage.
@@ -2482,15 +2555,33 @@ function renderCoachTab(state) {
   // Wiederverwendung des bestehenden <details>/<summary>-Aufklapp-Musters
   // (identisch zu "Alle Übungen ▼" bei Bestleistungen/Relative Stärke) —
   // kein neues UI-Pattern. Eingeklappt per Default (natives <details>-Verhalten).
-  const balanceHtml = balance ? `
+  const balanceHtml = balance ? (() => {
+    const relevantHistory = (state.decisionLog ?? [])
+      .filter(e => e.type === focus.status && e.outcome !== null);
+    const historyText = _decisionHistoryConclusion(relevantHistory);
+    const historyHtml = historyText
+      ? `<p class="coach-decision-history">${h(historyText)}</p>` : '';
+    return `
     <details class="pr-collapse coach-balance-collapse">
       <summary class="pr-collapse__summary">Abwägung anzeigen ▾</summary>
       <div class="pr-collapse__body">
+        ${historyHtml}
         ${_renderOption(balance.stayOption)}
         ${_renderOption(balance.changeOption)}
         <p class="coach-balance-closing">${h(balance.closing)}</p>
+        <div class="coach-decision-btns">
+          <button type="button" class="btn btn--ghost btn--sm"
+            data-action="decision-log-stay"
+            data-type="${h(focus.status)}"
+            data-signal="${h(focus.reasoning)}">Weiter wie bisher</button>
+          <button type="button" class="btn btn--ghost btn--sm"
+            data-action="decision-log-change"
+            data-type="${h(focus.status)}"
+            data-signal="${h(focus.reasoning)}">Empfehlung folgen</button>
+        </div>
       </div>
-    </details>` : '';
+    </details>`;
+  })() : '';
 
   // Plateau-Aktionen (Sprint C2, train-v109): nur bei status==='plateau'.
   // Dezenter Bestätigungs-Stil (btn--ghost), kein Accent-CTA — die Karte ist
@@ -3972,6 +4063,23 @@ function _handleClick(e) {
         plateauWeeksAtAction: +el.dataset.pw,
       });
       showToast(action === 'plateau-implemented' ? '✓ Als umgesetzt markiert' : 'Plateau-Hinweis ausgeblendet', 'ok');
+      break;
+    }
+
+    // Abwägungs-Entscheidungen loggen (Sprint: decision log)
+    case 'decision-log-stay':
+    case 'decision-log-change': {
+      const _d = new Date();
+      const _dow = _d.getDay();
+      _d.setDate(_d.getDate() + (_dow === 0 ? -6 : 1 - _dow));
+      const decidedWeekStart = _d.toISOString().slice(0, 10);
+      dispatch(A.DECISION_LOG_ADD, {
+        type: el.dataset.type,
+        signal: el.dataset.signal,
+        choice: action === 'decision-log-stay' ? 'stay' : 'change',
+        decidedWeekStart,
+      });
+      showToast('Entscheidung gespeichert', 'ok');
       break;
     }
 
@@ -5730,6 +5838,8 @@ export function mountApp(root) {
       _showSurpriseBanner(surprise.message);
       dispatch(A.RECORD_SURPRISE_SHOWN, { musterId: surprise.musterId });
     }
+
+    _checkDecisionOutcomes(st);
   }, 2000);
 }
 
