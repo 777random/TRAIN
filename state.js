@@ -221,7 +221,7 @@ const _NO_UNDO = new Set([
   'INSIGHTS_SET', 'ONBOARDING_DONE', 'MARK_TIP_SEEN', 'REENTRY_HANDLED',
   'EX_AUTO_PRESELECT_NEXT_WEEK_PLAN', 'ACTIVATE_STREAK_FREEZE', 'RECORD_SURPRISE_SHOWN',
   'PLATEAU_ACTION', 'DECISION_LOG_ADD', 'DECISION_LOG_OUTCOME',
-  'SET_ERKENNTNISSE_HORIZONT', 'SET_MOVEMENT_CHART_TYPE',
+  'SET_ERKENNTNISSE_HORIZONT',
 ]);
 
 /** Returns true when there is at least one undo snapshot available. */
@@ -886,7 +886,6 @@ function migrate(raw) {
   if (raw.settings.maxSessionMs                   === undefined) raw.settings.maxSessionMs                   = 10800000;
   if (raw.settings.autoStartPauseTimer            === undefined) raw.settings.autoStartPauseTimer            = true;
   if (!Array.isArray(raw.settings.dismissedNamePairs)) raw.settings.dismissedNamePairs = [];
-  if (raw.settings.movementChartType              === undefined) raw.settings.movementChartType              = 'radar';
 
   // Always-apply: week label (optional user-set name, no schema bump needed)
   (raw.weeks ?? []).forEach(wk => { if (!('label' in wk)) wk.label = ''; });
@@ -1191,7 +1190,6 @@ export const A = Object.freeze({
   DECISION_LOG_ADD:         'DECISION_LOG_ADD',         // { type, signal, choice: 'stay'|'change', decidedWeekStart }
   DECISION_LOG_OUTCOME:     'DECISION_LOG_OUTCOME',     // { id, outcome: { measuredWeekStart, signalPersisted, successRateBefore, successRateAfter } }
   SET_ERKENNTNISSE_HORIZONT: 'SET_ERKENNTNISSE_HORIZONT', // { value: number } — 4..52
-  SET_MOVEMENT_CHART_TYPE:   'SET_MOVEMENT_CHART_TYPE',   // { type: 'radar'|'bar' }
 });
 
 // ─── Reducer ──────────────────────────────────────────────────────────────────
@@ -2274,11 +2272,6 @@ function reduce(state, action) {
       if (!isNaN(v)) state.settings.erkenntnisseHorizont = Math.max(4, Math.min(52, v));
       break;
     }
-    case A.SET_MOVEMENT_CHART_TYPE: {
-      if (p.type === 'radar' || p.type === 'bar') state.settings.movementChartType = p.type;
-      break;
-    }
-
     default:
       console.warn('[TRAIN] Unknown action type:', type);
       return; // Don't persist unknown actions

@@ -2334,44 +2334,14 @@ function _relDate(startDate) {
   return `Vor ${weeks} Wochen`;
 }
 
-function _renderRadarSVG(catPct) {
-  const AXES = ['Push', 'Pull', 'Squat', 'Hinge', 'Carry', 'Core'];
-  const cx = 100, cy = 110, r = 70;
-  const ang = i => -Math.PI / 2 + i * (2 * Math.PI / AXES.length);
-  const pt  = (i, f) => [
-    +(cx + f * r * Math.cos(ang(i))).toFixed(1),
-    +(cy + f * r * Math.sin(ang(i))).toFixed(1),
-  ];
-  const rings = [1, 0.75, 0.5, 0.25].map(f => {
-    const pts = AXES.map((_, i) => pt(i, f).join(',')).join(' ');
-    return `<polygon points="${pts}" fill="none" stroke="#2E2E35" stroke-width="1"/>`;
-  }).join('');
-  const axisLines = AXES.map((_, i) => {
-    const [x2, y2] = pt(i, 1);
-    return `<line x1="${cx}" y1="${cy}" x2="${x2}" y2="${y2}" stroke="#2E2E35" stroke-width="1"/>`;
-  }).join('');
-  const dataPts = AXES.map((nm, i) => pt(i, Math.min((catPct[nm] ?? 0) / 100, 1)).join(',')).join(' ');
-  const polygon = `<polygon points="${dataPts}" fill="rgba(200,255,0,.18)" stroke="#C8FF00" stroke-width="2" stroke-linejoin="round"/>`;
-  const dots = AXES.map((nm, i) => {
-    if (!(catPct[nm] ?? 0)) return '';
-    const [dx, dy] = pt(i, Math.min((catPct[nm] ?? 0) / 100, 1));
-    return `<circle cx="${dx}" cy="${dy}" r="3" fill="#C8FF00"/>`;
-  }).join('');
-  const labels = AXES.map((nm, i) => {
-    const [lx, ly] = pt(i, 1.32);
-    const anchor = lx < cx - 5 ? 'end' : lx > cx + 5 ? 'start' : 'middle';
-    return `<text x="${lx}" y="${ly}" text-anchor="${anchor}" dominant-baseline="middle" font-size="10" fill="#AAA" font-family="system-ui,sans-serif">${nm}</text>
-      <text x="${lx}" y="${ly + 13}" text-anchor="${anchor}" dominant-baseline="middle" font-size="9" fill="#C8FF00" font-family="system-ui,sans-serif">${catPct[nm] ?? 0}%</text>`;
-  }).join('');
-  return `<svg viewBox="0 0 200 225" width="100%" style="max-width:400px;display:block;margin:0 auto" role="img" aria-label="Radar-Diagramm Bewegungsmuster">${rings}${axisLines}${polygon}${dots}${labels}</svg>`;
-}
-
 function _renderMovementPattern(state) {
   const RADAR_CATS = ['Push', 'Pull', 'Squat', 'Hinge', 'Carry', 'Core'];
   const customCatMap = {};
   for (const ce of state.customExercises ?? []) {
     if (ce.category) customCatMap[ce.name] = ce.category;
   }
+
+  // ── Balken: letzte 4 Wochen (ohne Deload) ────────────────────────────────
   const last4 = [...state.weeks]
     .filter(w => w.mode !== 'deload')
     .sort((a, b) => a.startDate.localeCompare(b.startDate))
@@ -2394,61 +2364,57 @@ function _renderMovementPattern(state) {
   if (!totalSets) return '';
   const catPct = {};
   for (const c of RADAR_CATS) catPct[c] = totalSets > 0 ? Math.round((catSets[c] ?? 0) / totalSets * 100) : 0;
-  const catsWithData = RADAR_CATS.filter(c => (catSets[c] ?? 0) > 0);
 
-  const warnings = [];
-  const pp = [catPct['Push'], catPct['Pull']];
-  const sh = [catPct['Squat'], catPct['Hinge']];
-  if (pp[0] > 0 && pp[1] > 0) {
-    if (pp[0] > pp[1] * 2) warnings.push('Push überwiegt Pull — Ungleichgewicht möglich.');
-    else if (pp[1] > pp[0] * 2) warnings.push('Pull überwiegt Push — Ungleichgewicht möglich.');
+  const maxPct = Math.max(...RADAR_CATS.map(c => catPct[c]), 1);
+  const chartHtml = RADAR_CATS.map(cat => {
+    const pct = catPct[cat];
+    return `<div class="mg-bar-row">
+      <span class="mg-bar-label">${cat}</span>
+      <div class="mg-bar-wrap"><div class="mg-bar" style="width:${pct ? Math.round(pct / maxPct * 100) : 0}%"></div></div>
+      <span class="mg-bar-val">${pct ? pct + '%' : '—'}</span>
+    </div>`;
+  }).join('');
+
+  // ── Push/Pull-Ratio: erkenntnisseHorizont Wochen ─────────────────────────
+  const horizont = state.settings?.erkenntnisseHorizont ?? 8;
+  const lastN = [...state.weeks]
+    .filter(w => w.mode !== 'deload')
+    .sort((a, b) => a.startDate.localeCompare(b.startDate))
+    .slice(-horizont);
+  let pushSets = 0, pullSets = 0;
+  for (const wk of lastN) {
+    for (const day of wk.days) {
+      for (const ex of day.exercises) {
+        const baseName = ex.substituteFor ?? ex.name;
+        const cat = customCatMap[baseName] ?? MOVEMENT_MAP[baseName] ?? 'Sonstige';
+        const n = ex.sets.filter(s => s.status === 'success').length;
+        if (cat === 'Push') pushSets += n;
+        else if (cat === 'Pull') pullSets += n;
+      }
+    }
   }
-  if (sh[0] > 0 && sh[1] > 0) {
-    if (sh[0] > sh[1] * 2) warnings.push('Squat überwiegt Hinge — Ungleichgewicht möglich.');
-    else if (sh[1] > sh[0] * 2) warnings.push('Hinge überwiegt Squat — Ungleichgewicht möglich.');
-  }
-  const warningsHtml = warnings.map(w => `<div class="movement-warning">⚠ ${h(w)}</div>`).join('');
 
-  const chartType  = state.settings?.movementChartType ?? 'radar';
-  const canRadar   = catsWithData.length >= 3;
-  const showRadar  = chartType === 'radar' && canRadar;
-  const showHint   = chartType === 'radar' && !canRadar;
-
-  const hintHtml = showHint
-    ? `<p class="movement-chart-hint">Netzdiagramm ab 3 Muskelgruppen mit Trainingsdaten verfügbar.</p>`
-    : '';
-
-  let chartHtml;
-  if (showRadar) {
-    chartHtml = _renderRadarSVG(catPct);
-  } else {
-    const maxPct = Math.max(...RADAR_CATS.map(c => catPct[c]), 1);
-    chartHtml = RADAR_CATS.map(cat => {
-      const pct = catPct[cat];
-      return `<div class="mg-bar-row">
-        <span class="mg-bar-label">${cat}</span>
-        <div class="mg-bar-wrap"><div class="mg-bar" style="width:${pct ? Math.round(pct / maxPct * 100) : 0}%"></div></div>
-        <span class="mg-bar-val">${pct ? pct + '%' : '—'}</span>
-      </div>`;
-    }).join('');
+  let ratioHtml = '';
+  if (pushSets > 0 && pullSets > 0) {
+    const dominant  = pushSets >= pullSets ? 'Push' : 'Pull';
+    const dominated = dominant === 'Push' ? 'Pull' : 'Push';
+    const ratio     = Math.round(Math.max(pushSets, pullSets) / Math.min(pushSets, pullSets) * 10) / 10;
+    let ratioText;
+    if (ratio <= 1.1) {
+      ratioText = 'Dein Push/Pull-Verhältnis ist ausgeglichen — gut für die Schultergesundheit.';
+    } else if (ratio <= 1.4) {
+      ratioText = `Dein Push/Pull-Verhältnis ist ${ratio.toFixed(1)}:1 — leicht ${dominant}-lastig. Für Schultergesundheit wäre ≤1:1 ideal.`;
+    } else {
+      ratioText = `Dein Push/Pull-Verhältnis ist ${ratio.toFixed(1)}:1 — deutlich ${dominant}-lastig. Mehr ${dominated}-Übungen könnten Dysbalancen vorbeugen.`;
+    }
+    ratioHtml = `<p class="erkenntnis-line" style="margin-top:var(--sp-3)">${h(ratioText)}</p>`;
   }
 
   return `<div class="chart-card">
     <div class="chart-card__title">Bewegungsmuster</div>
     <p style="font-size:11px;color:var(--c-text-3);margin-bottom:var(--sp-3)">Letzte 4 Wochen (ohne Deload)</p>
-    <div class="weight-step-opts" style="margin-bottom:var(--sp-3)">
-      <button type="button" class="weight-step-btn${chartType === 'radar' ? ' is-selected' : ''}"
-        data-action="set-movement-chart-type" data-chart-type="radar"
-        aria-pressed="${chartType === 'radar'}"
-      >🕸 Netz</button>
-      <button type="button" class="weight-step-btn${chartType === 'bar' ? ' is-selected' : ''}"
-        data-action="set-movement-chart-type" data-chart-type="bar"
-        aria-pressed="${chartType === 'bar'}"
-      >📊 Balken</button>
-    </div>
-    ${hintHtml}
     ${chartHtml}
-    ${warningsHtml}
+    ${ratioHtml}
   </div>`;
 }
 
@@ -4751,12 +4717,6 @@ function _handleClick(e) {
       const repsVal = _rInp?.value ?? '';
       dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si + 1, field: 'reps', value: repsVal });
       showToast('Wdh in nächsten Satz übernommen', 'ok');
-      break;
-    }
-
-    case 'set-movement-chart-type': {
-      const t = el.dataset.chartType;
-      if (t === 'radar' || t === 'bar') dispatch(A.SET_MOVEMENT_CHART_TYPE, { type: t });
       break;
     }
 
