@@ -792,6 +792,9 @@ function renderDayList(state) {
     if (tabsRow) {
       document.documentElement.style.setProperty('--tabs-h', `${tabsRow.offsetHeight}px`);
     }
+    // Android Chrome: prevent sticky parent from capturing horizontal touch events
+    container.querySelector('.day-tab-pills-scroll')
+      ?.addEventListener('touchstart', e => e.stopPropagation(), { passive: true });
   });
 
   _initStickyObserver();
