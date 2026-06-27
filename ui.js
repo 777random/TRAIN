@@ -136,9 +136,6 @@ let _toastTimer = null;
 
 
 
-/** Übungen mit offenem Fortschritts-Chart im Training: Set von "${di}-${ei}" Keys. */
-const _exChartOpen = new Set();
-
 /** Swipe tracking. */
 let _swipeStartX = null;
 let _swipeStartY = null;
@@ -621,7 +618,6 @@ function renderDayList(state) {
   if (_lastRenderedCurIdx !== null && _lastRenderedCurIdx !== state.curIdx && wk.days.length > 0) {
     _activeDayIdx = _getDefaultDayIndex(wk);
     _overviewMode = false;
-    _exChartOpen.clear();
     _cfgAdvOpen.clear();
     _subFormOpenKey = null;
     _scrollToFirstPending(_activeDayIdx);
@@ -788,8 +784,6 @@ function renderDayList(state) {
   }
 
   container.innerHTML = tabsHtml + contentHtml;
-
-  _insertOpenCharts(state);
 
   requestAnimationFrame(() => {
     const tabsRow = container.querySelector('.day-tab-bar');
@@ -1531,13 +1525,6 @@ function renderExercise(wk, di, ei, state) {
       maxlength="80"
     />
 
-    <button
-      class="btn-icon btn-icon--chart${_exChartOpen.has(`${di}-${ei}`) ? ' is-active' : ''}"
-      data-action="toggle-ex-chart" data-di="${di}" data-ei="${ei}"
-      aria-label="Fortschritts-Chart"
-      aria-expanded="${_exChartOpen.has(`${di}-${ei}`)}"
-    >📈</button>
-
     ${!locked ? (() => {
       const _pt     = ex.progressionType ?? 'weight';
       const _isReps = _pt === 'reps';
@@ -1625,8 +1612,6 @@ function renderExercise(wk, di, ei, state) {
   ${subFormHtml}
 
   ${cfgRow}
-
-  <div class="ex-chart-wrap" data-chart-di="${di}" data-chart-ei="${ei}"></div>
 
   ${(() => {
     const goalText = _nextGoalText(ex);
@@ -2978,30 +2963,6 @@ function _attachStreakChainTooltips() {
   wrap.addEventListener('touchend',   hide, { passive: true });
 }
 
-/** Baut offene Fortschritts-Charts nach jedem re-render der Day-Liste neu auf. */
-function _insertOpenCharts(state) {
-  if (_exChartOpen.size === 0) return;
-  const wk = state.weeks[state.curIdx];
-  if (!wk) return;
-  const calcWeeks = [...state.weeks]
-    .filter(w => w.mode !== 'deload')
-    .sort((a, b) => a.startDate.localeCompare(b.startDate))
-    .slice(-16);
-  _exChartOpen.forEach(key => {
-    const [di, ei] = key.split('-').map(Number);
-    const ex = wk.days[di]?.exercises[ei];
-    if (!ex) return;
-    const wrap = document.querySelector(`[data-chart-di="${di}"][data-chart-ei="${ei}"]`);
-    if (!wrap) return;
-    const corridor = _corridorFor(state, ex.name);
-    const svg = renderProgressChart(ex.name, calcWeeks, { compact: true, corridor });
-    if (svg) {
-      wrap.innerHTML = svg + _corridorHintHtml(corridor);
-      _attachChartTooltips(wrap);
-    }
-  });
-}
-
 /** Tooltip-Handler für data-tip-Kreise im SVG-Chart. */
 function _attachChartTooltips(container) {
   let tip = document.getElementById('_train-chart-tip');
@@ -4246,34 +4207,6 @@ function _handleClick(e) {
       const ce = (getState().customExercises ?? []).find(c => c.name === exToEdit.name && c.metric != null);
       if (!ce) break;
       _openExFormModal({ mode: 'edit', name: ce.name, metric: ce.metric, category: ce.category, originalName: ce.name });
-      break;
-    }
-
-    case 'toggle-ex-chart': {
-      const chartKey = `${di}-${ei}`;
-      const wrap = document.querySelector(`[data-chart-di="${di}"][data-chart-ei="${ei}"]`);
-      if (_exChartOpen.has(chartKey)) {
-        _exChartOpen.delete(chartKey);
-        el.classList.remove('is-active');
-        el.setAttribute('aria-expanded', 'false');
-        if (wrap) wrap.innerHTML = '';
-      } else {
-        _exChartOpen.add(chartKey);
-        el.classList.add('is-active');
-        el.setAttribute('aria-expanded', 'true');
-        if (wrap) {
-          const wk = getState().weeks[getState().curIdx];
-          const calcWeeks = [...getState().weeks]
-            .filter(w => w.mode !== 'deload')
-            .sort((a, b) => a.startDate.localeCompare(b.startDate))
-            .slice(-16);
-          const exName = wk?.days[+di]?.exercises[+ei]?.name;
-          const corridor = exName ? _corridorFor(getState(), exName) : null;
-          const svg = exName ? renderProgressChart(exName, calcWeeks, { compact: true, corridor }) : null;
-          if (svg) { wrap.innerHTML = svg + _corridorHintHtml(corridor); _attachChartTooltips(wrap); }
-          else wrap.innerHTML = '<p style="font-size:12px;color:var(--c-text-3);padding:8px 0">Noch zu wenig Daten — ab 2 Trainingswochen sichtbar.</p>';
-        }
-      }
       break;
     }
 

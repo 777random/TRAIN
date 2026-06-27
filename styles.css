@@ -1054,14 +1054,6 @@ exercise { position: unset; }
 #chart-ex-wrap svg { display: block; }
 .chart-corridor-hint { font-size: 11px; color: var(--c-text-3); margin: 4px 0 0; }
 
-/* Fortschritts-Chart im Training (kompakt, unter Übungsname) */
-.ex-chart-wrap { margin: 4px 0 8px; padding: 0 4px; }
-.ex-chart-wrap svg { display: block; }
-
-/* 📈-Button im Übungskopf */
-.btn-icon--chart { font-size: 14px; opacity: 0.55; transition: opacity .15s; }
-.btn-icon--chart:hover, .btn-icon--chart.is-active { opacity: 1; }
-
 /* +kg-Button im Übungskopf */
 .btn-icon--kg { font-size: 11px; font-weight: 700; letter-spacing: -0.02em; opacity: 0.6; }
 .btn-icon--kg:hover { opacity: 1; }
