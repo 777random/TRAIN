@@ -1664,7 +1664,8 @@ function reduce(state, action) {
       break;
     }
     case A.EX_SET_STEP: {
-      const ex = _currentWeek()?.days[p.di]?.exercises[p.ei]; if (!ex) break;
+      const wk = p.weekIdx != null ? state.weeks[p.weekIdx] : _currentWeek();
+      const ex = wk?.days[p.di]?.exercises[p.ei]; if (!ex) break;
       ex.weightStep = p.step;
       break;
     }

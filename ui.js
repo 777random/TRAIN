@@ -4463,7 +4463,7 @@ function _handleClick(e) {
 
     case 'set-step': {
       const step = parseFloat(el.dataset.step);
-      dispatch(A.EX_SET_STEP, { di: +di, ei: +ei, step });
+      dispatch(A.EX_SET_STEP, { di: +di, ei: +ei, step, weekIdx: getState().curIdx });
       break;
     }
 
