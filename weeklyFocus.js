@@ -308,7 +308,6 @@ function _checkProgression(state) {
     .filter(w => w.days.some(d => d.exercises.some(ex => ex.sets.some(s => s.status === 'success'))));
   if (calcWeeks.length < 2) return null;
 
-  const plateStep = state.settings?.plateStep ?? 2.5;
   const seen = new Set();
   let best = null;
 
@@ -320,6 +319,7 @@ function _checkProgression(state) {
       seen.add(ex.name);
       const exProgressionMode = ex.progressionMode ?? 'weight_first';
       const exTargetRepsMax   = ex.targetRepsMax ?? null;
+      const plateStep = ex.weightStep ?? state.settings?.plateStep ?? 2.5;
       if (!isReadyForAutoSelect(ex.name, calcWeeks, exProgressionMode, exTargetRepsMax)) return;
       const rec = getWeightRecommendation(ex.name, calcWeeks, plateStep, exProgressionMode, exTargetRepsMax);
       if (!rec) return;

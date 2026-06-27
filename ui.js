@@ -5251,7 +5251,6 @@ function _prepNewWeekModal() {
       .filter(w => w.days.some(d => d.exercises.some(ex => ex.sets.some(s => s.status === 'success'))));
     if (calcWeeks.length >= 2) {
       const seen = new Set();
-      const plateStep = state.settings?.plateStep ?? 2.5;
       const _autoSelections = [];
       curWk.days.forEach((day, di) => {
         (day.exercises ?? []).forEach((ex, ei) => {
@@ -5261,6 +5260,7 @@ function _prepNewWeekModal() {
           seen.add(ex.name);
           const exProgressionMode = ex.progressionMode ?? 'weight_first';
           const exTargetRepsMax   = ex.targetRepsMax ?? null;
+          const plateStep = ex.weightStep ?? state.settings?.plateStep ?? 2.5;
           const rec = getWeightRecommendation(ex.name, calcWeeks, plateStep, exProgressionMode, exTargetRepsMax);
           if (rec) {
             if (inRecoveryWindow && rec.delta > 0) {
