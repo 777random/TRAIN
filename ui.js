@@ -2615,14 +2615,24 @@ function renderCoachTab(state) {
  * gemeinsamen Erkenntnisse-Sektion gestellt wird.
  * @returns {string[]}
  */
-function _overallPerformanceParagraphs(state) {
+function _erkenntnisseHorizontLabel(N) {
+  const months = Math.round(N / 4.33);
+  const approx = months === 1 ? '~1 Monat'
+    : months === 3 ? '~1 Quartal'
+    : months === 6 ? '~6 Monate'
+    : months === 12 ? '~1 Jahr'
+    : `~${months} Monate`;
+  return `Letzte ${N} Wochen (${approx})`;
+}
+
+function _overallPerformanceParagraphs(state, N = 8) {
   const sortedWeeks = [...state.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
   const scoredWeeks = sortedWeeks.map(w => _weekSuccessScore(w));
 
-  const quality     = computeQualityTrend(scoredWeeks);
-  const consistency = computeConsistencyTrend(state);
-  const volume      = computeVolumeTrend(state);
-  const breadth     = computeBreadthProgress(state);
+  const quality     = computeQualityTrend(scoredWeeks, N);
+  const consistency = computeConsistencyTrend(state, N);
+  const volume      = computeVolumeTrend(state, N);
+  const breadth     = computeBreadthProgress(state, N);
 
   const paragraphs = [];
 
@@ -2631,12 +2641,12 @@ function _overallPerformanceParagraphs(state) {
     const dir = quality.direction === 'up' ? 'gestiegen' : quality.direction === 'down' ? 'gesunken' : 'stabil geblieben';
     paragraphs.push(quality.prevPct === null
       ? `Deine Erfolgsquote über alle Übungen liegt aktuell bei ${quality.curPct}%.`
-      : `Deine Erfolgsquote über alle Übungen ist in den letzten 4 Wochen von ${quality.prevPct}% auf ${quality.curPct}% ${dir}.`);
+      : `Deine Erfolgsquote über alle Übungen ist in den letzten ${quality.halfN} Wochen von ${quality.prevPct}% auf ${quality.curPct}% ${dir}.`);
   }
 
   // 2. Konsistenz
   if (consistency) {
-    let line = `Du hast in den letzten 8 Wochen ${consistency.curPct}% deiner geplanten Trainingstage absolviert.`;
+    let line = `Du hast in den letzten ${consistency.N} Wochen ${consistency.curPct}% deiner geplanten Trainingstage absolviert.`;
     if (consistency.direction !== null) {
       const dir = consistency.direction === 'up' ? 'steigend' : consistency.direction === 'down' ? 'sinkend' : 'stabil';
       line += ` Der Trend ist ${dir}.`;
@@ -2648,11 +2658,11 @@ function _overallPerformanceParagraphs(state) {
   if (volume) {
     let line;
     if (volume.pct === null) {
-      line = `Dein Gesamtvolumen liegt aktuell bei ${Math.round(volume.curVol).toLocaleString('de-DE')}kg pro 4-Wochen-Block.`;
+      line = `Dein Gesamtvolumen liegt aktuell bei ${Math.round(volume.curVol).toLocaleString('de-DE')}kg pro ${volume.halfN}-Wochen-Block.`;
     } else {
       const dir  = volume.direction === 'up' ? 'gestiegen' : volume.direction === 'down' ? 'gesunken' : 'stabil geblieben';
       const sign = volume.pct > 0 ? '+' : '';
-      line = `Dein Gesamtvolumen ist in den letzten 4 Wochen um ${sign}${volume.pct}% ${dir}.`;
+      line = `Dein Gesamtvolumen ist in den letzten ${volume.halfN} Wochen um ${sign}${volume.pct}% ${dir}.`;
     }
     if (volume.hasRelative) {
       line += ` Dazu kommen ${volume.relSetsAvg} Sätze ohne Zusatzgewicht pro Woche im Schnitt.`;
@@ -2683,8 +2693,8 @@ const _ERKENNTNIS_CATEGORY_ORDER = ['sleep', 'exWeekday', 'trend'];
  * Berechnung wie wkLabel()/_kw() in progressChart.js, hier auf das
  * heutige Datum statt einen Wochenstart angewendet.
  */
-function _rotatedErkenntnisEntries(state) {
-  const entries = computeErkenntnisLines(state);
+function _rotatedErkenntnisEntries(state, N = 8) {
+  const entries = computeErkenntnisLines(state, N);
   const today = new Date();
   const jan   = new Date(today.getFullYear(), 0, 1);
   const todayKW = Math.ceil(((today - jan) / 86_400_000 + jan.getDay() + 1) / 7);
@@ -2706,11 +2716,22 @@ function _rotatedErkenntnisEntries(state) {
  * Liefert '' wenn WEDER Gesamtperformance NOCH Beobachtungen Daten haben.
  */
 function _renderErkenntnisseSection(state) {
-  const perfParagraphs = _overallPerformanceParagraphs(state);
-  const obsEntries     = _rotatedErkenntnisEntries(state);
+  const N = Math.max(4, Math.min(52, state.settings?.erkenntnisseHorizont ?? 8));
+  const perfParagraphs = _overallPerformanceParagraphs(state, N);
+  const obsEntries     = _rotatedErkenntnisEntries(state, N);
   const insights       = state.insights ?? [];
 
   if (!perfParagraphs.length && !obsEntries.length && !insights.length) return '';
+
+  const stepperHtml = `
+  <div class="erkenntnis-stepper">
+    <button type="button" class="btn btn--ghost btn--sm erkenntnis-stepper__btn"
+      data-action="erkenntnisse-horizont-dec"${N <= 4 ? ' disabled' : ''}>−</button>
+    <span class="erkenntnis-stepper__label">${N} Wochen</span>
+    <button type="button" class="btn btn--ghost btn--sm erkenntnis-stepper__btn"
+      data-action="erkenntnisse-horizont-inc"${N >= 52 ? ' disabled' : ''}>+</button>
+  </div>
+  <p class="erkenntnis-stepper__hint">${h(_erkenntnisseHorizontLabel(N))}</p>`;
 
   const perfHtml = perfParagraphs.map(p => `<p class="erkenntnis-line">${h(p)}</p>`).join('');
 
@@ -2744,6 +2765,7 @@ function _renderErkenntnisseSection(state) {
   return `
   <div class="chart-card">
     <div class="chart-card__title">📊 Erkenntnisse</div>
+    ${stepperHtml}
     ${perfHtml}
     ${dividerTop}
     ${obsHtml}
@@ -4054,6 +4076,17 @@ function _handleClick(e) {
       });
       _checkDecisionOutcomes(getState());
       showToast('Entscheidung gespeichert', 'ok');
+      break;
+    }
+
+    case 'erkenntnisse-horizont-dec': {
+      const _curN = Math.max(4, Math.min(52, getState().settings?.erkenntnisseHorizont ?? 8));
+      if (_curN > 4) dispatch(A.SET_ERKENNTNISSE_HORIZONT, { value: _curN - 1 });
+      break;
+    }
+    case 'erkenntnisse-horizont-inc': {
+      const _curN = Math.max(4, Math.min(52, getState().settings?.erkenntnisseHorizont ?? 8));
+      if (_curN < 52) dispatch(A.SET_ERKENNTNISSE_HORIZONT, { value: _curN + 1 });
       break;
     }
 

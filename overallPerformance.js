@@ -37,35 +37,37 @@ function _nonDeloadVacationWeeks(state) {
 // Kopfkommentar zum zirkulären Import). Reihenfolge chronologisch.
 const QUALITY_STABLE_BAND = 2; // Prozentpunkte — Sprint-Text nennt keinen exakten Wert, eigene Wahl
 
-export function computeQualityTrend(scoredWeeks) {
+export function computeQualityTrend(scoredWeeks, N = 8) {
+  const half = Math.max(2, Math.round(N / 2));
   const scored = scoredWeeks.filter(s => s.total > 0);
-  if (scored.length < 4) return null;
-  const last4 = scored.slice(-4);
-  const prev4 = scored.slice(-8, -4);
+  if (scored.length < half) return null;
+  const last = scored.slice(-half);
+  const prev = scored.slice(-N, -half);
   const avgPct = arr => Math.round(arr.reduce((s, x) => s + x.pct, 0) / arr.length);
-  const curPct = avgPct(last4);
-  if (prev4.length === 0) return { curPct, prevPct: null, direction: null };
-  const prevPct = avgPct(prev4);
+  const curPct = avgPct(last);
+  if (prev.length === 0) return { curPct, prevPct: null, direction: null, halfN: half };
+  const prevPct = avgPct(prev);
   const diff = curPct - prevPct;
   const direction = Math.abs(diff) < QUALITY_STABLE_BAND ? 'stable' : diff > 0 ? 'up' : 'down';
-  return { curPct, prevPct, diff, direction };
+  return { curPct, prevPct, diff, direction, halfN: half };
 }
 
 // ─── Konsistenz ──────────────────────────────────────────────────────────────
 const CONSISTENCY_STABLE_BAND = 5; // Prozentpunkte — eigene Wahl, gröberes Maß als Qualität
 
-export function computeConsistencyTrend(state) {
+export function computeConsistencyTrend(state, N = 8) {
+  const half = Math.max(2, Math.round(N / 2));
   const eligible = _consistencyEligibleWeeks(state);
-  if (eligible.length < 4) return null;
-  const last8 = eligible.slice(-8);
+  if (eligible.length < half) return null;
+  const lastN = eligible.slice(-N);
   const avgPct = arr => Math.round(arr.reduce((s, r) => s + r.ratio, 0) / arr.length * 100);
-  const curPct = avgPct(last8);
-  const prev8 = eligible.slice(-16, -8);
-  if (prev8.length === 0) return { curPct, prevPct: null, direction: null };
-  const prevPct = avgPct(prev8);
+  const curPct = avgPct(lastN);
+  const prevN = eligible.slice(-2 * N, -N);
+  if (prevN.length === 0) return { curPct, prevPct: null, direction: null, N };
+  const prevPct = avgPct(prevN);
   const diff = curPct - prevPct;
   const direction = Math.abs(diff) < CONSISTENCY_STABLE_BAND ? 'stable' : diff > 0 ? 'up' : 'down';
-  return { curPct, prevPct, diff, direction };
+  return { curPct, prevPct, diff, direction, N };
 }
 
 // ─── Volumen ─────────────────────────────────────────────────────────────────
@@ -100,33 +102,35 @@ function _hasAnySuccess(week) {
 }
 const VOLUME_STABLE_BAND = 5; // Prozent — eigene Wahl
 
-export function computeVolumeTrend(state) {
+export function computeVolumeTrend(state, N = 8) {
+  const half = Math.max(2, Math.round(N / 2));
   const weeks = _nonDeloadVacationWeeks(state).filter(_hasAnySuccess);
-  if (weeks.length < 8) return null;
-  const last4 = weeks.slice(-4);
-  const prev4 = weeks.slice(-8, -4);
+  if (weeks.length < N) return null;
+  const last = weeks.slice(-half);
+  const prev = weeks.slice(-N, -half);
   const sum = (arr, fn) => arr.reduce((s, w) => s + fn(w), 0);
-  const curVol  = sum(last4, _weightVolume);
-  const prevVol = sum(prev4, _weightVolume);
+  const curVol  = sum(last, _weightVolume);
+  const prevVol = sum(prev, _weightVolume);
   let pct = null, direction = null;
   if (prevVol > 0) {
     pct = Math.round((curVol - prevVol) / prevVol * 100);
     direction = Math.abs(pct) < VOLUME_STABLE_BAND ? 'stable' : pct > 0 ? 'up' : 'down';
   }
-  const relSetsAvg = Math.round(sum(last4, _relativeVolumeSetCount) / last4.length);
-  const relRepsTotal = sum(last4, _relativeVolumeReps);
-  return { curVol, prevVol, pct, direction, hasRelative: relSetsAvg > 0 && relRepsTotal > 0, relSetsAvg };
+  const relSetsAvg = Math.round(sum(last, _relativeVolumeSetCount) / last.length);
+  const relRepsTotal = sum(last, _relativeVolumeReps);
+  return { curVol, prevVol, pct, direction, hasRelative: relSetsAvg > 0 && relRepsTotal > 0, relSetsAvg, halfN: half };
 }
 
 // ─── Breite ──────────────────────────────────────────────────────────────────
 // "Fortschritt in einer Kategorie" = mind. eine Übung dieser Kategorie hat
-// eine positive histRate (gesamte verfügbare Historie) UND >=6 Wochen Daten
-// (via _exerciseRateWindow(), liefert sonst null). Kategorien ganz ohne
+// eine positive histRate (gesamte verfügbare Historie) UND >=min(6,N) Wochen
+// Daten (via _exerciseRateWindow(), liefert sonst null). Kategorien ganz ohne
 // trainierte Übung ODER ohne irgendeine Übung mit genug Historie werden
 // nicht gezeigt (deckt "Carry bei fehlenden Daten still ausblenden" ab,
 // generalisiert auf alle Kategorien — kein "0 von 1").
-export function computeBreadthProgress(state) {
-  const sorted = _nonDeloadVacationWeeks(state);
+export function computeBreadthProgress(state, N = 8) {
+  const allSorted = _nonDeloadVacationWeeks(state);
+  const sorted = allSorted.slice(-N);
   const exNames = [...new Set(sorted.flatMap(w => w.days.flatMap(d => d.exercises.map(e => e.substituteFor ?? e.name))))];
 
   const byCat = {};
@@ -143,7 +147,7 @@ export function computeBreadthProgress(state) {
     if (!names.length) continue;
     let hasEnoughData = false, hasProgress = false;
     for (const name of names) {
-      const rw = _exerciseRateWindow(sorted, name);
+      const rw = _exerciseRateWindow(sorted, name, N);
       if (!rw) continue;
       hasEnoughData = true;
       if (rw.histRate > 0) hasProgress = true;

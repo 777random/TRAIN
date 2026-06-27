@@ -97,18 +97,20 @@ function countTagSets(wk, tag) {
  * eine einzige Implementierung dieser Formel, keine Duplikate.
  * @returns {{ threshold: number, avgWith: number, avgWithout: number } | null}
  */
-export function computeSleepCorrelation(state) {
+export function computeSleepCorrelation(state, N = 0) {
   const threshold = 7;
   // Prefer per-day sleepHours (averaged over done days), fall back to weekly bodyData.sleep
   const sleepMap = new Map();
-  const all = getSortedWeeks(state);
+  const allWeeks = getSortedWeeks(state);
+  const all = N > 0 ? allWeeks.slice(-N) : allWeeks;
   all.forEach(wk => {
     const daySleeps = wk.days.filter(d => d.sleepHours != null).map(d => d.sleepHours);
     const avgDay = daySleeps.length > 0 ? daySleeps.reduce((a, b) => a + b, 0) / daySleeps.length : null;
     sleepMap.set(wk, avgDay ?? wk.bodyData?.sleep ?? null);
   });
   const sorted = all.filter(wk => sleepMap.get(wk) != null);
-  if (sorted.length < 6) return null;
+  const minWeeks = N > 0 ? Math.min(6, N) : 6;
+  if (sorted.length < minWeeks) return null;
   const withS    = sorted.filter(w => sleepMap.get(w) >= threshold);
   const withoutS = sorted.filter(w => sleepMap.get(w) < threshold);
   if (withS.length < 2 || withoutS.length < 2) return null;

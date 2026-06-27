@@ -205,6 +205,7 @@ function buildDefaultState() {
         suggestProgress:  true,  // Steigerungs-Modal beim ersten Öffnen zeigen?
         showReview:       true,  // Wochenrückblick der Vorwoche zuerst zeigen?
       },
+      erkenntnisseHorizont: 8,  // Zeithorizont in Wochen (4–52)
     },
   };
 }
@@ -220,6 +221,7 @@ const _NO_UNDO = new Set([
   'INSIGHTS_SET', 'ONBOARDING_DONE', 'MARK_TIP_SEEN', 'REENTRY_HANDLED',
   'EX_AUTO_PRESELECT_NEXT_WEEK_PLAN', 'ACTIVATE_STREAK_FREEZE', 'RECORD_SURPRISE_SHOWN',
   'PLATEAU_ACTION', 'DECISION_LOG_ADD', 'DECISION_LOG_OUTCOME',
+  'SET_ERKENNTNISSE_HORIZONT',
 ]);
 
 /** Returns true when there is at least one undo snapshot available. */
@@ -901,6 +903,7 @@ export function loadState() {
       if (!Array.isArray(STATE.favoriteExercises)) STATE.favoriteExercises = [];
       if (!Array.isArray(STATE.customExercises))   STATE.customExercises   = [];
       if (!Array.isArray(STATE.decisionLog))        STATE.decisionLog       = [];
+      if (STATE.settings.erkenntnisseHorizont === undefined) STATE.settings.erkenntnisseHorizont = 8;
       if (STATE.lastReentryHandled === undefined)  STATE.lastReentryHandled = null;
       if (typeof STATE.longestStreakEver !== 'number') STATE.longestStreakEver = _calcLongestStreakEver(STATE.weeks);
       if (!Array.isArray(STATE.badges))            STATE.badges = [];
@@ -1168,6 +1171,7 @@ export const A = Object.freeze({
   // Decision log (Sprint: Abwägungs-Entscheidungen)
   DECISION_LOG_ADD:         'DECISION_LOG_ADD',         // { type, signal, choice: 'stay'|'change', decidedWeekStart }
   DECISION_LOG_OUTCOME:     'DECISION_LOG_OUTCOME',     // { id, outcome: { measuredWeekStart, signalPersisted, successRateBefore, successRateAfter } }
+  SET_ERKENNTNISSE_HORIZONT: 'SET_ERKENNTNISSE_HORIZONT', // { value: number } — 4..52
 });
 
 // ─── Reducer ──────────────────────────────────────────────────────────────────
@@ -2229,6 +2233,11 @@ function reduce(state, action) {
       if (!Array.isArray(state.decisionLog)) break;
       const entry = state.decisionLog.find(e => e.id === p.id);
       if (entry && entry.outcome === null) entry.outcome = p.outcome;
+      break;
+    }
+    case A.SET_ERKENNTNISSE_HORIZONT: {
+      const v = Math.round(Number(p.value));
+      if (!isNaN(v)) state.settings.erkenntnisseHorizont = Math.max(4, Math.min(52, v));
       break;
     }
 

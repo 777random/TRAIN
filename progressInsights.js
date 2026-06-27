@@ -30,8 +30,8 @@ function _weekdayName(wk, di) {
  * Durchschnitt aller ausreichend belegten Übungen.
  * @returns {{ name: string, rate: number, avgAll: number, diff: number } | null}
  */
-export function mostSuccessfulExercise(state) {
-  const sorted = _relevantWeeks(state);
+export function mostSuccessfulExercise(state, N = 8) {
+  const sorted = _relevantWeeks(state).slice(-N);
   const stats = new Map(); // name -> { success, total, weeks: Set<startDate> }
 
   for (const wk of sorted) {
@@ -65,8 +65,8 @@ export function mostSuccessfulExercise(state) {
  * Durchschnitt aller Wochentage mit ausreichend Datenpunkten.
  * @returns {{ name: string, rate: number, avgAll: number, diff: number } | null}
  */
-export function mostSuccessfulWeekday(state) {
-  const sorted = _relevantWeeks(state);
+export function mostSuccessfulWeekday(state, N = 8) {
+  const sorted = _relevantWeeks(state).slice(-N);
   const stats = new Map(); // weekdayName -> { success, total, count }
 
   for (const wk of sorted) {
@@ -96,41 +96,43 @@ export function mostSuccessfulWeekday(state) {
 }
 
 /**
- * Kategorie 3: Übung deren Gewichts-Steigerungsrate der letzten 4 Wochen
+ * Kategorie 3: Übung deren Gewichts-Steigerungsrate der letzten N/2 Wochen
  * deutlich (≥1.5x) über ihrer eigenen historischen Durchschnittsrate liegt.
  * @returns {{ name: string, curRate: number, histRate: number, diff: number } | null}
  */
 /**
  * Geteilte Basis für progressTrendOutlier() UND die Korridor-Kalibrierung im
  * Übungsfortschritt-Chart (siehe getProgressCorridorCalibration() unten) —
- * gleiche Mindest-Historie (6 Wochen mit Gewichtsdaten) und gleiche
- * Fensterlogik (Ø-Delta letzte 4 Wochen vs. Ø-Delta Gesamt-Historie).
- * Jetzt zusätzlich exportiert für overallPerformance.js (Breite-Dimension
- * der Gesamtperformance-Sektion) — Logik unverändert.
+ * gleiche Mindest-Historie und gleiche Fensterlogik (Ø-Delta letzte N/2
+ * Wochen vs. Ø-Delta Gesamt-Historie). N=8 entspricht dem alten Verhalten
+ * (min 6 Wochen, last 4 Deltas). Exportiert für overallPerformance.js.
  * @returns {{ history: number[], histRate: number, curRate: number, lastWeight: number } | null}
  */
-export function _exerciseRateWindow(sortedWeeks, exName) {
+export function _exerciseRateWindow(sortedWeeks, exName, N = 8) {
+  const minHistory = Math.min(6, N);
   const history = exWeightHistory(sortedWeeks, exName).filter(w => w > 0); // chronologisch, nur Wochen mit Gewichtsdaten
-  if (history.length < 6) return null;
+  if (history.length < minHistory) return null;
 
   const deltas = [];
   for (let i = 1; i < history.length; i++) deltas.push((history[i] - history[i - 1]) / history[i - 1]);
-  if (deltas.length < 5) return null;
+  const minDeltas = Math.max(1, minHistory - 1);
+  if (deltas.length < minDeltas) return null;
 
   const histRate = deltas.reduce((a, b) => a + b, 0) / deltas.length;
-  const recentDeltas = deltas.slice(-4);
+  const recentCount = Math.max(2, Math.round(N / 2));
+  const recentDeltas = deltas.slice(-recentCount);
   const curRate = recentDeltas.reduce((a, b) => a + b, 0) / recentDeltas.length;
 
   return { history, histRate, curRate, lastWeight: history[history.length - 1] };
 }
 
-export function progressTrendOutlier(state) {
+export function progressTrendOutlier(state, N = 8) {
   const sorted = _relevantWeeks(state);
   const exNames = [...new Set(sorted.flatMap(w => w.days.flatMap(d => d.exercises.map(e => e.name))))];
 
   let best = null;
   for (const name of exNames) {
-    const rw = _exerciseRateWindow(sorted, name);
+    const rw = _exerciseRateWindow(sorted, name, N);
     if (!rw) continue;
     if (rw.histRate <= 0) continue; // nur sinnvoll bei grundsätzlich positivem historischem Trend
     if (rw.curRate <= rw.histRate * 1.5) continue;
@@ -151,7 +153,7 @@ export function progressTrendOutlier(state) {
  * @returns {{ calibrationRate: number, startWeight: number } | null}
  */
 export function getProgressCorridorCalibration(sortedWeeks, exName) {
-  const rw = _exerciseRateWindow(sortedWeeks, exName);
+  const rw = _exerciseRateWindow(sortedWeeks, exName); // N=8 default → Korridor-Verhalten unverändert
   if (!rw) return null;
   if (rw.curRate <= 0) return null;
   return { calibrationRate: rw.curRate, startWeight: rw.lastWeight };
@@ -166,17 +168,18 @@ export function getProgressCorridorCalibration(sortedWeeks, exName) {
  * eigentliche Berechnung der drei Werte (sleep/ex/wd/trend) zu verändern.
  * @returns {{category: 'sleep'|'exWeekday'|'trend', text: string}[]}
  */
-export function computeErkenntnisLines(state) {
+export function computeErkenntnisLines(state, N = 8) {
+  const halfN = Math.max(2, Math.round(N / 2));
   const lines = [];
 
-  const sleep = computeSleepCorrelation(state);
+  const sleep = computeSleepCorrelation(state, N);
   if (sleep) {
     const diffPp = Math.round((sleep.avgWith - sleep.avgWithout) * 100);
     lines.push({ category: 'sleep', text: `An Tagen mit ${sleep.threshold}h+ Schlaf erreichst du ${diffPp}% mehr deiner Trainingsziele.` });
   }
 
-  const ex = mostSuccessfulExercise(state);
-  const wd = mostSuccessfulWeekday(state);
+  const ex = mostSuccessfulExercise(state, N);
+  const wd = mostSuccessfulWeekday(state, N);
   if (ex || wd) {
     const useEx = !!ex && (!wd || ex.diff >= wd.diff);
     if (useEx) {
@@ -186,9 +189,9 @@ export function computeErkenntnisLines(state) {
     }
   }
 
-  const trend = progressTrendOutlier(state);
+  const trend = progressTrendOutlier(state, N);
   if (trend) {
-    lines.push({ category: 'trend', text: `Deine ${trend.name} steigt aktuell schneller als sonst — +${Math.round(trend.curRate * 100)}% in den letzten 4 Wochen statt der üblichen +${Math.round(trend.histRate * 100)}%.` });
+    lines.push({ category: 'trend', text: `Deine ${trend.name} steigt aktuell schneller als sonst — +${Math.round(trend.curRate * 100)}% in den letzten ${halfN} Wochen statt der üblichen +${Math.round(trend.histRate * 100)}%.` });
   }
 
   return lines;
