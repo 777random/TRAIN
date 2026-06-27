@@ -72,6 +72,9 @@ let _subFormOpenKey = null;
 /** Key of the exercise with the open archive-confirm panel: `${di}-${ei}` or null. */
 let _archiveConfirmKey = null;
 
+/** Pending auto-evaluation after blur (cancelled if user manually confirms/fails before setTimeout fires). */
+let _pendingAutoEval = null;
+
 /** Key of the exercise whose ⋮ context menu is open: `${di}-${ei}` or null. */
 let _exMenuOpenKey = null;
 
@@ -3429,6 +3432,7 @@ function renderSettingsTab(state) {
     ${tog('vibrationEnabled', 'Vibration nach Pause', 'Funktioniert nur auf Android — iOS unterstützt Vibration in PWAs technisch nicht.')}
     ${tog('autoStartPauseTimer', 'Pausentimer automatisch', 'Timer startet automatisch nach jedem bestätigten Satz (außer dem letzten)')}
     ${tog('rpeEnabled', 'RPE anzeigen', 'Rate of Perceived Exertion — Anstrengungsgrad pro Satz')}
+    ${tog('autoEval', 'Automatische Satz-Bewertung', 'Satz wird bewertet sobald du die Wdh-Zahl einträgst und das Feld verlässt.')}
     <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:var(--sp-2)">
       <div>
         <div class="settings-row__label">Kleinstmögliche Steigerung</div>
@@ -3729,6 +3733,7 @@ function _bindEvents(root) {
   root.addEventListener('change',  _handleChange);
   root.addEventListener('input',   _handleInput);
   root.addEventListener('keydown', _handleKeydown);
+  root.addEventListener('blur',    _handleBlur, { capture: true });
 }
 
 /**
@@ -4606,6 +4611,7 @@ function _handleClick(e) {
       break;
     }
     case 'toggle-done': {
+      _pendingAutoEval = null;
       const _s = getState().weeks[getState().curIdx]?.days[+di]?.exercises[+ei]?.sets[+si];
       if (_s && _s.status === 'pending') {
         const _wInp = document.querySelector(`[data-action="set-weight"][data-di="${di}"][data-ei="${ei}"][data-si="${si}"]`);
@@ -4638,6 +4644,7 @@ function _handleClick(e) {
     }
 
     case 'confirm-set': {
+      _pendingAutoEval = null;
       const _cst = getState();
       const _cwk = _cst.weeks[_cst.curIdx];
       const _cex = _cwk?.days[+di]?.exercises[+ei];
@@ -5050,11 +5057,36 @@ function _handleChange(e) {
 }
 
 function _handleInput(e) {
-  // Absichtlich komplett leer gelassen! 
-  // Das verhindert, dass bei jedem einzelnen Tastendruck das Layout neu lädt 
+  // Absichtlich komplett leer gelassen!
+  // Das verhindert, dass bei jedem einzelnen Tastendruck das Layout neu lädt
   // und dir die Tastatur vor der Nase zuschlägt.
 }
 
+function _handleBlur(e) {
+  if (!getState().settings?.autoEval) return;
+  const el = e.target;
+  if (!el.matches('[data-action="set-reps"]')) return;
+  const { di, ei, si } = el.dataset;
+  const val = parseFloat(el.value);
+  _pendingAutoEval = { di: +di, ei: +ei, si: +si, reps: val };
+  setTimeout(() => {
+    if (!_pendingAutoEval) return;
+    if (document.activeElement === el) { _pendingAutoEval = null; return; }
+    const { di: _di, ei: _ei, si: _si, reps } = _pendingAutoEval;
+    _pendingAutoEval = null;
+    if (!Number.isFinite(reps) || reps <= 0) return;
+    dispatch(A.AUTO_EVAL_SET, { di: _di, ei: _ei, si: _si, reps });
+    // RPE-Nudge nach erfolgreicher Auto-Bewertung (identisch zu confirm-set)
+    const aft    = getState();
+    const aftSet = aft.weeks[aft.curIdx]?.days[_di]?.exercises[_ei]?.sets[_si];
+    if (aftSet?.status === 'success' && aft.settings?.rpeEnabled !== false && aftSet.rpe == null) {
+      clearTimeout(_rpeNudgeTimer);
+      _rpeNudgeKey   = `${_di}-${_ei}-${_si}`;
+      scheduleRender();
+      _rpeNudgeTimer = setTimeout(() => { _rpeNudgeKey = null; _rpeNudgeTimer = null; scheduleRender(); }, 4000);
+    }
+  }, 0);
+}
 
 function _handleKeydown(e) {
   if (e.key === 'Enter') {

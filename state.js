@@ -882,6 +882,7 @@ function migrate(raw) {
   // Always-apply defaults for settings added in later versions
   if (raw.settings.vibrationEnabled               === undefined) raw.settings.vibrationEnabled               = true;
   if (raw.settings.rpeEnabled                     === undefined) raw.settings.rpeEnabled                     = true;
+  if (raw.settings.autoEval                       === undefined) raw.settings.autoEval                       = false;
   if (raw.settings.weeksSinceLastBackupReminder   === undefined) raw.settings.weeksSinceLastBackupReminder   = 0;
   if (raw.settings.maxSessionMs                   === undefined) raw.settings.maxSessionMs                   = 10800000;
   if (raw.settings.autoStartPauseTimer            === undefined) raw.settings.autoStartPauseTimer            = true;
@@ -1151,6 +1152,7 @@ export const A = Object.freeze({
   SET_AUTOFILL_DOWN:   'SET_AUTOFILL_DOWN',   // { di, ei, si } — weight (all) + reps (next)
   SET_AUTOFILL_RPE:    'SET_AUTOFILL_RPE',    // { di, ei, si } — rpe → next set only
   CONFIRM_SET:         'CONFIRM_SET',          // { di, ei, si, reps } — quick-confirm next pending set
+  AUTO_EVAL_SET:       'AUTO_EVAL_SET',        // { di, ei, si, reps } — auto-evaluation on blur (autoEval setting)
   SET_RPE:             'SET_RPE',             // { di, ei, si, rpe: number }
   EX_SET_SUBSTITUTE:   'EX_SET_SUBSTITUTE',   // { di, ei, substituteFor: string|null }
   // Session log
@@ -1885,6 +1887,55 @@ function reduce(state, action) {
           }
           // Wdh-PR an einem submaximalen Gewicht — identisch zu SET_TOGGLE_DONE,
           // beide Bestätigungswege müssen konsistent bleiben.
+          if (!ex.prRepsHistory) ex.prRepsHistory = {};
+          if (weight < ex.prWeight) {
+            const w = String(weight);
+            if (reps > (ex.prRepsHistory[w] ?? 0)) ex.prRepsHistory[w] = reps;
+          }
+        }
+      }
+      break;
+    }
+
+    case A.AUTO_EVAL_SET: {
+      const wk = _currentWeek(); if (!wk) break;
+      const ex = wk.days[p.di]?.exercises[p.ei]; if (!ex) break;
+      const s  = ex.sets[p.si]; if (!s) break;
+      if (s.status !== 'pending') break;
+      s.reps = p.reps;
+      const targetReps  = parseFloat(ex.targetReps) || 0;
+      const repsVal     = parseFloat(s.reps) || 0;
+      const canSuccess  = targetReps > 0 ? repsVal >= targetReps : repsVal > 0;
+      s.status = canSuccess ? 'success' : 'fail';
+      s.done   = canSuccess;
+      if (canSuccess && wk.mode !== 'deload') {
+        const weight = parseFloat(s.weight) || 0;
+        const reps   = parseFloat(s.reps)   || 0;
+        if (reps > 0) {
+          if (weight > 0) {
+            const volume  = weight * reps;
+            const est1RM  = reps <= 10 ? weight * (1 + reps / 30) : 0;
+            const name    = ex.name;
+            if (!state.prs) state.prs = {};
+            const prev    = state.prs[name] ?? { maxWeight: 0, maxVolume: 0, maxEstimated1RM: 0, maxRepsAtMaxWeight: 0, date: null };
+            const newMaxW   = Math.max(prev.maxWeight,       weight);
+            const newMaxV   = Math.max(prev.maxVolume,       volume);
+            const newMaxE   = Math.max(prev.maxEstimated1RM, est1RM);
+            const newMaxRMW = weight > prev.maxWeight
+              ? reps
+              : (weight === prev.maxWeight ? Math.max(prev.maxRepsAtMaxWeight ?? 0, reps) : prev.maxRepsAtMaxWeight ?? 0);
+            if (newMaxW > prev.maxWeight || newMaxV > prev.maxVolume || newMaxE > prev.maxEstimated1RM) {
+              state.prs[name] = { maxWeight: newMaxW, maxVolume: newMaxV, maxEstimated1RM: newMaxE, maxRepsAtMaxWeight: newMaxRMW, date: new Date().toISOString().split('T')[0] };
+            }
+            if (est1RM > 0 && (ex.oneRM == null || est1RM > ex.oneRM)) {
+              ex.oneRM = Math.round(est1RM * 10) / 10;
+            }
+          }
+          if (ex.prWeight === null || weight > ex.prWeight) {
+            ex.prWeight = weight; ex.prRepsAtMaxWeight = reps;
+          } else if (weight >= ex.prWeight && reps > (ex.prRepsAtMaxWeight ?? 0)) {
+            ex.prRepsAtMaxWeight = reps;
+          }
           if (!ex.prRepsHistory) ex.prRepsHistory = {};
           if (weight < ex.prWeight) {
             const w = String(weight);
