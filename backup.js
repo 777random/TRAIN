@@ -19,6 +19,15 @@ function today() {
   return new Date().toISOString().split('T')[0];
 }
 
+// Wochendurchschnitt aus weightLog, Fallback auf bodyData.weight (pre-v29)
+function _wkAvgWeight(bd) {
+  const log = bd.weightLog;
+  if (Array.isArray(log) && log.length > 0) {
+    return Math.round(log.reduce((s, e) => s + e.weight, 0) / log.length * 10) / 10;
+  }
+  return bd.weight ?? '';
+}
+
 // ─── JSON Backup ──────────────────────────────────────────────────────────────
 
 export function exportJSON(onSuccess) {
@@ -145,7 +154,7 @@ export function exportCSV(scope = 'all') {
             s.weight ?? 0, s.reps ?? '', s.rpe ?? '',
             s.done ? 'Ja' : 'Nein',
             (s.weight ?? 0) * (s.reps ?? 0),
-            first ? (bd.weight ?? '') : '',
+            first ? _wkAvgWeight(bd) : '',
             first ? (bd.energy ?? '') : '',
             first ? (bd.sleep  ?? '') : '',
           ));
@@ -180,7 +189,7 @@ export function exportCSV(scope = 'all') {
       kw, von, bis, modus, wk.note ?? '',
       `${dd}/${wk.days.length}`, tot, done, `${pct}%`,
       vol, avg, log.length,
-      bd.weight ?? '', bd.sleep ?? '', bd.energy ?? '',
+      _wkAvgWeight(bd), bd.sleep ?? '', bd.energy ?? '',
     ));
   }
 

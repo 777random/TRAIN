@@ -24,7 +24,7 @@
 
 export const STORAGE_KEY        = 'train_v6';
 export const STORAGE_KEY_SHADOW = 'train_v6_shadow';
-export const SCHEMA_VERSION     = 28;
+export const SCHEMA_VERSION     = 29;
 
 export const BADGE_THRESHOLDS = [
   { id: 'badge_4',   weeks: 4,   title: 'Erster Schritt' },
@@ -866,6 +866,19 @@ function migrate(raw) {
     raw.meta = { ...raw.meta, schemaVersion: 28 };
   }
 
+  // v28 → v29: bodyData.weightLog — tägliche Gewichtseinträge pro Woche
+  if ((raw.meta?.schemaVersion ?? 0) < 29) {
+    (raw.weeks ?? []).forEach(wk => {
+      if (!wk.bodyData) wk.bodyData = {};
+      if (!Array.isArray(wk.bodyData.weightLog)) {
+        wk.bodyData.weightLog = wk.bodyData.weight != null
+          ? [{ date: wk.startDate, weight: wk.bodyData.weight }]
+          : [];
+      }
+    });
+    raw.meta = { ...raw.meta, schemaVersion: 29 };
+  }
+
   // Always-apply defaults for settings added in later versions
   if (raw.settings.vibrationEnabled               === undefined) raw.settings.vibrationEnabled               = true;
   if (raw.settings.rpeEnabled                     === undefined) raw.settings.rpeEnabled                     = true;
@@ -1144,6 +1157,7 @@ export const A = Object.freeze({
   SESSION_STOP:        'SESSION_STOP',        // { duration, time }
   // Body data
   BODY_SET_FIELD:      'BODY_SET_FIELD',      // { field, value }
+  BODY_LOG_WEIGHT:     'BODY_LOG_WEIGHT',     // { date: 'YYYY-MM-DD', weight: number }
   // Template
   TPL_SAVE:            'TPL_SAVE',            // { template: DayTemplate[] }
   SAVE_WEEK_AS_TEMPLATE:'SAVE_WEEK_AS_TEMPLATE', // {}
@@ -1901,6 +1915,19 @@ function reduce(state, action) {
       const wk = _currentWeek(); if (!wk) break;
       if (!wk.bodyData) wk.bodyData = {};
       wk.bodyData[p.field] = p.value;
+      break;
+    }
+    case A.BODY_LOG_WEIGHT: {
+      const wk = _currentWeek(); if (!wk) break;
+      if (!wk.bodyData) wk.bodyData = {};
+      if (!Array.isArray(wk.bodyData.weightLog)) wk.bodyData.weightLog = [];
+      const idx = wk.bodyData.weightLog.findIndex(e => e.date === p.date);
+      if (idx >= 0) {
+        wk.bodyData.weightLog[idx].weight = p.weight;
+      } else {
+        wk.bodyData.weightLog.push({ date: p.date, weight: p.weight });
+        wk.bodyData.weightLog.sort((a, b) => a.date.localeCompare(b.date));
+      }
       break;
     }
 

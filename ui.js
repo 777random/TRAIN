@@ -1903,12 +1903,20 @@ ${s._showNote ? `
 
 // ─── Body tab ────────────────────────────────────────────────────────────────
 
-/** Körpergewichts-Verlauf: ein Eintrag pro Woche mit gesetztem bodyData.weight, aufsteigend. */
+/** Körpergewichts-Verlauf: Wochendurchschnitt aus weightLog, aufsteigend.
+ *  Fallback auf bodyData.weight für alte Daten (vor v29). */
 function _bodyWeightHistory(state) {
   return [...state.weeks]
-    .filter(w => w.bodyData?.weight)
+    .filter(w => (w.bodyData?.weightLog?.length > 0) || w.bodyData?.weight)
     .sort((a, b) => a.startDate.localeCompare(b.startDate))
-    .map(w => ({ startDate: w.startDate, weight: w.bodyData.weight }));
+    .map(w => {
+      const log = w.bodyData.weightLog;
+      if (log?.length > 0) {
+        const avg = log.reduce((s, e) => s + e.weight, 0) / log.length;
+        return { startDate: w.startDate, weight: Math.round(avg * 10) / 10 };
+      }
+      return { startDate: w.startDate, weight: w.bodyData.weight };
+    });
 }
 
 /** Gewichts-Übungen der aktuellen Woche mit bekannter Bestleistung, dedupliziert nach Name. */
@@ -2044,9 +2052,34 @@ function renderBodyTab(state) {
   const wk = state.weeks[state.curIdx];
   const bd = wk?.bodyData ?? {};
   const targetWeight = state.settings?.targetWeight;
-  const weightDiff = targetWeight && bd.weight
-    ? (targetWeight - bd.weight)
+
+  // ── Tägliche Gewichtsdaten ────────────────────────────────────────────────
+  const todayStr   = new Date().toISOString().slice(0, 10);
+  const weightLog  = Array.isArray(bd.weightLog) ? bd.weightLog : [];
+  const todayEntry = weightLog.find(e => e.date === todayStr);
+
+  // Placeholder: letzter bekannter Wert (diese Woche oder vorherige)
+  const lastLogEntry = weightLog[weightLog.length - 1];
+  const prevHistory  = _bodyWeightHistory(state);
+  const lastKnown    = lastLogEntry?.weight ?? prevHistory[prevHistory.length - 1]?.weight ?? null;
+
+  // Wochendurchschnitt der aktuellen Woche
+  const weekAvg = weightLog.length > 0
+    ? Math.round(weightLog.reduce((s, e) => s + e.weight, 0) / weightLog.length * 10) / 10
     : null;
+
+  // Kompakter Wochenverlauf
+  const DAY_SHORT = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+  const weekLogLine = weightLog.length > 1
+    ? weightLog.map(e => {
+        const d = new Date(e.date + 'T12:00:00');
+        return `${DAY_SHORT[d.getDay()]} ${e.weight}`;
+      }).join(' · ')
+    : null;
+
+  // Aktuelles Gewicht für Zieldiff (heutiger Eintrag > Wochenø > Legacy)
+  const currWeight = todayEntry?.weight ?? weekAvg ?? bd.weight ?? null;
+  const weightDiff = targetWeight && currWeight ? (targetWeight - currWeight) : null;
 
   // ── Sektion 1: Körpergewicht ─────────────────────────────────────────────
   const history = _bodyWeightHistory(state);
@@ -2064,20 +2097,23 @@ function renderBodyTab(state) {
     <div class="body-today-row">
       <span class="body-today-row__label">Heute:</span>
       <input id="body-weight-today" class="body-input" type="number" step="0.1"
-        value="${bd.weight ?? ''}" placeholder="82.5"
+        value="${todayEntry ? todayEntry.weight : ''}"
+        placeholder="${lastKnown ?? '82.5'}"
         aria-label="Körpergewicht heute in kg"
         style="width:100px"
       />
       <span style="font-size:13px;color:var(--c-text-3)">kg</span>
       <button class="btn btn--accent btn--sm" data-action="log-bodyweight">Eintragen</button>
     </div>
+    ${weekLogLine ? `
+    <div class="body-week-log">${h(weekLogLine)}${weekAvg !== null ? ` · <strong>Ø ${weekAvg} kg</strong>` : ''}</div>` : ''}
     ${!last ? `
     <p class="empty-state__hint" style="margin-top:var(--sp-3)">Trage dein Körpergewicht ein um deine relative Stärke zu verfolgen.</p>` : `
     ${chartSvg ? `<div style="margin-top:var(--sp-3)">${chartSvg}</div>` : ''}
     <div class="body-metrics-row">
       <div class="body-metric">
         <div class="body-metric__val">${last.weight} kg</div>
-        <div class="body-metric__lbl">Aktuell</div>
+        <div class="body-metric__lbl">Aktuell (Ø)</div>
       </div>
       ${change !== null ? `
       <div class="body-metric">
@@ -4702,7 +4738,8 @@ function _handleClick(e) {
       const input = document.getElementById('body-weight-today');
       const w     = parseFloat(input?.value);
       if (!Number.isFinite(w) || w <= 0) break;
-      dispatch(A.BODY_SET_FIELD, { field: 'weight', value: w });
+      const todayDate = new Date().toISOString().slice(0, 10);
+      dispatch(A.BODY_LOG_WEIGHT, { date: todayDate, weight: w });
       showToast('Körpergewicht eingetragen ✓', 'ok');
       break;
     }

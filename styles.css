@@ -1016,6 +1016,7 @@ exercise { position: unset; }
 .body-badge span { font-weight: 400; color: var(--c-text-3); font-size: 11px; }
 .body-today-row { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
 .body-today-row__label { font-size: 13px; color: var(--c-text-3); }
+.body-week-log { margin-top: var(--sp-2); font-size: 12px; color: var(--c-text-2); line-height: 1.5; }
 .body-metrics-row { display: flex; gap: var(--sp-4); margin-top: var(--sp-3); flex-wrap: wrap; }
 .body-metric__val { font-family: var(--font-display); font-size: 18px; }
 .body-metric__lbl { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--c-text-3); margin-top: 2px; }
