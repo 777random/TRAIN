@@ -496,10 +496,27 @@ function _checkAndGrantBadges(state) {
   }
 }
 
+// Trägt einen Satz in die prMap ein. Extrahiert um "Heute anders"-Doppelbuchung
+// (Original-Slot + Ersatz-Übung) ohne Code-Duplizierung zu ermöglichen.
+function _addToPrMap(map, name, weight, reps) {
+  if (!map[name]) map[name] = { prWeight: null, prReps: null, repsHistory: {} };
+  const m = map[name];
+  if (m.prWeight === null || weight > m.prWeight) {
+    m.prWeight = weight; m.prReps = reps;
+  } else if (weight === m.prWeight && reps > (m.prReps ?? 0)) {
+    m.prReps = reps;
+  }
+  const w = String(weight);
+  if (reps > (m.repsHistory[w] ?? 0)) m.repsHistory[w] = reps;
+}
+
 function _recalcExercisePRs(state) {
   const curWk = state.weeks[state.curIdx];
   if (!curWk) return;
-  // Build name → {prWeight, prRepsAtMaxWeight, repsHistory} from all completed sets
+  // Build name → {prWeight, prReps, repsHistory} from all completed sets.
+  // "Heute anders"-Sessions (substituteFor gesetzt) buchen doppelt:
+  // unter dem Original-Slot (Slot-Kontinuität) UND unter der Ersatz-Übung
+  // (damit sie eine eigene PR-Historie aufbaut wenn sie zur Hauptübung wird).
   const prMap = {};
   state.weeks.forEach(wk => {
     if (wk.mode === 'deload') return;
@@ -510,20 +527,13 @@ function _recalcExercisePRs(state) {
           const reps   = parseFloat(s.reps)   || 0;
           if (reps === 0) return;
           const weight = parseFloat(s.weight) || 0;
-          const name   = ex.substituteFor || ex.name;
-          if (!name) return;
-          if (!prMap[name]) prMap[name] = { prWeight: null, prReps: null, repsHistory: {} };
-          const m = prMap[name];
-          if (m.prWeight === null || weight > m.prWeight) {
-            m.prWeight = weight; m.prReps = reps;
-          } else if (weight === m.prWeight && reps > (m.prReps ?? 0)) {
-            m.prReps = reps;
+          const primaryName = ex.substituteFor || ex.name;
+          if (!primaryName) return;
+          _addToPrMap(prMap, primaryName, weight, reps);
+          // Doppelbuchung: Ersatz-Übung bekommt eigene Einträge
+          if (ex.substituteFor && ex.name && ex.name !== ex.substituteFor) {
+            _addToPrMap(prMap, ex.name, weight, reps);
           }
-          // Pro Gewicht die beste je erreichte Wdh-Zahl — unabhängig vom
-          // (an dieser Stelle noch nicht final bekannten) Maximalgewicht;
-          // das Filtern auf "submaximal" passiert erst beim Anwenden unten.
-          const w = String(weight);
-          if (reps > (m.repsHistory[w] ?? 0)) m.repsHistory[w] = reps;
         });
       });
     });
