@@ -2363,7 +2363,7 @@ function _renderRadarSVG(catPct) {
     return `<text x="${lx}" y="${ly}" text-anchor="${anchor}" dominant-baseline="middle" font-size="10" fill="#AAA" font-family="system-ui,sans-serif">${nm}</text>
       <text x="${lx}" y="${ly + 13}" text-anchor="${anchor}" dominant-baseline="middle" font-size="9" fill="#C8FF00" font-family="system-ui,sans-serif">${catPct[nm] ?? 0}%</text>`;
   }).join('');
-  return `<svg viewBox="0 0 200 225" width="100%" style="max-width:220px;display:block;margin:0 auto" role="img" aria-label="Radar-Diagramm Bewegungsmuster">${rings}${axisLines}${polygon}${dots}${labels}</svg>`;
+  return `<svg viewBox="0 0 200 225" width="100%" style="max-width:400px;display:block;margin:0 auto" role="img" aria-label="Radar-Diagramm Bewegungsmuster">${rings}${axisLines}${polygon}${dots}${labels}</svg>`;
 }
 
 function _renderMovementPattern(state) {
@@ -2409,8 +2409,17 @@ function _renderMovementPattern(state) {
   }
   const warningsHtml = warnings.map(w => `<div class="movement-warning">⚠ ${h(w)}</div>`).join('');
 
+  const chartType  = state.settings?.movementChartType ?? 'radar';
+  const canRadar   = catsWithData.length >= 3;
+  const showRadar  = chartType === 'radar' && canRadar;
+  const showHint   = chartType === 'radar' && !canRadar;
+
+  const hintHtml = showHint
+    ? `<p class="movement-chart-hint">Netzdiagramm ab 3 Muskelgruppen mit Trainingsdaten verfügbar.</p>`
+    : '';
+
   let chartHtml;
-  if (catsWithData.length >= 4) {
+  if (showRadar) {
     chartHtml = _renderRadarSVG(catPct);
   } else {
     const maxPct = Math.max(...RADAR_CATS.map(c => catPct[c]), 1);
@@ -2427,6 +2436,17 @@ function _renderMovementPattern(state) {
   return `<div class="chart-card">
     <div class="chart-card__title">Bewegungsmuster</div>
     <p style="font-size:11px;color:var(--c-text-3);margin-bottom:var(--sp-3)">Letzte 4 Wochen (ohne Deload)</p>
+    <div class="weight-step-opts" style="margin-bottom:var(--sp-3)">
+      <button type="button" class="weight-step-btn${chartType === 'radar' ? ' is-selected' : ''}"
+        data-action="set-movement-chart-type" data-chart-type="radar"
+        aria-pressed="${chartType === 'radar'}"
+      >🕸 Netz</button>
+      <button type="button" class="weight-step-btn${chartType === 'bar' ? ' is-selected' : ''}"
+        data-action="set-movement-chart-type" data-chart-type="bar"
+        aria-pressed="${chartType === 'bar'}"
+      >📊 Balken</button>
+    </div>
+    ${hintHtml}
     ${chartHtml}
     ${warningsHtml}
   </div>`;
@@ -4731,6 +4751,12 @@ function _handleClick(e) {
       const repsVal = _rInp?.value ?? '';
       dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si + 1, field: 'reps', value: repsVal });
       showToast('Wdh in nächsten Satz übernommen', 'ok');
+      break;
+    }
+
+    case 'set-movement-chart-type': {
+      const t = el.dataset.chartType;
+      if (t === 'radar' || t === 'bar') dispatch(A.SET_MOVEMENT_CHART_TYPE, { type: t });
       break;
     }
 

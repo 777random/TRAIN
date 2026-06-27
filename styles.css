@@ -1807,6 +1807,9 @@ details[open] > .deload-details__summary::before { content: '▾ '; }
   font-size: 13px; color: var(--c-accent); font-family: var(--font-display); letter-spacing: .05em;
 }
 .orm-hint__basis { font-size: 11px; color: var(--c-text-3); font-family: var(--font-body); margin-left: 6px; letter-spacing: 0; }
+.movement-chart-hint {
+  margin-bottom: var(--sp-3); font-size: 11px; color: var(--c-text-3);
+}
 .movement-warning {
   margin-top: var(--sp-3); padding: var(--sp-2) var(--sp-3);
   background: rgba(255,180,0,.1); border: 1px solid rgba(255,180,0,.3);
