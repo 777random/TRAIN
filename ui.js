@@ -970,8 +970,9 @@ function _renderRitualAnchor(state, wk, di) {
  * ist, auch bei Streak=0 (ehrliche Darstellung, kein Sonderfall).
  */
 function _renderStreakBadge(state) {
-  const streakDays = (_calcStreak(state)?.cur ?? 0) * 7;
-  return `<button type="button" class="streak-badge" data-action="open-streak-freeze" aria-label="${streakDays} Tage Streak — Streak-Freeze öffnen">🔥 <span class="streak-badge__num">${streakDays}</span> Tage</button>`;
+  const streakWeeks = (_calcStreak(state)?.cur ?? 0);
+  const streakLabel = streakWeeks === 1 ? '1 Woche' : `${streakWeeks} Wochen`;
+  return `<button type="button" class="streak-badge" data-action="open-streak-freeze" aria-label="${streakLabel} Streak — Streak-Freeze öffnen">🔥 <span class="streak-badge__num">${streakWeeks}</span> ${streakWeeks === 1 ? 'Woche' : 'Wochen'}</button>`;
 }
 
 /**
@@ -1006,7 +1007,7 @@ function _showStreakFreezePopup(state) {
   overlay.className = 'vac-plan-modal-overlay';
   overlay.innerHTML = `
     <div class="vac-plan-modal">
-      <div class="vac-plan-modal__title">🔥 ${streak.cur * 7} Tage Streak</div>
+      <div class="vac-plan-modal__title">🔥 ${streak.cur === 1 ? '1 Woche' : `${streak.cur} Wochen`} Streak</div>
       ${body}
     </div>`;
   document.body.appendChild(overlay);
@@ -2866,7 +2867,7 @@ function renderProgressTab(state) {
       const fmtMin   = m => m >= 60 ? `${Math.floor(m/60)}h${m%60 ? String(m%60).padStart(2,'0') : ''}` : `${m}'`;
       return `
     <div class="streak-row">
-      <div class="streak-card"><div class="streak-num">${streak.cur}</div><div class="streak-lbl">Wo. · ${streak.cur * 7} T.</div></div>
+      <div class="streak-card"><div class="streak-num">${streak.cur}</div><div class="streak-lbl">Wochen</div></div>
       <div class="streak-card"><div class="streak-num">${streak.best}</div><div class="streak-lbl">Best</div></div>
       <div class="streak-card"><div class="streak-num">${state.weeks.length}</div><div class="streak-lbl">Wochen</div></div>
       ${avgScore !== null ? `
