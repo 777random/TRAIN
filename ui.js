@@ -926,7 +926,8 @@ function _trainingContextAnchor(state, wk, di) {
   }
   if (!found) return null;
 
-  const daysAgo = Math.max(0, Math.round((_dayDate(wk, di) - _dayDate(found.week, found.dayIdx)) / 86_400_000));
+  const todayNoon = (() => { const d = new Date(); d.setHours(12, 0, 0, 0); return d; })();
+  const daysAgo = Math.max(0, Math.round((todayNoon - _dayDate(found.week, found.dayIdx)) / 86_400_000));
   const timeText = daysAgo === 0 ? 'heute' : daysAgo === 1 ? 'gestern' : `vor ${daysAgo} Tagen`;
   return { timeText };
 }
@@ -1068,10 +1069,8 @@ function _prevWeekBanner(state, wk, di) {
   }));
   const _pbTotal   = _pbSucc + _pbFail;
   const _pbScore   = _pbTotal > 0 ? Math.round(_pbSucc / _pbTotal * 100) : 0;
-  const streak     = _calcStreak(state);
-  const streakPart = streak.cur >= 2 ? `&nbsp;&nbsp;🔥 ${streak.cur * 7} Tage in Folge` : '';
   return `<div class="prev-banner" role="status">
-    ${ic.barChart()}<span>Selber Tag letzte Woche: ${_pbScore}% · ${_pbSucc}/${_pbTotal} Sätze ✓${streakPart}</span>
+    ${ic.barChart()}<span>Selber Tag letzte Woche: ${_pbScore}% · ${_pbSucc}/${_pbTotal} Sätze ✓</span>
   </div>`;
 }
 
@@ -1683,7 +1682,7 @@ function renderExercise(wk, di, ei, state) {
       </div>
       <span class="fulfill-meter__label" style="color:${color}">Ziel: ${nSets}×${ex.targetReps} | Ist: ${achieved}/${target} ${unit}</span>
     </div>
-    ${actualPct > 0 ? `<div class="effort-pct" style="color:${actualPct > 100 ? 'var(--c-accent)' : 'var(--c-text-3)'}">${actualPct > 100 ? '↑ ' : ''}${actualPct}% Ziel</div>` : ''}`;
+    ${actualPct > 0 ? `<div class="effort-pct" style="color:${actualPct > 100 ? 'var(--c-accent)' : 'var(--c-text-3)'}">${actualPct > 100 ? '↑ ' : ''}${Math.min(actualPct, 100)}% Ziel</div>` : ''}`;
   })()}
 
   ${!locked ? `
@@ -1764,7 +1763,7 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
                      (s.reps ?? 0) >= ex.prRepsHistory[String(s.weight)];
   const isRepsPR   = isRepsPRAtMax || isRepsPRSubmax;
   const isPR = isWeightPR || isRepsPR;
-  const effortScore   = (st === 'success' && ex.targetReps) ? Math.round((s.reps ?? 0) / ex.targetReps * 100) : null;
+  const effortScore   = (st === 'success' && ex.targetReps && (ex.metric === 'reps' || !ex.metric)) ? Math.round((s.reps ?? 0) / ex.targetReps * 100) : null;
   const isEffortGoal  = effortScore !== null && effortScore >= 100;
   const doneIcon = st === 'success' ? ic.check()
                : st === 'fail'    ? ic.xMark()
@@ -1892,7 +1891,6 @@ ${s._showNote ? `
     data-action="set-note" data-di="${di}" data-ei="${ei}" data-si="${si}"
     aria-label="Notiz zu Satz ${si + 1}"
     maxlength="120"
-    autofocus
   />
 </div>` : ''}`;
 }

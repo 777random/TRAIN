@@ -905,6 +905,10 @@ export function loadState() {
       if (!Array.isArray(STATE.decisionLog))        STATE.decisionLog       = [];
       if (STATE.settings.erkenntnisseHorizont === undefined) STATE.settings.erkenntnisseHorizont = 8;
       if (STATE.lastReentryHandled === undefined)  STATE.lastReentryHandled = null;
+      // _showNote is transient UI state — never survive a reload
+      STATE.weeks.forEach(w => w.days.forEach(d => d.exercises.forEach(ex =>
+        ex.sets.forEach(s => { delete s._showNote; })
+      )));
       if (typeof STATE.longestStreakEver !== 'number') STATE.longestStreakEver = _calcLongestStreakEver(STATE.weeks);
       if (!Array.isArray(STATE.badges))            STATE.badges = [];
       if (!Array.isArray(STATE.seenTips))          STATE.seenTips = [];

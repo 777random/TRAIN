@@ -85,6 +85,12 @@ let _goPopup      = null;   // "WEITER!" full-screen popup
 function _pad(n) { return String(n).padStart(2, '0'); }
 
 function _fmt(totalSeconds) {
+  if (totalSeconds >= 3600) {
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    const s = totalSeconds % 60;
+    return `${h}:${_pad(m)}:${_pad(s)}`;
+  }
   const m = Math.floor(totalSeconds / 60);
   const s = totalSeconds % 60;
   return `${_pad(m)}:${_pad(s)}`;
@@ -104,19 +110,23 @@ function _getActiveDay() {
 function _updateClockDisplay() {
   if (!_clockEl) return;
   const day = _getActiveDay();
+  const maxMs = (getState().settings?.maxSessionMs ?? 10800000);
   if (!day?.sessionStartTs || day.sessionEndTs) {
-    // No active session
     if (_sessInterval) { clearInterval(_sessInterval); _sessInterval = null; }
-    _clockEl.textContent = '00:00';
+    if (day?.sessionStartTs && day.sessionEndTs) {
+      // Freeze at elapsed duration when session ended
+      const elapsed = Math.min(day.sessionEndTs - day.sessionStartTs, maxMs);
+      _clockEl.textContent = _fmt(Math.floor(elapsed / 1000));
+    } else {
+      _clockEl.textContent = '00:00';
+    }
     _clockEl.classList.remove('toolbar-timer--running');
     return;
   }
-  const maxMs   = (getState().settings?.maxSessionMs ?? 10800000);
   const elapsed = Math.min(Date.now() - day.sessionStartTs, maxMs);
   const seconds = Math.floor(elapsed / 1000);
   _clockEl.textContent = '● ' + _fmt(seconds);
   _clockEl.classList.add('toolbar-timer--running');
-  // Auto-stop display when max reached
   if (elapsed >= maxMs && _sessInterval) {
     clearInterval(_sessInterval);
     _sessInterval = null;
