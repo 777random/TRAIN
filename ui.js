@@ -709,29 +709,31 @@ function renderDayList(state) {
       aria-label="Neue Trainingswoche erstellen">${ic.plus()}</button>
   </div>
   <div class="day-tab-pills-row">
-    <div class="day-tab-pills${wk.days.length >= 4 ? ' is-scrollable' : ''}">
-      <button
-        class="day-overview-toggle${_overviewMode ? ' is-active' : ''}"
-        data-action="toggle-overview"
-        aria-label="${_overviewMode ? 'Einzelansicht' : 'Übersicht'}"
-        aria-pressed="${_overviewMode}"
-        title="${_overviewMode ? 'Einzelansicht' : 'Alle Tage anzeigen'}"
-      >${ic.columns()}</button>
-      ${wk.days.map((day, di) => {
-        const done   = !!day.markedDone;
-        const locked = !!day.locked;
-        const isAct  = !_overviewMode && _activeDayIdx === di;
-        const total  = day.exercises.reduce((s, ex) => s + ex.sets.length, 0);
-        const done_s = day.exercises.reduce((s, ex) => s + ex.sets.filter(st => st.done).length, 0);
-        return `<button
-          class="day-tab${isAct ? ' is-active' : ''}${done ? ' day-tab--done' : ''}${isDl ? ' day-tab--deload' : ''}${day.isVacation ? ' day-tab--vacation' : ''}"
-          data-day-hdr="${di}"
-          role="tab" aria-selected="${isAct}" aria-controls="day-panel-${di}"
-          id="day-tab-${di}"
-          title="${h(day.title)}"
-          aria-label="${h(day.title)} – ${done_s}/${total} Sätze"
-        >${h(day.title)}</button>`;
-      }).join('')}
+    <div class="day-tab-pills-scroll">
+      <div class="day-tab-pills">
+        <button
+          class="day-overview-toggle${_overviewMode ? ' is-active' : ''}"
+          data-action="toggle-overview"
+          aria-label="${_overviewMode ? 'Einzelansicht' : 'Übersicht'}"
+          aria-pressed="${_overviewMode}"
+          title="${_overviewMode ? 'Einzelansicht' : 'Alle Tage anzeigen'}"
+        >${ic.columns()}</button>
+        ${wk.days.map((day, di) => {
+          const done   = !!day.markedDone;
+          const locked = !!day.locked;
+          const isAct  = !_overviewMode && _activeDayIdx === di;
+          const total  = day.exercises.reduce((s, ex) => s + ex.sets.length, 0);
+          const done_s = day.exercises.reduce((s, ex) => s + ex.sets.filter(st => st.done).length, 0);
+          return `<button
+            class="day-tab${isAct ? ' is-active' : ''}${done ? ' day-tab--done' : ''}${isDl ? ' day-tab--deload' : ''}${day.isVacation ? ' day-tab--vacation' : ''}"
+            data-day-hdr="${di}"
+            role="tab" aria-selected="${isAct}" aria-controls="day-panel-${di}"
+            id="day-tab-${di}"
+            title="${h(day.title)}"
+            aria-label="${h(day.title)} – ${done_s}/${total} Sätze"
+          >${h(day.title)}</button>`;
+        }).join('')}
+      </div>
     </div>
     ${_renderStreakBadge(state)}
   </div>

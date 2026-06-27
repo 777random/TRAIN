@@ -270,14 +270,18 @@ button, input, select, textarea { font: inherit; }
    immer sichtbar (flex-shrink:0), Pillen-Container schrumpft/scrollt statt
    den Badge aus dem sichtbaren Bereich zu drängen. */
 .day-tab-pills-row {
-  display: flex; align-items: center; gap: var(--sp-2);
+  display: flex; align-items: center; gap: var(--sp-2); overflow: hidden;
 }
-.day-tab-pills {
-  display: flex; flex-wrap: nowrap; gap: var(--sp-2); align-items: center;
+.day-tab-pills-scroll {
   flex: 1; min-width: 0;
-  overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
+  overflow-x: scroll; -webkit-overflow-scrolling: touch;
+  scrollbar-width: none; -ms-overflow-style: none;
 }
-.day-tab-pills::-webkit-scrollbar { display: none; }
+.day-tab-pills-scroll::-webkit-scrollbar { display: none; }
+.day-tab-pills {
+  display: inline-flex; gap: var(--sp-2); align-items: center;
+  white-space: nowrap; padding-right: 4px;
+}
 
 /* 2.1: full-text pill */
 .day-tab {
