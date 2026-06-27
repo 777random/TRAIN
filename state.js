@@ -1131,6 +1131,8 @@ export const A = Object.freeze({
   PLATEAU_ACTION:         'PLATEAU_ACTION',         // { exerciseName, action: 'ignored'|'implemented', since, plateauWeeksAtAction }
   EX_APPLY_REENTRY_REDUCTION: 'EX_APPLY_REENTRY_REDUCTION', // { factor } – reduces weights/targets in current week
   EX_REMOVE:           'EX_REMOVE',           // { di, ei }
+  EX_ARCHIVE:          'EX_ARCHIVE',          // { di, ei, weekIdx } — blendet aus, löscht nicht
+  EX_UNARCHIVE:        'EX_UNARCHIVE',        // { name: string } — reaktiviert in allen Wochen
   EX_UPDATE:           'EX_UPDATE',           // { di, ei, field, value }
   EX_MOVE:             'EX_MOVE',             // { di, fromEi, toEi }
   EX_TOGGLE_CFG:       'EX_TOGGLE_CFG',       // { di, ei }
@@ -1610,6 +1612,19 @@ function reduce(state, action) {
     case A.EX_REMOVE: {
       const day = _currentWeek()?.days[p.di]; if (!day) break;
       day.exercises.splice(p.ei, 1);
+      break;
+    }
+    case A.EX_ARCHIVE: {
+      const wk = p.weekIdx != null ? state.weeks[p.weekIdx] : _currentWeek();
+      const ex = wk?.days[p.di]?.exercises[p.ei]; if (!ex) break;
+      ex.archived = true;
+      break;
+    }
+    case A.EX_UNARCHIVE: {
+      for (const wk of state.weeks)
+        for (const day of wk.days)
+          for (const ex of day.exercises)
+            if (ex.name === p.name) ex.archived = false;
       break;
     }
     case A.EX_UPDATE: {

@@ -69,6 +69,9 @@ let _confirmFlashKey = null;
 /** Key of the exercise with the open substitute-name form: `${di}-${ei}` or null. */
 let _subFormOpenKey = null;
 
+/** Key of the exercise with the open archive-confirm panel: `${di}-${ei}` or null. */
+let _archiveConfirmKey = null;
+
 /** Key of the exercise whose ⋮ context menu is open: `${di}-${ei}` or null. */
 let _exMenuOpenKey = null;
 
@@ -635,8 +638,9 @@ function renderDayList(state) {
   let totalSets = 0, doneSets = 0;
   if (!_overviewMode && _activeDayIdx !== null && wk.days[_activeDayIdx]) {
     const ad = wk.days[_activeDayIdx];
-    totalSets = ad.exercises.reduce((s, ex) => s + ex.sets.length, 0);
-    doneSets  = ad.exercises.reduce((s, ex) => s + ex.sets.filter(st => st.done).length, 0);
+    const activeExes = ad.exercises.filter(ex => !ex.archived);
+    totalSets = activeExes.reduce((s, ex) => s + ex.sets.length, 0);
+    doneSets  = activeExes.reduce((s, ex) => s + ex.sets.filter(st => st.done).length, 0);
   }
   const pct = totalSets > 0 ? Math.round(doneSets / totalSets * 100) : 0;
   const progressHtml = (!_overviewMode && _activeDayIdx !== null) ? `
@@ -722,8 +726,9 @@ function renderDayList(state) {
           const done   = !!day.markedDone;
           const locked = !!day.locked;
           const isAct  = !_overviewMode && _activeDayIdx === di;
-          const total  = day.exercises.reduce((s, ex) => s + ex.sets.length, 0);
-          const done_s = day.exercises.reduce((s, ex) => s + ex.sets.filter(st => st.done).length, 0);
+          const activeEx = day.exercises.filter(ex => !ex.archived);
+          const total  = activeEx.reduce((s, ex) => s + ex.sets.length, 0);
+          const done_s = activeEx.reduce((s, ex) => s + ex.sets.filter(st => st.done).length, 0);
           return `<button
             class="day-tab${isAct ? ' is-active' : ''}${done ? ' day-tab--done' : ''}${isDl ? ' day-tab--deload' : ''}${day.isVacation ? ' day-tab--vacation' : ''}"
             data-day-hdr="${di}"
@@ -755,9 +760,10 @@ function renderDayList(state) {
     contentHtml = `<div class="day-overview-grid">
       ${wk.days.map((day, di) => {
         const done   = !!day.markedDone;
-        const total  = day.exercises.reduce((s, ex) => s + ex.sets.length, 0);
-        const done_s = day.exercises.reduce((s, ex) => s + ex.sets.filter(st => st.done).length, 0);
-        const vol    = day.exercises.reduce((s, ex) => s + ex.sets.filter(st => st.status === 'success').reduce((ss, st) => ss + (st.weight ?? 0) * (st.reps ?? 0), 0), 0);
+        const activeEx2 = day.exercises.filter(ex => !ex.archived);
+        const total  = activeEx2.reduce((s, ex) => s + ex.sets.length, 0);
+        const done_s = activeEx2.reduce((s, ex) => s + ex.sets.filter(st => st.done).length, 0);
+        const vol    = activeEx2.reduce((s, ex) => s + ex.sets.filter(st => st.status === 'success').reduce((ss, st) => ss + (st.weight ?? 0) * (st.reps ?? 0), 0), 0);
         const dpct   = total > 0 ? Math.round(done_s / total * 100) : 0;
         return `<div class="day-overview-card${done ? ' day-overview-card--done' : ''}${isDl ? ' day-overview-card--deload' : ''}"
           data-action="overview-open-day" data-di="${di}" role="button" tabindex="0"
@@ -1086,7 +1092,7 @@ function renderDayBody(wk, di, state) {
   const done     = !!day.markedDone;
   const isVacDay = !!day.isVacation;
 
-  const exHtml       = day.exercises.map((ex, ei) => renderExercise(wk, di, ei, state)).join('');
+  const exHtml       = day.exercises.map((ex, ei) => ex.archived ? '' : renderExercise(wk, di, ei, state)).join('');
   const lockBtnLabel = done ? 'Tag entsperren' : 'Tag als abgeschlossen markieren und sperren';
   const lockBtnIcon  = done ? ic.unlock() : ic.lock();
 
@@ -1607,6 +1613,7 @@ function renderExercise(wk, di, ei, state) {
         ${ex.substituteFor
           ? `<button class="ex-menu-item" role="menuitem" data-action="reset-sub" data-di="${di}" data-ei="${ei}">↩ Substitution zurücksetzen</button>`
           : `<button class="ex-menu-item" role="menuitem" data-action="open-sub-form" data-di="${di}" data-ei="${ei}">↔ Heute anders</button>`}
+        <button class="ex-menu-item" role="menuitem" data-action="open-archive-confirm" data-di="${di}" data-ei="${ei}">📦 Übung archivieren</button>
         <button class="ex-menu-item ex-menu-item--danger" role="menuitem" data-action="remove-ex" data-di="${di}" data-ei="${ei}">🗑️ Übung löschen</button>
         ` : ''}
       </div>` : ''}
@@ -1615,6 +1622,15 @@ function renderExercise(wk, di, ei, state) {
 
   ${subBannerHtml}
   ${subFormHtml}
+
+  ${_archiveConfirmKey === `${di}-${ei}` ? `
+  <div class="sub-form" style="text-align:center;padding:var(--sp-4)">
+    <p style="font-size:13px;color:var(--c-text-2);margin-bottom:var(--sp-3)">${h(ex.name)} wird aus dem Training ausgeblendet. Die bisherige Historie bleibt erhalten.</p>
+    <div style="display:flex;gap:var(--sp-2);justify-content:center">
+      <button class="btn btn--danger btn--sm" data-action="confirm-archive-ex" data-di="${di}" data-ei="${ei}">Archivieren</button>
+      <button class="btn btn--sm" data-action="cancel-archive-ex">Abbrechen</button>
+    </div>
+  </div>` : ''}
 
   ${cfgRow}
 
@@ -2295,11 +2311,13 @@ function _trueVol(week) {
 function _weekSuccessScore(week) {
   let succ = 0, fail = 0;
   for (const d of week.days)
-    for (const ex of d.exercises)
+    for (const ex of d.exercises) {
+      if (ex.archived) continue;
       for (const s of ex.sets) {
         if (s.status === 'success') succ++;
         else if (s.status === 'fail') fail++;
       }
+    }
   const total = succ + fail;
   return { succ, fail, total, pct: total > 0 ? Math.round(succ / total * 100) : 0 };
 }
@@ -2836,6 +2854,9 @@ function renderProgressTab(state) {
   const streak     = _calcStreak(state);
   const _scoreList = state.weeks.map(w => _weekSuccessScore(w)).filter(s => s.total > 0).map(s => s.pct);
   const avgScore   = _scoreList.length > 0 ? Math.round(_scoreList.reduce((a, b) => a + b, 0) / _scoreList.length) : null;
+  const archivedNames = new Set(
+    state.weeks.flatMap(w => w.days.flatMap(d => d.exercises.filter(e => e.archived).map(e => e.name)))
+  );
   const allExNames = [...new Set(
     state.weeks.flatMap(w => w.days.flatMap(d => d.exercises.map(e => e.name)))
   )].sort();
@@ -2874,9 +2895,10 @@ function renderProgressTab(state) {
   <div class="chart-card">
     <div class="chart-card__title">Übungsfortschritt</div>
     <select class="chart-select" id="chart-ex-select" aria-label="Übung für Progressionskurve wählen">
-      ${allExNames.map(n => `<option value="${h(n)}">${h(n)}</option>`).join('')}
+      ${allExNames.map(n => `<option value="${h(n)}">${h(n)}${archivedNames.has(n) ? ' (archiviert)' : ''}</option>`).join('')}
     </select>
     <div class="chart-wrap" id="chart-ex-wrap"></div>
+    <div id="chart-archive-hint"></div>
     <div id="chart-1rm-hint"></div>
     <div id="chart-last4-wrap"></div>
   </div>
@@ -3079,6 +3101,13 @@ function _updateExChart(state) {
     _attachChartTooltips(wrap);
   } else {
     wrap.innerHTML = '<p class="empty-state__hint">Wähle eine Übung und trainiere mindestens 2 Wochen um den Verlauf zu sehen.</p>';
+  }
+  const archiveWrap = document.getElementById('chart-archive-hint');
+  if (archiveWrap) {
+    const isArchived = state.weeks.some(w => w.days.some(d => d.exercises.some(ex => ex.name === name && ex.archived)));
+    archiveWrap.innerHTML = isArchived
+      ? `<p class="erkenntnis-line" style="margin-top:var(--sp-2)">Diese Übung ist archiviert. <button class="btn btn--sm" data-action="unarchive-ex" data-name="${h(name)}" style="margin-left:var(--sp-2)">Reaktivieren</button></p>`
+      : '';
   }
   const ormWrap = document.getElementById('chart-1rm-hint');
   if (ormWrap) ormWrap.innerHTML = _renderAnalysis1RM(name, state);
@@ -4287,6 +4316,26 @@ function _handleClick(e) {
       if (confirm('Übung entfernen?')) {
         dispatch(A.EX_REMOVE, { di: +di, ei: +ei });
       }
+      break;
+
+    case 'open-archive-confirm':
+      _archiveConfirmKey = `${di}-${ei}`;
+      _exMenuOpenKey = null;
+      renderDayList(getState());
+      break;
+
+    case 'confirm-archive-ex':
+      dispatch(A.EX_ARCHIVE, { di: +di, ei: +ei, weekIdx: getState().curIdx });
+      _archiveConfirmKey = null;
+      break;
+
+    case 'cancel-archive-ex':
+      _archiveConfirmKey = null;
+      renderDayList(getState());
+      break;
+
+    case 'unarchive-ex':
+      dispatch(A.EX_UNARCHIVE, { name: el.dataset.name });
       break;
 
     case 'toggle-ex-menu': {
