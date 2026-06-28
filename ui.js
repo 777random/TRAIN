@@ -2564,6 +2564,63 @@ function _decisionHistoryConclusion(entries) {
 // Plateau-Erkennung wird hier nicht zusätzlich/dupliziert dargestellt —
 // computeWeeklyFocus() ruft detectPlateaus() 1:1 wiederverwendet auf,
 // dieselbe Funktion die auch der Wochenrückblick nutzt.
+
+function _buildCoachQuestionCard(state, focus) {
+  const curWkStart = getLatestWeek(state.weeks)?.startDate ?? null;
+  const cq = state.coachQuestion;
+  if (cq?.weekStart === curWkStart && cq?.answer != null) return '';
+
+  let qid, questionText, options;
+
+  if (focus.status === 'pre_plateau') {
+    qid = 'pre_plateau_subjective';
+    questionText = `Fühlt sich ${h(focus.exerciseName ?? '')} subjektiv schwerer an als noch vor ein paar Wochen?`;
+    options = [
+      { answer: 'yes', label: 'Ja, deutlich anstrengender' },
+      { answer: 'no',  label: 'Nein, fühlt sich normal an' },
+    ];
+  } else if (focus.status === 'progression' && focus.confidence === 'medium') {
+    qid = 'progression_feeling';
+    questionText = `Wie hat sich dein letztes Training bei ${h(focus.exerciseName ?? '')} angefühlt?`;
+    options = [
+      { answer: 'good',  label: 'Gut — hätte mehr gehen' },
+      { answer: 'okay',  label: 'Anstrengend aber okay' },
+      { answer: 'tired', label: 'Erschöpfend' },
+    ];
+  } else if (focus.status === 'plateau') {
+    const exName = focus.plateau?.exerciseName;
+    if (!exName) return '';
+    const action = (state.plateauActions ?? {})[exName];
+    if (action?.action !== 'implemented') return '';
+    const sinceMs = new Date(action.since + 'T00:00:00').getTime();
+    const curMs   = curWkStart ? new Date(curWkStart + 'T00:00:00').getTime() : 0;
+    if (curMs - sinceMs < 7 * 86_400_000) return '';
+    qid = 'plateau_outcome';
+    questionText = `Hat die Strategie bei ${h(exName)} geholfen?`;
+    options = [
+      { answer: 'helped',     label: 'Ja — ich konnte steigern' },
+      { answer: 'needs_time', label: 'Noch nicht — brauche mehr Zeit' },
+      { answer: 'not_helped', label: 'Nein — funktioniert nicht' },
+    ];
+  } else {
+    return '';
+  }
+
+  const btns = options.map(o =>
+    `<button type="button" class="btn btn--ghost btn--sm coach-question__btn"
+      data-action="coach-answer"
+      data-qid="${h(qid)}"
+      data-week="${h(curWkStart ?? '')}"
+      data-answer="${h(o.answer)}">${h(o.label)}</button>`
+  ).join('');
+
+  return `
+  <div class="chart-card coach-question-card">
+    <div class="coach-question__text">${questionText}</div>
+    <div class="coach-question__options">${btns}</div>
+  </div>`;
+}
+
 function renderCoachTab(state) {
   const container = document.getElementById('coach-tab-content');
   if (!container) return;
@@ -2661,6 +2718,7 @@ function renderCoachTab(state) {
       </button>
     </div>` : '';
 
+  const questionCardHtml = _buildCoachQuestionCard(state, focus);
   container.innerHTML = `
   <div class="chart-card coach-focus-card">
     <div class="chart-card__title">📋 Fokus der Woche</div>
@@ -2670,7 +2728,8 @@ function renderCoachTab(state) {
     ${decisionBtnsHtml}
     ${whyHtml}
     ${plateauActionsHtml}
-  </div>`;
+  </div>
+  ${questionCardHtml}`;
 }
 
 /**
@@ -4129,6 +4188,16 @@ function _handleClick(e) {
     // Wochenstart der chronologisch letzten Woche, dieselbe Anker-Konvention
     // wie _isPlateauSuppressed()/_relativeWeekLabel() (nicht state.curIdx,
     // das kann beim Navigieren auf eine andere Woche zeigen).
+    case 'coach-answer': {
+      dispatch(A.COACH_ANSWER, {
+        weekStart:  el.dataset.week,
+        questionId: el.dataset.qid,
+        answer:     el.dataset.answer,
+      });
+      showToast('Antwort gespeichert', 'ok');
+      break;
+    }
+
     case 'plateau-implemented':
     case 'plateau-ignore': {
       const curWk = getLatestWeek(getState().weeks);

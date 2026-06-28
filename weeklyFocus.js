@@ -259,11 +259,19 @@ function _checkPrePlateau(state) {
             for (const s of ex.sets) { tot++; if (s.status === 'success') succ++; }
     if (tot === 0 || succ / tot < 0.7) continue;
 
+    const cqWkStart = getLatestWeek(state.weeks)?.startDate;
+    const cq = state.coachQuestion;
+    const cqAnswer = (cq?.weekStart === cqWkStart && cq?.questionId === 'pre_plateau_subjective' && cq?.answer != null) ? cq.answer : null;
     return {
       status: 'pre_plateau',
       headline: 'Steigerung wird teurer',
-      reasoning: `${name} kostet pro kg mehr Aufwand als vor 3 Wochen — ein Plateau deutet sich an.`,
-      recommendation: 'Jetzt Strategie überdenken: Wdh erhöhen statt Gewicht, oder Deload einplanen bevor die Steigerung stoppt.',
+      reasoning: `${name} kostet pro kg mehr Aufwand als vor 3 Wochen — ein Plateau deutet sich an.${cqAnswer === 'yes' ? ' Du bestätigst: die Übung fühlt sich deutlich anstrengender an.' : ''}`,
+      recommendation: cqAnswer === 'yes'
+        ? 'Plane jetzt eine Deload-Woche ein — dein Körper bestätigt den Trend.'
+        : cqAnswer === 'no'
+        ? 'Erhöhe die Wdh statt das Gewicht — der RPE-Trend könnte technischer Natur sein.'
+        : 'Jetzt Strategie überdenken: Wdh erhöhen statt Gewicht, oder Deload einplanen bevor die Steigerung stoppt.',
+      exerciseName: name,
     };
   }
   return null;
@@ -373,11 +381,17 @@ function _checkPlateau(state) {
   const alsoText = alsoAffected.length > 0
     ? ` Auch betroffen: ${alsoAffected[0].exerciseName} (${alsoAffected[0].plateauWeeks} Wochen).`
     : '';
+  const cq = state.coachQuestion;
+  const cqAnswer = (cq?.weekStart === curWk.startDate && cq?.questionId === 'plateau_outcome' && cq?.answer != null) ? cq.answer : null;
+  const finalReasoning = reasoning + (cqAnswer === 'helped' ? ' Du berichtest Fortschritt — weiter so.' : '');
+  const finalRec = cqAnswer === 'not_helped'
+    ? 'Versuche eine andere Übungsvariante oder erhöhe das Volumen statt das Gewicht.'
+    : longest.actionText + alsoText;
   return {
     status: 'plateau',
     headline: 'Plateau überwinden',
-    reasoning,
-    recommendation: longest.actionText + alsoText,
+    reasoning: finalReasoning,
+    recommendation: finalRec,
     plateau: longest,
   };
 }
@@ -450,13 +464,20 @@ function _checkProgression(state) {
     : (confSuccessRate >= 0.8 && (confAvgRpe === null || confAvgRpe <= 8.5))               ? 'medium'
     : 'low';
 
+  const cq = state.coachQuestion;
+  const cqAnswer = (cq?.weekStart === curWk.startDate && cq?.questionId === 'progression_feeling' && cq?.answer != null) ? cq.answer : null;
+  const finalConfidence = cqAnswer === 'good' ? 'high' : cqAnswer === 'tired' ? 'low' : confidence;
+  const finalRec = cqAnswer === 'tired'
+    ? 'Gewicht diese Woche halten — dein subjektives Empfinden spricht dagegen.'
+    : `+${best.rec.delta}kg bei ${best.name} testen`;
   return {
     status: 'progression',
     headline: 'Steigerung sinnvoll',
     reasoning: reasonText ? `${intro} ${reasonText} spricht aktuell dafür.${alsoReadyText}` : `${intro}${alsoReadyText}`,
-    recommendation: `+${best.rec.delta}kg bei ${best.name} testen`,
-    confidence,
+    recommendation: finalRec,
+    confidence: finalConfidence,
     dataWeeks: calcWeeks.length,
+    exerciseName: best.name,
   };
 }
 

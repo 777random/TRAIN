@@ -1053,6 +1053,10 @@ exercise { position: unset; }
 .coach-confidence--medium { color: #e8a020; }
 .coach-confidence--low    { color: var(--c-text-3); }
 .coach-data-hint { font-size: 11px; color: var(--c-text-3); margin: calc(-1 * var(--sp-2)) 0 var(--sp-3); }
+.coach-question-card { margin-top: var(--sp-3); }
+.coach-question__text { font-size: 14px; color: var(--c-text); margin: 0 0 var(--sp-3); line-height: 1.5; }
+.coach-question__options { display: flex; flex-direction: column; gap: var(--sp-2); }
+.coach-question__btn { width: 100%; text-align: left; justify-content: flex-start; }
 .coach-why-collapse { margin-top: var(--sp-3); }
 .coach-balance-collapse { margin-top: var(--sp-3); }
 .coach-balance-option { margin-bottom: var(--sp-3); }

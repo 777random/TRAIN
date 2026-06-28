@@ -182,6 +182,7 @@ function buildDefaultState() {
     surpriseLog: {},          // { [musterId]: "YYYY-MM" } – letzter Monat, in dem ein Überraschungs-Muster gezeigt wurde
     plateauActions: {},       // { [exerciseName]: { action: 'ignored'|'implemented', since, plateauWeeksAtAction } }
     decisionLog: [],          // { id, type, signal, choice, decidedWeekStart, outcome } – Abwägungs-Entscheidungen
+    coachQuestion: { weekStart: null, questionId: null, answer: null }, // adaptive Nachfrage — eine Frage pro Woche
     settings: {
       swipe:              true,
       drag:               true,
@@ -221,7 +222,7 @@ const _NO_UNDO = new Set([
   'INSIGHTS_SET', 'ONBOARDING_DONE', 'MARK_TIP_SEEN', 'REENTRY_HANDLED',
   'EX_AUTO_PRESELECT_NEXT_WEEK_PLAN', 'ACTIVATE_STREAK_FREEZE', 'RECORD_SURPRISE_SHOWN',
   'PLATEAU_ACTION', 'DECISION_LOG_ADD', 'DECISION_LOG_OUTCOME',
-  'SET_ERKENNTNISSE_HORIZONT',
+  'SET_ERKENNTNISSE_HORIZONT', 'COACH_ANSWER',
 ]);
 
 /** Returns true when there is at least one undo snapshot available. */
@@ -887,6 +888,9 @@ function migrate(raw) {
   if (raw.settings.maxSessionMs                   === undefined) raw.settings.maxSessionMs                   = 10800000;
   if (raw.settings.autoStartPauseTimer            === undefined) raw.settings.autoStartPauseTimer            = true;
   if (!Array.isArray(raw.settings.dismissedNamePairs)) raw.settings.dismissedNamePairs = [];
+  if (!raw.coachQuestion || typeof raw.coachQuestion !== 'object') {
+    raw.coachQuestion = { weekStart: null, questionId: null, answer: null };
+  }
 
   // Always-apply: week label (optional user-set name, no schema bump needed)
   (raw.weeks ?? []).forEach(wk => { if (!('label' in wk)) wk.label = ''; });
@@ -1193,6 +1197,7 @@ export const A = Object.freeze({
   // Decision log (Sprint: Abwägungs-Entscheidungen)
   DECISION_LOG_ADD:         'DECISION_LOG_ADD',         // { type, signal, choice: 'stay'|'change', decidedWeekStart }
   DECISION_LOG_OUTCOME:     'DECISION_LOG_OUTCOME',     // { id, outcome: { measuredWeekStart, signalPersisted, successRateBefore, successRateAfter } }
+  COACH_ANSWER:             'COACH_ANSWER',             // { weekStart, questionId, answer }
   SET_ERKENNTNISSE_HORIZONT: 'SET_ERKENNTNISSE_HORIZONT', // { value: number } — 4..52
 });
 
@@ -1303,6 +1308,9 @@ function reduce(state, action) {
       state.weeks.push(newWeek);
       _resortWeeksKeepingCurrent(state, newWeek);
       _checkAndGrantBadges(state);
+      if (state.coachQuestion?.weekStart && state.coachQuestion.weekStart !== p.startDate) {
+        state.coachQuestion = { weekStart: null, questionId: null, answer: null };
+      }
       break;
     }
     // Sprint C3 (train-v110): automatische Wochenerstellung beim App-Öffnen.
@@ -1331,6 +1339,9 @@ function reduce(state, action) {
       state.weeks.push(newWeek);
       _resortWeeksKeepingCurrent(state, newWeek);
       _checkAndGrantBadges(state);
+      if (state.coachQuestion?.weekStart && state.coachQuestion.weekStart !== p.startDate) {
+        state.coachQuestion = { weekStart: null, questionId: null, answer: null };
+      }
       state.autoWeekPending = true;
       break;
     }
@@ -2331,6 +2342,14 @@ function reduce(state, action) {
       if (!Array.isArray(state.decisionLog)) break;
       const entry = state.decisionLog.find(e => e.id === p.id);
       if (entry && entry.outcome === null) entry.outcome = p.outcome;
+      break;
+    }
+    case A.COACH_ANSWER: {
+      state.coachQuestion = {
+        weekStart:  p.weekStart,
+        questionId: p.questionId,
+        answer:     p.answer,
+      };
       break;
     }
     case A.SET_ERKENNTNISSE_HORIZONT: {
