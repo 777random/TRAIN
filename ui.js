@@ -2585,51 +2585,58 @@ function renderCoachTab(state) {
       ${opt.cons.map(c => `<div class="coach-balance-con">− ${h(c)}</div>`).join('')}
     </div>`;
 
-  // Wiederverwendung des bestehenden <details>/<summary>-Aufklapp-Musters
-  // (identisch zu "Alle Übungen ▼" bei Bestleistungen/Relative Stärke) —
-  // kein neues UI-Pattern. Eingeklappt per Default (natives <details>-Verhalten).
-  const balanceHtml = balance ? (() => {
+  // Directive — WAS in einem Satz (erstes Inhaltselement, prominent)
+  const directive = focus.recommendation ?? 'Trainiere wie geplant weiter.';
+
+  // Aktive Entscheidung aus decisionLog (Button-Zustand + Hinweis)
+  const activeDecision = balance ? (state.decisionLog ?? [])
+    .filter(e => e.type === focus.status && e.outcome === null)
+    .at(-1) : null;
+  const stayClass   = activeDecision?.choice === 'stay'   ? ' is-selected' : activeDecision ? ' is-dimmed' : '';
+  const changeClass = activeDecision?.choice === 'change' ? ' is-selected' : activeDecision ? ' is-dimmed' : '';
+  const hintHtml = activeDecision ? (() => {
+    const dateStr = new Date(activeDecision.decidedWeekStart + 'T00:00:00')
+      .toLocaleDateString('de-DE', { day: 'numeric', month: 'long' });
+    return `<p class="coach-decision-hint">Entscheidung vom ${h(dateStr)} gespeichert — Ergebnis wird nach 2 weiteren Wochen gemessen.</p>`;
+  })() : '';
+
+  // Aktions-Buttons AUSSERHALB von <details> — immer sichtbar wenn balance vorhanden
+  const decisionBtnsHtml = balance ? `
+  <div class="coach-decision-btns">
+    <button type="button" class="btn btn--ghost btn--sm${stayClass}"
+      data-action="decision-log-stay"
+      data-type="${h(focus.status)}"
+      data-signal="${h(focus.reasoning)}">Weiter wie bisher</button>
+    <button type="button" class="btn btn--ghost btn--sm${changeClass}"
+      data-action="decision-log-change"
+      data-type="${h(focus.status)}"
+      data-signal="${h(focus.reasoning)}">Empfehlung folgen</button>
+  </div>
+  ${hintHtml}` : '';
+
+  // "Warum?"-Collapse — kein Element bei onTrack (reasoning ist minimal/nicht handlungsrelevant)
+  const whyHtml = focus.status !== 'onTrack' ? (() => {
     const relevantHistory = (state.decisionLog ?? [])
       .filter(e => e.type === focus.status && e.outcome !== null);
     const historyText = _decisionHistoryConclusion(relevantHistory);
     const historyHtml = historyText
       ? `<p class="coach-decision-history">${h(historyText)}</p>` : '';
-    const activeDecision = (state.decisionLog ?? [])
-      .filter(e => e.type === focus.status && e.outcome === null)
-      .at(-1);
-    const stayClass   = activeDecision?.choice === 'stay'   ? ' is-selected' : activeDecision ? ' is-dimmed' : '';
-    const changeClass = activeDecision?.choice === 'change' ? ' is-selected' : activeDecision ? ' is-dimmed' : '';
-    const hintHtml = activeDecision ? (() => {
-      const dateStr = new Date(activeDecision.decidedWeekStart + 'T00:00:00')
-        .toLocaleDateString('de-DE', { day: 'numeric', month: 'long' });
-      return `<p class="coach-decision-hint">Entscheidung vom ${h(dateStr)} gespeichert — Ergebnis wird nach 2 weiteren Wochen gemessen.</p>`;
-    })() : '';
+    const balanceBodyHtml = balance ? `
+      ${_renderOption(balance.stayOption)}
+      ${_renderOption(balance.changeOption)}
+      <p class="coach-balance-closing">${h(balance.closing)}</p>` : '';
     return `
-    <details class="pr-collapse coach-balance-collapse">
-      <summary class="pr-collapse__summary">Abwägung anzeigen ▾</summary>
+    <details class="coach-why-collapse">
+      <summary class="pr-collapse__summary">Warum? ▾</summary>
       <div class="pr-collapse__body">
+        <p class="coach-focus-reasoning">${h(focus.reasoning)}</p>
         ${historyHtml}
-        ${_renderOption(balance.stayOption)}
-        ${_renderOption(balance.changeOption)}
-        <p class="coach-balance-closing">${h(balance.closing)}</p>
-        <div class="coach-decision-btns">
-          <button type="button" class="btn btn--ghost btn--sm${stayClass}"
-            data-action="decision-log-stay"
-            data-type="${h(focus.status)}"
-            data-signal="${h(focus.reasoning)}">Weiter wie bisher</button>
-          <button type="button" class="btn btn--ghost btn--sm${changeClass}"
-            data-action="decision-log-change"
-            data-type="${h(focus.status)}"
-            data-signal="${h(focus.reasoning)}">Empfehlung folgen</button>
-        </div>
-        ${hintHtml}
+        ${balanceBodyHtml}
       </div>
     </details>`;
   })() : '';
 
-  // Plateau-Aktionen (Sprint C2, train-v109): nur bei status==='plateau'.
-  // Dezenter Bestätigungs-Stil (btn--ghost), kein Accent-CTA — die Karte ist
-  // informativ, nicht handlungsdrängend.
+  // Plateau-Aktionen: unverändert (Sprint C2, train-v109)
   const plateauActionsHtml = focus.status === 'plateau' ? `
     <div class="coach-plateau-actions">
       <button type="button" class="btn btn--ghost btn--sm" data-action="plateau-implemented" data-ex="${h(focus.plateau.exerciseName)}" data-pw="${focus.plateau.plateauWeeks}">
@@ -2644,9 +2651,9 @@ function renderCoachTab(state) {
   <div class="chart-card coach-focus-card">
     <div class="chart-card__title">📋 Fokus der Woche</div>
     <div class="coach-focus-status">${icon} ${h(focus.headline)}</div>
-    <p class="coach-focus-reasoning">${h(focus.reasoning)}</p>
-    ${focus.recommendation ? `<p class="coach-focus-recommendation">${h(focus.recommendation)}</p>` : ''}
-    ${balanceHtml}
+    <p class="coach-focus-directive">${h(directive)}</p>
+    ${decisionBtnsHtml}
+    ${whyHtml}
     ${plateauActionsHtml}
   </div>`;
 }
