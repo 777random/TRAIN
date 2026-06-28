@@ -2479,6 +2479,7 @@ function _hasAnyTrainingData(state) {
 const _FOCUS_ICONS = {
   reentry:        '🔄',
   overload:       '🔋',
+  pre_plateau:    '📈',
   consistencyGap: '📅',
   plateau:        '⚠️',
   progression:    '💪',
@@ -2588,6 +2589,19 @@ function renderCoachTab(state) {
   // Directive — WAS in einem Satz (erstes Inhaltselement, prominent)
   const directive = focus.recommendation ?? 'Trainiere wie geplant weiter.';
 
+  // Konfidenz-Anzeige — nur bei progression (messbare Erfolgswahrscheinlichkeit)
+  const confidenceHtml = focus.status === 'progression' ? (() => {
+    const _CONF = {
+      high:   { text: 'Erfolgswahrscheinlichkeit hoch',                               cls: 'coach-confidence--high'   },
+      medium: { text: 'Erfolgswahrscheinlichkeit mittel',                              cls: 'coach-confidence--medium' },
+      low:    { text: 'Erfolgswahrscheinlichkeit niedrig — Gewicht halten wäre sicherer', cls: 'coach-confidence--low' },
+    };
+    const conf = _CONF[focus.confidence] ?? _CONF.low;
+    const dataHint = (focus.dataWeeks ?? 4) < 4
+      ? `<div class="coach-data-hint">Basiert auf ${focus.dataWeeks} Wochen Daten</div>` : '';
+    return `<div class="coach-confidence ${h(conf.cls)}">● ${h(conf.text)}</div>${dataHint}`;
+  })() : '';
+
   // Aktive Entscheidung aus decisionLog (Button-Zustand + Hinweis)
   const activeDecision = balance ? (state.decisionLog ?? [])
     .filter(e => e.type === focus.status && e.outcome === null)
@@ -2652,6 +2666,7 @@ function renderCoachTab(state) {
     <div class="chart-card__title">📋 Fokus der Woche</div>
     <div class="coach-focus-status">${icon} ${h(focus.headline)}</div>
     <p class="coach-focus-directive">${h(directive)}</p>
+    ${confidenceHtml}
     ${decisionBtnsHtml}
     ${whyHtml}
     ${plateauActionsHtml}

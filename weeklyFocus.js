@@ -180,7 +180,73 @@ function _checkOverload(state) {
   return null;
 }
 
-// ─── Prio 3: Konsistenz-Engpass ─────────────────────────────────────────────
+// ─── Prio 3: Pre-Plateau-Antizipation ───────────────────────────────────────
+// Feuert wenn RPE-Kosten pro kg steigen, obwohl das Gewicht noch leicht
+// zunimmt — erkennt die Erschöpfungszone BEVOR die Steigerung stoppt.
+// Abgrenzung zu _checkRisingRpe (Prio 2): dort ist Gewicht identisch (Plateau
+// bereits eingetreten); hier steigt Gewicht noch, aber der Preis pro kg auch.
+
+function _checkPrePlateau(state) {
+  const weeks = _nonDeloadWeeks(state);
+  if (weeks.length < 3) return null;
+  const last3 = weeks.slice(-3);
+  const exNames = [...new Set(last3.flatMap(w => w.days.flatMap(d => d.exercises.map(e => e.name))))];
+
+  for (const name of exNames) {
+    // Max-Gewicht (success sets) pro Woche
+    const maxWeights = last3.map(wk => {
+      let max = 0;
+      for (const d of wk.days)
+        for (const ex of d.exercises)
+          if (ex.name === name)
+            for (const s of ex.sets)
+              if (s.status === 'success' && (s.weight ?? 0) > max) max = s.weight;
+      return max;
+    });
+
+    // (a) Gewicht muss gestiegen sein — schließt _checkRisingRpe-Bereich aus
+    if (maxWeights.some(w => w === 0)) continue;
+    if (maxWeights[2] <= maxWeights[0]) continue;
+
+    // (b) RPE-Kosten pro kg: avgRpe[i] / maxWeight[i] streng steigend
+    const rpeCostPerKg = last3.map((wk, i) => {
+      const vals = [];
+      for (const d of wk.days)
+        for (const ex of d.exercises)
+          if (ex.name === name)
+            for (const s of ex.sets)
+              if (s.status === 'success' && s.rpe != null) vals.push(s.rpe);
+      if (!vals.length) return null;
+      const avgRpe = vals.reduce((a, b) => a + b, 0) / vals.length;
+      return avgRpe / maxWeights[i];
+    });
+
+    // (d) RPE-Daten für alle 3 Wochen vorhanden
+    if (rpeCostPerKg.some(r => r == null)) continue;
+
+    // (b) Streng monoton steigend
+    if (!(rpeCostPerKg[0] < rpeCostPerKg[1] && rpeCostPerKg[1] < rpeCostPerKg[2])) continue;
+
+    // (c) Erfolgsquote ≥ 70% (kein echtes Leistungsproblem)
+    let succ = 0, tot = 0;
+    for (const wk of last3)
+      for (const d of wk.days)
+        for (const ex of d.exercises)
+          if (ex.name === name)
+            for (const s of ex.sets) { tot++; if (s.status === 'success') succ++; }
+    if (tot === 0 || succ / tot < 0.7) continue;
+
+    return {
+      status: 'pre_plateau',
+      headline: 'Steigerung wird teurer',
+      reasoning: `${name} kostet pro kg mehr Aufwand als vor 3 Wochen — ein Plateau deutet sich an.`,
+      recommendation: 'Jetzt Strategie überdenken: Wdh erhöhen statt Gewicht, oder Deload einplanen bevor die Steigerung stoppt.',
+    };
+  }
+  return null;
+}
+
+// ─── Prio 4: Konsistenz-Engpass ─────────────────────────────────────────────
 // Anteil absolvierter Trainingstage pro Woche — Urlaubstage-Ausschlussregel
 // kommt aus state.js' isTrainingDay() (einzige Quelle, siehe Datei-Kopf).
 // Ein verbleibender Urlaubstag (isVacation, aber mit Training) zählt als
@@ -280,11 +346,15 @@ function _checkPlateau(state) {
   const reasoning = detectionAge <= 2
     ? `${longest.exerciseName} zeigt seit ${longest.plateauWeeks} Wochen keine Steigerung.`
     : `${longest.exerciseName} stagniert weiterhin seit ${longest.plateauWeeks} Wochen — eine Anpassung könnte jetzt sinnvoll sein.`;
+  const alsoAffected = active.filter(p => p !== longest);
+  const alsoText = alsoAffected.length > 0
+    ? ` Auch betroffen: ${alsoAffected[0].exerciseName} (${alsoAffected[0].plateauWeeks} Wochen).`
+    : '';
   return {
     status: 'plateau',
     headline: 'Plateau überwinden',
     reasoning,
-    recommendation: longest.actionText,
+    recommendation: longest.actionText + alsoText,
     plateau: longest,
   };
 }
@@ -309,7 +379,7 @@ function _checkProgression(state) {
   if (calcWeeks.length < 2) return null;
 
   const seen = new Set();
-  let best = null;
+  const readyCandidates = [];
 
   curWk.days.forEach(day => {
     (day.exercises ?? []).forEach(ex => {
@@ -323,11 +393,14 @@ function _checkProgression(state) {
       if (!isReadyForAutoSelect(ex.name, calcWeeks, exProgressionMode, exTargetRepsMax)) return;
       const rec = getWeightRecommendation(ex.name, calcWeeks, plateStep, exProgressionMode, exTargetRepsMax);
       if (!rec) return;
-      if (!best || rec.delta > best.rec.delta) best = { name: ex.name, rec, ex };
+      readyCandidates.push({ name: ex.name, rec, ex });
     });
   });
 
-  if (!best) return null;
+  if (!readyCandidates.length) return null;
+  readyCandidates.sort((a, b) => b.rec.delta - a.rec.delta);
+  const best   = readyCandidates[0];
+  const second = readyCandidates[1] ?? null;
 
   const streak = _qualificationStreak(best.name, calcWeeks, best.ex.progressionMode ?? 'weight_first', best.ex.targetRepsMax ?? null);
   const alreadyConfirmedSame = best.ex.nextWeekPlanConfirmed && best.ex.nextWeekPlan === best.rec.delta;
@@ -335,12 +408,32 @@ function _checkProgression(state) {
   const intro = (streak >= 2 && !alreadyConfirmedSame)
     ? `${best.name} erfüllt die Kriterien bereits seit ${streak} Wochen.`
     : `${best.name} ist bereit für eine Steigerung.`;
+  const alsoReadyText = second ? ` Auch bereit für Steigerung: ${second.name}.` : '';
+
+  // Konfidenz: successRate + avgRpe der letzten 4 Wochen für best
+  let succ = 0, fail = 0, rpeSum = 0, rpeCount = 0;
+  for (const wk of calcWeeks.slice(-4))
+    for (const d of wk.days)
+      for (const ex of d.exercises)
+        if (ex.name === best.name)
+          for (const s of ex.sets) {
+            if (s.status === 'success') { succ++; if (s.rpe != null) { rpeSum += s.rpe; rpeCount++; } }
+            else if (s.status === 'fail') fail++;
+          }
+  const confTotal = succ + fail;
+  const confSuccessRate = confTotal > 0 ? succ / confTotal : 1;
+  const confAvgRpe = rpeCount > 0 ? rpeSum / rpeCount : null;
+  const confidence = (confSuccessRate >= 0.9 && (confAvgRpe === null || confAvgRpe <= 7.5)) ? 'high'
+    : (confSuccessRate >= 0.8 && (confAvgRpe === null || confAvgRpe <= 8.5))               ? 'medium'
+    : 'low';
 
   return {
     status: 'progression',
     headline: 'Steigerung sinnvoll',
-    reasoning: reasonText ? `${intro} ${reasonText} spricht aktuell dafür.` : intro,
+    reasoning: reasonText ? `${intro} ${reasonText} spricht aktuell dafür.${alsoReadyText}` : `${intro}${alsoReadyText}`,
     recommendation: `+${best.rec.delta}kg bei ${best.name} testen`,
+    confidence,
+    dataWeeks: calcWeeks.length,
   };
 }
 
@@ -363,6 +456,7 @@ function _fallback(state) {
 export function computeWeeklyFocus(state) {
   return _checkReentry(state)
     ?? _checkOverload(state)
+    ?? _checkPrePlateau(state)
     ?? _checkConsistencyGap(state)
     ?? _checkPlateau(state)
     ?? _checkProgression(state)

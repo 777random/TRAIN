@@ -1047,7 +1047,12 @@ exercise { position: unset; }
 .coach-focus-status { font-family: var(--font-display); font-size: 20px; letter-spacing: .04em; margin-bottom: var(--sp-3); }
 .coach-focus-reasoning { font-size: 13px; color: var(--c-text-2); margin: 0 0 var(--sp-3); }
 .coach-focus-recommendation { font-size: 14px; font-weight: 600; color: var(--c-text); margin: 0; }
-.coach-focus-directive { font-size: 16px; font-weight: 700; color: var(--c-text); margin: 0 0 var(--sp-3); line-height: 1.4; }
+.coach-focus-directive { font-size: 16px; font-weight: 700; color: var(--c-text); margin: 0 0 var(--sp-2); line-height: 1.4; }
+.coach-confidence { font-size: 13px; margin: 0 0 var(--sp-3); }
+.coach-confidence--high   { color: var(--c-ok); }
+.coach-confidence--medium { color: #e8a020; }
+.coach-confidence--low    { color: var(--c-text-3); }
+.coach-data-hint { font-size: 11px; color: var(--c-text-3); margin: calc(-1 * var(--sp-2)) 0 var(--sp-3); }
 .coach-why-collapse { margin-top: var(--sp-3); }
 .coach-balance-collapse { margin-top: var(--sp-3); }
 .coach-balance-option { margin-bottom: var(--sp-3); }
