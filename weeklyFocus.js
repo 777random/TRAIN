@@ -108,6 +108,21 @@ function _checkLowSleep(state) {
   return { signal: 'sleep', value: avg };
 }
 
+// Kein eigenständiges Overload-Signal — nur Verstärker für bestehende Signale
+// (RPE, Schlaf, Erfolgsquote). Mindestens 2 Tage nötig, Urlaubstage ausgeschlossen.
+function _checkLowEnergy(state) {
+  const weeks = _nonDeloadWeeks(state);
+  if (!weeks.length) return null;
+  const latest = weeks[weeks.length - 1];
+  const energies = latest.days
+    .filter(d => d.energyLevel != null && !d.isVacation)
+    .map(d => d.energyLevel);
+  if (energies.length < 2) return null;
+  const avg = energies.reduce((a, b) => a + b, 0) / energies.length;
+  if (avg > 2.5) return null;
+  return { signal: 'energy', value: avg };
+}
+
 function _checkRisingRpe(state) {
   const weeks = _nonDeloadWeeks(state);
   if (weeks.length < 3) return null;
@@ -147,16 +162,23 @@ function _checkDroppingCompletion(state) {
   return { signal: 'completion', avg3, avg8 };
 }
 
-function _buildOverloadResult(signal) {
+function _buildOverloadResult(signal, energySignal = null) {
+  const hasLowEnergy = energySignal != null;
   let reasoning;
   if (signal.signal === 'sleep') {
-    reasoning = signal.value < 6
-      ? `Die Daten zeigen: dein Schlaf liegt im Schnitt nur bei ${signal.value.toFixed(1)}h diese Woche — deutlich unter den empfohlenen 7h.`
-      : `Die Daten zeigen: dein Schlaf liegt im Schnitt bei ${signal.value.toFixed(1)}h diese Woche — etwas unter den empfohlenen 7h.`;
+    if (hasLowEnergy) {
+      reasoning = `Sowohl Schlaf (Ø ${signal.value.toFixed(1)}h) als auch Energielevel (Ø ${energySignal.value.toFixed(1)}/5) deuten diese Woche auf Erholungsbedarf hin.`;
+    } else {
+      reasoning = signal.value < 6
+        ? `Die Daten zeigen: dein Schlaf liegt im Schnitt nur bei ${signal.value.toFixed(1)}h diese Woche — deutlich unter den empfohlenen 7h.`
+        : `Die Daten zeigen: dein Schlaf liegt im Schnitt bei ${signal.value.toFixed(1)}h diese Woche — etwas unter den empfohlenen 7h.`;
+    }
   } else if (signal.signal === 'rpe') {
     reasoning = `${signal.exerciseName}: die Anstrengung (RPE) steigt seit 3 Wochen bei gleichem Gewicht — ${signal.values.map(v => v.toFixed(1)).join(' → ')}.`;
+    if (hasLowEnergy) reasoning += ` Dein durchschnittliches Energielevel lag diese Woche bei ${energySignal.value.toFixed(1)}/5.`;
   } else {
     reasoning = `Deine Erfolgsquote ist von ${Math.round(signal.avg8 * 100)}% auf ${Math.round(signal.avg3 * 100)}% gesunken.`;
+    if (hasLowEnergy) reasoning += ` Dein durchschnittliches Energielevel lag diese Woche bei ${energySignal.value.toFixed(1)}/5.`;
   }
   return {
     status: 'overload',
@@ -171,12 +193,13 @@ function _buildOverloadResult(signal) {
 }
 
 function _checkOverload(state) {
+  const energy = _checkLowEnergy(state);
   const sleep = _checkLowSleep(state);
-  if (sleep) return _buildOverloadResult(sleep);
+  if (sleep) return _buildOverloadResult(sleep, energy);
   const rpe = _checkRisingRpe(state);
-  if (rpe) return _buildOverloadResult(rpe);
+  if (rpe) return _buildOverloadResult(rpe, energy);
   const completion = _checkDroppingCompletion(state);
-  if (completion) return _buildOverloadResult(completion);
+  if (completion) return _buildOverloadResult(completion, energy);
   return null;
 }
 

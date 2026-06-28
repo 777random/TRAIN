@@ -28,6 +28,16 @@ function _wkAvgWeight(bd) {
   return bd.weight ?? '';
 }
 
+function _wkAvgEnergy(wk) {
+  const vals = (wk.days ?? []).map(d => d.energyLevel).filter(v => v != null);
+  return vals.length ? (vals.reduce((s, v) => s + v, 0) / vals.length).toFixed(1) : '';
+}
+
+function _wkAvgSleep(wk) {
+  const vals = (wk.days ?? []).map(d => d.sleepHours).filter(v => v != null);
+  return vals.length ? (vals.reduce((s, v) => s + v, 0) / vals.length).toFixed(1) : '';
+}
+
 // ─── JSON Backup ──────────────────────────────────────────────────────────────
 
 export function exportJSON(onSuccess) {
@@ -155,8 +165,8 @@ export function exportCSV(scope = 'all') {
             s.done ? 'Ja' : 'Nein',
             (s.weight ?? 0) * (s.reps ?? 0),
             first ? _wkAvgWeight(bd) : '',
-            first ? (bd.energy ?? '') : '',
-            first ? (bd.sleep  ?? '') : '',
+            first ? _wkAvgEnergy(wk) : '',
+            first ? _wkAvgSleep(wk)  : '',
           ));
         });
       }
@@ -189,7 +199,7 @@ export function exportCSV(scope = 'all') {
       kw, von, bis, modus, wk.note ?? '',
       `${dd}/${wk.days.length}`, tot, done, `${pct}%`,
       vol, avg, log.length,
-      _wkAvgWeight(bd), bd.sleep ?? '', bd.energy ?? '',
+      _wkAvgWeight(bd), _wkAvgSleep(wk), _wkAvgEnergy(wk),
     ));
   }
 
