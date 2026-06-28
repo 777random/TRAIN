@@ -2151,6 +2151,14 @@ details[open] > .deload-details__summary::before { content: '▾ '; }
 }
 .ob-choice-btn:hover { border-color: var(--c-text-3); }
 .ob-choice-btn.is-selected { border-color: var(--c-accent); color: var(--c-text); background: rgba(200,255,0,.07); }
+.ob-optional { width: 100%; margin-top: var(--sp-2); }
+.ob-optional__summary {
+  font-size: 13px; color: var(--c-text-2); cursor: pointer;
+  text-align: center; padding: var(--sp-2) 0; list-style: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.ob-optional__summary::-webkit-details-marker { display: none; }
+.ob-optional__body { padding-top: var(--sp-3); }
 
 /* ── One-time tip banner ──────────────────────────────────── */
 .tip-banner {

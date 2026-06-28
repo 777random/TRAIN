@@ -6312,15 +6312,13 @@ function _showOnboarding() {
   const st = getState();
   console.log('[TRAIN] _showOnboarding called — weeks:', st.weeks.length, 'onboardingDone:', st.onboardingDone);
   if (st.weeks.length > 0 || st.onboardingDone === true) return;
-  if (document.getElementById('onboarding')) return; // already mounted
+  if (document.getElementById('onboarding')) return;
   _onboardingActive = true;
 
-  let _step   = 1;
-  let _selTpl = null;
-  // Beide optional, keine Vorauswahl, nicht persistiert — wirken nur einmalig
-  // auf Anzeige/Anwendung der Vorlage in diesem Onboarding-Durchlauf.
-  let _expLevel = null; // 'anfaenger' | 'fortgeschritten' | 'erfahren' | null
-  let _mainGoal = null; // 'kraftaufbau' | 'muskelaufbau' | 'fitness' | null
+  let _selTpl       = null;
+  let _expLevel     = null; // 'anfaenger' | 'fortgeschritten' | 'erfahren' | null
+  let _mainGoal     = null; // 'kraftaufbau' | 'muskelaufbau' | 'fitness' | null
+  let _optionalOpen = false; // <details>-Zustand über innerHTML-Rebuilds hinweg
 
   const el = document.createElement('div');
   el.id = 'onboarding';
@@ -6341,101 +6339,66 @@ function _showOnboarding() {
   ].join(';');
   document.body.appendChild(el);
 
-  const _isInstalled = () =>
-    navigator.standalone === true ||
-    window.matchMedia('(display-mode: standalone)').matches;
-
-  const _dots = () => [1, 2, 3]
-    .map(i => `<span class="ob-dot${i === _step ? ' ob-dot--active' : ''}"></span>`)
-    .join('');
-
   function _render() {
-    if (_step === 1) {
-      el.innerHTML = `
-        <div class="ob-screen">
-          <div class="ob-indicator">${_dots()}</div>
-          <h1 class="ob-title">Jede Woche ein bisschen besser.</h1>
-          <p class="ob-sub">Du trainierst. TRAIN erkennt, wann mehr möglich ist.</p>
-          <button class="btn btn--accent ob-btn" data-ob="next">Weiter →</button>
-        </div>`;
-    } else if (_step === 2) {
-      // Empfehlung nach Erfahrung + Hauptziel — rein visuell, beeinflusst
-      // keine Auswahl/Anwendung. null wenn weder Erfahrung noch Ziel gewählt
-      // wurde. Priorität (Sprint C1, train-v108, behebt Logik-Fehler der
-      // Vorversion): Fitness-Ziel zuerst (immer Vorlage 3, unabhängig von
-      // Erfahrung) > Anfänger (immer Vorlage 1, unabhängig vom Ziel) >
-      // Muskelaufbau (Vorlage 2) > sonst (Kraftaufbau bei Fortgeschritten/
-      // Erfahren → Vorlage 2).
-      const _recommendedIdx = (!_expLevel && !_mainGoal) ? null
-        : _mainGoal === 'fitness'      ? 2
-        : _expLevel === 'anfaenger'    ? 0
-        : _mainGoal === 'muskelaufbau' ? 1
-        : 1;
+    // Empfehlung-Logik (Sprint C1, train-v108): Fitness > Anfänger > Muskelaufbau > sonst
+    const _recommendedIdx = (!_expLevel && !_mainGoal) ? null
+      : _mainGoal === 'fitness'      ? 2
+      : _expLevel === 'anfaenger'    ? 0
+      : _mainGoal === 'muskelaufbau' ? 1
+      : 1;
 
-      const _expOptions  = [['anfaenger', 'Anfänger'], ['fortgeschritten', 'Fortgeschritten'], ['erfahren', 'Erfahren']];
-      const _goalOptions = [
-        ['kraftaufbau', 'Ich will stärker werden'],
-        ['muskelaufbau', 'Ich will mehr Muskeln aufbauen'],
-        ['fitness', 'Ich will fitter werden'],
-      ];
+    const _expOptions  = [['anfaenger', 'Anfänger'], ['fortgeschritten', 'Fortgeschritten'], ['erfahren', 'Erfahren']];
+    const _goalOptions = [
+      ['kraftaufbau',  'Stärker werden'],
+      ['muskelaufbau', 'Mehr Muskeln'],
+      ['fitness',      'Fitter werden'],
+    ];
 
-      const expRow = `
-        <div class="ob-choice-block">
-          <div class="ob-choice-label">Wie viel Erfahrung hast du?</div>
-          <div class="ob-choice-row">
-            ${_expOptions.map(([val, label]) => `
-              <button type="button" class="ob-choice-btn${_expLevel === val ? ' is-selected' : ''}"
-                data-ob="select-exp" data-exp="${val}">${label}</button>`).join('')}
-          </div>
-        </div>`;
-      const goalRow = `
-        <div class="ob-choice-block">
-          <div class="ob-choice-label">Was ist dein Hauptziel?</div>
-          <div class="ob-choice-row">
-            ${_goalOptions.map(([val, label]) => `
-              <button type="button" class="ob-choice-btn${_mainGoal === val ? ' is-selected' : ''}"
-                data-ob="select-goal" data-goal="${val}">${label}</button>`).join('')}
-          </div>
-        </div>`;
+    const cards = _ONBOARDING_TEMPLATES.map((t, i) => `
+      <div class="ob-tpl-card${_selTpl === i ? ' is-selected' : ''}${_recommendedIdx === i ? ' ob-tpl-card--recommended' : ''}" data-ob="select" data-tpl="${i}">
+        <span class="ob-tpl-icon">${t.icon}</span>
+        <div class="ob-tpl-info">
+          <div class="ob-tpl-title">${t.title}</div>
+          <div class="ob-tpl-meta">${t.meta}</div>
+          <div class="ob-tpl-sub">${t.sub}</div>
+          ${_recommendedIdx === i ? '<div class="ob-tpl-recommended">✓ Empfohlen für dich</div>' : ''}
+        </div>
+      </div>`).join('');
 
-      const cards = _ONBOARDING_TEMPLATES.map((t, i) => `
-        <div class="ob-tpl-card${_selTpl === i ? ' is-selected' : ''}${_recommendedIdx === i ? ' ob-tpl-card--recommended' : ''}" data-ob="select" data-tpl="${i}">
-          <span class="ob-tpl-icon">${t.icon}</span>
-          <div class="ob-tpl-info">
-            <div class="ob-tpl-title">${t.title}</div>
-            <div class="ob-tpl-meta">${t.meta}</div>
-            <div class="ob-tpl-sub">${t.sub}</div>
-            ${_recommendedIdx === i ? '<div class="ob-tpl-recommended">✓ Empfohlen für dich</div>' : ''}
+    el.innerHTML = `
+      <div class="ob-screen">
+        <h2 class="ob-title ob-title--sm">Womit möchtest du starten?</h2>
+        <div class="ob-tpl-list">${cards}</div>
+        <button class="btn btn--accent ob-btn" data-ob="load"${_selTpl === null ? ' disabled' : ''}>Vorlage laden →</button>
+        <details class="ob-optional">
+          <summary class="ob-optional__summary">Optional: Vorlage anpassen ▾</summary>
+          <div class="ob-optional__body">
+            <div class="ob-choice-block">
+              <div class="ob-choice-label">Erfahrung</div>
+              <div class="ob-choice-row">
+                ${_expOptions.map(([val, label]) => `
+                  <button type="button" class="ob-choice-btn${_expLevel === val ? ' is-selected' : ''}"
+                    data-ob="select-exp" data-exp="${val}">${label}</button>`).join('')}
+              </div>
+            </div>
+            <div class="ob-choice-block">
+              <div class="ob-choice-label">Hauptziel</div>
+              <div class="ob-choice-row">
+                ${_goalOptions.map(([val, label]) => `
+                  <button type="button" class="ob-choice-btn${_mainGoal === val ? ' is-selected' : ''}"
+                    data-ob="select-goal" data-goal="${val}">${label}</button>`).join('')}
+              </div>
+            </div>
           </div>
-        </div>`).join('');
-      el.innerHTML = `
-        <div class="ob-screen">
-          <div class="ob-indicator">${_dots()}</div>
-          <h2 class="ob-title ob-title--sm">Womit möchtest du starten?</h2>
-          ${expRow}
-          ${goalRow}
-          <div class="ob-tpl-list">${cards}</div>
-          <button class="btn btn--accent ob-btn" data-ob="load"${_selTpl === null ? ' disabled' : ''}>Vorlage laden →</button>
-          <button class="btn btn--ghost ob-btn ob-btn--sm" data-ob="skip">Ohne Vorlage starten</button>
-        </div>`;
-    } else {
-      const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-      const hint  = isIos
-        ? '<strong>Wichtig:</strong> iOS löscht App-Daten automatisch nach 7 Tagen wenn die App nicht auf dem Homescreen installiert ist.<br><br>Tippe auf <strong>Teilen ↑</strong> → <strong>„Zum Home-Bildschirm hinzufügen"</strong> um deine Trainingsdaten dauerhaft zu sichern.'
-        : 'Tippe auf <strong>Menü ⋮</strong> → <strong>„App installieren"</strong> um TRAIN auf deinem Startbildschirm zu speichern und Datenverlust zu vermeiden.';
-      el.innerHTML = `
-        <div class="ob-screen">
-          <div class="ob-indicator">${_dots()}</div>
-          <div class="ob-logo" style="font-size:56px">📲</div>
-          <h2 class="ob-title ob-title--sm">Für zuverlässige Datenspeicherung</h2>
-          <p class="ob-sub">${hint}</p>
-          <div class="ob-backup-warn">
-            ⚠️ Browser-Daten löschen = Trainingsdaten verloren.<br>
-            Erstelle regelmäßig ein Backup unter<br>
-            <strong>Einstellungen → Backup erstellen</strong>.
-          </div>
-          <button class="btn btn--accent ob-btn" data-ob="done">Verstanden</button>
-        </div>`;
+        </details>
+        <button class="btn btn--ghost ob-btn ob-btn--sm" data-ob="skip">Ohne Vorlage starten</button>
+      </div>`;
+
+    // <details>-Zustand nach innerHTML-Rebuild wiederherstellen + Toggle tracken
+    const detEl = el.querySelector('.ob-optional');
+    if (detEl) {
+      if (_optionalOpen) detEl.open = true;
+      detEl.addEventListener('toggle', () => { _optionalOpen = detEl.open; });
     }
   }
 
@@ -6443,21 +6406,23 @@ function _showOnboarding() {
     const btn = e.target.closest('[data-ob]');
     if (!btn) return;
     switch (btn.dataset.ob) {
-      case 'next':   _step = 2; _render(); break;
-      case 'select': _selTpl = +btn.dataset.tpl; _render(); break;
-      case 'select-exp':  _expLevel = _expLevel === btn.dataset.exp ? null : btn.dataset.exp; _render(); break;
-      case 'select-goal': _mainGoal = _mainGoal === btn.dataset.goal ? null : btn.dataset.goal; _render(); break;
-      case 'load':   if (_selTpl !== null) _applyTpl(_selTpl); _advance(); break;
-      case 'skip':   _applyBlank(); _advance(); break;
-      case 'done':   _finish(); break;
+      case 'select':
+        _selTpl = +btn.dataset.tpl; _render(); break;
+      case 'select-exp':
+        _expLevel = _expLevel === btn.dataset.exp ? null : btn.dataset.exp;
+        _optionalOpen = true;
+        _render(); break;
+      case 'select-goal':
+        _mainGoal = _mainGoal === btn.dataset.goal ? null : btn.dataset.goal;
+        _optionalOpen = true;
+        _render(); break;
+      case 'load':
+        if (_selTpl !== null) _applyTpl(_selTpl);
+        _finish(); break;
+      case 'skip':
+        _applyBlank(); _finish(); break;
     }
   });
-
-  function _advance() {
-    if (_isInstalled()) { _finish(); return; }
-    _step = 3;
-    _render();
-  }
 
   // Laufzeit-Anpassung von Sätzen/Pause nach gewählter Erfahrungsstufe.
   // _ONBOARDING_TEMPLATES selbst bleibt unverändert — nur die beim Erstellen
