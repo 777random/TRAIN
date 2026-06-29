@@ -2526,6 +2526,48 @@ function _checkDecisionOutcomes(state) {
       },
     });
   }
+
+  // ── Coach performance measurement ──────────────────────────────────────────
+  const _perf = state.coachPerformance;
+  if (_perf?.suggestions?.length) {
+    const _pendingPerf = _perf.suggestions.filter(
+      s => s.outcome === null && s.status === 'progression'
+    );
+    if (_pendingPerf.length) {
+      const _sortedNonSeed = [...state.weeks]
+        .filter(w => !w.isSeedWeek)
+        .sort((a, b) => a.startDate.localeCompare(b.startDate));
+      for (const _entry of _pendingPerf) {
+        const _followWeek = _sortedNonSeed.find(wk => wk.startDate > _entry.weekStart);
+        if (!_followWeek) continue;
+        const _exSets = [];
+        for (const d of _followWeek.days)
+          for (const ex of d.exercises)
+            if (ex.name === _entry.exerciseName)
+              _exSets.push(...ex.sets);
+        let _followed = null;
+        let _outcome  = null;
+        if (_exSets.length > 0 && _entry.fromWeight !== null && _entry.suggestedDelta !== null) {
+          const _targetWeight = _entry.fromWeight + _entry.suggestedDelta;
+          const _maxWeight = Math.max(..._exSets.map(s => s.weight ?? 0));
+          if (_maxWeight >= _targetWeight - 0.01) {
+            _followed = true;
+            const _atTarget = _exSets.filter(s => (s.weight ?? 0) >= _targetWeight - 0.01);
+            _outcome = _atTarget.some(s => s.status === 'success') ? 'success' : 'partial';
+          } else {
+            _followed = false;
+            _outcome  = 'fail';
+          }
+        }
+        dispatch(A.COACH_PERF_MEASURE, {
+          id:               _entry.id,
+          followed:         _followed,
+          outcome:          _outcome,
+          measuredWeekStart: _followWeek.startDate,
+        });
+      }
+    }
+  }
 }
 
 // ─── Decision history conclusion ──────────────────────────────────────────────
@@ -2633,6 +2675,24 @@ function renderCoachTab(state) {
   _checkDecisionOutcomes(state);
 
   const focus   = computeWeeklyFocus(state);
+
+  // Log progression suggestion if not already logged this week
+  if (focus.status === 'progression' && focus.exerciseName) {
+    const _logWkStart = getLatestWeek(state.weeks)?.startDate;
+    const _alreadyLogged = (state.coachPerformance?.suggestions ?? [])
+      .some(s => s.weekStart === _logWkStart && s.exerciseName === focus.exerciseName);
+    if (_logWkStart && !_alreadyLogged) {
+      dispatch(A.COACH_PERF_LOG, {
+        weekStart:       _logWkStart,
+        status:          focus.status,
+        exerciseName:    focus.exerciseName,
+        suggestedDelta:  focus.suggestedDelta ?? null,
+        fromWeight:      focus.fromWeight     ?? null,
+        confidenceLevel: focus.confidence     ? focus.confidence.toUpperCase() : null,
+      });
+    }
+  }
+
   const icon    = _FOCUS_ICONS[focus.status] ?? _FOCUS_ICONS.onTrack;
   const balance = buildDecisionalBalance(focus);
 
@@ -2902,6 +2962,44 @@ function _renderErkenntnisseSection(state) {
   </div>`;
 }
 
+// ─── Coach-Bilanz: Trefferquote der Progressions-Empfehlungen ──────────────────
+function _coachBilanzHtml(state) {
+  const measured = (state.coachPerformance?.suggestions ?? [])
+    .filter(s => s.status === 'progression' && s.outcome !== null);
+  if (measured.length < 5) return '';
+
+  const N        = measured.length;
+  const succCount = measured.filter(s => s.outcome === 'success').length;
+  const pct      = Math.round(succCount / N * 100);
+
+  const highSugg = measured.filter(s => s.confidenceLevel === 'HIGH');
+  const medSugg  = measured.filter(s => s.confidenceLevel === 'MEDIUM');
+  const highSucc = highSugg.filter(s => s.outcome === 'success').length;
+  const medSucc  = medSugg.filter(s => s.outcome === 'success').length;
+  const highPct  = highSugg.length > 0 ? Math.round(highSucc / highSugg.length * 100) : null;
+  const medPct   = medSugg.length  > 0 ? Math.round(medSucc  / medSugg.length  * 100) : null;
+
+  const conclusion = pct > 75
+    ? `Der Coach trifft in ${succCount} von ${N} Fällen — du kannst seinen Empfehlungen vertrauen.`
+    : pct >= 50
+    ? `Der Coach trifft in ${succCount} von ${N} Fällen — die HIGH-Empfehlungen sind zuverlässiger als MEDIUM.`
+    : `Der Coach sammelt noch Daten über dein Training — die Empfehlungen werden präziser.`;
+
+  const confLines = [
+    highPct !== null ? `<div class="coach-bilanz-row"><span>HIGH-Empfehlungen: ${highSugg.length}</span><span>${highPct}% erfolgreich</span></div>` : '',
+    medPct  !== null ? `<div class="coach-bilanz-row"><span>MEDIUM-Empfehlungen: ${medSugg.length}</span><span>${medPct}% erfolgreich</span></div>` : '',
+  ].filter(Boolean).join('');
+
+  return `
+  <div class="chart-card coach-bilanz-card">
+    <div class="chart-card__title">📊 Coach-Bilanz</div>
+    <div class="coach-bilanz-row"><span>Progressions-Empfehlungen</span><span>${N}</span></div>
+    <div class="coach-bilanz-row"><span>Erfolgreich umgesetzt</span><span>${succCount} (${pct}%)</span></div>
+    ${confLines ? `<div class="coach-bilanz-divider"></div>${confLines}` : ''}
+    <p class="coach-bilanz-conclusion">${h(conclusion)}</p>
+  </div>`;
+}
+
 // ─── Fortschritt tab: Wochenrückblick, Erkenntnisse, Übungsfortschritt, Bestleistungen, Bewegungsmuster, Streak+Abzeichen ──
 function renderProgressTab(state) {
   const container = document.getElementById('progress-tab-content');
@@ -2934,6 +3032,7 @@ function renderProgressTab(state) {
   // vormals getrennten Sektionen unverändert, nur Darstellung/Position
   // geändert (siehe _renderErkenntnisseSection()).
   const erkenntnisseHtml = _renderErkenntnisseSection(state);
+  const coachBilanzHtml  = _coachBilanzHtml(state);
 
   const streak     = _calcStreak(state);
   const _scoreList = state.weeks.map(w => _weekSuccessScore(w)).filter(s => s.total > 0).map(s => s.pct);
@@ -2975,6 +3074,8 @@ function renderProgressTab(state) {
   ${weekReviewHtml}
 
   ${erkenntnisseHtml}
+
+  ${coachBilanzHtml}
 
   <div class="chart-card">
     <div class="chart-card__title">Übungsfortschritt</div>

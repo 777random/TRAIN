@@ -183,6 +183,7 @@ function buildDefaultState() {
     plateauActions: {},       // { [exerciseName]: { action: 'ignored'|'implemented', since, plateauWeeksAtAction } }
     decisionLog: [],          // { id, type, signal, choice, decidedWeekStart, outcome } – Abwägungs-Entscheidungen
     coachQuestion: { weekStart: null, questionId: null, answer: null }, // adaptive Nachfrage — eine Frage pro Woche
+    coachPerformance: { suggestions: [] }, // Logging + Messung von Progressions-Empfehlungen
     settings: {
       swipe:              true,
       drag:               true,
@@ -222,7 +223,7 @@ const _NO_UNDO = new Set([
   'INSIGHTS_SET', 'ONBOARDING_DONE', 'ONBOARDING_SEED', 'MARK_TIP_SEEN', 'REENTRY_HANDLED',
   'EX_AUTO_PRESELECT_NEXT_WEEK_PLAN', 'ACTIVATE_STREAK_FREEZE', 'RECORD_SURPRISE_SHOWN',
   'PLATEAU_ACTION', 'DECISION_LOG_ADD', 'DECISION_LOG_OUTCOME',
-  'SET_ERKENNTNISSE_HORIZONT', 'COACH_ANSWER',
+  'SET_ERKENNTNISSE_HORIZONT', 'COACH_ANSWER', 'COACH_PERF_LOG', 'COACH_PERF_MEASURE',
 ]);
 
 /** Returns true when there is at least one undo snapshot available. */
@@ -891,6 +892,12 @@ function migrate(raw) {
   if (!raw.coachQuestion || typeof raw.coachQuestion !== 'object') {
     raw.coachQuestion = { weekStart: null, questionId: null, answer: null };
   }
+  if (!raw.coachPerformance || typeof raw.coachPerformance !== 'object') {
+    raw.coachPerformance = { suggestions: [] };
+  }
+  if (!Array.isArray(raw.coachPerformance.suggestions)) {
+    raw.coachPerformance.suggestions = [];
+  }
 
   // Always-apply: week label (optional user-set name, no schema bump needed)
   (raw.weeks ?? []).forEach(wk => { if (!('label' in wk)) wk.label = ''; });
@@ -1202,6 +1209,8 @@ export const A = Object.freeze({
   DECISION_LOG_OUTCOME:     'DECISION_LOG_OUTCOME',     // { id, outcome: { measuredWeekStart, signalPersisted, successRateBefore, successRateAfter } }
   COACH_ANSWER:             'COACH_ANSWER',             // { weekStart, questionId, answer }
   ONBOARDING_SEED:          'ONBOARDING_SEED',          // { startDate, exercises: [{ name, weight, reps?, rpe? }] }
+  COACH_PERF_LOG:           'COACH_PERF_LOG',           // { weekStart, status, exerciseName, suggestedDelta, fromWeight, confidenceLevel }
+  COACH_PERF_MEASURE:       'COACH_PERF_MEASURE',       // { id, followed, outcome, measuredWeekStart }
   SET_ERKENNTNISSE_HORIZONT: 'SET_ERKENNTNISSE_HORIZONT', // { value: number } — 4..52
 });
 
@@ -2384,6 +2393,40 @@ function reduce(state, action) {
         questionId: p.questionId,
         answer:     p.answer,
       };
+      break;
+    }
+    case A.COACH_PERF_LOG: {
+      if (!p.weekStart || !p.exerciseName) break;
+      if (!Array.isArray(state.coachPerformance?.suggestions)) {
+        state.coachPerformance = { suggestions: [] };
+      }
+      const _alreadyLogged = state.coachPerformance.suggestions.some(
+        s => s.weekStart === p.weekStart && s.exerciseName === p.exerciseName
+      );
+      if (_alreadyLogged) break;
+      state.coachPerformance.suggestions.push({
+        id:             Date.now(),
+        weekStart:      p.weekStart,
+        status:         p.status,
+        exerciseName:   p.exerciseName,
+        suggestedDelta: p.suggestedDelta ?? null,
+        fromWeight:     p.fromWeight     ?? null,
+        confidenceLevel: p.confidenceLevel ?? null,
+        followed:        null,
+        outcome:         null,
+        measuredWeekStart: null,
+      });
+      if (state.coachPerformance.suggestions.length > 100) {
+        state.coachPerformance.suggestions.splice(0, state.coachPerformance.suggestions.length - 100);
+      }
+      break;
+    }
+    case A.COACH_PERF_MEASURE: {
+      const _entry = state.coachPerformance?.suggestions?.find(s => s.id === p.id);
+      if (!_entry || _entry.outcome !== null) break;
+      _entry.followed          = p.followed;
+      _entry.outcome           = p.outcome;
+      _entry.measuredWeekStart = p.measuredWeekStart;
       break;
     }
     case A.SET_ERKENNTNISSE_HORIZONT: {

@@ -478,6 +478,8 @@ function _checkProgression(state) {
     confidence: finalConfidence,
     dataWeeks: calcWeeks.length,
     exerciseName: best.name,
+    suggestedDelta: best.rec.delta,
+    fromWeight: best.rec.lastWeight,
   };
 }
 
