@@ -219,7 +219,7 @@ const _MAX_UNDO  = 20;
 // Actions that are pure navigation or external events — not worth undoing.
 const _NO_UNDO = new Set([
   'UNDO', 'WEEK_NAVIGATE', 'STATE_IMPORT', 'SESSION_START', 'SESSION_RESET', 'SESSION_STOP',
-  'INSIGHTS_SET', 'ONBOARDING_DONE', 'MARK_TIP_SEEN', 'REENTRY_HANDLED',
+  'INSIGHTS_SET', 'ONBOARDING_DONE', 'ONBOARDING_SEED', 'MARK_TIP_SEEN', 'REENTRY_HANDLED',
   'EX_AUTO_PRESELECT_NEXT_WEEK_PLAN', 'ACTIVATE_STREAK_FREEZE', 'RECORD_SURPRISE_SHOWN',
   'PLATEAU_ACTION', 'DECISION_LOG_ADD', 'DECISION_LOG_OUTCOME',
   'SET_ERKENNTNISSE_HORIZONT', 'COACH_ANSWER',
@@ -895,6 +895,9 @@ function migrate(raw) {
   // Always-apply: week label (optional user-set name, no schema bump needed)
   (raw.weeks ?? []).forEach(wk => { if (!('label' in wk)) wk.label = ''; });
 
+  // isSeedWeek: additive flag for synthetic onboarding seed weeks
+  (raw.weeks ?? []).forEach(wk => { if (wk.isSeedWeek === undefined) wk.isSeedWeek = false; });
+
   // Backward compat: rename legacy setType 'pyramid' → 'manual'
   const _normSetType = ex => { if (ex.setType === 'pyramid') ex.setType = 'manual'; };
   (raw.weeks ?? []).forEach(wk => (wk.days ?? []).forEach(day => (day.exercises ?? []).forEach(_normSetType)));
@@ -1198,6 +1201,7 @@ export const A = Object.freeze({
   DECISION_LOG_ADD:         'DECISION_LOG_ADD',         // { type, signal, choice: 'stay'|'change', decidedWeekStart }
   DECISION_LOG_OUTCOME:     'DECISION_LOG_OUTCOME',     // { id, outcome: { measuredWeekStart, signalPersisted, successRateBefore, successRateAfter } }
   COACH_ANSWER:             'COACH_ANSWER',             // { weekStart, questionId, answer }
+  ONBOARDING_SEED:          'ONBOARDING_SEED',          // { startDate, exercises: [{ name, weight, reps?, rpe? }] }
   SET_ERKENNTNISSE_HORIZONT: 'SET_ERKENNTNISSE_HORIZONT', // { value: number } — 4..52
 });
 
@@ -2315,6 +2319,36 @@ function reduce(state, action) {
     case A.ONBOARDING_DONE: {
       state.onboardingDone = true;
       if (state.weeks.length === 0) _appendDefaultWeek();
+      break;
+    }
+
+    case A.ONBOARDING_SEED: {
+      if (!p.startDate || !Array.isArray(p.exercises) || !p.exercises.length) break;
+      if (state.weeks.find(w => w.startDate === p.startDate)) break; // dedupe
+      const _seedExercises = p.exercises.map((sw, i) => ({
+        id: Date.now() - 1000 + i,
+        name: sw.name, note: '', pauseSec: 90, metric: 'reps',
+        sets: [{ weight: sw.weight, reps: sw.reps ?? 5, rpe: sw.rpe ?? null, status: 'success', done: true }],
+        weightStep: 2.5, nextWeekPlan: 0, nextWeekPlanConfirmed: false,
+        targetSets: 1, targetReps: sw.reps ?? 5,
+        _showCfg: false, setType: 'standard', tags: [], showPlates: false,
+        progressionType: 'weight', substituteFor: null,
+        progressionMode: 'weight_first', targetRepsMax: null, prRepsHistory: {},
+      }));
+      const _seedWeek = {
+        id: Date.now() - 1000,
+        startDate: p.startDate, note: 'Startwerte',
+        mode: 'standard', isSeedWeek: true,
+        days: [{
+          id: Date.now() - 999, title: 'Startwerte', subtitle: '',
+          warmup: '', cooldown: '', locked: true, markedDone: true,
+          isVacation: false, exercises: _seedExercises,
+        }],
+        sessionLog: [], bodyData: {}, restDays: [],
+      };
+      state.weeks.push(_seedWeek);
+      _resortWeeksKeepingCurrent(state, state.weeks[state.curIdx]);
+      _recalcExercisePRs(state);
       break;
     }
 

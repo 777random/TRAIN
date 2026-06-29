@@ -22,7 +22,7 @@ import {
   effectiveStreakFreeze, _quarter, nextQuarterStartLabel, clearAutoWeekPending,
 } from './state.js';
 import {
-  exportJSON, importJSON, exportCSV,
+  exportJSON, exportJSONAuto, importJSON, exportCSV,
 } from './backup.js';
 import * as ic from './icons.js';
 import { fireTrigger } from './triggerEngine.js';
@@ -5703,6 +5703,7 @@ function _bindTabSwitcher() {
 
 let _renderScheduled  = false;
 let _onboardingActive = false; // true while onboarding overlay is mounted
+let _knownWeekCount   = -1;   // -1 = not yet initialised; used to detect new-week events
 
 // Reposition fixed floating elements (⋮ dropdown, +kg picker) after render
 function _positionFloating() {
@@ -5743,6 +5744,18 @@ function scheduleRender() {
     _renderScheduled = false;
     if (_onboardingActive) return;
     const state = getState();
+
+    // Auto-backup: silently download JSON when a new week is created
+    const newWeekCount = state.weeks?.length ?? 0;
+    if (_knownWeekCount >= 0 && newWeekCount > _knownWeekCount && newWeekCount >= 2) {
+      const sorted = [...state.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
+      const completedWeek = sorted[sorted.length - 2];
+      if (completedWeek?.startDate && !completedWeek.isSeedWeek) {
+        exportJSONAuto(completedWeek.startDate);
+      }
+    }
+    _knownWeekCount = newWeekCount;
+
     renderWeekHeader(state);
     renderDayList(state);
     if (_activeTab === 'body')     renderBodyTab(state);
@@ -6399,10 +6412,12 @@ function _showOnboarding() {
   if (document.getElementById('onboarding')) return;
   _onboardingActive = true;
 
-  let _selTpl       = null;
-  let _expLevel     = null; // 'anfaenger' | 'fortgeschritten' | 'erfahren' | null
-  let _mainGoal     = null; // 'kraftaufbau' | 'muskelaufbau' | 'fitness' | null
-  let _optionalOpen = false; // <details>-Zustand über innerHTML-Rebuilds hinweg
+  let _selTpl          = null;
+  let _expLevel        = null;    // 'anfaenger' | 'fortgeschritten' | 'erfahren' | null
+  let _mainGoal        = null;    // 'kraftaufbau' | 'muskelaufbau' | 'fitness' | null
+  let _optionalOpen    = false;   // <details> state — survives innerHTML rebuilds
+  let _startwerteOpen  = false;   // <details> state for startwerte section
+  let _startwerte      = {};      // { [exerciseName]: { weight, reps, rpe } }
 
   const el = document.createElement('div');
   el.id = 'onboarding';
@@ -6449,6 +6464,31 @@ function _showOnboarding() {
         </div>
       </div>`).join('');
 
+    // Exercises for the selected template (reps-metric only, max 5)
+    const tplExercises = _selTpl !== null
+      ? _ONBOARDING_TEMPLATES[_selTpl].days.flatMap(d => d.exercises).filter(ex => ex.m === 'reps').slice(0, 5)
+      : [];
+
+    const startwerteHtml = tplExercises.length > 0 ? `
+        <details class="ob-optional ob-startwerte">
+          <summary class="ob-optional__summary">Startwerte eingeben (optional) ▾</summary>
+          <div class="ob-optional__body">
+            <p class="ob-startwerte__hint">Gib deine aktuellen Arbeitsgewichte ein — TRAIN kann so ab der ersten Woche bessere Empfehlungen geben.</p>
+            ${tplExercises.map(ex => `
+            <div class="ob-startwert-row">
+              <div class="ob-startwert-name">${h(ex.name)}</div>
+              <div class="ob-startwert-inputs">
+                <input type="number" inputmode="decimal" class="ob-startwert-input" placeholder="kg" min="0" step="2.5"
+                  data-sw-field="weight" data-sw-name="${h(ex.name)}">
+                <input type="number" inputmode="numeric" class="ob-startwert-input ob-startwert-input--sm" placeholder="Wdh" min="1"
+                  data-sw-field="reps" data-sw-name="${h(ex.name)}">
+                <input type="number" inputmode="decimal" class="ob-startwert-input ob-startwert-input--sm" placeholder="RPE" min="1" max="10" step="0.5"
+                  data-sw-field="rpe" data-sw-name="${h(ex.name)}">
+              </div>
+            </div>`).join('')}
+          </div>
+        </details>` : '';
+
     el.innerHTML = `
       <div class="ob-screen">
         <h2 class="ob-title ob-title--sm">Womit möchtest du starten?</h2>
@@ -6475,16 +6515,38 @@ function _showOnboarding() {
             </div>
           </div>
         </details>
+        ${startwerteHtml}
         <button class="btn btn--ghost ob-btn ob-btn--sm" data-ob="skip">Ohne Vorlage starten</button>
       </div>`;
 
-    // <details>-Zustand nach innerHTML-Rebuild wiederherstellen + Toggle tracken
-    const detEl = el.querySelector('.ob-optional');
+    // <details>-Zustände nach innerHTML-Rebuild wiederherstellen + Toggle tracken
+    const detEl = el.querySelector('.ob-optional:not(.ob-startwerte)');
     if (detEl) {
       if (_optionalOpen) detEl.open = true;
       detEl.addEventListener('toggle', () => { _optionalOpen = detEl.open; });
     }
+    const swDetEl = el.querySelector('.ob-startwerte');
+    if (swDetEl) {
+      if (_startwerteOpen) swDetEl.open = true;
+      swDetEl.addEventListener('toggle', () => { _startwerteOpen = swDetEl.open; });
+      // Restore input values preserved across rebuilds
+      el.querySelectorAll('[data-sw-field][data-sw-name]').forEach(inp => {
+        const sw = _startwerte[inp.dataset.swName];
+        const val = sw?.[inp.dataset.swField];
+        if (val != null) inp.value = val;
+      });
+    }
   }
+
+  el.addEventListener('input', e => {
+    const inp = e.target;
+    const name  = inp.dataset?.swName;
+    const field = inp.dataset?.swField;
+    if (!name || !field) return;
+    if (!_startwerte[name]) _startwerte[name] = {};
+    const raw = inp.value.trim();
+    _startwerte[name][field] = raw === '' ? null : +raw;
+  });
 
   el.addEventListener('click', e => {
     const btn = e.target.closest('[data-ob]');
@@ -6584,6 +6646,16 @@ function _showOnboarding() {
   }
 
   function _finish() {
+    // Seed week: dispatch before ONBOARDING_DONE so week exists when Coach renders
+    const seedExs = Object.entries(_startwerte)
+      .filter(([, sw]) => sw?.weight != null && sw.weight > 0)
+      .map(([name, sw]) => ({ name, weight: sw.weight, reps: sw.reps, rpe: sw.rpe }));
+    if (seedExs.length > 0) {
+      const _d = new Date();
+      const _dow = _d.getDay();
+      _d.setDate(_d.getDate() + (_dow === 0 ? -6 : 1 - _dow) - 7); // last Monday
+      dispatch(A.ONBOARDING_SEED, { startDate: _d.toISOString().slice(0, 10), exercises: seedExs });
+    }
     _onboardingActive = false;
     dispatch(A.ONBOARDING_DONE, {});
     el.remove();

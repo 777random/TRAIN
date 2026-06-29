@@ -2168,6 +2168,19 @@ details[open] > .deload-details__summary::before { content: '▾ '; }
 }
 .ob-optional__summary::-webkit-details-marker { display: none; }
 .ob-optional__body { padding-top: var(--sp-3); }
+.ob-startwerte__hint { font-size: 12px; color: var(--c-text-3); margin: 0 0 var(--sp-3); line-height: 1.5; }
+.ob-startwert-row { margin-bottom: var(--sp-3); }
+.ob-startwert-name { font-size: 14px; font-weight: 600; color: var(--c-text-2); margin-bottom: var(--sp-1); }
+.ob-startwert-inputs { display: flex; gap: var(--sp-2); }
+.ob-startwert-input {
+  flex: 1; background: var(--c-surface2); border: 1.5px solid var(--c-border);
+  border-radius: 8px; color: var(--c-text); font-size: 15px; font-family: inherit;
+  padding: 8px 10px; min-width: 0; width: 100%;
+  -webkit-appearance: none; text-align: center;
+}
+.ob-startwert-input::placeholder { color: var(--c-text-3); }
+.ob-startwert-input:focus { outline: none; border-color: var(--c-accent); }
+.ob-startwert-input--sm { flex: 0 0 58px; }
 
 /* ── One-time tip banner ──────────────────────────────────── */
 .tip-banner {

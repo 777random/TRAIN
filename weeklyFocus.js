@@ -484,6 +484,18 @@ function _checkProgression(state) {
 // ─── Fallback: Auf Kurs ─────────────────────────────────────────────────────
 
 function _fallback(state) {
+  if (state.weeks.length <= 2) {
+    const hasSeed = state.weeks.some(w => w.isSeedWeek);
+    const seedNote = hasSeed
+      ? ' Erste Analyse auf Basis deiner Startwerte möglich ab nächster Woche.'
+      : '';
+    return {
+      status: 'onTrack',
+      headline: 'Auf Kurs',
+      reasoning: `Du baust gerade deine Datenbasis auf. Ab Woche 2 kann TRAIN konkrete Empfehlungen geben.${seedNote}`,
+      recommendation: null,
+    };
+  }
   const variants = [
     'Keine besonderen Auffälligkeiten diese Woche. Trainiere wie geplant weiter.',
     'Alles im grünen Bereich — mach weiter wie bisher.',

@@ -62,6 +62,13 @@ export function exportJSON(onSuccess) {
   _done();
 }
 
+export function exportJSONAuto(startDate) {
+  const json     = JSON.stringify(getState(), null, 2);
+  const filename = `TRAIN_Backup_${startDate}.json`;
+  const blob     = new Blob([json], { type: 'application/json;charset=utf-8' });
+  triggerDownload(blob, filename);
+}
+
 export function importJSON(file) {
   return new Promise((resolve, reject) => {
     if (!file) { reject(new Error('No file provided.')); return; }
