@@ -2568,6 +2568,59 @@ function _checkDecisionOutcomes(state) {
       }
     }
   }
+
+  // ── coachQuestion Outcome-Messung ───────────────────────────────────────────
+  const _cq = state.coachQuestion;
+  if (_cq?.answer != null && _cq.outcome === null && _cq.weekStart) {
+    const _cqNonSeed = [...state.weeks]
+      .filter(w => !w.isSeedWeek)
+      .sort((a, b) => a.startDate.localeCompare(b.startDate));
+    const _cqFollowWk = _cqNonSeed.find(w => w.startDate > _cq.weekStart);
+    if (_cqFollowWk) {
+      const _cqFakeState = {
+        ...state,
+        weeks: _cqNonSeed.filter(w => w.startDate <= _cqFollowWk.startDate),
+      };
+      let _cqFocusStatus = 'onTrack';
+      try { _cqFocusStatus = computeWeeklyFocus(_cqFakeState).status; } catch {}
+
+      let _cqOutcome = 'unclear';
+
+      if (_cq.questionId === 'pre_plateau_subjective') {
+        const _neg = _cqFocusStatus === 'plateau' || _cqFocusStatus === 'overload';
+        if (_cq.answer === 'yes') _cqOutcome = _neg ? 'confirmed' : 'not_confirmed';
+        else if (_cq.answer === 'no') _cqOutcome = _neg ? 'not_confirmed' : 'confirmed';
+
+      } else if (_cq.questionId === 'progression_feeling') {
+        const _prevWk = _cqNonSeed.filter(w => w.startDate < _cqFollowWk.startDate).at(-1);
+        let _hadIncrease = false;
+        if (_prevWk) {
+          for (const _d of _cqFollowWk.days) {
+            if (_hadIncrease) break;
+            for (const _ex of _d.exercises) {
+              const _prevEx = _prevWk.days.flatMap(dd => dd.exercises).find(e => e.name === _ex.name);
+              if (!_prevEx) continue;
+              const _prevMax = Math.max(0, ..._prevEx.sets.map(s => s.weight ?? 0));
+              const _succMax = Math.max(0, ..._ex.sets.filter(s => s.status === 'success').map(s => s.weight ?? 0));
+              if (_succMax > _prevMax) { _hadIncrease = true; break; }
+            }
+          }
+        }
+        if (_cq.answer === 'good')  _cqOutcome = _hadIncrease ? 'confirmed' : 'unclear';
+        else if (_cq.answer === 'tired') _cqOutcome = _hadIncrease ? 'not_confirmed' : 'confirmed';
+
+      } else if (_cq.questionId === 'plateau_outcome') {
+        const _stillPlateau = _cqFocusStatus === 'plateau';
+        if (_cq.answer === 'helped')      _cqOutcome = _stillPlateau ? 'not_confirmed' : 'confirmed';
+        else if (_cq.answer === 'not_helped') _cqOutcome = _stillPlateau ? 'confirmed' : 'not_confirmed';
+      }
+
+      dispatch(A.COACH_QUESTION_OUTCOME, {
+        outcome:           _cqOutcome,
+        measuredWeekStart: _cqFollowWk.startDate,
+      });
+    }
+  }
 }
 
 // ─── Decision history conclusion ──────────────────────────────────────────────
@@ -2648,6 +2701,13 @@ function _buildCoachQuestionCard(state, focus) {
     return '';
   }
 
+  // Show confirmation hint if last answered question with same type was confirmed
+  const _cqHist  = state.coachQuestionHistory ?? [];
+  const _lastSame = [..._cqHist].reverse().find(e => e.questionId === qid);
+  const _confirmedHint = _lastSame?.outcome === 'confirmed'
+    ? ' <span class="coach-question__hint">Letztes Mal hat diese Einschätzung gestimmt.</span>'
+    : '';
+
   const btns = options.map(o =>
     `<button type="button" class="btn btn--ghost btn--sm coach-question__btn"
       data-action="coach-answer"
@@ -2658,7 +2718,7 @@ function _buildCoachQuestionCard(state, focus) {
 
   return `
   <div class="chart-card coach-question-card">
-    <div class="coach-question__text">${questionText}</div>
+    <div class="coach-question__text">${questionText}${_confirmedHint}</div>
     <div class="coach-question__options">${btns}</div>
   </div>`;
 }
@@ -2964,39 +3024,64 @@ function _renderErkenntnisseSection(state) {
 
 // ─── Coach-Bilanz: Trefferquote der Progressions-Empfehlungen ──────────────────
 function _coachBilanzHtml(state) {
-  const measured = (state.coachPerformance?.suggestions ?? [])
+  // ── Progressions-Block ─────────────────────────────────────────────────────
+  const measured  = (state.coachPerformance?.suggestions ?? [])
     .filter(s => s.status === 'progression' && s.outcome !== null);
-  if (measured.length < 5) return '';
+  let progressionsHtml = '';
+  if (measured.length >= 5) {
+    const N        = measured.length;
+    const succCount = measured.filter(s => s.outcome === 'success').length;
+    const pct      = Math.round(succCount / N * 100);
+    const highSugg = measured.filter(s => s.confidenceLevel === 'HIGH');
+    const medSugg  = measured.filter(s => s.confidenceLevel === 'MEDIUM');
+    const highSucc = highSugg.filter(s => s.outcome === 'success').length;
+    const medSucc  = medSugg.filter(s => s.outcome === 'success').length;
+    const highPct  = highSugg.length > 0 ? Math.round(highSucc / highSugg.length * 100) : null;
+    const medPct   = medSugg.length  > 0 ? Math.round(medSucc  / medSugg.length  * 100) : null;
+    const conclusion = pct > 75
+      ? `Der Coach trifft in ${succCount} von ${N} Fällen — du kannst seinen Empfehlungen vertrauen.`
+      : pct >= 50
+      ? `Der Coach trifft in ${succCount} von ${N} Fällen — die HIGH-Empfehlungen sind zuverlässiger als MEDIUM.`
+      : `Der Coach sammelt noch Daten über dein Training — die Empfehlungen werden präziser.`;
+    const confLines = [
+      highPct !== null ? `<div class="coach-bilanz-row"><span>HIGH-Empfehlungen: ${highSugg.length}</span><span>${highPct}% erfolgreich</span></div>` : '',
+      medPct  !== null ? `<div class="coach-bilanz-row"><span>MEDIUM-Empfehlungen: ${medSugg.length}</span><span>${medPct}% erfolgreich</span></div>` : '',
+    ].filter(Boolean).join('');
+    progressionsHtml = `
+    <div class="coach-bilanz-row"><span>Progressions-Empfehlungen</span><span>${N}</span></div>
+    <div class="coach-bilanz-row"><span>Erfolgreich umgesetzt</span><span>${succCount} (${pct}%)</span></div>
+    ${confLines ? `<div class="coach-bilanz-divider"></div>${confLines}` : ''}
+    <p class="coach-bilanz-conclusion">${h(conclusion)}</p>`;
+  }
 
-  const N        = measured.length;
-  const succCount = measured.filter(s => s.outcome === 'success').length;
-  const pct      = Math.round(succCount / N * 100);
+  // ── Coach-Fragen-Block ─────────────────────────────────────────────────────
+  const _cqMeasured = (state.coachQuestionHistory ?? [])
+    .filter(e => e.outcome === 'confirmed' || e.outcome === 'not_confirmed');
+  let fragenHtml = '';
+  if (_cqMeasured.length >= 3) {
+    const qN    = _cqMeasured.length;
+    const qSucc = _cqMeasured.filter(e => e.outcome === 'confirmed').length;
+    const qPct  = Math.round(qSucc / qN * 100);
+    const qConc = qPct > 70
+      ? `TRAIN's Nachfragen treffen in ${qSucc} von ${qN} Fällen — die Einschätzungen sind verlässlich.`
+      : `TRAIN lernt noch dein Muster — die Nachfragen werden präziser.`;
+    fragenHtml = `
+    <div class="coach-bilanz-subtitle">Coach-Fragen Bilanz</div>
+    <div class="coach-bilanz-row"><span>Fragen gestellt</span><span>${qN}</span></div>
+    <div class="coach-bilanz-row"><span>Einschätzung bestätigt</span><span>${qSucc} (${qPct}%)</span></div>
+    <p class="coach-bilanz-conclusion">${h(qConc)}</p>`;
+  }
 
-  const highSugg = measured.filter(s => s.confidenceLevel === 'HIGH');
-  const medSugg  = measured.filter(s => s.confidenceLevel === 'MEDIUM');
-  const highSucc = highSugg.filter(s => s.outcome === 'success').length;
-  const medSucc  = medSugg.filter(s => s.outcome === 'success').length;
-  const highPct  = highSugg.length > 0 ? Math.round(highSucc / highSugg.length * 100) : null;
-  const medPct   = medSugg.length  > 0 ? Math.round(medSucc  / medSugg.length  * 100) : null;
+  if (!progressionsHtml && !fragenHtml) return '';
 
-  const conclusion = pct > 75
-    ? `Der Coach trifft in ${succCount} von ${N} Fällen — du kannst seinen Empfehlungen vertrauen.`
-    : pct >= 50
-    ? `Der Coach trifft in ${succCount} von ${N} Fällen — die HIGH-Empfehlungen sind zuverlässiger als MEDIUM.`
-    : `Der Coach sammelt noch Daten über dein Training — die Empfehlungen werden präziser.`;
-
-  const confLines = [
-    highPct !== null ? `<div class="coach-bilanz-row"><span>HIGH-Empfehlungen: ${highSugg.length}</span><span>${highPct}% erfolgreich</span></div>` : '',
-    medPct  !== null ? `<div class="coach-bilanz-row"><span>MEDIUM-Empfehlungen: ${medSugg.length}</span><span>${medPct}% erfolgreich</span></div>` : '',
-  ].filter(Boolean).join('');
+  const divider = progressionsHtml && fragenHtml ? '<div class="coach-bilanz-divider"></div>' : '';
 
   return `
   <div class="chart-card coach-bilanz-card">
     <div class="chart-card__title">📊 Coach-Bilanz</div>
-    <div class="coach-bilanz-row"><span>Progressions-Empfehlungen</span><span>${N}</span></div>
-    <div class="coach-bilanz-row"><span>Erfolgreich umgesetzt</span><span>${succCount} (${pct}%)</span></div>
-    ${confLines ? `<div class="coach-bilanz-divider"></div>${confLines}` : ''}
-    <p class="coach-bilanz-conclusion">${h(conclusion)}</p>
+    ${progressionsHtml}
+    ${divider}
+    ${fragenHtml}
   </div>`;
 }
 

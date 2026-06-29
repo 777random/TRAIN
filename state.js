@@ -182,7 +182,8 @@ function buildDefaultState() {
     surpriseLog: {},          // { [musterId]: "YYYY-MM" } – letzter Monat, in dem ein Überraschungs-Muster gezeigt wurde
     plateauActions: {},       // { [exerciseName]: { action: 'ignored'|'implemented', since, plateauWeeksAtAction } }
     decisionLog: [],          // { id, type, signal, choice, decidedWeekStart, outcome } – Abwägungs-Entscheidungen
-    coachQuestion: { weekStart: null, questionId: null, answer: null }, // adaptive Nachfrage — eine Frage pro Woche
+    coachQuestion: { weekStart: null, questionId: null, answer: null, outcome: null, measuredWeekStart: null }, // adaptive Nachfrage — eine Frage pro Woche
+    coachQuestionHistory: [], // abgeschlossene Fragen mit Outcome: [{ weekStart, questionId, answer, outcome, measuredWeekStart }]
     coachPerformance: { suggestions: [] }, // Logging + Messung von Progressions-Empfehlungen
     settings: {
       swipe:              true,
@@ -223,7 +224,7 @@ const _NO_UNDO = new Set([
   'INSIGHTS_SET', 'ONBOARDING_DONE', 'ONBOARDING_SEED', 'MARK_TIP_SEEN', 'REENTRY_HANDLED',
   'EX_AUTO_PRESELECT_NEXT_WEEK_PLAN', 'ACTIVATE_STREAK_FREEZE', 'RECORD_SURPRISE_SHOWN',
   'PLATEAU_ACTION', 'DECISION_LOG_ADD', 'DECISION_LOG_OUTCOME',
-  'SET_ERKENNTNISSE_HORIZONT', 'COACH_ANSWER', 'COACH_PERF_LOG', 'COACH_PERF_MEASURE',
+  'SET_ERKENNTNISSE_HORIZONT', 'COACH_ANSWER', 'COACH_PERF_LOG', 'COACH_PERF_MEASURE', 'COACH_QUESTION_OUTCOME',
 ]);
 
 /** Returns true when there is at least one undo snapshot available. */
@@ -890,8 +891,11 @@ function migrate(raw) {
   if (raw.settings.autoStartPauseTimer            === undefined) raw.settings.autoStartPauseTimer            = true;
   if (!Array.isArray(raw.settings.dismissedNamePairs)) raw.settings.dismissedNamePairs = [];
   if (!raw.coachQuestion || typeof raw.coachQuestion !== 'object') {
-    raw.coachQuestion = { weekStart: null, questionId: null, answer: null };
+    raw.coachQuestion = { weekStart: null, questionId: null, answer: null, outcome: null, measuredWeekStart: null };
   }
+  if (raw.coachQuestion.outcome           === undefined) raw.coachQuestion.outcome           = null;
+  if (raw.coachQuestion.measuredWeekStart === undefined) raw.coachQuestion.measuredWeekStart = null;
+  if (!Array.isArray(raw.coachQuestionHistory)) raw.coachQuestionHistory = [];
   if (!raw.coachPerformance || typeof raw.coachPerformance !== 'object') {
     raw.coachPerformance = { suggestions: [] };
   }
@@ -1211,6 +1215,7 @@ export const A = Object.freeze({
   ONBOARDING_SEED:          'ONBOARDING_SEED',          // { startDate, exercises: [{ name, weight, reps?, rpe? }] }
   COACH_PERF_LOG:           'COACH_PERF_LOG',           // { weekStart, status, exerciseName, suggestedDelta, fromWeight, confidenceLevel }
   COACH_PERF_MEASURE:       'COACH_PERF_MEASURE',       // { id, followed, outcome, measuredWeekStart }
+  COACH_QUESTION_OUTCOME:   'COACH_QUESTION_OUTCOME',   // { outcome: 'confirmed'|'not_confirmed'|'unclear', measuredWeekStart }
   SET_ERKENNTNISSE_HORIZONT: 'SET_ERKENNTNISSE_HORIZONT', // { value: number } — 4..52
 });
 
@@ -1322,7 +1327,10 @@ function reduce(state, action) {
       _resortWeeksKeepingCurrent(state, newWeek);
       _checkAndGrantBadges(state);
       if (state.coachQuestion?.weekStart && state.coachQuestion.weekStart !== p.startDate) {
-        state.coachQuestion = { weekStart: null, questionId: null, answer: null };
+        const _pendingMeasure = state.coachQuestion.answer !== null && state.coachQuestion.outcome === null;
+        if (!_pendingMeasure) {
+          state.coachQuestion = { weekStart: null, questionId: null, answer: null, outcome: null, measuredWeekStart: null };
+        }
       }
       break;
     }
@@ -1353,7 +1361,10 @@ function reduce(state, action) {
       _resortWeeksKeepingCurrent(state, newWeek);
       _checkAndGrantBadges(state);
       if (state.coachQuestion?.weekStart && state.coachQuestion.weekStart !== p.startDate) {
-        state.coachQuestion = { weekStart: null, questionId: null, answer: null };
+        const _pendingMeasure = state.coachQuestion.answer !== null && state.coachQuestion.outcome === null;
+        if (!_pendingMeasure) {
+          state.coachQuestion = { weekStart: null, questionId: null, answer: null, outcome: null, measuredWeekStart: null };
+        }
       }
       state.autoWeekPending = true;
       break;
@@ -2389,10 +2400,29 @@ function reduce(state, action) {
     }
     case A.COACH_ANSWER: {
       state.coachQuestion = {
-        weekStart:  p.weekStart,
-        questionId: p.questionId,
-        answer:     p.answer,
+        weekStart:         p.weekStart,
+        questionId:        p.questionId,
+        answer:            p.answer,
+        outcome:           null,
+        measuredWeekStart: null,
       };
+      break;
+    }
+    case A.COACH_QUESTION_OUTCOME: {
+      if (!state.coachQuestion?.answer || state.coachQuestion.outcome !== null) break;
+      state.coachQuestion.outcome           = p.outcome;
+      state.coachQuestion.measuredWeekStart = p.measuredWeekStart;
+      if (!Array.isArray(state.coachQuestionHistory)) state.coachQuestionHistory = [];
+      state.coachQuestionHistory.push({
+        weekStart:         state.coachQuestion.weekStart,
+        questionId:        state.coachQuestion.questionId,
+        answer:            state.coachQuestion.answer,
+        outcome:           p.outcome,
+        measuredWeekStart: p.measuredWeekStart,
+      });
+      if (state.coachQuestionHistory.length > 50) {
+        state.coachQuestionHistory.splice(0, state.coachQuestionHistory.length - 50);
+      }
       break;
     }
     case A.COACH_PERF_LOG: {
