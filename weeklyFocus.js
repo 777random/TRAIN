@@ -486,8 +486,18 @@ function _checkProgression(state) {
 // ─── Fallback: Auf Kurs ─────────────────────────────────────────────────────
 
 function _fallback(state) {
-  if (state.weeks.length <= 2) {
-    const hasSeed = state.weeks.some(w => w.isSeedWeek);
+  // Nur Wochen mit echten bewerteten Sätzen zählen — leere, von
+  // _checkAndAutoCreateWeek() bei jedem App-Boot ohne Training angehängte
+  // Auto-Wochen (nur 'pending'-Sätze) und Onboarding-Seed-Wochen dürfen die
+  // Früh-Phase-Erkennung nicht verwässern. Eine Seed-Woche zählt wie eine
+  // halbe echte Woche (Startwerte-Baseline vorhanden) — daher der +1-Bonus.
+  const hasSeed = state.weeks.some(w => w.isSeedWeek);
+  const _realWeeks = state.weeks.filter(w => !w.isSeedWeek &&
+    w.days.some(d => d.exercises.some(ex => ex.sets.some(s =>
+      s.status === 'success' || s.status === 'fail'
+    )))
+  );
+  if (_realWeeks.length + (hasSeed ? 1 : 0) <= 1) {
     const seedNote = hasSeed
       ? ' Erste Analyse auf Basis deiner Startwerte möglich ab nächster Woche.'
       : '';
@@ -573,31 +583,16 @@ function _balanceForConsistencyGap(focus) {
   };
 }
 
-function _balanceForPlateau(focus) {
-  const p = focus.plateau;
-  return {
-    stayOption: {
-      label: 'Weiter wie bisher (gleiche Strategie/Gewicht beibehalten)',
-      pros: ['Kein Wechsel nötig, gewohnte Übung bleibt'],
-      cons: ['Stagnation hält wahrscheinlich an'],
-    },
-    changeOption: {
-      label: `Strategie wechseln: ${p.actionText}`,
-      pros: ['Neuer Reiz kann das Plateau durchbrechen'],
-      cons: ['Kurzfristig andere Belastung als gewohnt'],
-    },
-    closing: `Bei ${p.plateauWeeks} Wochen ohne Steigerung spricht mehr für einen Wechsel.`,
-  };
-}
-
 /**
  * @param {Object} focus  Rückgabe von computeWeeklyFocus()
  * @returns {{ stayOption: Object, changeOption: Object, closing: string } | null}
- *   null für reentry/progression/onTrack — keine Decisional Balance dafür.
+ *   null für reentry/plateau/progression/onTrack — keine Decisional Balance
+ *   dafür. Plateau hat mit "✓ Habe ich umgesetzt"/"Ignorieren" (plateauActions)
+ *   bereits ein eigenes, nicht-redundantes Entscheidungs-Paar (Sprint: Plateau-
+ *   Buttons konsolidieren).
  */
 export function buildDecisionalBalance(focus) {
   if (focus.status === 'overload') return _balanceForOverload(focus);
   if (focus.status === 'consistencyGap') return _balanceForConsistencyGap(focus);
-  if (focus.status === 'plateau') return _balanceForPlateau(focus);
   return null;
 }

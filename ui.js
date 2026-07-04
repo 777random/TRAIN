@@ -87,6 +87,12 @@ let _weekMenuOpen = false;
 /** Key of the exercise whose settings panel (cfgRow) is open: `${di}-${ei}` or null. */
 let _cfgOpenKey = null;
 
+/** Transient 3s-Bestätigung nach Plateau-Button-Klick: { action: 'implemented'|'ignored', exerciseName } oder null. */
+let _plateauActionFeedback = null;
+
+/** War .coach-why-collapse vor dem Plateau-Button-Klick aufgeklappt? Einmalig nach der Feedback-Karte wiederhergestellt. */
+let _whyWasOpen = false;
+
 /** Key of the exercise whose +kg picker popover is open: `${di}-${ei}` or null. */
 let _kgPickerKey = null;
 
@@ -1264,7 +1270,8 @@ function _nextGoalText(ex) {
     const curWeight = Math.max(...ex.sets.map(s => s.weight ?? 0));
     newValueText = `${curWeight + ex.nextWeekPlan}kg`;
   }
-  return `Nächste Steigerung: +${ex.nextWeekPlan} → ${newValueText}`;
+  const _sign = ex.nextWeekPlan >= 0 ? '+' : '';
+  return `Nächste ${ex.nextWeekPlan >= 0 ? 'Steigerung' : 'Anpassung'}: ${_sign}${ex.nextWeekPlan} → ${newValueText}`;
 }
 
 // ─── Exercise ─────────────────────────────────────────────────────────────────
@@ -1306,7 +1313,7 @@ function renderExercise(wk, di, ei, state) {
         if (pe) {
           const scs = pe.sets.filter(s => s.status === 'success' && s.reps != null && s.reps > 0);
           if (scs.length > 0) {
-            const avg = Math.round(scs.reduce((sum, s) => sum + s.reps, 0) / scs.length);
+            const avg = Math.round(scs.reduce((sum, s) => sum + (parseFloat(s.reps) || 0), 0) / scs.length);
             _suggestionHtml = `<span class="target-suggestion">Vorschlag: ${avg} (Ø letzte Woche)</span><button type="button" class="btn-adopt-target" data-action="adopt-target-reps" data-di="${di}" data-ei="${ei}" data-value="${avg}">Übernehmen</button>`;
           }
           break;
@@ -1544,11 +1551,12 @@ function renderExercise(wk, di, ei, state) {
       const _isReps = _pt === 'reps';
       const _isSets = _pt === 'sets';
       const _planVal = ex.nextWeekPlanConfirmed ? (ex.nextWeekPlan ?? 0) : (ex.nextWeekPlan || (_isReps || _isSets ? 1 : 0));
+      const _weightVal = ex.nextWeekPlan || 0;
       const _btnLabel = _isReps
         ? `+${_planVal} Wdh${ex.nextWeekPlanConfirmed ? ' ✓' : ''}`
         : _isSets
           ? `+${_planVal} Satz${ex.nextWeekPlanConfirmed ? ' ✓' : ''}`
-          : `+${ex.nextWeekPlan || 0}${ex.nextWeekPlanConfirmed ? ' ✓' : ''}`;
+          : `${_weightVal >= 0 ? '+' : ''}${_weightVal}${ex.nextWeekPlanConfirmed ? ' ✓' : ''}`;
       return `
     <div class="ex-kg-wrap">
       <button
@@ -1695,7 +1703,7 @@ function renderExercise(wk, di, ei, state) {
     if (ex.substituteFor && (!prevEx || prevEx.metric !== ex.metric)) return '';
     const nSets     = ex.sets.length;
     const target    = nSets * ex.targetReps;
-    const achieved  = ex.sets.filter(s => s.status === 'success').reduce((sum, s) => sum + (s.reps ?? 0), 0);
+    const achieved  = ex.sets.filter(s => s.status === 'success').reduce((sum, s) => sum + (parseFloat(s.reps) || 0), 0);
     const actualPct = target > 0 ? Math.round(achieved / target * 100) : 0;
     const pct       = Math.min(actualPct, 100);
     const color     = pct >= 100 ? 'var(--c-ok)' : pct >= 80 ? 'var(--c-warn)' : 'var(--c-danger)';
@@ -2337,8 +2345,8 @@ function _avgRepsLast4(exName, allWeeks) {
     for (const day of wk.days) {
       const ex = day.exercises.find(e => e.name === exName);
       if (!ex) continue;
-      const ok = ex.sets.filter(s => s.status === 'success' && (s.reps ?? 0) > 0).map(s => s.reps);
-      if (ok.length) repsSum.push(Math.round(ok.reduce((a, b) => a + b) / ok.length));
+      const ok = ex.sets.filter(s => s.status === 'success' && (s.reps ?? 0) > 0).map(s => parseFloat(s.reps) || 0);
+      if (ok.length) repsSum.push(Math.round(ok.reduce((a, b) => a + b, 0) / ok.length));
     }
   }
   return repsSum.length ? Math.round(repsSum.reduce((a, b) => a + b) / repsSum.length) : null;
@@ -2660,6 +2668,36 @@ function _decisionHistoryConclusion(entries) {
 // computeWeeklyFocus() ruft detectPlateaus() 1:1 wiederverwendet auf,
 // dieselbe Funktion die auch der Wochenrückblick nutzt.
 
+function _coachPerfSummaryHtml(state) {
+  const measured = (state.coachPerformance?.suggestions ?? [])
+    .filter(s => s.status === 'progression' && s.outcome !== null);
+  if (measured.length < 5) return '';
+  const N        = measured.length;
+  const succCount = measured.filter(s => s.outcome === 'success').length;
+  const pct      = Math.round(succCount / N * 100);
+  const text = pct > 75
+    ? `🎯 Coach-Trefferquote: ${pct}% (${N} Fälle)`
+    : pct >= 50
+    ? `📊 Coach-Trefferquote: ${pct}% (${N} Fälle)`
+    : `📊 Coach sammelt noch Daten (${N} Fälle)`;
+  return `
+  <div class="coach-perf-summary">
+    <span class="coach-perf-summary__text">${h(text)}</span>
+    <button type="button" class="coach-perf-summary__link" data-action="coach-perf-details">Details →</button>
+  </div>`;
+}
+
+function _plateauActionFeedbackHtml(fb) {
+  const text = fb.action === 'implemented'
+    ? `✓ ${fb.exerciseName}: Strategie als umgesetzt markiert. TRAIN prüft in einer Woche ob sie geholfen hat.`
+    : `Plateau bei ${fb.exerciseName} ausgeblendet. TRAIN meldet sich wieder wenn sich etwas ändert.`;
+  return `
+  <div class="chart-card coach-focus-card">
+    <div class="chart-card__title">📋 Fokus der Woche</div>
+    <p class="coach-plateau-feedback">${h(text)}</p>
+  </div>`;
+}
+
 function _buildCoachQuestionCard(state, focus) {
   const curWkStart = getLatestWeek(state.weeks)?.startDate ?? null;
   const cq = state.coachQuestion;
@@ -2729,6 +2767,11 @@ function renderCoachTab(state) {
 
   if (!_hasAnyTrainingData(state)) {
     container.innerHTML = _noAnalysisDataHtml();
+    return;
+  }
+
+  if (_plateauActionFeedback) {
+    container.innerHTML = _plateauActionFeedbackHtml(_plateauActionFeedback);
     return;
   }
 
@@ -2838,7 +2881,8 @@ function renderCoachTab(state) {
       </button>
     </div>` : '';
 
-  const questionCardHtml = _buildCoachQuestionCard(state, focus);
+  const questionCardHtml  = _buildCoachQuestionCard(state, focus);
+  const perfSummaryHtml   = _coachPerfSummaryHtml(state);
   container.innerHTML = `
   <div class="chart-card coach-focus-card">
     <div class="chart-card__title">📋 Fokus der Woche</div>
@@ -2849,7 +2893,14 @@ function renderCoachTab(state) {
     ${whyHtml}
     ${plateauActionsHtml}
   </div>
+  ${perfSummaryHtml}
   ${questionCardHtml}`;
+
+  if (_whyWasOpen) {
+    const whyElAfter = document.querySelector('.coach-why-collapse');
+    if (whyElAfter) whyElAfter.open = true;
+    _whyWasOpen = false;
+  }
 }
 
 /**
@@ -3077,7 +3128,7 @@ function _coachBilanzHtml(state) {
   const divider = progressionsHtml && fragenHtml ? '<div class="coach-bilanz-divider"></div>' : '';
 
   return `
-  <div class="chart-card coach-bilanz-card">
+  <div class="chart-card coach-bilanz-card coach-bilanz">
     <div class="chart-card__title">📊 Coach-Bilanz</div>
     ${progressionsHtml}
     ${divider}
@@ -3507,7 +3558,7 @@ function _backupAgeInDays(settings) {
   const lbd = settings?.lastBackupDate;
   if (!lbd) return null;
   const ts = typeof lbd === 'number' ? lbd : new Date(lbd + 'T00:00:00').getTime();
-  return Math.floor((Date.now() - ts) / 86_400_000);
+  return Math.max(0, Math.floor((Date.now() - ts) / 86_400_000));
 }
 
 function _backupStatusHtml(settings) {
@@ -4384,23 +4435,93 @@ function _handleClick(e) {
       break;
     }
 
+    case 'coach-perf-details': {
+      _switchToTab('progress');
+      setTimeout(() => {
+        const bilanzEl = document.querySelector('.coach-bilanz');
+        if (bilanzEl) bilanzEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+      break;
+    }
+
     case 'plateau-implemented':
     case 'plateau-ignore': {
-      const curWk = getLatestWeek(getState().weeks);
+      const _plSt = getState();
+      const curWk = getLatestWeek(_plSt.weeks);
       if (!curWk) break;
+      const isImplemented = action === 'plateau-implemented';
+
+      // Aufgeklappt-Zustand von "Warum?" merken — die Feedback-Karte ersetzt
+      // das <details>-Element für 3s durch ein neues (DOM-Rebuild verliert
+      // den open-State), danach wird er wiederhergestellt (renderCoachTab()).
+      const whyEl = document.querySelector('.coach-why-collapse');
+      _whyWasOpen = whyEl?.open ?? false;
+
+      // Plateau-Details (strategy/currentWeight) VOR dem PLATEAU_ACTION-Dispatch
+      // lesen — danach ist genau dieses Plateau sofort unterdrückt und
+      // computeWeeklyFocus() liefert es nicht mehr.
+      const _plFocus = computeWeeklyFocus(_plSt);
+      const plateau = (_plFocus.status === 'plateau' && _plFocus.plateau.exerciseName === el.dataset.ex)
+        ? _plFocus.plateau : null;
+
+      // _plateauActionFeedback VOR den Dispatches setzen: jeder dispatch()
+      // löst über subscribe(scheduleRender) einen Re-Render aus — der muss
+      // bereits die Feedback-Karte zeigen (sonst würde ein Zwischen-Render mit
+      // der normalen Fokus-Karte den einmaligen _whyWasOpen-Restore vorzeitig
+      // verbrauchen, bevor die Feedback-Phase überhaupt sichtbar war).
+      _plateauActionFeedback = { action: isImplemented ? 'implemented' : 'ignored', exerciseName: el.dataset.ex };
+      setTimeout(() => {
+        _plateauActionFeedback = null;
+        scheduleRender();
+      }, 3000);
+
       dispatch(A.PLATEAU_ACTION, {
         exerciseName: el.dataset.ex,
-        action: action === 'plateau-implemented' ? 'implemented' : 'ignored',
+        action: isImplemented ? 'implemented' : 'ignored',
         since: curWk.startDate,
         plateauWeeksAtAction: +el.dataset.pw,
       });
-      showToast(action === 'plateau-implemented' ? '✓ Als umgesetzt markiert' : 'Plateau-Hinweis ausgeblendet', 'ok');
+
+      // Automatische Konsequenz — nur bei "Habe ich umgesetzt", nur für
+      // 'deload'/'volume' (numerisch eindeutig). 'variation' hat zwei
+      // konkurrierende Stellschrauben (-5kg ODER +3 Wdh) und bleibt manuell.
+      if (isImplemented && plateau && (plateau.strategy === 'deload' || plateau.strategy === 'volume')) {
+        const weekIdx = _plSt.weeks.indexOf(curWk);
+        for (let di = 0; di < curWk.days.length; di++) {
+          const ei = curWk.days[di].exercises.findIndex(ex => ex.name === plateau.exerciseName);
+          if (ei === -1) continue;
+          if (plateau.strategy === 'deload') {
+            const ex = curWk.days[di].exercises[ei];
+            const weightStep = ex.weightStep || 2.5;
+            const rawDelta = -(plateau.currentWeight * 0.225);
+            // Auf weightStep runden — bei sehr leichten Gewichten kann das auf 0
+            // runden (_applyPlannedProgression behandelt plan=0 als "kein Plan"
+            // und wendet nichts an); dann mindestens einen weightStep abziehen,
+            // damit "Habe ich umgesetzt" nie ein stiller No-Op wird.
+            const delta = Math.round(rawDelta / weightStep) * weightStep || -weightStep;
+            dispatch(A.EX_SET_NEXT_WEEK_PLAN, { di, ei, value: delta, weekIdx });
+          } else {
+            // Ein einzelner Dispatch (statt EX_UPDATE + EX_SET_NEXT_WEEK_PLAN
+            // getrennt) — sonst landen zwei Undo-Stack-Einträge für eine
+            // logisch atomare Aktion, und ein Undo würde nur nextWeekPlan
+            // zurücksetzen, progressionType='sets' aber stehen lassen.
+            dispatch(A.EX_SET_NEXT_WEEK_PLAN, { di, ei, value: 1, weekIdx, progressionType: 'sets' });
+          }
+          break;
+        }
+      }
+
+      showToast(isImplemented ? '✓ Als umgesetzt markiert' : 'Plateau-Hinweis ausgeblendet', 'ok');
       break;
     }
 
     // Abwägungs-Entscheidungen loggen (Sprint: decision log)
     case 'decision-log-stay':
     case 'decision-log-change': {
+      // Guard: nur loggen wenn der aktuelle Fokus überhaupt eine Decisional
+      // Balance hat (z.B. nicht mehr bei 'plateau' — siehe plateauActions).
+      const _dlState = getState();
+      if (!buildDecisionalBalance(computeWeeklyFocus(_dlState))) break;
       const _d = new Date();
       const _dow = _d.getDay();
       _d.setDate(_d.getDate() + (_dow === 0 ? -6 : 1 - _dow));
@@ -5645,7 +5766,7 @@ function _prepNewWeekModal() {
           seen.add(ex.name);
           const exProgressionMode = ex.progressionMode ?? 'weight_first';
           const exTargetRepsMax   = ex.targetRepsMax ?? null;
-          const plateStep = ex.weightStep ?? state.settings?.plateStep ?? 2.5;
+          const plateStep = ex.weightStep || state.settings?.plateStep || 2.5;
           const rec = getWeightRecommendation(ex.name, calcWeeks, plateStep, exProgressionMode, exTargetRepsMax);
           if (rec) {
             if (inRecoveryWindow && rec.delta > 0) {
@@ -5810,7 +5931,7 @@ function _saveTemplate() {
     else if (field === 'setsCount') {
       const n = Math.max(1, Math.min(8, +inp.value || 1));
       while (ex.sets.length < n)
-        ex.sets.push({ weight: ex.sets[0]?.weight ?? 0, reps: ex.sets[0]?.reps ?? 10, rpe: null, done: false });
+        ex.sets.push({ weight: ex.sets[0]?.weight ?? 0, reps: parseFloat(ex.sets[0]?.reps) || 10, rpe: null, done: false });
       if (ex.sets.length > n) ex.sets = ex.sets.slice(0, n);
     }
     else if (field === 'reps')   ex.sets.forEach(s => s.reps   = +inp.value || 10);
@@ -6244,7 +6365,7 @@ function _getDayCompletionStats(di) {
     if (!ex.targetReps) continue;
     for (const s of ex.sets ?? []) {
       if (s.status === 'success') {
-        effortAchieved += s.reps ?? 0;
+        effortAchieved += parseFloat(s.reps) || 0;
         effortTarget   += ex.targetReps;
       }
     }

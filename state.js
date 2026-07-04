@@ -1156,7 +1156,7 @@ export const A = Object.freeze({
   EX_MOVE:             'EX_MOVE',             // { di, fromEi, toEi }
   EX_TOGGLE_CFG:       'EX_TOGGLE_CFG',       // { di, ei }
   EX_INC_WEIGHT:       'EX_INC_WEIGHT',       // { di, ei, amount } – erhöht alle Sätze sofort
-  EX_SET_NEXT_WEEK_PLAN:'EX_SET_NEXT_WEEK_PLAN',// { di, ei, value, weekIdx? }  – setzt nextWeekPlan + confirmed=true; weekIdx default = curIdx
+  EX_SET_NEXT_WEEK_PLAN:'EX_SET_NEXT_WEEK_PLAN',// { di, ei, value, weekIdx?, progressionType? } – setzt nextWeekPlan + confirmed=true (+ optional progressionType, atomar); weekIdx default = curIdx
   EX_TOGGLE_NEXT_WEEK_CONFIRMED: 'EX_TOGGLE_NEXT_WEEK_CONFIRMED', // { di, ei, weekIdx? } – toggelt confirmed; weekIdx default = curIdx
   EX_AUTO_PRESELECT_NEXT_WEEK_PLAN: 'EX_AUTO_PRESELECT_NEXT_WEEK_PLAN', // { selections: [{di, ei, value}], weekIdx? } – Coach-Chip Vorauswahl, kein User-Tap; weekIdx default = curIdx
   EX_SET_STEP:         'EX_SET_STEP',         // { di, ei, step }  – speichert Steigerungsrate
@@ -1702,6 +1702,7 @@ function reduce(state, action) {
       const ex = wk?.days[p.di]?.exercises[p.ei]; if (!ex) break;
       ex.nextWeekPlan = p.value ?? 0;
       ex.nextWeekPlanConfirmed = true;
+      if (p.progressionType) ex.progressionType = p.progressionType;
       break;
     }
     case A.EX_TOGGLE_NEXT_WEEK_CONFIRMED: {
@@ -1882,7 +1883,7 @@ function reduce(state, action) {
       const ex = wk.days[p.di]?.exercises[p.ei]; if (!ex) break;
       const s  = ex.sets[p.si];
       if (!s || s.status === 'success') break;
-      if (p.reps != null) s.reps = p.reps;
+      if (p.reps != null) s.reps = parseFloat(p.reps) || 0;
       // Gleiche canSuccess-Logik wie SET_TOGGLE_DONE: ein Satz wird nur
       // 'success' wenn die Wdh das Ziel erreichen — ohne definiertes
       // targetReps gilt weiterhin nur reps > 0 (kein Blockieren).
@@ -1937,7 +1938,7 @@ function reduce(state, action) {
       const ex = wk.days[p.di]?.exercises[p.ei]; if (!ex) break;
       const s  = ex.sets[p.si]; if (!s) break;
       if (s.status !== 'pending') break;
-      s.reps = p.reps;
+      s.reps = parseFloat(p.reps) || 0;
       const targetReps  = parseFloat(ex.targetReps) || 0;
       const repsVal     = parseFloat(s.reps) || 0;
       const canSuccess  = targetReps > 0 ? repsVal >= targetReps : repsVal > 0;
@@ -2298,7 +2299,7 @@ function reduce(state, action) {
       wk.days.forEach(day => (day.exercises ?? []).forEach(ex => {
         const hasWeight = ex.metric === 'reps' && ex.sets.some(s => (s.weight ?? 0) > 0);
         if (hasWeight) {
-          const step = ex.weightStep ?? 2.5;
+          const step = ex.weightStep || 2.5;
           ex.sets.forEach(s => {
             if ((s.weight ?? 0) > 0) s.weight = Math.round((s.weight * (1 - factor)) / step) * step;
           });

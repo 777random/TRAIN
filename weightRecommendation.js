@@ -6,6 +6,7 @@
 
 /** Rounds weight to the nearest plate step (e.g. 2.5 kg or 1.25 kg). */
 export function roundToPlate(weight, step = 2.5) {
+  step = step || 2.5;
   return Math.round(weight / step) * step;
 }
 
