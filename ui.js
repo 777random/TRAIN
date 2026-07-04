@@ -5112,7 +5112,7 @@ function _handleClick(e) {
       const _aftEx = getState().weeks[getState().curIdx]?.days[+di]?.exercises[+ei];
       if (_aftEx?.targetReps) {
         const _doneSets = (_aftEx.sets ?? []).filter(s => s.status === 'success');
-        const _totalAch = _doneSets.reduce((sum, s) => sum + (s.reps ?? 0), 0);
+        const _totalAch = _doneSets.reduce((sum, s) => sum + (parseFloat(s.reps) || 0), 0);
         const _totalTgt = (_aftEx.sets?.length ?? 0) * _aftEx.targetReps;
         if (_totalTgt > 0 && _totalAch > 0) {
           _maybeShowTip('tip-03', 'Effort-Score: wie viel % deines Ziels du erreicht hast. Über 100% = mehr als geplant.');
@@ -6391,7 +6391,7 @@ function _getDayCompletionStats(di) {
     for (const s of ex.sets ?? []) {
       if (s.status === 'success') {
         effortAchieved += parseFloat(s.reps) || 0;
-        effortTarget   += ex.targetReps;
+        effortTarget   += parseFloat(ex.targetReps) || 0;
       }
     }
   }
@@ -6679,7 +6679,7 @@ function _renderBadgeGallery(state) {
         <div class="badge-item__sub badge-item__date">${dateStr}</div>
       </button>`;
     }
-    const weeksLeft = thr.weeks - streak;
+    const weeksLeft = Math.max(0, thr.weeks - streak);
     return `<div class="badge-item">
       <img src="./badges/${thr.id}.png" alt="${thr.title}" class="badge-img" width="80" height="80" style="filter:grayscale(100%) opacity(0.3)">
       <div class="badge-item__title">${thr.title}</div>

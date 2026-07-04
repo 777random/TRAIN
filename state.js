@@ -426,7 +426,10 @@ function _weekEndMs(wk) {
 function _streakGapBreaks(wk, prevWk, freeze) {
   if (!prevWk) return false;
   const gapDays = (new Date(wk.startDate + 'T00:00:00').getTime() - _weekEndMs(prevWk)) / 86_400_000;
-  if (gapDays <= 7) return false;
+  // Malformes startDate (korrupte/hand-editierte Daten) -> gapDays wird NaN.
+  // NaN <= 7 ist false, würde also fälschlich in die Break-Logik durchfallen
+  // -> NaN explizit als "kein Break" behandeln (defensiver Fallback).
+  if (!Number.isFinite(gapDays) || gapDays <= 7) return false;
   if (freeze?.activeUntilWeekStart) {
     const frozenStartMs = new Date(freeze.activeUntilWeekStart + 'T00:00:00').getTime();
     if (frozenStartMs > _weekEndMs(prevWk) && frozenStartMs < new Date(wk.startDate + 'T00:00:00').getTime()) {
