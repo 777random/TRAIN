@@ -8,7 +8,14 @@
  *   3. At least 3 such weeks exist.
  *
  * Deload weeks (week.mode === 'deload') are completely excluded from counting.
+ *
+ * "Success" here means isFullSuccess() (status='success' AND reps>=targetReps
+ * when a target is set) — a 'success' set with fewer reps than the target is
+ * a partial success and does not count, same strict standard as
+ * isReadyForAutoSelect() in weightRecommendation.js.
  */
+
+import { isFullSuccess } from './setUtils.js';
 
 function _exMaxWeight(wk, exName) {
   let max = 0;
@@ -16,7 +23,7 @@ function _exMaxWeight(wk, exName) {
     for (const ex of d.exercises)
       if (ex.name === exName)
         for (const s of ex.sets)
-          if (s.status === 'success' && (s.weight ?? 0) > max) max = s.weight;
+          if (isFullSuccess(s, ex) && (s.weight ?? 0) > max) max = s.weight;
   return max;
 }
 
@@ -27,7 +34,7 @@ function _exSuccessRate(wk, exName) {
       if (ex.name === exName)
         for (const s of ex.sets) {
           total++;
-          if (s.status === 'success') success++;
+          if (isFullSuccess(s, ex)) success++;
         }
   return total > 0 ? success / total : 0;
 }

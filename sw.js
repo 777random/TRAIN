@@ -18,7 +18,7 @@
  *   asset conflicts.
  */
 
-const CACHE_VERSION  = 'train-v145';
+const CACHE_VERSION  = 'train-v146';
 const FONT_CACHE     = 'train-fonts-v1';
 
 /**
@@ -44,6 +44,7 @@ const PRECACHE_URLS = [
   './weekReview.js',
   './weekReviewModal.js',
   './plateauDetector.js',
+  './setUtils.js',
   './exerciseNameCleanup.js',
   './progressInsights.js',
   './weeklyFocus.js',

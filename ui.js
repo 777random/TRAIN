@@ -2806,8 +2806,11 @@ function renderCoachTab(state) {
       ${opt.cons.map(c => `<div class="coach-balance-con">− ${h(c)}</div>`).join('')}
     </div>`;
 
-  // Directive — WAS in einem Satz (erstes Inhaltselement, prominent)
-  const directive = focus.recommendation ?? 'Trainiere wie geplant weiter.';
+  // Directive — WAS in einem Satz (erstes Inhaltselement, prominent).
+  // Fällt auf focus.reasoning zurück bevor der generische Platzhalter greift
+  // (z.B. onTrack/_fallback() liefert nie eine recommendation, aber immer
+  // eine informative reasoning wie "Du baust gerade deine Datenbasis auf.").
+  const directive = focus.recommendation ?? focus.reasoning ?? 'Trainiere wie geplant weiter.';
 
   // Konfidenz-Anzeige — nur bei progression (messbare Erfolgswahrscheinlichkeit)
   const confidenceHtml = focus.status === 'progression' ? (() => {
@@ -2848,8 +2851,10 @@ function renderCoachTab(state) {
   </div>
   ${hintHtml}` : '';
 
-  // "Warum?"-Collapse — kein Element bei onTrack (reasoning ist minimal/nicht handlungsrelevant)
-  const whyHtml = focus.status !== 'onTrack' ? (() => {
+  // "Warum?"-Collapse — bei onTrack nur wenn reasoning zusätzliche Info über
+  // die bereits als directive angezeigte hinaus enthält (sonst wäre der
+  // Collapse eine reine Wiederholung der Directive ohne Mehrwert).
+  const whyHtml = (focus.status !== 'onTrack' || (focus.reasoning != null && focus.reasoning !== directive)) ? (() => {
     const relevantHistory = (state.decisionLog ?? [])
       .filter(e => e.type === focus.status && e.outcome !== null);
     const historyText = _decisionHistoryConclusion(relevantHistory);

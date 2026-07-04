@@ -97,6 +97,11 @@ function _checkReentry(state) {
 // Eigenständige, an S-02 (RPE-Trend)/S-04 (Erfolgsquote) angelehnte aber
 // NICHT importierte Schwellenwert-Logik (insightEngine.js bleibt unverändert).
 
+// sleepHours hat zwei legitime Verwendungszwecke:
+// 1. Überlastungs-Signal (hier, _checkLowSleep -> _checkOverload)
+// 2. Schlaf↔Abschlussquote-Korrelation in insightEngine.js/progressInsights.js
+// Beide sind framework-konform, da beide Entscheidungsrelevanz haben — keine
+// Vereinheitlichung nötig, kein Duplikat.
 function _checkLowSleep(state) {
   const weeks = _nonDeloadWeeks(state);
   if (!weeks.length) return null;

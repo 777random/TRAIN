@@ -1,8 +1,10 @@
 /**
  * weightRecommendation.js – RPE- und Erfolgsquoten-basierte Gewichtsempfehlung.
  *
- * Pure function, keine Seiteneffekte, keine Importe.
+ * Pure functions, keine Seiteneffekte.
  */
+
+import { isFullSuccess } from './setUtils.js';
 
 /** Rounds weight to the nearest plate step (e.g. 2.5 kg or 1.25 kg). */
 export function roundToPlate(weight, step = 2.5) {
@@ -25,14 +27,17 @@ export function roundToPlate(weight, step = 2.5) {
 export function getWeightRecommendation(exerciseName, weeks, plateStep = 2.5, progressionMode = 'weight_first', targetRepsMax = null) {
   if (weeks.length < 2) return null;
 
-  // Sätze pro Woche für diese Übung sammeln (success + fail getrennt)
+  // Sätze pro Woche für diese Übung sammeln (success + fail getrennt).
+  // isFullSuccess() statt rohem status==='success': ein 'success'-Satz mit
+  // weniger Wdh als targetReps ist ein Teilerfolg und zählt hier bewusst
+  // nicht als voller Erfolg (weder success noch fail — einfach ausgeklammert).
   const weekSets = weeks.map(wk => {
     const success = [], fail = [];
     for (const d of wk.days)
       for (const ex of d.exercises)
         if (ex.name === exerciseName)
           for (const s of ex.sets) {
-            if (s.status === 'success') success.push(s);
+            if (isFullSuccess(s, ex)) success.push(s);
             else if (s.status === 'fail') fail.push(s);
           }
     return { success, fail };
@@ -164,7 +169,12 @@ export function getWeightRecommendation(exerciseName, weeks, plateStep = 2.5, pr
  * Prüft, ob eine Übung automatisch für die Steigerung vorausgewählt werden
  * soll: in den letzten 2-3 Nicht-Deload/Nicht-Urlaub-Wochen mit Daten für
  * diese Übung durchgehend 100% Erfolgsquote (keine fail-Sätze) und eine
- * Ø RPE über diese Wochen von höchstens 8.
+ * Ø RPE über diese Wochen von höchstens 8. Dieser Wert (8.0, nicht 8.5) ist
+ * die maßgebliche Progressionsbereitschafts-Schwelle im gesamten Projekt —
+ * die separate Konfidenz-Einstufung in weeklyFocus.js (HIGH/MEDIUM/LOW) hat
+ * eigene, bewusst andere RPE-Schwellen (7.5/8.5) für eine andere Frage
+ * ("wie sicher ist die Empfehlung", nicht "ist die Übung bereit") — keine
+ * Vereinheitlichung nötig, keine Duplikat-Drift.
  *
  * @param {string} exerciseName
  * @param {Array}  weeks – bereits auf Nicht-Deload/Nicht-Urlaub gefilterte Wochen
