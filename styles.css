@@ -1440,6 +1440,16 @@ exercise { position: unset; }
 .storage-warning.is-visible { display: flex; }
 .storage-warning .btn { min-height: 30px; font-size: 12px; background: rgba(255,255,255,.2); border-color: rgba(255,255,255,.5); color: #fff; }
 
+/* Service-Worker update banner — persistent, kein Auto-Dismiss */
+.sw-update-banner {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 600;
+  background: var(--c-accent); color: #0E0E10; font-size: 13px; font-weight: 600;
+  padding: var(--sp-2) var(--sp-4); text-align: center;
+  display: none; gap: var(--sp-3); align-items: center; justify-content: center; flex-wrap: wrap;
+}
+.sw-update-banner.is-visible { display: flex; }
+.sw-update-banner .btn { min-height: 30px; font-size: 12px; background: rgba(14,14,16,.15); border-color: rgba(14,14,16,.4); color: #0E0E10; }
+
 /* ── Responsive ────────────────────────────────────────────── */
 @media (min-width: 480px) {
   .week-nav__label { font-size: 28px; }

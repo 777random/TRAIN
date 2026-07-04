@@ -86,7 +86,8 @@ Set    → { weight, reps, rpe, status ('pending'|'success'|'fail'), done }
 
 `timer.js` imports only `state.js`. It communicates with `ui.js` exclusively through custom `window` events:
 - `ui.js` → `timer.js`: `train:set-done`, `train:set-input`, `train:warmup-click`, `train:day-complete`
-- `timer.js` → `ui.js`: `train:toast`, `train:show-update-banner`
+
+`train:show-update-banner` is dispatched by `index.html` (relaying `registerSW.js`'s `train:sw-update-ready`) and listened for directly by `ui.js` — `timer.js` is not involved.
 
 Do not import `ui.js` from `timer.js` or vice versa.
 

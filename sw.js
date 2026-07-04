@@ -18,7 +18,7 @@
  *   asset conflicts.
  */
 
-const CACHE_VERSION  = 'train-v143';
+const CACHE_VERSION  = 'train-v144';
 const FONT_CACHE     = 'train-fonts-v1';
 
 /**
@@ -66,7 +66,9 @@ self.addEventListener('install', event => {
     caches
       .open(CACHE_VERSION)
       .then(cache => cache.addAll(PRECACHE_URLS))
-      .then(() => self.skipWaiting()) // activate immediately, don't wait for tabs to close
+      // KEIN automatisches self.skipWaiting() hier — der neue Worker soll in
+      // 'installed' warten, bis die UI per postMessage({type:'SKIP_WAITING'})
+      // eine bewusste Nutzer-Aktion bestätigt (siehe 'message'-Handler unten).
       .catch(err => console.error('[SW] Precache failed:', err))
   );
 });
@@ -168,12 +170,11 @@ async function staleWhileRevalidate(request, cacheName) {
   }
 }
 
-// ─── Message handling (for future use) ───────────────────────────────────────
+// ─── Message handling ─────────────────────────────────────────────────────────
 //
-// The UI layer can send messages to the SW via:
+// UI layer (ui.js '#sw-update-btn' click) sends:
 //   navigator.serviceWorker.controller.postMessage({ type: 'SKIP_WAITING' })
-//
-// Useful for "Update available – reload?" prompts.
+// This is the ONLY way this worker ever skips waiting — see 'install' above.
 
 self.addEventListener('message', event => {
   if (event.data?.type === 'SKIP_WAITING') {

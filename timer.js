@@ -312,13 +312,6 @@ function _bindCustomEvents() {
     _updateClockDisplay();
   });
 
-  // Fired from index.html when SW has an update ready – show a toast via ui.js
-  window.addEventListener('train:show-update-banner', () => {
-    // Timer module just forwards this; ui.js will handle the toast if subscribed
-    window.dispatchEvent(new CustomEvent('train:toast', {
-      detail: { msg: 'Update verfügbar – bitte neu laden', type: 'info' },
-    }));
-  });
 }
 
 // ─── Build overlay DOM ────────────────────────────────────────────────────────

@@ -6265,6 +6265,11 @@ function _buildScaffold(root) {
   <span>⚠ Speicher voll! Bitte Backup herunterladen.</span>
   <button class="btn" id="storage-warn-btn">
     ${ic.download()} JSON-Backup</button>
+</div>
+
+<div class="sw-update-banner" id="sw-update-banner" role="alert">
+  <span>🔄 Update verfügbar</span>
+  <button class="btn" id="sw-update-btn">Jetzt aktualisieren</button>
 </div>`;
 }
 
@@ -6282,6 +6287,19 @@ export function mountApp(root) {
 
   document.getElementById('storage-warn-btn')?.addEventListener('click', () => {
     exportJSON(() => showToast('✓ Backup gespeichert', 'ok', 2000));
+  });
+
+  document.getElementById('sw-update-btn')?.addEventListener('click', (e) => {
+    // Bewusste Nutzer-Aktion — sw.js aktiviert den wartenden Worker NIE von
+    // selbst (siehe 'install' dort). localStorage bleibt über den Reload
+    // hinweg erhalten (unabhängig vom Service-Worker-Cache).
+    e.target.disabled = true;
+    if (!navigator.serviceWorker?.controller) { window.location.reload(); return; }
+    let reloaded = false;
+    const doReload = () => { if (!reloaded) { reloaded = true; window.location.reload(); } };
+    navigator.serviceWorker.addEventListener('controllerchange', doReload, { once: true });
+    navigator.serviceWorker.controller.postMessage({ type: 'SKIP_WAITING' });
+    setTimeout(doReload, 3000); // Sicherheitsnetz falls controllerchange ausbleibt
   });
 
   _bindEvents(root);
@@ -6303,6 +6321,13 @@ export function mountApp(root) {
 
   window.addEventListener('train:storage-error', () => {
     _storageWarn?.classList.add('is-visible');
+  });
+
+  // Von index.html gefeuert sobald ein neuer Service Worker installiert ist
+  // und wartet (train:sw-update-ready -> train:show-update-banner). Bleibt
+  // sichtbar bis Klick auf "Jetzt aktualisieren" — kein Auto-Dismiss.
+  window.addEventListener('train:show-update-banner', () => {
+    document.getElementById('sw-update-banner')?.classList.add('is-visible');
   });
 
   window.addEventListener('train:badge-earned', e => {
