@@ -2485,13 +2485,15 @@ function _hasAnyTrainingData(state) {
 }
 
 const _FOCUS_ICONS = {
-  reentry:        '🔄',
-  overload:       '🔋',
-  pre_plateau:    '📈',
-  consistencyGap: '📅',
-  plateau:        '⚠️',
-  progression:    '💪',
-  onTrack:        '✅',
+  reentry:            '🔄',
+  overload:           '🔋',
+  pre_plateau:        '📈',
+  consistencyQuality: '🎯',
+  consistencyGap:     '📅',
+  plateau:            '⚠️',
+  progression:        '💪',
+  pushPullImbalance:  '⚖️',
+  onTrack:            '✅',
 };
 
 // ─── Decision outcome check ───────────────────────────────────────────────────

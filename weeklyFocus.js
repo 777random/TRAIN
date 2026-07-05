@@ -4,22 +4,38 @@
  * EINER priorisierten Aussage. Pure Funktionen, keine Seiteneffekte.
  *
  * Priorität (erstes zutreffendes Signal gewinnt):
- *   1. Wiedereinstieg   – state.lastReentryHandled (bestehend, 1:1 wiederverwendet)
- *   2. Überlastung       – Schlaf / RPE-Trend / Erfolgsquote (neue, aber an
- *                          S-02/S-04 angelehnte Schwellenwerte – keine Duplizierung
- *                          von insightEngine.js, eigenständige Implementierung)
- *   3. Konsistenz-Engpass – Anteil absolvierter Trainingstage über 6 Wochen,
+ *   1. Wiedereinstieg    – state.lastReentryHandled (bestehend, 1:1 wiederverwendet)
+ *   2. Überlastung        – Schlaf / RPE-Trend / Erfolgsquote / Präventiver Deload
+ *                          (neue, aber an S-02/S-04 angelehnte Schwellenwerte –
+ *                          keine Duplizierung von insightEngine.js, eigenständige
+ *                          Implementierung). Präventiver Deload ist vierter Zweig
+ *                          innerhalb dieses Signals (siehe _checkOverload) — feuert
+ *                          nur wenn keines der drei akuten Signale bereits zutrifft.
+ *   3. Pre-Plateau-Antizipation
+ *   4. Konsistenz-Qualität – hohe/stabile Frequenz bei sinkender Erfolgsquote,
+ *                          nutzt computeConsistencyTrend()/computeQualityTrend()
+ *                          aus overallPerformance.js, 1:1 wiederverwendet
+ *   5. Konsistenz-Engpass – Anteil absolvierter Trainingstage über 6 Wochen,
  *                          nutzt state.js' isTrainingDay() für die Urlaubstage-
  *                          Ausschlussregel (einzige Quelle, nicht dupliziert)
- *   4. Plateau           – detectPlateaus() aus plateauDetector.js, 1:1 wiederverwendet
- *   5. Progression       – isReadyForAutoSelect()/getWeightRecommendation() aus
+ *   6. Plateau           – detectPlateaus() aus plateauDetector.js, 1:1 wiederverwendet
+ *   7. Progression       – isReadyForAutoSelect()/getWeightRecommendation() aus
  *                          weightRecommendation.js, 1:1 wiederverwendet
+ *   8. Push/Pull-Warnung – deutliches muskuläres Ungleichgewicht über
+ *                          erkenntnisseHorizont-Wochen, MOVEMENT_MAP-basiert
  *   Fallback: "Auf Kurs"
  */
 
-import { getLatestWeek, isTrainingDay } from './state.js';
+import { getLatestWeek } from './state.js';
 import { detectPlateaus } from './plateauDetector.js';
 import { getWeightRecommendation, isReadyForAutoSelect } from './weightRecommendation.js';
+import { _weekConsistencyRatio, _consistencyEligibleWeeks } from './consistencyUtils.js';
+import { computeVolumeTrend, computeConsistencyTrend, computeQualityTrend } from './overallPerformance.js';
+import { MOVEMENT_MAP } from './movementMap.js';
+
+// Re-export für bestehende Konsumenten (surpriseRewards.js) — Funktionen
+// selbst leben seit diesem Sprint in consistencyUtils.js, siehe dort.
+export { _weekConsistencyRatio, _consistencyEligibleWeeks };
 
 const DAY_MS = 86_400_000;
 
@@ -167,6 +183,50 @@ function _checkDroppingCompletion(state) {
   return { signal: 'completion', avg3, avg8 };
 }
 
+// Wochen seit dem letzten Deload — Rückwärts-Suchlauf analog zu
+// insightEngine.js' E-03 ("Deload-Wirkung"), hier aber als allgemeiner
+// Zähler statt einmaligem Vorher/Nachher-Vergleich. Zählt über ALLE Wochen
+// (unfiltered, wie in E-03), da die Deload-Woche selbst gefunden werden muss.
+// Nie ein Deload in der Historie -> gesamte Historie zählt als "seit Deload"
+// (kein Sonderfall nötig: ergibt für neue Nutzer ohnehin niedrige, harmlose
+// Werte unterhalb der 8-Wochen-Schwelle unten).
+function _weeksSinceLastDeload(state) {
+  const sorted = _sortedWeeks(state);
+  if (!sorted.length) return 0;
+  const deloadIdx = [...sorted.keys()].reverse().find(i => sorted[i].mode === 'deload');
+  return deloadIdx == null ? sorted.length : (sorted.length - 1) - deloadIdx;
+}
+
+// Ø RPE einer Woche über ALLE Übungen (nicht pro Übung wie _exAvgRpe in
+// plateauDetector.js) — eigenständig statt aus insightEngine.js importiert
+// (dort existiert avgRpeWeek() bereits, aber nicht exportiert; weeklyFocus.js
+// importiert bewusst nicht aus insightEngine.js, siehe Datei-Kopf).
+function _avgRpeWeek(wk) {
+  const rpes = [];
+  for (const d of wk.days) for (const ex of d.exercises) for (const s of ex.sets)
+    if (s.status === 'success' && s.rpe != null) rpes.push(s.rpe);
+  return rpes.length ? rpes.reduce((a, b) => a + b, 0) / rpes.length : null;
+}
+
+// Präventiver Deload: kein Deload seit >=8 Wochen UND (Volumen steigt ODER
+// Ø RPE der letzten 3 Wochen > 7.5). Vierter, letzter Zweig in _checkOverload()
+// unten — feuert dadurch automatisch NIE gleichzeitig mit Schlaf/RPE-Trend/
+// Erfolgsquote (verhindert doppelte "Erhol dich"-Karten ohne Extra-Logik).
+function _checkPreventiveDeload(state) {
+  const weeksSince = _weeksSinceLastDeload(state);
+  if (weeksSince < 8) return null;
+
+  const volTrend = computeVolumeTrend(state, 4);
+  const volumeUp = volTrend?.direction === 'up';
+
+  const recentRpes = _nonDeloadWeeks(state).slice(-3).map(_avgRpeWeek).filter(v => v != null);
+  const avgRpe  = recentRpes.length ? recentRpes.reduce((a, b) => a + b, 0) / recentRpes.length : null;
+  const rpeHigh = avgRpe != null && avgRpe > 7.5;
+
+  if (!volumeUp && !rpeHigh) return null;
+  return { signal: 'deload_preventive', weeksSince, volumeUp, avgRpe };
+}
+
 function _buildOverloadResult(signal, energySignal = null) {
   const hasLowEnergy = energySignal != null;
   let reasoning;
@@ -197,6 +257,24 @@ function _buildOverloadResult(signal, energySignal = null) {
   };
 }
 
+// Eigener Builder statt _buildOverloadResult() — anderer headline/andere
+// directive als die drei akuten Überlastungssignale ("Deload einplanen"
+// statt "Erholung priorisieren", keine "keine Steigerung"-Ansage), da
+// präventiv statt akut.
+function _buildPreventiveDeloadResult(signal) {
+  const details = [];
+  if (signal.volumeUp) details.push('dein Trainingsvolumen ist zuletzt gestiegen');
+  if (signal.avgRpe != null && signal.avgRpe > 7.5) details.push(`deine RPE liegt bei Ø ${signal.avgRpe.toFixed(1)}`);
+  const detailText = details.length ? details.join(' und ') : 'die Anzeichen mehren sich';
+  return {
+    status: 'overload',
+    headline: 'Deload einplanen',
+    reasoning: `Sportwissenschaftlich empfohlen: alle 6–12 Wochen eine Deload-Woche. ${detailText.charAt(0).toUpperCase() + detailText.slice(1)}.`,
+    recommendation: `Du trainierst seit ${signal.weeksSince} Wochen ohne Deload — eine Regenerationswoche beugt Stagnation vor.`,
+    signalType: signal.signal,
+  };
+}
+
 function _checkOverload(state) {
   const energy = _checkLowEnergy(state);
   const sleep = _checkLowSleep(state);
@@ -205,6 +283,8 @@ function _checkOverload(state) {
   if (rpe) return _buildOverloadResult(rpe, energy);
   const completion = _checkDroppingCompletion(state);
   if (completion) return _buildOverloadResult(completion, energy);
+  const preventiveDeload = _checkPreventiveDeload(state);
+  if (preventiveDeload) return _buildPreventiveDeloadResult(preventiveDeload);
   return null;
 }
 
@@ -282,30 +362,70 @@ function _checkPrePlateau(state) {
   return null;
 }
 
-// ─── Prio 4: Konsistenz-Engpass ─────────────────────────────────────────────
+// ─── Prio 4: Konsistenz-Qualität ────────────────────────────────────────────
+// Feuert wenn die Trainingsfrequenz gleichbleibt/steigt, ABER die
+// Satz-Erfolgsquote sinkt UND unter 75% liegt — "mehr Frequenz bringt gerade
+// nichts, weil die Ausführungsqualität leidet". Abgrenzung zu
+// _checkConsistencyGap (Prio 5): dort sinkt die FREQUENZ selbst (Tage fallen
+// aus); hier bleibt die Frequenz intakt, nur die Qualität pro Satz sinkt.
+// Nutzt computeConsistencyTrend()/computeQualityTrend() aus
+// overallPerformance.js 1:1 wiederverwendet (identische Berechnung wie im
+// Fortschritt-Tab), NICHT neu implementiert.
+
+// scoredWeeks für computeQualityTrend(): dieselbe Formel wie ui.js'
+// _weekSuccessScore() (success/(success+fail), archivierte Übungen
+// ausgeschlossen), hier bewusst dupliziert statt importiert — ui.js
+// importiert bereits weeklyFocus.js, ein Reimport wäre zirkulär (identisches
+// Muster zu _trueVol()/_weightVolume() in overallPerformance.js).
+function _scoreWeek(week) {
+  let succ = 0, fail = 0;
+  for (const d of week.days)
+    for (const ex of d.exercises) {
+      if (ex.archived) continue;
+      for (const s of ex.sets) {
+        if (s.status === 'success') succ++;
+        else if (s.status === 'fail') fail++;
+      }
+    }
+  const total = succ + fail;
+  return { succ, fail, total, pct: total > 0 ? Math.round(succ / total * 100) : 0 };
+}
+
+function _checkConsistencyQuality(state) {
+  // Historie-Gate wie _checkConsistencyGap unten (min. 6 auswertbare Wochen) —
+  // dieselbe Datenbasis (_consistencyEligibleWeeks), unabhängig davon ob am
+  // Ende ConsistencyQuality oder ConsistencyGap zutrifft.
+  const eligible = _consistencyEligibleWeeks(state);
+  if (eligible.length < 6) return null;
+
+  const consistency = computeConsistencyTrend(state, 8);
+  if (!consistency || (consistency.direction !== 'up' && consistency.direction !== 'stable')) return null;
+
+  const scoredWeeks = _sortedWeeks(state).map(_scoreWeek);
+  const quality = computeQualityTrend(scoredWeeks, 8);
+  if (!quality || quality.direction !== 'down') return null;
+  if (quality.curPct >= 75) return null;
+
+  const consistencyWord = consistency.direction === 'up' ? 'gestiegen' : 'stabil';
+  return {
+    status: 'consistencyQuality',
+    headline: 'Qualität vor Quantität',
+    reasoning: `Deine Konsistenz ist ${consistencyWord}, aber deine Satz-Erfolgsquote ist in den letzten ${quality.halfN} Wochen von ${quality.prevPct}% auf ${quality.curPct}% gesunken. Mehr Frequenz erzeugt gerade keinen Mehrwert.`,
+    recommendation: 'Du trainierst regelmäßig, aber deine Erfolgsquote sinkt — weniger Einheiten, besser ausgeführt.',
+  };
+}
+
+// ─── Prio 5: Konsistenz-Engpass ─────────────────────────────────────────────
 // Anteil absolvierter Trainingstage pro Woche — Urlaubstage-Ausschlussregel
 // kommt aus state.js' isTrainingDay() (einzige Quelle, siehe Datei-Kopf).
 // Ein verbleibender Urlaubstag (isVacation, aber mit Training) zählt als
 // erledigt.
-
-// Exportiert für overallPerformance.js (Konsistenz-Dimension der
-// Gesamtperformance-Sektion) — Logik unverändert, nur zusätzlich von
-// außerhalb dieser Datei aufrufbar. Der Engpass-Check unten
-// (_checkConsistencyGap, eigenes 6-Wochen-Fenster + eigene Schwellenwerte)
-// bleibt komplett unverändert.
-export function _weekConsistencyRatio(wk) {
-  const active = wk.days.filter(isTrainingDay);
-  if (active.length === 0) return null; // reine Ruhewoche, nicht auswertbar
-  const done = active.filter(d => d.markedDone || d.isVacation).length;
-  return done / active.length;
-}
-
-export function _consistencyEligibleWeeks(state) {
-  return _sortedWeeks(state)
-    .filter(w => w.mode !== 'deload')
-    .map(wk => ({ wk, ratio: _weekConsistencyRatio(wk) }))
-    .filter(r => r.ratio !== null);
-}
+//
+// _weekConsistencyRatio()/_consistencyEligibleWeeks() leben seit dem Sprint
+// "Drei neue Coach-Signale" in consistencyUtils.js statt hier (Logik
+// unverändert, nur verschoben, um den zirkulären Import mit
+// overallPerformance.js zu vermeiden — siehe Datei-Kopf-Kommentar dort).
+// Re-Export oben für bestehende Konsumenten (surpriseRewards.js).
 
 function _evaluateConsistencyWindow(windowWeeks) {
   const avg = windowWeeks.reduce((s, r) => s + r.ratio, 0) / windowWeeks.length;
@@ -342,7 +462,7 @@ function _checkConsistencyGap(state) {
   };
 }
 
-// ─── Prio 4: Plateau ────────────────────────────────────────────────────────
+// ─── Prio 6: Plateau ────────────────────────────────────────────────────────
 // detectPlateaus() 1:1 wiederverwendet, NICHT neu implementiert.
 
 /**
@@ -401,7 +521,7 @@ function _checkPlateau(state) {
   };
 }
 
-// ─── Prio 5: Progression ────────────────────────────────────────────────────
+// ─── Prio 7: Progression ────────────────────────────────────────────────────
 // isReadyForAutoSelect()/getWeightRecommendation() 1:1 wiederverwendet.
 
 function _qualificationStreak(name, calcWeeks, progressionMode, targetRepsMax) {
@@ -488,6 +608,56 @@ function _checkProgression(state) {
   };
 }
 
+// ─── Prio 8: Push/Pull-Warnung ──────────────────────────────────────────────
+// Deutliches muskuläres Ungleichgewicht (Push vs. Pull) über
+// erkenntnisseHorizont-Wochen — Zeitfenster und Kategorisierung identisch zur
+// bestehenden Push/Pull-Anzeige in ui.js' _renderMovementPattern() (MOVEMENT_MAP
+// + customExercises-Override), dort aber NICHT importiert: ui.js importiert
+// bereits weeklyFocus.js, ein Reimport wäre zirkulär (identisches Muster zu
+// _scoreWeek() oben) — daher hier bewusst inline dupliziert.
+// Schwelle 1.5 bewusst höher als die 1.4-Schwelle im Fortschritt-Tab — der
+// Coach soll nur bei deutlichem Ungleichgewicht warnen, nicht bei leichter
+// Schieflage (die dortige Anzeige bleibt informativ, ohne Handlungsdruck).
+function _checkPushPullBalance(state) {
+  const customCatMap = {};
+  for (const ce of state.customExercises ?? []) {
+    if (ce.category) customCatMap[ce.name] = ce.category;
+  }
+
+  const horizont = state.settings?.erkenntnisseHorizont ?? 8;
+  const lastN = _sortedWeeks(state)
+    .filter(w => w.mode !== 'deload')
+    .slice(-horizont);
+  if (lastN.length < 4) return null; // zu wenig Historie -> nicht auswertbar
+
+  let pushSets = 0, pullSets = 0;
+  for (const wk of lastN) {
+    for (const day of wk.days) {
+      for (const ex of day.exercises) {
+        const baseName = ex.substituteFor ?? ex.name;
+        const cat = customCatMap[baseName] ?? MOVEMENT_MAP[baseName];
+        const n = ex.sets.filter(s => s.status === 'success').length;
+        if (cat === 'Push') pushSets += n;
+        else if (cat === 'Pull') pullSets += n;
+      }
+    }
+  }
+  if (pushSets === 0 || pullSets === 0) return null; // keine Daten für eine Seite
+
+  const ratio = Math.round(Math.max(pushSets, pullSets) / Math.min(pushSets, pullSets) * 10) / 10;
+  if (ratio <= 1.5) return null;
+
+  const dominant = pushSets >= pullSets ? 'Push' : 'Pull';
+  return {
+    status: 'pushPullImbalance',
+    headline: 'Muskuläres Gleichgewicht',
+    reasoning: `Verhältnis der letzten ${lastN.length} Wochen: ${pushSets} Push-Sätze zu ${pullSets} Pull-Sätze — ${ratio.toFixed(1)}:1, deutlich ${dominant}-lastig.`,
+    recommendation: dominant === 'Push'
+      ? 'Dein Training ist deutlich Push-lastig — mehr Pull-Übungen schützen langfristig deine Schultern.'
+      : 'Dein Training ist deutlich Pull-lastig — mehr Push-Übungen für Balance.',
+  };
+}
+
 // ─── Fallback: Auf Kurs ─────────────────────────────────────────────────────
 
 function _fallback(state) {
@@ -530,9 +700,11 @@ export function computeWeeklyFocus(state) {
   return _checkReentry(state)
     ?? _checkOverload(state)
     ?? _checkPrePlateau(state)
+    ?? _checkConsistencyQuality(state)
     ?? _checkConsistencyGap(state)
     ?? _checkPlateau(state)
     ?? _checkProgression(state)
+    ?? _checkPushPullBalance(state)
     ?? _fallback(state);
 }
 
@@ -591,10 +763,11 @@ function _balanceForConsistencyGap(focus) {
 /**
  * @param {Object} focus  Rückgabe von computeWeeklyFocus()
  * @returns {{ stayOption: Object, changeOption: Object, closing: string } | null}
- *   null für reentry/plateau/progression/onTrack — keine Decisional Balance
- *   dafür. Plateau hat mit "✓ Habe ich umgesetzt"/"Ignorieren" (plateauActions)
- *   bereits ein eigenes, nicht-redundantes Entscheidungs-Paar (Sprint: Plateau-
- *   Buttons konsolidieren).
+ *   null für reentry/plateau/progression/consistencyQuality/pushPullImbalance/
+ *   onTrack — keine Decisional Balance dafür (Sprint "Drei neue Coach-Signale"
+ *   führt keine für die zwei neuen Status ein, out of scope). Plateau hat mit
+ *   "✓ Habe ich umgesetzt"/"Ignorieren" (plateauActions) bereits ein eigenes,
+ *   nicht-redundantes Entscheidungs-Paar (Sprint: Plateau-Buttons konsolidieren).
  */
 export function buildDecisionalBalance(focus) {
   if (focus.status === 'overload') return _balanceForOverload(focus);

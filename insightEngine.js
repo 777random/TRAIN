@@ -575,27 +575,13 @@ export const INSIGHTS = [
     },
   },
 
-  // ── B-01: Push/Pull imbalance ─────────────────────────────────────────────
-  {
-    id: 'B-01', priority: 9, type: 'balance',
-    trigger: ['WOCHE_ABGESCHLOSSEN'],
-    evaluate(state) {
-      const sorted = getSortedWeeks(state);
-      if (!sorted.length) return null;
-      const curWk = sorted[sorted.length - 1];
-      const push  = countTagSets(curWk, 'Push');
-      const pull  = countTagSets(curWk, 'Pull');
-      if (push === 0 || pull === 0) return null;
-      const ratio = Math.round(push / pull * 10) / 10;
-      if (ratio >= 0.5 && ratio <= 2) return null;
-      return {
-        id: 'B-01', type: 'balance', priority: 9,
-        title: 'Push/Pull-Verhältnis',
-        message: `Diese Woche: ${push} Push-Sätze, ${pull} Pull-Sätze – dein Verhältnis ist ${ratio}:1.`,
-        recommendation: 'Ein ausgeglichenes Verhältnis (0,5:1 bis 2:1) reduziert Verletzungsrisiko an Schultern. Tausche eine Push-Übung gegen eine Pull-Übung.',
-      };
-    },
-  },
+  // B-01 (Push/Pull imbalance via ex.tags) entfernt, Sprint "Drei neue
+  // Coach-Signale" — toter Code: ex.tags wird nirgends im UI befüllt (immer
+  // []), countTagSets(wk,'Push'/'Pull') lieferte daher immer 0, die Insight
+  // feuerte praktisch nie. Ersetzt durch _checkPushPullBalance() in
+  // weeklyFocus.js (MOVEMENT_MAP-basiert, tatsächlich aktive Kategorisierung
+  // — siehe dortiger Kommentar). countTagSets() bleibt, wird von B-02/P-04/
+  // W-03 weiterhin verwendet.
 
   // ── B-02: No sets in a movement pattern for 4 weeks ──────────────────────
   {

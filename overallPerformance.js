@@ -8,7 +8,11 @@
  * Persistierung.
  *
  * Wiederverwendete Bausteine (Logik dort jeweils unverändert, nur exportiert):
- *   - _weekConsistencyRatio()/_consistencyEligibleWeeks() aus weeklyFocus.js
+ *   - _weekConsistencyRatio()/_consistencyEligibleWeeks() aus consistencyUtils.js
+ *     (bis Sprint "Drei neue Coach-Signale" aus weeklyFocus.js importiert —
+ *     verschoben, weil weeklyFocus.js jetzt selbst computeVolumeTrend/
+ *     computeConsistencyTrend/computeQualityTrend aus dieser Datei importiert;
+ *     ein Rückimport hätte einen zirkulären Import erzeugt)
  *   - _exerciseRateWindow() aus progressInsights.js
  *   - getSortedWeeks()/exWeightHistory() aus insightEngine.js (bereits exportiert)
  *   - MOVEMENT_MAP aus movementMap.js (aus ui.js extrahiert, um einen
@@ -21,7 +25,7 @@
  */
 
 import { getSortedWeeks } from './insightEngine.js';
-import { _weekConsistencyRatio, _consistencyEligibleWeeks } from './weeklyFocus.js';
+import { _weekConsistencyRatio, _consistencyEligibleWeeks } from './consistencyUtils.js';
 import { _exerciseRateWindow } from './progressInsights.js';
 import { MOVEMENT_MAP } from './movementMap.js';
 

@@ -26,11 +26,10 @@ const RECOMMENDATIONS = [
     generate: () =>
       'Reduziere in Woche 1 das Gewicht auf 80% und steigere erst ab Woche 2 wieder.',
   },
-  {
-    insightId: 'B-01',
-    generate: () =>
-      'Tausche eine Push-Übung gegen eine Ruder-Variation – z.B. einarmiges Kabelrudern oder Pendlay Row.',
-  },
+  // B-01-Eintrag entfernt, Sprint "Drei neue Coach-Signale" — die zugehörige
+  // Insight (Push/Pull via ex.tags) wurde in insightEngine.js als toter Code
+  // entfernt (ex.tags nie befüllt, feuerte nie), dieser Override wäre damit
+  // ebenfalls unerreichbar gewesen.
 ];
 
 /**
