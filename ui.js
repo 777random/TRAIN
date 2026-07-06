@@ -30,7 +30,7 @@ import { getWeightRecommendation, roundToPlate, isReadyForAutoSelect } from './w
 import { renderProgressChart, renderBodyWeightChart, renderRelativeStrengthChart } from './progressChart.js';
 import { buildWeekReview }        from './weekReview.js';
 import { showWeekReviewModal, renderWeekReviewHtml } from './weekReviewModal.js';
-import { computeWeeklyFocus, isInRecoveryWindow, buildDecisionalBalance } from './weeklyFocus.js';
+import { computeWeeklyFocus, computeStructuralSignals, isInRecoveryWindow, buildDecisionalBalance } from './weeklyFocus.js';
 import { findExactDuplicates, findSimilarCandidates } from './exerciseNameCleanup.js';
 import { computeErkenntnisLines, getProgressCorridorCalibration } from './progressInsights.js';
 import { MOVEMENT_MAP } from './movementMap.js';
@@ -2484,17 +2484,39 @@ function _hasAnyTrainingData(state) {
   );
 }
 
+// consistencyQuality/pushPullImbalance entfernt, Sprint "Coach-Tab
+// Architektur" — beide Status können seit der Trennung Akut/Strukturell
+// nicht mehr von computeWeeklyFocus() zurückgegeben werden (nur noch von
+// computeStructuralSignals(), das eigene Icons je Signal-Typ nutzt, siehe
+// _structuralSignalHtml() unten).
 const _FOCUS_ICONS = {
-  reentry:            '🔄',
-  overload:           '🔋',
-  pre_plateau:        '📈',
-  consistencyQuality: '🎯',
-  consistencyGap:     '📅',
-  plateau:            '⚠️',
-  progression:        '💪',
-  pushPullImbalance:  '⚖️',
-  onTrack:            '✅',
+  reentry:        '🔄',
+  overload:       '🔋',
+  pre_plateau:    '📈',
+  consistencyGap: '📅',
+  plateau:        '⚠️',
+  progression:    '💪',
+  onTrack:        '✅',
 };
+
+// Icons/Kurztexte je strukturellem Signal-Typ (computeStructuralSignals()) —
+// bewusst eigenständige, kurze Formulierungen statt Wiederverwendung von
+// headline/reasoning/recommendation: die Strukturkarte ist optisch sekundär
+// und braucht keinen "Warum?"-Collapse (siehe renderCoachTab()).
+function _structuralSignalHtml(sig) {
+  if (sig.type === 'deload_preventive') {
+    return { icon: '🔄', text: `${sig.weeksSince} Wochen ohne Deload — Regenerationswoche einplanen.` };
+  }
+  if (sig.type === 'consistency_quality') {
+    return { icon: '📉', text: 'Häufiger trainieren hilft gerade nicht — Qualität sinkt.' };
+  }
+  if (sig.type === 'push_pull') {
+    return sig.dominant === 'Push'
+      ? { icon: '⚖️', text: 'Push-lastig — mehr Pull-Übungen für Schultergesundheit.' }
+      : { icon: '⚖️', text: 'Pull-lastig — mehr Push-Übungen für Balance.' };
+  }
+  return null;
+}
 
 // ─── Decision outcome check ───────────────────────────────────────────────────
 // Prüft ob für offene Einträge (outcome===null) bereits ≥2 Wochen im State
@@ -2888,6 +2910,24 @@ function renderCoachTab(state) {
       </button>
     </div>` : '';
 
+  // Strukturkarte: unabhängig von focus/Hauptkarte — computeStructuralSignals()
+  // liefert 0-2 Signale, die parallel zur Hauptkarte relevant sind (kein
+  // "erstes gewinnt" wie bei computeWeeklyFocus(), siehe weeklyFocus.js).
+  // Dezent, kein "Warum?"-Collapse, kein Aktions-Button — strukturelle
+  // Hinweise brauchen keine wöchentliche Entscheidung.
+  const structuralSignals = computeStructuralSignals(state);
+  const structuralCardHtml = structuralSignals.length ? `
+  <div class="coach-structural-card">
+    ${structuralSignals.map(sig => {
+      const item = _structuralSignalHtml(sig);
+      if (!item) return '';
+      return `<div class="coach-structural-item">
+        <span class="coach-structural-icon">${item.icon}</span>
+        <span class="coach-structural-text">${h(item.text)}</span>
+      </div>`;
+    }).join('')}
+  </div>` : '';
+
   const questionCardHtml  = _buildCoachQuestionCard(state, focus);
   const perfSummaryHtml   = _coachPerfSummaryHtml(state);
   container.innerHTML = `
@@ -2900,6 +2940,7 @@ function renderCoachTab(state) {
     ${whyHtml}
     ${plateauActionsHtml}
   </div>
+  ${structuralCardHtml}
   ${perfSummaryHtml}
   ${questionCardHtml}`;
 

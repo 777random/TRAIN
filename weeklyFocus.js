@@ -1,29 +1,41 @@
 /**
- * weeklyFocus.js – "Fokus der Woche"-Karte: verdichtet mehrere bestehende
- * Signale (Wiedereinstieg, Überlastung, Konsistenz, Plateau, Progression) zu
- * EINER priorisierten Aussage. Pure Funktionen, keine Seiteneffekte.
+ * weeklyFocus.js – Coach-Tab-Signale, aufgeteilt in zwei unabhängige Ebenen
+ * (Sprint "Coach-Tab Architektur"):
  *
- * Priorität (erstes zutreffendes Signal gewinnt):
- *   1. Wiedereinstieg    – state.lastReentryHandled (bestehend, 1:1 wiederverwendet)
- *   2. Überlastung        – Schlaf / RPE-Trend / Erfolgsquote / Präventiver Deload
- *                          (neue, aber an S-02/S-04 angelehnte Schwellenwerte –
- *                          keine Duplizierung von insightEngine.js, eigenständige
- *                          Implementierung). Präventiver Deload ist vierter Zweig
- *                          innerhalb dieses Signals (siehe _checkOverload) — feuert
- *                          nur wenn keines der drei akuten Signale bereits zutrifft.
- *   3. Pre-Plateau-Antizipation
- *   4. Konsistenz-Qualität – hohe/stabile Frequenz bei sinkender Erfolgsquote,
- *                          nutzt computeConsistencyTrend()/computeQualityTrend()
- *                          aus overallPerformance.js, 1:1 wiederverwendet
- *   5. Konsistenz-Engpass – Anteil absolvierter Trainingstage über 6 Wochen,
- *                          nutzt state.js' isTrainingDay() für die Urlaubstage-
- *                          Ausschlussregel (einzige Quelle, nicht dupliziert)
- *   6. Plateau           – detectPlateaus() aus plateauDetector.js, 1:1 wiederverwendet
- *   7. Progression       – isReadyForAutoSelect()/getWeightRecommendation() aus
- *                          weightRecommendation.js, 1:1 wiederverwendet
- *   8. Push/Pull-Warnung – deutliches muskuläres Ungleichgewicht über
- *                          erkenntnisseHorizont-Wochen, MOVEMENT_MAP-basiert
- *   Fallback: "Auf Kurs"
+ * 1. computeWeeklyFocus() – AKUTE Kaskade, EIN priorisiertes Signal (erstes
+ *    zutreffendes gewinnt), braucht diese Woche eine konkrete Reaktion:
+ *      1. Wiedereinstieg    – state.lastReentryHandled (bestehend, 1:1 wiederverwendet)
+ *      2. Überlastung       – Schlaf / RPE-Trend / Erfolgsquote (3 Zweige,
+ *                             eigene Formulierung je Zweig, an S-02/S-04
+ *                             angelehnte aber NICHT aus insightEngine.js
+ *                             importierte Schwellenwerte)
+ *      3. Plateau           – detectPlateaus() aus plateauDetector.js, 1:1
+ *                             wiederverwendet. VOR Pre-Plateau (bestätigter,
+ *                             stärkerer Befund hat Vorrang vor einer bloßen
+ *                             Antizipation einer anderen Übung — Fix Problem 2)
+ *      4. Pre-Plateau-Antizipation
+ *      5. Konsistenz-Engpass – Anteil absolvierter Trainingstage über 6 Wochen,
+ *                             nutzt state.js' isTrainingDay() für die Urlaubstage-
+ *                             Ausschlussregel (einzige Quelle, nicht dupliziert)
+ *      6. Progression       – isReadyForAutoSelect()/getWeightRecommendation()
+ *                             aus weightRecommendation.js, 1:1 wiederverwendet
+ *      Fallback: "Auf Kurs"
+ *
+ * 2. computeStructuralSignals() – STRUKTURELLE Signale, Array von 0-N
+ *    gleichzeitig aktiven Hinweisen (kein "erstes gewinnt"), brauchen KEINE
+ *    wöchentliche Entscheidung, bleiben über mehrere Wochen relevant:
+ *      A. Präventiver Deload  – aus _checkOverload() herausgelöst (war dort
+ *                               vierter Zweig) — strukturell (8-Wochen-Horizont),
+ *                               keine akute Entscheidung nötig
+ *      B. Konsistenz-Qualität – hohe/stabile Frequenz bei sinkender Erfolgsquote,
+ *                               nutzt computeConsistencyTrend()/computeQualityTrend()
+ *                               aus overallPerformance.js, 1:1 wiederverwendet
+ *      C. Push/Pull-Warnung   – deutliches muskuläres Ungleichgewicht über
+ *                               erkenntnisseHorizont-Wochen, MOVEMENT_MAP-basiert
+ *    Maximal 2 gleichzeitig (Priorität A > B > C), Rendering in ui.js als
+ *    eigene, optisch sekundäre Karte unabhängig von computeWeeklyFocus().
+ *
+ * Beide Funktionen sind pure, keine Seiteneffekte.
  */
 
 import { getLatestWeek } from './state.js';
@@ -209,9 +221,12 @@ function _avgRpeWeek(wk) {
 }
 
 // Präventiver Deload: kein Deload seit >=8 Wochen UND (Volumen steigt ODER
-// Ø RPE der letzten 3 Wochen > 7.5). Vierter, letzter Zweig in _checkOverload()
-// unten — feuert dadurch automatisch NIE gleichzeitig mit Schlaf/RPE-Trend/
-// Erfolgsquote (verhindert doppelte "Erhol dich"-Karten ohne Extra-Logik).
+// Ø RPE der letzten 3 Wochen > 7.5). Strukturelles Signal (8-Wochen-Horizont,
+// keine akute Wochenentscheidung) — seit Sprint "Coach-Tab Architektur" NICHT
+// mehr Teil von _checkOverload(), sondern eigenständig in
+// computeStructuralSignals() unten (Fix Problem 4: strukturelle Signale
+// verdrängten zuvor akute/spezifischere Signale durch ihre Platzierung in
+// der akuten Kaskade).
 function _checkPreventiveDeload(state) {
   const weeksSince = _weeksSinceLastDeload(state);
   if (weeksSince < 8) return null;
@@ -227,50 +242,52 @@ function _checkPreventiveDeload(state) {
   return { signal: 'deload_preventive', weeksSince, volumeUp, avgRpe };
 }
 
+// Eigene headline/directive pro Signal-Typ (Fix Problem 7) — vorher teilten
+// sich alle drei Zweige "Erholung priorisieren"/"Diese Woche keine
+// Gewichtssteigerungen", der Athlet konnte die Ursache (Schlaf vs. eine
+// bestimmte Übung vs. programmweite Quote) ohne "Warum?"-Aufklappen nicht
+// unterscheiden. energySignal bleibt reiner Verstärker-Text im reasoning,
+// unverändert gegenüber vorher.
 function _buildOverloadResult(signal, energySignal = null) {
   const hasLowEnergy = energySignal != null;
-  let reasoning;
+  const energySuffix = hasLowEnergy
+    ? ` Dein durchschnittliches Energielevel lag diese Woche bei ${energySignal.value.toFixed(1)}/5.`
+    : '';
+
   if (signal.signal === 'sleep') {
-    if (hasLowEnergy) {
-      reasoning = `Sowohl Schlaf (Ø ${signal.value.toFixed(1)}h) als auch Energielevel (Ø ${energySignal.value.toFixed(1)}/5) deuten diese Woche auf Erholungsbedarf hin.`;
-    } else {
-      reasoning = signal.value < 6
+    const reasoning = hasLowEnergy
+      ? `Sowohl Schlaf (Ø ${signal.value.toFixed(1)}h) als auch Energielevel (Ø ${energySignal.value.toFixed(1)}/5) deuten diese Woche auf Erholungsbedarf hin.`
+      : signal.value < 6
         ? `Die Daten zeigen: dein Schlaf liegt im Schnitt nur bei ${signal.value.toFixed(1)}h diese Woche — deutlich unter den empfohlenen 7h.`
         : `Die Daten zeigen: dein Schlaf liegt im Schnitt bei ${signal.value.toFixed(1)}h diese Woche — etwas unter den empfohlenen 7h.`;
-    }
-  } else if (signal.signal === 'rpe') {
-    reasoning = `${signal.exerciseName}: die Anstrengung (RPE) steigt seit 3 Wochen bei gleichem Gewicht — ${signal.values.map(v => v.toFixed(1)).join(' → ')}.`;
-    if (hasLowEnergy) reasoning += ` Dein durchschnittliches Energielevel lag diese Woche bei ${energySignal.value.toFixed(1)}/5.`;
-  } else {
-    reasoning = `Deine Erfolgsquote ist von ${Math.round(signal.avg8 * 100)}% auf ${Math.round(signal.avg3 * 100)}% gesunken.`;
-    if (hasLowEnergy) reasoning += ` Dein durchschnittliches Energielevel lag diese Woche bei ${energySignal.value.toFixed(1)}/5.`;
+    return {
+      status: 'overload',
+      headline: 'Schlaf priorisieren',
+      reasoning,
+      recommendation: 'Diese Woche keine Gewichtssteigerungen — dein Schlaf kostet Kraft.',
+      signalType: signal.signal,
+    };
   }
+
+  if (signal.signal === 'rpe') {
+    return {
+      status: 'overload',
+      headline: 'Aufwand steigt',
+      reasoning: `${signal.exerciseName}: die Anstrengung (RPE) steigt seit 3 Wochen bei gleichem Gewicht — ${signal.values.map(v => v.toFixed(1)).join(' → ')}.${energySuffix}`,
+      recommendation: `${signal.exerciseName} wird anstrengender ohne mehr Gewicht — diese Woche halten.`,
+      signalType: signal.signal,
+    };
+  }
+
+  // completion
   return {
     status: 'overload',
-    headline: 'Erholung priorisieren',
-    reasoning,
-    recommendation: 'Diese Woche keine Gewichtssteigerungen.',
+    headline: 'Qualität sichern',
+    reasoning: `Deine Erfolgsquote ist von ${Math.round(signal.avg8 * 100)}% auf ${Math.round(signal.avg3 * 100)}% gesunken.${energySuffix}`,
+    recommendation: 'Deine Erfolgsquote ist gesunken — Gewicht halten bis sie sich stabilisiert.',
     // Rohes Signal zusätzlich offengelegt (bereits oben berechnet, keine neue
     // Logik) — für die Decisional-Balance, die wissen muss WELCHES der 3
     // Signale zutraf, ohne die reasoning-Prosa zu parsen.
-    signalType: signal.signal,
-  };
-}
-
-// Eigener Builder statt _buildOverloadResult() — anderer headline/andere
-// directive als die drei akuten Überlastungssignale ("Deload einplanen"
-// statt "Erholung priorisieren", keine "keine Steigerung"-Ansage), da
-// präventiv statt akut.
-function _buildPreventiveDeloadResult(signal) {
-  const details = [];
-  if (signal.volumeUp) details.push('dein Trainingsvolumen ist zuletzt gestiegen');
-  if (signal.avgRpe != null && signal.avgRpe > 7.5) details.push(`deine RPE liegt bei Ø ${signal.avgRpe.toFixed(1)}`);
-  const detailText = details.length ? details.join(' und ') : 'die Anzeichen mehren sich';
-  return {
-    status: 'overload',
-    headline: 'Deload einplanen',
-    reasoning: `Sportwissenschaftlich empfohlen: alle 6–12 Wochen eine Deload-Woche. ${detailText.charAt(0).toUpperCase() + detailText.slice(1)}.`,
-    recommendation: `Du trainierst seit ${signal.weeksSince} Wochen ohne Deload — eine Regenerationswoche beugt Stagnation vor.`,
     signalType: signal.signal,
   };
 }
@@ -283,16 +300,16 @@ function _checkOverload(state) {
   if (rpe) return _buildOverloadResult(rpe, energy);
   const completion = _checkDroppingCompletion(state);
   if (completion) return _buildOverloadResult(completion, energy);
-  const preventiveDeload = _checkPreventiveDeload(state);
-  if (preventiveDeload) return _buildPreventiveDeloadResult(preventiveDeload);
   return null;
 }
 
-// ─── Prio 3: Pre-Plateau-Antizipation ───────────────────────────────────────
+// ─── Prio 4: Pre-Plateau-Antizipation ───────────────────────────────────────
 // Feuert wenn RPE-Kosten pro kg steigen, obwohl das Gewicht noch leicht
 // zunimmt — erkennt die Erschöpfungszone BEVOR die Steigerung stoppt.
 // Abgrenzung zu _checkRisingRpe (Prio 2): dort ist Gewicht identisch (Plateau
 // bereits eingetreten); hier steigt Gewicht noch, aber der Preis pro kg auch.
+// Steht seit Fix Problem 2 NACH Plateau (Prio 3) — ein bestätigtes Plateau
+// ist der stärkere Befund und hat Vorrang vor dieser bloßen Antizipation.
 
 function _checkPrePlateau(state) {
   const weeks = _nonDeloadWeeks(state);
@@ -362,12 +379,15 @@ function _checkPrePlateau(state) {
   return null;
 }
 
-// ─── Prio 4: Konsistenz-Qualität ────────────────────────────────────────────
+// ─── Struktur B: Konsistenz-Qualität ────────────────────────────────────────
 // Feuert wenn die Trainingsfrequenz gleichbleibt/steigt, ABER die
 // Satz-Erfolgsquote sinkt UND unter 75% liegt — "mehr Frequenz bringt gerade
 // nichts, weil die Ausführungsqualität leidet". Abgrenzung zu
-// _checkConsistencyGap (Prio 5): dort sinkt die FREQUENZ selbst (Tage fallen
-// aus); hier bleibt die Frequenz intakt, nur die Qualität pro Satz sinkt.
+// _checkConsistencyGap (Prio 5, akute Kaskade): dort sinkt die FREQUENZ
+// selbst (Tage fallen aus); hier bleibt die Frequenz intakt, nur die
+// Qualität pro Satz sinkt. Strukturell (Trend über 8 Wochen) — seit Sprint
+// "Coach-Tab Architektur" NICHT mehr Teil der akuten Kaskade, sondern in
+// computeStructuralSignals() unten.
 // Nutzt computeConsistencyTrend()/computeQualityTrend() aus
 // overallPerformance.js 1:1 wiederverwendet (identische Berechnung wie im
 // Fortschritt-Tab), NICHT neu implementiert.
@@ -400,6 +420,14 @@ function _checkConsistencyQuality(state) {
 
   const consistency = computeConsistencyTrend(state, 8);
   if (!consistency || (consistency.direction !== 'up' && consistency.direction !== 'stable')) return null;
+  // Fix Problem 5: verhindert Überschneidung mit _checkConsistencyGap (dort
+  // Schwelle 0.7 als Ratio, hier curPct auf 0-100-Skala — daher <70, nicht
+  // <0.7). 'stable' bedeutet nur "wenig Veränderung zwischen den Halbfenstern",
+  // NICHT "guter Wert" — eine chronisch niedrige, aber flache Quote würde
+  // sonst hier fälschlich als "Konsistenz ist stabil" durchgewunken, obwohl
+  // ConsistencyGap die inhaltlich passendere Karte für einen chronisch
+  // niedrigen Wert ist.
+  if (consistency.curPct < 70) return null;
 
   const scoredWeeks = _sortedWeeks(state).map(_scoreWeek);
   const quality = computeQualityTrend(scoredWeeks, 8);
@@ -415,7 +443,7 @@ function _checkConsistencyQuality(state) {
   };
 }
 
-// ─── Prio 5: Konsistenz-Engpass ─────────────────────────────────────────────
+// ─── Prio 5 (akute Kaskade): Konsistenz-Engpass ─────────────────────────────
 // Anteil absolvierter Trainingstage pro Woche — Urlaubstage-Ausschlussregel
 // kommt aus state.js' isTrainingDay() (einzige Quelle, siehe Datei-Kopf).
 // Ein verbleibender Urlaubstag (isVacation, aber mit Training) zählt als
@@ -462,8 +490,9 @@ function _checkConsistencyGap(state) {
   };
 }
 
-// ─── Prio 6: Plateau ────────────────────────────────────────────────────────
-// detectPlateaus() 1:1 wiederverwendet, NICHT neu implementiert.
+// ─── Prio 3 (akute Kaskade): Plateau ────────────────────────────────────────
+// detectPlateaus() 1:1 wiederverwendet, NICHT neu implementiert. Seit Fix
+// Problem 2 VOR Pre-Plateau (Prio 4) — bestätigter Befund hat Vorrang.
 
 /**
  * Sprint C2 (train-v109): "Ignorieren"/"Habe ich umgesetzt" unterdrücken die
@@ -521,7 +550,7 @@ function _checkPlateau(state) {
   };
 }
 
-// ─── Prio 7: Progression ────────────────────────────────────────────────────
+// ─── Prio 6 (akute Kaskade): Progression ────────────────────────────────────
 // isReadyForAutoSelect()/getWeightRecommendation() 1:1 wiederverwendet.
 
 function _qualificationStreak(name, calcWeeks, progressionMode, targetRepsMax) {
@@ -608,7 +637,7 @@ function _checkProgression(state) {
   };
 }
 
-// ─── Prio 8: Push/Pull-Warnung ──────────────────────────────────────────────
+// ─── Struktur C: Push/Pull-Warnung ──────────────────────────────────────────
 // Deutliches muskuläres Ungleichgewicht (Push vs. Pull) über
 // erkenntnisseHorizont-Wochen — Zeitfenster und Kategorisierung identisch zur
 // bestehenden Push/Pull-Anzeige in ui.js' _renderMovementPattern() (MOVEMENT_MAP
@@ -618,6 +647,9 @@ function _checkProgression(state) {
 // Schwelle 1.5 bewusst höher als die 1.4-Schwelle im Fortschritt-Tab — der
 // Coach soll nur bei deutlichem Ungleichgewicht warnen, nicht bei leichter
 // Schieflage (die dortige Anzeige bleibt informativ, ohne Handlungsdruck).
+// Strukturell — seit Sprint "Coach-Tab Architektur" NICHT mehr Teil der
+// akuten Kaskade (dort praktisch nie sichtbar, da Progression fast immer
+// vorher zutrifft), sondern in computeStructuralSignals() unten.
 function _checkPushPullBalance(state) {
   const customCatMap = {};
   for (const ce of state.customExercises ?? []) {
@@ -655,6 +687,10 @@ function _checkPushPullBalance(state) {
     recommendation: dominant === 'Push'
       ? 'Dein Training ist deutlich Push-lastig — mehr Pull-Übungen schützen langfristig deine Schultern.'
       : 'Dein Training ist deutlich Pull-lastig — mehr Push-Übungen für Balance.',
+    // Zusätzlich zur Prosa offengelegt (bereits oben berechnet, keine neue
+    // Logik) — für die Strukturkarte in ui.js, die den Kurztext ohne Parsen
+    // von reasoning/recommendation auswählen muss.
+    dominant,
   };
 }
 
@@ -692,6 +728,14 @@ function _fallback(state) {
 }
 
 /**
+ * Akute Kaskade — EIN priorisiertes Signal, erstes zutreffendes gewinnt.
+ * Plateau steht bewusst VOR Pre-Plateau (Fix Problem 2): ein bestätigtes
+ * Plateau (3+ Wochen Stagnation, ≥80% Erfolgsquote) ist ein stärkerer/
+ * sichererer Befund als eine bloße Antizipation (RPE-Kosten steigen,
+ * Plateau noch nicht eingetreten) einer anderen Übung — der stärkere Befund
+ * hat Vorrang, auch wenn beide für unterschiedliche Übungen gleichzeitig
+ * zuträfen.
+ *
  * @param {Object} state
  * @returns {{ status: string, headline: string, reasoning: string,
  *             recommendation: string|null, plateau?: Object }}
@@ -699,13 +743,45 @@ function _fallback(state) {
 export function computeWeeklyFocus(state) {
   return _checkReentry(state)
     ?? _checkOverload(state)
-    ?? _checkPrePlateau(state)
-    ?? _checkConsistencyQuality(state)
-    ?? _checkConsistencyGap(state)
     ?? _checkPlateau(state)
+    ?? _checkPrePlateau(state)
+    ?? _checkConsistencyGap(state)
     ?? _checkProgression(state)
-    ?? _checkPushPullBalance(state)
     ?? _fallback(state);
+}
+
+// ─── Strukturelle Signale ────────────────────────────────────────────────────
+// Gegenstück zu computeWeeklyFocus(): kein "erstes Signal gewinnt", sondern
+// ALLE zutreffenden strukturellen Signale gleichzeitig (0-N), da sie keine
+// wöchentliche Entscheidung erzwingen und sich nicht gegenseitig ausschließen
+// (Fix Problem 1/4 — vorher standen Präventiver Deload/ConsistencyQuality/
+// PushPullBalance in derselben ??-Kette wie die akuten Signale und wurden
+// dadurch systematisch verdrängt, PushPullBalance praktisch nie sichtbar).
+// Priorität A > B > C nur für die Max.-2-Begrenzung relevant, nicht für
+// gegenseitigen Ausschluss.
+
+/**
+ * @param {Object} state
+ * @returns {Array<Object>} 0-2 strukturelle Signale, höchstens 2 gleichzeitig
+ *   (Priorität Präventiver Deload > Konsistenz-Qualität > Push/Pull bei
+ *   Überzahl). Jedes Objekt trägt ein `type`-Feld
+ *   ('deload_preventive'|'consistency_quality'|'push_pull') als Diskriminator
+ *   fürs Rendering in ui.js, zusätzlich zu den jeweiligen Rohdaten
+ *   (weeksSince/dominant/etc.) für die dortigen Kurztexte.
+ */
+export function computeStructuralSignals(state) {
+  const signals = [];
+
+  const deload = _checkPreventiveDeload(state);
+  if (deload) signals.push({ type: 'deload_preventive', ...deload });
+
+  const cq = _checkConsistencyQuality(state);
+  if (cq) signals.push({ type: 'consistency_quality', ...cq });
+
+  const pp = _checkPushPullBalance(state);
+  if (pp) signals.push({ type: 'push_pull', ...pp });
+
+  return signals.slice(0, 2);
 }
 
 // ─── Decisional Balance ─────────────────────────────────────────────────────
@@ -761,13 +837,14 @@ function _balanceForConsistencyGap(focus) {
 }
 
 /**
- * @param {Object} focus  Rückgabe von computeWeeklyFocus()
+ * @param {Object} focus  Rückgabe von computeWeeklyFocus() — NICHT für Einträge
+ *   aus computeStructuralSignals() gedacht (die haben in ui.js keine Decisional
+ *   Balance, kein "Warum?", keinen Aktions-Button, siehe Strukturkarte).
  * @returns {{ stayOption: Object, changeOption: Object, closing: string } | null}
- *   null für reentry/plateau/progression/consistencyQuality/pushPullImbalance/
- *   onTrack — keine Decisional Balance dafür (Sprint "Drei neue Coach-Signale"
- *   führt keine für die zwei neuen Status ein, out of scope). Plateau hat mit
- *   "✓ Habe ich umgesetzt"/"Ignorieren" (plateauActions) bereits ein eigenes,
- *   nicht-redundantes Entscheidungs-Paar (Sprint: Plateau-Buttons konsolidieren).
+ *   null für reentry/plateau/progression/onTrack — keine Decisional Balance
+ *   dafür. Plateau hat mit "✓ Habe ich umgesetzt"/"Ignorieren" (plateauActions)
+ *   bereits ein eigenes, nicht-redundantes Entscheidungs-Paar (Sprint: Plateau-
+ *   Buttons konsolidieren).
  */
 export function buildDecisionalBalance(focus) {
   if (focus.status === 'overload') return _balanceForOverload(focus);

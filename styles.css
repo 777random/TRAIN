@@ -1085,6 +1085,17 @@ exercise { position: unset; }
 /* Sprint C2 (train-v109): Plateau-Aktionen — dezent, kein Accent-CTA. */
 .coach-plateau-actions { display: flex; gap: var(--sp-2); margin-top: var(--sp-3); flex-wrap: wrap; }
 .coach-plateau-actions .btn { flex: 1; min-width: 140px; }
+
+/* Sprint "Coach-Tab Architektur": Strukturkarte für computeStructuralSignals() —
+   bewusst kein .chart-card-Look (kein Border-Radius, kein Schatten): diese
+   Hinweise sind über mehrere Wochen relevant statt eine wöchentliche
+   Entscheidung zu verlangen, sollen optisch sekundär hinter der Hauptkarte
+   bleiben. */
+.coach-structural-card { padding: var(--sp-3) var(--sp-4); border-top: 1px solid var(--c-border); border-bottom: 1px solid var(--c-border); margin-bottom: var(--sp-3); }
+.coach-structural-item { display: flex; align-items: flex-start; gap: var(--sp-2); font-size: 13px; color: var(--c-text-2); }
+.coach-structural-item + .coach-structural-item { margin-top: var(--sp-2); }
+.coach-structural-icon { flex-shrink: 0; }
+.coach-structural-text { line-height: 1.4; }
 .chart-wrap { position: relative; min-height: 60px; }
 .chart-wrap canvas { width: 100% !important; }
 #chart-ex-wrap svg { display: block; }
