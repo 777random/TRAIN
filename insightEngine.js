@@ -735,7 +735,7 @@ export const INSIGHTS = [
       if (![5, 10, 15, 20, 25, 30, 40, 50].includes(streak)) return null;
       return {
         id: 'K-01', type: 'consistency', priority: 4,
-        title: 'Streak-Meilenstein',
+        title: 'Konsistenz-Meilenstein',
         message: `${streak} Wochen am Stück – Konsistenz ist dein größter Fortschritt.`,
         recommendation: null,
       };

@@ -41,13 +41,9 @@
 import { getLatestWeek } from './state.js';
 import { detectPlateaus } from './plateauDetector.js';
 import { getWeightRecommendation, isReadyForAutoSelect } from './weightRecommendation.js';
-import { _weekConsistencyRatio, _consistencyEligibleWeeks } from './consistencyUtils.js';
+import { _consistencyEligibleWeeks } from './consistencyUtils.js';
 import { computeVolumeTrend, computeConsistencyTrend, computeQualityTrend } from './overallPerformance.js';
 import { MOVEMENT_MAP } from './movementMap.js';
-
-// Re-export für bestehende Konsumenten (surpriseRewards.js) — Funktionen
-// selbst leben seit diesem Sprint in consistencyUtils.js, siehe dort.
-export { _weekConsistencyRatio, _consistencyEligibleWeeks };
 
 const DAY_MS = 86_400_000;
 
@@ -453,7 +449,6 @@ function _checkConsistencyQuality(state) {
 // "Drei neue Coach-Signale" in consistencyUtils.js statt hier (Logik
 // unverändert, nur verschoben, um den zirkulären Import mit
 // overallPerformance.js zu vermeiden — siehe Datei-Kopf-Kommentar dort).
-// Re-Export oben für bestehende Konsumenten (surpriseRewards.js).
 
 function _evaluateConsistencyWindow(windowWeeks) {
   const avg = windowWeeks.reduce((s, r) => s + r.ratio, 0) / windowWeeks.length;

@@ -145,7 +145,7 @@ function _buildRecommendations(highlights, lowlights, completedDays, plannedDays
     recs.push({ text: `${name} war dein stärkster Lift — halte den Trend und plane eine weitere kleine Steigerung.` });
   } else if (h1?.type === 'streak') {
     const n = parseInt(h1.text, 10);
-    recs.push({ text: `Dein ${n}-Wochen-Streak zeigt Konstanz — weiter so und achte auf Überbelastungszeichen.` });
+    recs.push({ text: `${n} Wochen konsistentes Training — weiter so und achte auf Überbelastungszeichen.` });
   } else {
     recs.push({ text: 'Konsistenz ist der Schlüssel — halte das Tempo bei und fokussiere dich auf saubere Technik.' });
   }
@@ -210,7 +210,7 @@ export function buildWeekReview(week, allWeeks, favoriteExercises = []) {
     if (gainH && highlights.length < 3) highlights.push(gainH);
   }
   if (streak >= 2 && highlights.length < 3)
-    highlights.push({ type: 'streak', label: 'Streak', text: `${streak} Wochen in Folge` });
+    highlights.push({ type: 'streak', label: 'Konsistenz', text: `${streak} Wochen in Folge` });
 
   // ── Lowlights ─────────────────────────────────────────────────────────────────
   const lowlights = [];

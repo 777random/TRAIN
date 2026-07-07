@@ -175,11 +175,6 @@ function buildDefaultState() {
     badges: [],               // { id, unlockedAt }[] – earned badges
     onboardingDone: false,    // true after first-run flow completed
     seenTips: [],             // string[] – tip IDs the user has already seen
-    streakFreeze: {            // bewusst manuell aktivierter Streak-Schutz, 1×/Quartal
-      activeUntilWeekStart: null, // ISO-Wochenstart der geschützten Woche, oder null
-      lastUsedMonth: null,        // "YYYY-MM" des letzten Einsatzes, oder null
-    },
-    surpriseLog: {},          // { [musterId]: "YYYY-MM" } – letzter Monat, in dem ein Überraschungs-Muster gezeigt wurde
     plateauActions: {},       // { [exerciseName]: { action: 'ignored'|'implemented', since, plateauWeeksAtAction } }
     decisionLog: [],          // { id, type, signal, choice, decidedWeekStart, outcome } – Abwägungs-Entscheidungen
     coachQuestion: { weekStart: null, questionId: null, answer: null, outcome: null, measuredWeekStart: null }, // adaptive Nachfrage — eine Frage pro Woche
@@ -222,7 +217,7 @@ const _MAX_UNDO  = 20;
 const _NO_UNDO = new Set([
   'UNDO', 'WEEK_NAVIGATE', 'STATE_IMPORT', 'SESSION_START', 'SESSION_RESET', 'SESSION_STOP',
   'INSIGHTS_SET', 'ONBOARDING_DONE', 'ONBOARDING_SEED', 'MARK_TIP_SEEN', 'REENTRY_HANDLED',
-  'EX_AUTO_PRESELECT_NEXT_WEEK_PLAN', 'ACTIVATE_STREAK_FREEZE', 'RECORD_SURPRISE_SHOWN',
+  'EX_AUTO_PRESELECT_NEXT_WEEK_PLAN',
   'PLATEAU_ACTION', 'DECISION_LOG_ADD', 'DECISION_LOG_OUTCOME',
   'SET_ERKENNTNISSE_HORIZONT', 'COACH_ANSWER', 'COACH_PERF_LOG', 'COACH_PERF_MEASURE', 'COACH_QUESTION_OUTCOME',
 ]);
@@ -232,50 +227,15 @@ export function canUndo() { return _undoStack.length > 0; }
 
 /**
  * Public wrapper: gap-aware current streak (in weeks) across the given
- * weeks array. `freeze` (optional) — pass state.streakFreeze (already run
- * through effectiveStreakFreeze()) to apply Streak-Freeze protection;
- * omitting it reproduces the exact pre-Streak-Freeze behaviour.
+ * weeks array. Streak-Freeze entfernt (Sprint "Framework-Audit Cleanup",
+ * Fix 2) — die Berechnung berücksichtigt keinen Schutzmechanismus mehr,
+ * ein 'missed' bricht die Zählung immer.
  */
-export function calcCurrentStreak(weeks, freeze) { return _calcCurrentStreak(weeks, freeze); }
+export function calcCurrentStreak(weeks) { return _calcCurrentStreak(weeks); }
 /** Public wrapper: gap-aware longest-ever streak (in weeks) across the given weeks array. */
 export function calcLongestStreakEver(weeks) { return _calcLongestStreakEver(weeks); }
 /** Public wrapper: per-week training status — 'completed' | 'attended' | 'missed'. See _weekTrainingStatus(). */
 export function weekTrainingStatus(w) { return _weekTrainingStatus(w); }
-
-/**
- * Lazily "expires" a Streak-Freeze without needing a dispatch/mutation: if
- * the protected week's calendar span has already fully passed, returns a
- * copy with activeUntilWeekStart reset to null. Pure, no side effects —
- * call this wherever streakFreeze is read (streak calc, popup display)
- * instead of mutating state on a timer/background check.
- */
-export function effectiveStreakFreeze(streakFreeze) {
-  if (!streakFreeze?.activeUntilWeekStart) return streakFreeze ?? { activeUntilWeekStart: null, lastUsedMonth: null };
-  const weekEndMs = new Date(streakFreeze.activeUntilWeekStart + 'T00:00:00').getTime() + 7 * 86_400_000;
-  if (Date.now() > weekEndMs) return { ...streakFreeze, activeUntilWeekStart: null };
-  return streakFreeze;
-}
-
-/**
- * Maps a "YYYY-MM" string to its calendar quarter, e.g. "2026-08" -> "2026-Q3".
- * Streak-Freeze limit (1×/Quartal) compares on this, not on the raw month —
- * lastUsedMonth itself stays "YYYY-MM" (no schema/storage change).
- */
-export const _quarter = (isoMonth) => {
-  const [y, m] = isoMonth.split('-');
-  return `${y}-Q${Math.ceil(+m / 3)}`;
-};
-
-/** German label ("Oktober 2026") of the first month of the quarter AFTER isoMonth's quarter. */
-export function nextQuarterStartLabel(isoMonth) {
-  const [yStr, mStr] = isoMonth.split('-');
-  const y = +yStr, m = +mStr;
-  const q = Math.ceil(m / 3);
-  const nextQ = (q % 4) + 1;
-  const nextY = q === 4 ? y + 1 : y;
-  const names = ['Januar', 'April', 'Juli', 'Oktober'];
-  return `${names[nextQ - 1]} ${nextY}`;
-}
 
 // ─── Internal STATE + subscriber registry ────────────────────────────────────
 
@@ -418,51 +378,35 @@ function _weekEndMs(wk) {
  * (chronologically later week being evaluated). An unmarked pause this
  * long breaks the streak even if both weeks are individually "done".
  *
- * `freeze` (optional, only passed by the freeze-aware current-streak path —
- * _calcLongestStreakEver() never passes it, preserving its exact prior
- * behaviour): if the gap fully contains the protected week's calendar span,
- * the gap is treated as covered by the freeze and does not break the streak.
+ * Streak-Freeze entfernt (Sprint "Framework-Audit Cleanup", Fix 2) — kein
+ * `freeze`-Parameter mehr, ein Lücken-Bruch ist immer endgültig.
  */
-function _streakGapBreaks(wk, prevWk, freeze) {
+function _streakGapBreaks(wk, prevWk) {
   if (!prevWk) return false;
   const gapDays = (new Date(wk.startDate + 'T00:00:00').getTime() - _weekEndMs(prevWk)) / 86_400_000;
   // Malformes startDate (korrupte/hand-editierte Daten) -> gapDays wird NaN.
   // NaN <= 7 ist false, würde also fälschlich in die Break-Logik durchfallen
   // -> NaN explizit als "kein Break" behandeln (defensiver Fallback).
   if (!Number.isFinite(gapDays) || gapDays <= 7) return false;
-  if (freeze?.activeUntilWeekStart) {
-    const frozenStartMs = new Date(freeze.activeUntilWeekStart + 'T00:00:00').getTime();
-    if (frozenStartMs > _weekEndMs(prevWk) && frozenStartMs < new Date(wk.startDate + 'T00:00:00').getTime()) {
-      return false;
-    }
-  }
   return true;
 }
 
 /**
- * `freeze` (optional): { activeUntilWeekStart } — a week whose startDate
- * matches is treated as protected: a 'missed' status becomes 'attended'
- * (no break, no increment — the freeze prevents a break, it doesn't grant
- * a point). Omitting `freeze` reproduces the exact pre-Streak-Freeze
- * behaviour.
- *
  * `lastWk` tracks the last week PROCESSED (completed OR attended) purely
  * for gap-detection — both are real, present week records, so a calendar
  * gap must be measured against whichever is chronologically closest, not
  * only against the last 'completed' week. Only 'cur' itself is gated to
  * 'completed' weeks.
  */
-function _calcCurrentStreak(weeks, freeze) {
+function _calcCurrentStreak(weeks) {
   const sorted = [...weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
   let cur = 0;
   let lastWk = null;
   for (let i = sorted.length - 1; i >= 0; i--) {
     const wk     = sorted[i];
-    const frozen = freeze?.activeUntilWeekStart === wk.startDate;
-    let status   = _weekTrainingStatus(wk);
-    if (status === 'missed' && frozen) status = 'attended';
+    const status = _weekTrainingStatus(wk);
     if (status === 'missed') break;
-    if (lastWk && _streakGapBreaks(lastWk, wk, freeze)) break;
+    if (lastWk && _streakGapBreaks(lastWk, wk)) break;
     if (status === 'completed') cur++;
     lastWk = wk;
   }
@@ -486,22 +430,31 @@ function _calcLongestStreakEver(weeks) {
   return best;
 }
 
+// Badge-Vergabe eingefroren (Sprint "Framework-Audit Cleanup", Fix 5) — Code
+// bewusst nur auskommentiert, nicht gelöscht: BADGE_THRESHOLDS, state.badges
+// und die Galerie-Anzeige bleiben vollständig funktionsfähig, nur das
+// automatische Freischalten NEUER Abzeichen ist abgeschaltet. Bereits
+// vergebene Abzeichen (state.badges) bleiben unangetastet und weiterhin
+// sichtbar. longestStreakEver wird weiterhin fortgeschrieben — das ist Teil
+// der Streak-WERT-Ermittlung (Constraint: "Streak-Wert unverändert"), nicht
+// der Gamification-Präsentation.
 function _checkAndGrantBadges(state) {
-  const streak  = _calcCurrentStreak(state.weeks, effectiveStreakFreeze(state.streakFreeze));
   state.longestStreakEver = Math.max(state.longestStreakEver ?? 0, _calcLongestStreakEver(state.weeks));
-  const now     = new Date().toISOString();
-  const newOnes = [];
-  for (const thr of BADGE_THRESHOLDS) {
-    if (streak >= thr.weeks && !state.badges.some(b => b.id === thr.id)) {
-      state.badges.push({ id: thr.id, unlockedAt: now });
-      newOnes.push({ ...thr, unlockedAt: now });
-    }
-  }
-  if (newOnes.length > 0) {
-    setTimeout(() => {
-      window.dispatchEvent(new CustomEvent('train:badge-earned', { detail: newOnes }));
-    }, 0);
-  }
+
+  // const streak  = _calcCurrentStreak(state.weeks);
+  // const now     = new Date().toISOString();
+  // const newOnes = [];
+  // for (const thr of BADGE_THRESHOLDS) {
+  //   if (streak >= thr.weeks && !state.badges.some(b => b.id === thr.id)) {
+  //     state.badges.push({ id: thr.id, unlockedAt: now });
+  //     newOnes.push({ ...thr, unlockedAt: now });
+  //   }
+  // }
+  // if (newOnes.length > 0) {
+  //   setTimeout(() => {
+  //     window.dispatchEvent(new CustomEvent('train:badge-earned', { detail: newOnes }));
+  //   }, 0);
+  // }
 }
 
 // Trägt einen Satz in die prMap ein. Extrahiert um "Heute anders"-Doppelbuchung
@@ -917,6 +870,14 @@ function migrate(raw) {
   (raw.weeks ?? []).forEach(wk => (wk.days ?? []).forEach(day => (day.exercises ?? []).forEach(_normSetType)));
   (raw.customTemplate ?? []).forEach(day => (day.exercises ?? []).forEach(_normSetType));
 
+  // Always-apply, rein subtraktiv (Sprint "Framework-Audit Cleanup", Fix 1+2):
+  // streakFreeze (Fix 2) und surpriseLog (Fix 1) entfernt — kein neuer
+  // Schema-Bump, da nur Löschung, keine neue Struktur. Absichtlich NICHT im
+  // historischen v24→v25-Block angefasst (bleibt als Aufzeichnung, was diese
+  // Version damals einführte).
+  if ('streakFreeze' in raw) delete raw.streakFreeze;
+  if ('surpriseLog'  in raw) delete raw.surpriseLog;
+
   return raw;
 }
 
@@ -1148,8 +1109,6 @@ export const A = Object.freeze({
   EX_MERGE_NAMES:       'EX_MERGE_NAMES',       // { variantNames: string[], finalName } – Übungsnamen-Bereinigung
   DISMISS_NAME_PAIR:    'DISMISS_NAME_PAIR',    // { a, b } – Ähnlichkeits-Kandidat dauerhaft verwerfen
   REENTRY_HANDLED:      'REENTRY_HANDLED',      // {} – marks current pause as handled (Ja/Nein)
-  ACTIVATE_STREAK_FREEZE: 'ACTIVATE_STREAK_FREEZE', // {} – bewusste, manuelle Aktivierung, 1×/Quartal
-  RECORD_SURPRISE_SHOWN:  'RECORD_SURPRISE_SHOWN',  // { musterId } – markiert ein Überraschungs-Muster als diesen Monat gezeigt
   PLATEAU_ACTION:         'PLATEAU_ACTION',         // { exerciseName, action: 'ignored'|'implemented', since, plateauWeeksAtAction }
   EX_APPLY_REENTRY_REDUCTION: 'EX_APPLY_REENTRY_REDUCTION', // { factor } – reduces weights/targets in current week
   EX_REMOVE:           'EX_REMOVE',           // { di, ei }
@@ -2097,7 +2056,7 @@ function reduce(state, action) {
       if (!state.weeks.length) _appendDefaultWeek();
       _resortWeeksKeepingCurrent(state, _importRefWeek);
       _checkAndGrantBadges(state);
-      console.log('[TRAIN] Post-import streak:', _calcCurrentStreak(state.weeks, effectiveStreakFreeze(state.streakFreeze)), 'badges:', state.badges);
+      console.log('[TRAIN] Post-import streak:', _calcCurrentStreak(state.weeks), 'badges:', state.badges);
       break;
     }
 
@@ -2262,26 +2221,6 @@ function reduce(state, action) {
     // ── Wiedereinstieg nach Pause ────────────────────────────────────────────
     case A.REENTRY_HANDLED: {
       state.lastReentryHandled = Date.now();
-      break;
-    }
-    // Bewusste, manuelle Aktivierung (nie automatisch) — schützt die NÄCHSTE
-    // Woche (_nextMonday(), dieselbe Funktion wie WEEK_CREATE's Default-
-    // Startdatum), nicht rückwirkend. 1×/Kalenderquartal, kein Stapeln (ein
-    // neuer Aufruf überschreibt activeUntilWeekStart statt es zu addieren).
-    // lastUsedMonth bleibt "YYYY-MM" (kein Feld-Rename) — nur der Vergleich
-    // erfolgt auf Quartalsebene via _quarter().
-    case A.ACTIVATE_STREAK_FREEZE: {
-      const curMonth = new Date().toISOString().slice(0, 7);
-      if (!state.streakFreeze) state.streakFreeze = { activeUntilWeekStart: null, lastUsedMonth: null };
-      if (state.streakFreeze.lastUsedMonth && _quarter(state.streakFreeze.lastUsedMonth) === _quarter(curMonth)) break; // Limit dieses Quartal bereits verbraucht
-      state.streakFreeze.activeUntilWeekStart = _nextMonday();
-      state.streakFreeze.lastUsedMonth = curMonth;
-      break;
-    }
-    case A.RECORD_SURPRISE_SHOWN: {
-      if (!p.musterId) break;
-      if (!state.surpriseLog) state.surpriseLog = {};
-      state.surpriseLog[p.musterId] = new Date().toISOString().slice(0, 7);
       break;
     }
     case A.PLATEAU_ACTION: {

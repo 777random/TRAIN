@@ -20,7 +20,7 @@ function _summaryRow({ streak, totalSets, completedDays, plannedDays, avgSession
     ? (goalFulfillment >= 90 ? 'var(--c-ok)' : goalFulfillment >= 70 ? 'var(--c-warn)' : 'var(--c-danger)')
     : '';
   const items = [
-    `🔥 ${streak ?? 0}`,
+    `${streak ?? 0} Wochen`,
     `✓ ${totalSets} Sätze`,
     `${completedDays}/${plannedDays} Tage`,
     avgSessionDuration != null ? `${avgSessionDuration}′ Ø Session` : '— Ø Session',
@@ -48,7 +48,7 @@ export function renderWeekReviewHtml(reviewData) {
   const kw = String(_kw(week.startDate)).padStart(2, '0');
 
   return `
-  ${isVacation ? '<div class="wr-vacation-banner">🏖 Urlaubswoche — Streak läuft weiter</div>' : ''}
+  ${isVacation ? '<div class="wr-vacation-banner">🏖 Urlaubswoche — unterbricht deinen Trainingsrhythmus nicht</div>' : ''}
   ${isDeload ? '<div class="wr-deload-banner">Deload-Woche — reduziertes Volumen erwartet</div>' : ''}
   <div class="wr-kw-row">
     <span class="wr-kw">KW ${kw}</span>

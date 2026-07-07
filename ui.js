@@ -19,7 +19,7 @@
 import {
   getState, dispatch, subscribe, A, canUndo, BADGE_THRESHOLDS, VACATION_PLANS,
   calcCurrentStreak, calcLongestStreakEver, weekTrainingStatus, getLatestWeek,
-  effectiveStreakFreeze, _quarter, nextQuarterStartLabel, clearAutoWeekPending,
+  clearAutoWeekPending,
 } from './state.js';
 import {
   exportJSON, exportJSONAuto, importJSON, exportCSV,
@@ -35,7 +35,6 @@ import { findExactDuplicates, findSimilarCandidates } from './exerciseNameCleanu
 import { computeErkenntnisLines, getProgressCorridorCalibration } from './progressInsights.js';
 import { MOVEMENT_MAP } from './movementMap.js';
 import { computeQualityTrend, computeConsistencyTrend, computeVolumeTrend, computeBreadthProgress } from './overallPerformance.js';
-import { checkSurpriseRewards } from './surpriseRewards.js';
 
 // ─── Module-level UI state (transient, never persisted) ──────────────────────
 
@@ -431,23 +430,6 @@ function _showTooltip(text) {
   document.body.appendChild(tip);
   const close = () => tip.remove();
   setTimeout(() => document.addEventListener('click', close, { capture: true, once: true }), 0);
-}
-
-/**
- * Dezenter, einmaliger Überraschungs-Banner — kein Modal, kein Blocker, kein
- * Ton. Verschwindet nach 4.5s ODER bei Tap (pointer-events: auto, anders als
- * .tip-banner).
- */
-function _showSurpriseBanner(message) {
-  document.getElementById('_train-surprise-banner')?.remove();
-  const el = document.createElement('div');
-  el.id = '_train-surprise-banner';
-  el.className = 'surprise-banner';
-  el.textContent = message;
-  document.body.appendChild(el);
-  const close = () => el.remove();
-  el.addEventListener('click', close, { once: true });
-  setTimeout(close, 4500);
 }
 
 /** Show tip once — skips if already seen, records it, then shows banner. */
@@ -984,69 +966,20 @@ function _renderRitualAnchor(state, wk, di) {
 }
 
 /**
- * Prominente Streak-Anzeige im sticky Tag-Pillen-Bereich — gleiche Quelle
- * wie der bestehende Flammen-Zusatz im Vorwoche-Banner (_calcStreak(state).cur,
- * ×7 für Tage), keine neue Berechnung. Immer sichtbar sobald ein Tag aktiv
- * ist, auch bei Streak=0 (ehrliche Darstellung, kein Sonderfall).
+ * Konsistenz-Anzeige im sticky Tag-Pillen-Bereich (_calcStreak(state).cur,
+ * keine neue Berechnung). Immer sichtbar sobald ein Tag aktiv ist, auch bei
+ * 0 Wochen (ehrliche Darstellung, kein Sonderfall). Rein informativ seit
+ * Sprint "Framework-Audit Cleanup" (Fix 2/3/4) — kein Tap-Handler mehr (der
+ * frühere Streak-Freeze-Einstiegspunkt ist entfernt), kein Flammen-Icon,
+ * neutrale Formulierung statt "Streak".
  */
 function _renderStreakBadge(state) {
   const streakWeeks = (_calcStreak(state)?.cur ?? 0);
   const streakLabel = streakWeeks === 1 ? '1 Woche' : `${streakWeeks} Wochen`;
-  return `<button type="button" class="streak-badge" data-action="open-streak-freeze" aria-label="${streakLabel} Streak — Streak-Freeze öffnen">🔥 <span class="streak-badge__num">${streakWeeks}</span> ${streakWeeks === 1 ? 'Woche' : 'Wochen'}</button>`;
+  return `<span class="streak-badge" aria-label="${streakLabel} konsistentes Training"><span class="streak-badge__num">${streakWeeks}</span> ${streakWeeks === 1 ? 'Woche' : 'Wochen'}</span>`;
 }
 
-/**
- * Streak-Freeze-Popup, gleiches dynamisches Overlay-Pattern wie
- * _showReentryPopup() — kein vordeklariertes statisches Modal, da nicht
- * Teil des festen mountApp-Shells. 3 Zustände: verfügbar / aktiv /
- * dieses Quartal bereits verbraucht.
- */
-function _showStreakFreezePopup(state) {
-  document.getElementById('streak-freeze-modal')?.remove();
-  const streak  = _calcStreak(state);
-  const freeze  = effectiveStreakFreeze(state.streakFreeze);
-  const curMonth = new Date().toISOString().slice(0, 7);
-  const lastUsedMonth = state.streakFreeze?.lastUsedMonth ?? null;
-  const usedThisQuarter = lastUsedMonth !== null && _quarter(lastUsedMonth) === _quarter(curMonth);
-
-  let body;
-  if (freeze.activeUntilWeekStart) {
-    body = `<p class="vac-plan-modal__sub">Streak geschützt bis Ende dieser Woche.</p>
-      <button class="btn btn--ghost" data-action="close-modal" data-target="streak-freeze-modal" style="width:100%;min-height:var(--touch)">Schließen</button>`;
-  } else if (usedThisQuarter) {
-    body = `<p class="vac-plan-modal__sub">Dieses Quartal bereits verwendet.<br>Wieder verfügbar ab ${nextQuarterStartLabel(lastUsedMonth)}.</p>
-      <button class="btn btn--ghost" data-action="close-modal" data-target="streak-freeze-modal" style="width:100%;min-height:var(--touch)">Schließen</button>`;
-  } else {
-    body = `<p class="vac-plan-modal__sub">Schützt deine Streak bei einer verpassten Woche. 1× pro Quartal verfügbar.</p>
-      <button class="btn btn--accent" data-action="activate-streak-freeze" style="width:100%;min-height:var(--touch)">Streak schützen</button>
-      <button class="btn btn--ghost" data-action="close-modal" data-target="streak-freeze-modal" style="width:100%;min-height:var(--touch)">Abbrechen</button>`;
-  }
-
-  const overlay = document.createElement('div');
-  overlay.id = 'streak-freeze-modal';
-  overlay.className = 'vac-plan-modal-overlay';
-  overlay.innerHTML = `
-    <div class="vac-plan-modal">
-      <div class="vac-plan-modal__title">🔥 ${streak.cur === 1 ? '1 Woche' : `${streak.cur} Wochen`} Streak</div>
-      ${body}
-    </div>`;
-  document.body.appendChild(overlay);
-
-  overlay.addEventListener('click', e => {
-    if (e.target === overlay) { overlay.remove(); return; }
-    const btn = e.target.closest('[data-action]');
-    if (!btn) return;
-    if (btn.dataset.action === 'activate-streak-freeze') {
-      dispatch(A.ACTIVATE_STREAK_FREEZE, {});
-      showToast('Streak geschützt ✓', 'ok');
-      overlay.remove();
-    } else if (btn.dataset.action === 'close-modal') {
-      overlay.remove();
-    }
-  });
-}
-
-/** Abzeichen-Detailansicht (D2) — nur für bereits erreichte Abzeichen, dieselbe disposable-Overlay-Konvention wie _showStreakFreezePopup. */
+/** Abzeichen-Detailansicht (D2) — nur für bereits erreichte Abzeichen, dieselbe disposable-Overlay-Konvention wie _showReentryPopup(). */
 function _showBadgeDetail(thr, earned) {
   document.getElementById('badge-detail-modal')?.remove();
   const dateStr = new Date(earned.unlockedAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' });
@@ -1073,11 +1006,10 @@ function _showBadgeDetail(thr, earned) {
  * "Selber Tag letzte Woche"-Zeile (Zeile 3 des Ritual-Ankers, vormals
  * "Vorwoche-Banner") — Berechnung unverändert seit der ursprünglichen
  * Auslagerung (Erfolgsquote + Sätze-Summe über alle Übungen desselben
- * Tag-Slots der Vorwoche, plus Streak-Zusatz ab streak.cur>=2). Lebte bis
- * Sprint B (train-v107) im sticky Bereich, jetzt Teil von
- * _renderRitualAnchor() im scrollbaren Bereich — nur Bezeichnung + Position
- * geändert, NICHT die Berechnung. Bedingung unverändert: nur ab
- * state.curIdx>0 und wenn prevDay existiert.
+ * Tag-Slots der Vorwoche). Lebte bis Sprint B (train-v107) im sticky
+ * Bereich, jetzt Teil von _renderRitualAnchor() im scrollbaren Bereich —
+ * nur Bezeichnung + Position geändert, NICHT die Berechnung. Bedingung
+ * unverändert: nur ab state.curIdx>0 und wenn prevDay existiert.
  */
 function _prevWeekBanner(state, wk, di) {
   if (!(state.curIdx > 0)) return '';
@@ -1169,7 +1101,7 @@ function renderDayBody(wk, di, state) {
 
   return `
     ${_renderRitualAnchor(state, wk, di)}
-    ${isVacDay ? '<div class="day-vacation-banner">🏖 Urlaubstag — Streak läuft weiter</div>' : ''}
+    ${isVacDay ? '<div class="day-vacation-banner">🏖 Urlaubstag — unterbricht deinen Trainingsrhythmus nicht</div>' : ''}
     ${noteBlock}
     ${warmupBlock}
     <div data-ex-list="${di}">${exHtml}</div>
@@ -3286,7 +3218,7 @@ function renderProgressTab(state) {
       return `
     <div class="streak-row">
       <div class="streak-card"><div class="streak-num">${streak.cur}</div><div class="streak-lbl">Wochen</div></div>
-      <div class="streak-card"><div class="streak-num">${streak.best}</div><div class="streak-lbl">Best</div></div>
+      <div class="streak-card"><div class="streak-num">${streak.best}</div><div class="streak-lbl">Längste</div></div>
       <div class="streak-card"><div class="streak-num">${state.weeks.length}</div><div class="streak-lbl">Wochen</div></div>
       ${avgScore !== null ? `
       <button type="button" class="streak-card" data-action="toggle-metric-tooltip" data-metric="avg-score" aria-expanded="${_metricTooltipKey === 'avg-score'}" aria-label="Ø Erfolg erklären">
@@ -3331,9 +3263,9 @@ function _updateInlineReview(state) {
 
 function _calcStreak(state) {
   // Defensiver Fallback: cur/best müssen IMMER eine Zahl sein, nie null/
-  // undefined — sonst zeigt die 🔥-Badge "null Tage" statt "0 Tage" (siehe
+  // undefined — sonst zeigt die Streak-Badge "null Tage" statt "0 Tage" (siehe
   // Fix 1, train-v106).
-  const cur  = calcCurrentStreak(state.weeks, effectiveStreakFreeze(state.streakFreeze)) ?? 0;
+  const cur  = calcCurrentStreak(state.weeks) ?? 0;
   const best = Math.max(state.longestStreakEver ?? 0, calcLongestStreakEver(state.weeks) ?? 0);
   return { cur, best };
 }
@@ -4209,10 +4141,6 @@ function _handleClick(e) {
 
   switch (action) {
 
-    case 'open-streak-freeze':
-      _showStreakFreezePopup(getState());
-      break;
-
     case 'show-badge-detail': {
       const thr = BADGE_THRESHOLDS.find(t => t.id === el.dataset.badgeId);
       const earned = (getState().badges ?? []).find(b => b.id === el.dataset.badgeId);
@@ -4316,7 +4244,7 @@ function _handleClick(e) {
         _weekMenuOpen = false;
         dispatch(A.DAY_TOGGLE_VACATION, { di: _di });
       } else {
-        _maybeShowTip('tip-09', 'Urlaubstage unterbrechen deinen Streak nicht. Markiere sie damit TRAIN deine Analyse korrekt berechnet.');
+        _maybeShowTip('tip-09', 'Urlaubstage unterbrechen deinen Trainingsrhythmus nicht. Markiere sie damit TRAIN deine Analyse korrekt berechnet.');
         _dayMenuOpenKey = null;
         _weekMenuOpen = false;
         scheduleRender();
@@ -6038,10 +5966,11 @@ function _switchToTab(tab) {
     const _completedWks = state.weeks.filter(w => w.days?.some(d => d.markedDone)).length;
     if (_completedWks >= 2) {
       _maybeShowTip('tip-05', 'Jeder Punkt = eine Woche. Blau = Training · Amber = Urlaub · Grau = Pause.');
-      setTimeout(() => _maybeShowTip('tip-07', 'Abzeichen verdienst du durch konsequentes Training. 4 Wochen Streak = erstes Abzeichen.'), 4200);
-    } else {
-      _maybeShowTip('tip-07', 'Abzeichen verdienst du durch konsequentes Training. 4 Wochen Streak = erstes Abzeichen.');
     }
+    // tip-07 entfernt (Sprint "Framework-Audit Cleanup", Fix 5) — versprach
+    // "4 Wochen Streak = erstes Abzeichen", aber die Abzeichen-Vergabe ist
+    // eingefroren (siehe state.js' _checkAndGrantBadges()). Ein Tipp, der ein
+    // nie eintretendes Ereignis ankündigt, wäre irreführend.
   }
   if (tab === 'settings') renderSettingsTab(state);
 }
@@ -6404,12 +6333,6 @@ export function mountApp(root) {
       _showBackupReminderToast();
     }
 
-    const surprise = checkSurpriseRewards(st);
-    if (surprise) {
-      _showSurpriseBanner(surprise.message);
-      dispatch(A.RECORD_SURPRISE_SHOWN, { musterId: surprise.musterId });
-    }
-
     _checkDecisionOutcomes(st);
   }, 2000);
 }
@@ -6714,9 +6637,13 @@ function _showBadgeOverlay(badge) {
   el.addEventListener('click', dismiss, { once: true });
 }
 
+// weeksLeft-Countdown ("noch X Tage") für nicht erreichte Abzeichen entfernt
+// (Sprint "Framework-Audit Cleanup", Fix 5) — seit die Abzeichen-Vergabe
+// eingefroren ist (_checkAndGrantBadges() in state.js), wäre ein Countdown
+// bis zu einem Unlock, der nie kommt, irreführend. Grau/transparent allein
+// kommuniziert bereits "nicht erreicht", ohne ein Versprechen zu machen.
 function _renderBadgeGallery(state) {
   const badges  = state.badges ?? [];
-  const streak  = calcCurrentStreak(state.weeks);
   const items = BADGE_THRESHOLDS.map(thr => {
     const earned = badges.find(b => b.id === thr.id);
     if (earned) {
@@ -6727,11 +6654,9 @@ function _renderBadgeGallery(state) {
         <div class="badge-item__sub badge-item__date">${dateStr}</div>
       </button>`;
     }
-    const weeksLeft = Math.max(0, thr.weeks - streak);
     return `<div class="badge-item">
       <img src="./badges/${thr.id}.png" alt="${thr.title}" class="badge-img" width="80" height="80" style="filter:grayscale(100%) opacity(0.3)">
       <div class="badge-item__title">${thr.title}</div>
-      <div class="badge-item__sub">noch ${weeksLeft * 7} Tage</div>
     </div>`;
   });
   return `<div class="section-label" style="margin-top:var(--sp-5)">Abzeichen</div>
