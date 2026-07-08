@@ -21,11 +21,19 @@ function _dayISODate(week, dayIdx) {
 
 // Tage, die weder abgeschlossen sind NOCH schon stattgefunden haben, dürfen
 // nicht als "verpasst" gezählt werden — sie sind einfach noch nicht dran
-// (Sprint "Kategorie-1-Bugfixes", Fix 3). Betrifft in der Praxis nur die
+// (Sprint "Kategorie-1-Bugfixes", Fix 3; Off-by-one behoben in Sprint
+// "Fix3 + Fix4 Nachbessern", Fix 3b). Betrifft in der Praxis nur die
 // aktuell laufende, noch nicht abgeschlossene Woche im Wochenrückblick.
+//
+// "<" statt "<=": der HEUTIGE Tag ist erst NACH Ablauf des Tages "erreicht"
+// im Sinne von "hätte schon erledigt sein können" — mit "<=" zählte der
+// laufende, noch nicht abgeschlossene heutige Tag sofort als fällig und
+// damit als "verpasst", sobald er nicht schon zu Tagesbeginn markedDone
+// war (bestätigt per Diagnose-Reproduktion: bei todayISO === Tag-Datum
+// kippte der noch laufende Tag ohne "<"-Fix in "verpasst").
 function _reachableDays(week) {
   const todayISO = new Date().toISOString().slice(0, 10);
-  return week.days.filter((d, i) => d.markedDone || _dayISODate(week, i) <= todayISO);
+  return week.days.filter((d, i) => d.markedDone || _dayISODate(week, i) < todayISO);
 }
 
 function _sumVolume(week) {

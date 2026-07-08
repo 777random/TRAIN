@@ -3003,9 +3003,7 @@ function _renderErkenntnisseSection(state) {
   // effectiveN: gegen die tatsächlich vorhandene (Nicht-Seed-)Wochenzahl
   // geclampt (Sprint "Kategorie-1-Bugfixes", Fix 4) — verhindert dass der
   // Hinweistext "Letzte 13 Wochen" behauptet, obwohl die App erst 8 echte
-  // Wochen alt ist. N selbst (die Einstellung) bleibt für den Stepper +/-
-  // unverändert — der Nutzer darf den Horizont schon jetzt höher stellen,
-  // auch bevor genug Daten existieren, ohne später daran denken zu müssen.
+  // Wochen alt ist.
   const realWeekCount = state.weeks.filter(w => !w.isSeedWeek).length;
   const effectiveN = realWeekCount > 0 ? Math.min(N, realWeekCount) : N;
   const perfParagraphs = _overallPerformanceParagraphs(state, effectiveN);
@@ -3014,13 +3012,24 @@ function _renderErkenntnisseSection(state) {
 
   if (!perfParagraphs.length && !obsEntries.length && !insights.length) return '';
 
+  // Stepper-Anzeige + Grenzen ZUSÄTZLICH gegen die echte Wochenzahl geclampt
+  // (Sprint "Fix3 + Fix4 Nachbessern", Fix 4a) — nur beim Rendern, NICHT in
+  // state.settings geschrieben: der Nutzer behält seinen gespeicherten
+  // Wunschwert (state.settings.erkenntnisseHorizont bleibt unverändert),
+  // stepperN zieht automatisch nach, sobald mehr echte Wochen existieren.
+  // stepperMax hat immer mindestens den Boden 4 (nie < MIN), auch wenn
+  // realWeekCount selbst < 4 ist — sonst würde der Stepper bei einer ganz
+  // neuen App in einen unsinnigen leeren [MIN>MAX]-Bereich fallen.
+  const stepperMax = realWeekCount > 0 ? Math.max(4, Math.min(52, realWeekCount)) : 52;
+  const stepperN   = Math.max(4, Math.min(stepperMax, N));
+
   const stepperHtml = `
   <div class="erkenntnis-stepper">
     <button type="button" class="btn btn--ghost btn--sm erkenntnis-stepper__btn"
-      data-action="erkenntnisse-horizont-dec"${N <= 4 ? ' disabled' : ''}>−</button>
-    <span class="erkenntnis-stepper__label">${N} Wochen</span>
+      data-action="erkenntnisse-horizont-dec"${stepperN <= 4 ? ' disabled' : ''}>−</button>
+    <span class="erkenntnis-stepper__label">${stepperN} Wochen</span>
     <button type="button" class="btn btn--ghost btn--sm erkenntnis-stepper__btn"
-      data-action="erkenntnisse-horizont-inc"${N >= 52 ? ' disabled' : ''}>+</button>
+      data-action="erkenntnisse-horizont-inc"${stepperN >= stepperMax ? ' disabled' : ''}>+</button>
   </div>
   <p class="erkenntnis-stepper__hint">${h(_erkenntnisseHorizontLabel(effectiveN))}</p>`;
 
@@ -4538,14 +4547,41 @@ function _handleClick(e) {
       break;
     }
 
+    // Fix 4a ("Fix3 + Fix4 Nachbessern"): oberes Ende zusätzlich gegen die
+    // echte (Nicht-Seed-)Wochenzahl geclampt — identisch zu stepperMax in
+    // _renderErkenntnisseSection(), damit +/- konsistent zu dem rechnet,
+    // was der Stepper gerade ANZEIGT (nicht gegen einen ggf. höheren, aber
+    // unsichtbaren Rohwert in state.settings). Fix 4b: scrollTop von #app
+    // wird vor dem Dispatch gesichert und nach dem darauffolgenden Render
+    // wiederhergestellt — kein scrollIntoView()/focus() existiert in diesem
+    // Pfad; der beobachtete "Sprung" ist ein Layout-Reflow-Artefakt (die
+    // Erkenntnisse-Karte kann durch den neuen Horizont ihre Höhe ändern,
+    // wodurch die direkt darunterliegende Übungsfortschritt-Karte an die
+    // fixe Scroll-Position rutscht). Zweiter rAF (nach dem von
+    // scheduleRender() registrierten) läuft garantiert NACH dessen Render,
+    // da rAF-Callbacks in Registrierungsreihenfolge abgearbeitet werden.
     case 'erkenntnisse-horizont-dec': {
-      const _curN = Math.max(4, Math.min(52, getState().settings?.erkenntnisseHorizont ?? 8));
-      if (_curN > 4) dispatch(A.SET_ERKENNTNISSE_HORIZONT, { value: _curN - 1 });
+      const _realWeeks   = getState().weeks.filter(w => !w.isSeedWeek).length;
+      const _stepperMax  = _realWeeks > 0 ? Math.max(4, Math.min(52, _realWeeks)) : 52;
+      const _curN = Math.max(4, Math.min(_stepperMax, getState().settings?.erkenntnisseHorizont ?? 8));
+      if (_curN > 4) {
+        const _appEl = document.getElementById('app');
+        const _scrollTop = _appEl?.scrollTop ?? 0;
+        dispatch(A.SET_ERKENNTNISSE_HORIZONT, { value: _curN - 1 });
+        requestAnimationFrame(() => { if (_appEl) _appEl.scrollTop = _scrollTop; });
+      }
       break;
     }
     case 'erkenntnisse-horizont-inc': {
-      const _curN = Math.max(4, Math.min(52, getState().settings?.erkenntnisseHorizont ?? 8));
-      if (_curN < 52) dispatch(A.SET_ERKENNTNISSE_HORIZONT, { value: _curN + 1 });
+      const _realWeeks   = getState().weeks.filter(w => !w.isSeedWeek).length;
+      const _stepperMax  = _realWeeks > 0 ? Math.max(4, Math.min(52, _realWeeks)) : 52;
+      const _curN = Math.max(4, Math.min(_stepperMax, getState().settings?.erkenntnisseHorizont ?? 8));
+      if (_curN < _stepperMax) {
+        const _appEl = document.getElementById('app');
+        const _scrollTop = _appEl?.scrollTop ?? 0;
+        dispatch(A.SET_ERKENNTNISSE_HORIZONT, { value: _curN + 1 });
+        requestAnimationFrame(() => { if (_appEl) _appEl.scrollTop = _scrollTop; });
+      }
       break;
     }
 
