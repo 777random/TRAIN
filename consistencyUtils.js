@@ -12,17 +12,45 @@
  * diese eigene, import-arme Datei (nur state.js/insightEngine.js) löst das,
  * analog zu movementMap.js' Extraktion aus ui.js im selben Zweck.
  *
- * Logik unverändert gegenüber der vorherigen weeklyFocus.js-Version.
+ * Logik unverändert gegenüber der vorherigen weeklyFocus.js-Version — bis
+ * auf den future-Tage-Fix in _weekConsistencyRatio() (siehe dort).
  */
 
 import { isTrainingDay } from './state.js';
 import { getSortedWeeks } from './insightEngine.js';
 
+// Lokale Kopie der Tag-Index→ISO-Datum-Formel — identisch zu weekReview.js'
+// _dayISODate() (dort behoben in Sprint "Fix3 + Fix4 Nachbessern", Fix 3b)
+// und ui.js' _dayDate(). Bewusst dupliziert statt importiert, um diese
+// Datei import-arm zu halten (siehe Datei-Kopfkommentar) und keine neue
+// Kreuz-Abhängigkeit einzuführen.
+function _dayISODate(wk, dayIdx) {
+  const d = new Date(wk.startDate + 'T12:00:00');
+  d.setDate(d.getDate() + dayIdx);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Sprint "Consistency-Ratio future-Tage-Fix": zukünftige (noch nicht
+ * fällige) Tage zählen nicht mehr im Nenner mit — identischer Bug/Fix wie
+ * weekReview.js' _reachableDays() (Fix 3b): "<" statt "<=", ein heute noch
+ * laufender, nicht abgeschlossener Tag zählt nicht als "fällig", ein
+ * bereits erledigter (auch am heutigen Tag) hingegen schon. Ohne diesen
+ * Fix zog eine laufende Woche mit z.B. 2 von 4 geplanten Tagen erledigt
+ * (die anderen 2 stehen erst noch an) fälschlich nur 50% statt 100%.
+ * isTrainingDay()-Filter (Urlaubstage-Ausschlussregel) bleibt unverändert
+ * und wird VOR der Fälligkeits-Prüfung angewendet — der ursprüngliche
+ * Array-Index (für die Datumsberechnung) bleibt dabei erhalten.
+ */
 export function _weekConsistencyRatio(wk) {
-  const active = wk.days.filter(isTrainingDay);
-  if (active.length === 0) return null; // reine Ruhewoche, nicht auswertbar
-  const done = active.filter(d => d.markedDone || d.isVacation).length;
-  return done / active.length;
+  const todayISO = new Date().toISOString().slice(0, 10);
+  const due = wk.days
+    .map((day, di) => ({ day, di }))
+    .filter(({ day }) => isTrainingDay(day))
+    .filter(({ day, di }) => day.markedDone || _dayISODate(wk, di) < todayISO);
+  if (due.length === 0) return null; // reine Ruhewoche ODER noch kein Tag fällig
+  const done = due.filter(({ day }) => day.markedDone || day.isVacation).length;
+  return done / due.length;
 }
 
 export function _consistencyEligibleWeeks(state) {
