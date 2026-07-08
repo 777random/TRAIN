@@ -41,6 +41,7 @@
 import { getLatestWeek } from './state.js';
 import { detectPlateaus } from './plateauDetector.js';
 import { getWeightRecommendation, isReadyForAutoSelect } from './weightRecommendation.js';
+import { isFullSuccess } from './setUtils.js';
 import { _consistencyEligibleWeeks } from './consistencyUtils.js';
 import { computeVolumeTrend, computeConsistencyTrend, computeQualityTrend } from './overallPerformance.js';
 import { MOVEMENT_MAP } from './movementMap.js';
@@ -64,6 +65,16 @@ function _completionRate(wk) {
   return total > 0 ? success / total : 0;
 }
 
+// Dauer des "Wiedereinstieg"-Fensters nach lastReentryHandled — Sprint
+// "Kategorie-1-Bugfixes", Fix 7: 14 -> 7 Tage. Betrifft NUR dieses Fenster
+// (wie lange die Wiedereinstiegs-Karte danach noch aktiv bleibt), NICHT den
+// Auslöse-Schwellenwert für das Reentry-Popup selbst (ui.js'
+// _detectReentryPause() nutzt bereits "pauseDays <= 7 -> kein Popup",
+// unverändert) und NICHT die davon unabhängigen "14"-Vorkommen an anderer
+// Stelle (Plateau-Aktions-Unterdrückung, Backup-Reminder, relative
+// Datumslabels — alles andere Features, siehe Diagnose-Sprint).
+const REENTRY_WINDOW_DAYS = 7;
+
 // ─── Prio 1: Wiedereinstieg ─────────────────────────────────────────────────
 // Extrahiert aus ui.js (vormals private _isInRecoveryWindow) — identische
 // Logik, einzige Implementierung. ui.js importiert diese Funktion jetzt
@@ -72,7 +83,7 @@ function _completionRate(wk) {
 export function isInRecoveryWindow(state) {
   if (!state.lastReentryHandled) return false;
   const startMs = state.lastReentryHandled;
-  const endMs   = startMs + 14 * DAY_MS;
+  const endMs   = startMs + REENTRY_WINDOW_DAYS * DAY_MS;
   const relevantWeeks = state.weeks.filter(w => {
     const ms = new Date(w.startDate + 'T00:00:00').getTime();
     return ms >= startMs && ms < endMs;
@@ -104,7 +115,7 @@ export function isInRecoveryWindow(state) {
 function _checkReentry(state) {
   if (!state.lastReentryHandled) return null;
   const daysSince = Math.floor((Date.now() - state.lastReentryHandled) / DAY_MS);
-  if (daysSince < 0 || daysSince >= 14) return null;
+  if (daysSince < 0 || daysSince >= REENTRY_WINDOW_DAYS) return null;
   const weekNum = Math.floor(daysSince / 7) + 1;
   const inRecovery = isInRecoveryWindow(state);
   return {
@@ -596,14 +607,21 @@ function _checkProgression(state) {
     : `${best.name} ist bereit für eine Steigerung.`;
   const alsoReadyText = second ? ` Auch bereit für Steigerung: ${second.name}.` : '';
 
-  // Konfidenz: successRate + avgRpe der letzten 4 Wochen für best
+  // Konfidenz: successRate + avgRpe der letzten 4 Wochen für best.
+  // isFullSuccess() statt rohem status==='success' (Sprint "Kategorie-1-
+  // Bugfixes", Fix 5e) — identisches Muster wie getWeightRecommendation()
+  // in weightRecommendation.js: ein 'success'-Satz mit weniger Wdh als
+  // targetReps ist ein Teilerfolg und zählt weder als Erfolg noch als
+  // Fehlschlag (ausgeklammert), sonst würde ein Teilerfolg die Konfidenz
+  // derselben Empfehlung optisch nach oben ziehen, die getWeightRecommendation()
+  // selbst bereits strenger (nicht als vollen Erfolg) bewertet.
   let succ = 0, fail = 0, rpeSum = 0, rpeCount = 0;
   for (const wk of calcWeeks.slice(-4))
     for (const d of wk.days)
       for (const ex of d.exercises)
         if (ex.name === best.name)
           for (const s of ex.sets) {
-            if (s.status === 'success') { succ++; if (s.rpe != null) { rpeSum += s.rpe; rpeCount++; } }
+            if (isFullSuccess(s, ex)) { succ++; if (s.rpe != null) { rpeSum += s.rpe; rpeCount++; } }
             else if (s.status === 'fail') fail++;
           }
   const confTotal = succ + fail;

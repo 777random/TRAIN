@@ -9,6 +9,25 @@ function _kw(sd) {
   return Math.ceil(((d - jan) / 86_400_000 + jan.getDay() + 1) / 7);
 }
 
+// ISO-Datum eines Tag-Slots — identische Formel zu ui.js' _dayDate() (dort
+// nicht importiert: dieser Datei-Kopfkommentar sagt "kein State-Zugriff",
+// ein Import aus ui.js wäre zudem zirkulär, da ui.js bereits weekReview.js
+// importiert).
+function _dayISODate(week, dayIdx) {
+  const d = new Date(week.startDate + 'T12:00:00');
+  d.setDate(d.getDate() + dayIdx);
+  return d.toISOString().slice(0, 10);
+}
+
+// Tage, die weder abgeschlossen sind NOCH schon stattgefunden haben, dürfen
+// nicht als "verpasst" gezählt werden — sie sind einfach noch nicht dran
+// (Sprint "Kategorie-1-Bugfixes", Fix 3). Betrifft in der Praxis nur die
+// aktuell laufende, noch nicht abgeschlossene Woche im Wochenrückblick.
+function _reachableDays(week) {
+  const todayISO = new Date().toISOString().slice(0, 10);
+  return week.days.filter((d, i) => d.markedDone || _dayISODate(week, i) <= todayISO);
+}
+
 function _sumVolume(week) {
   let v = 0;
   for (const d of week.days)
@@ -190,8 +209,12 @@ export function buildWeekReview(week, allWeeks, favoriteExercises = []) {
 
   // ── Summary ──────────────────────────────────────────────────────────────────
   const totalSets        = _countSuccessSets(week);
-  const completedDays    = week.days.filter(d => d.markedDone).length;
-  const plannedDays      = week.days.length;
+  // Nur "erreichbare" Tage zählen (heute oder früher, oder bereits erledigt)
+  // — verhindert dass Tage der laufenden Woche, die schlicht noch nicht
+  // dran waren, als "verpasst" gezählt werden (Fix 3).
+  const reachableDays    = _reachableDays(week);
+  const completedDays    = reachableDays.filter(d => d.markedDone).length;
+  const plannedDays      = reachableDays.length;
   const sessionDurs      = (week.sessionLog ?? []).map(l => l.duration);
   const avgSessionDuration = sessionDurs.length
     ? Math.round(sessionDurs.reduce((a, b) => a + b, 0) / sessionDurs.length / 60)

@@ -1635,7 +1635,11 @@ function renderExercise(wk, di, ei, state) {
     if (ex.substituteFor && (!prevEx || prevEx.metric !== ex.metric)) return '';
     const nSets     = ex.sets.length;
     const target    = nSets * ex.targetReps;
-    const achieved  = ex.sets.filter(s => s.status === 'success').reduce((sum, s) => sum + (parseFloat(s.reps) || 0), 0);
+    // success UND fail zählen (Sprint "Kategorie-1-Bugfixes", Fix 5c/8) —
+    // ein fail-Satz mit z.B. 5 von 8 Ziel-Wdh war trotzdem echte Arbeit,
+    // vorher fiel er komplett aus dem Zähler, obwohl sein Soll im Nenner
+    // (target = nSets × targetReps, unconditional) weiterhin mitzählte.
+    const achieved  = ex.sets.filter(s => s.status === 'success' || s.status === 'fail').reduce((sum, s) => sum + (parseFloat(s.reps) || 0), 0);
     const actualPct = target > 0 ? Math.round(achieved / target * 100) : 0;
     const pct       = Math.min(actualPct, 100);
     const color     = pct >= 100 ? 'var(--c-ok)' : pct >= 80 ? 'var(--c-warn)' : 'var(--c-danger)';
@@ -2996,8 +3000,16 @@ function _rotatedErkenntnisEntries(state, N = 8) {
  */
 function _renderErkenntnisseSection(state) {
   const N = Math.max(4, Math.min(52, state.settings?.erkenntnisseHorizont ?? 8));
-  const perfParagraphs = _overallPerformanceParagraphs(state, N);
-  const obsEntries     = _rotatedErkenntnisEntries(state, N);
+  // effectiveN: gegen die tatsächlich vorhandene (Nicht-Seed-)Wochenzahl
+  // geclampt (Sprint "Kategorie-1-Bugfixes", Fix 4) — verhindert dass der
+  // Hinweistext "Letzte 13 Wochen" behauptet, obwohl die App erst 8 echte
+  // Wochen alt ist. N selbst (die Einstellung) bleibt für den Stepper +/-
+  // unverändert — der Nutzer darf den Horizont schon jetzt höher stellen,
+  // auch bevor genug Daten existieren, ohne später daran denken zu müssen.
+  const realWeekCount = state.weeks.filter(w => !w.isSeedWeek).length;
+  const effectiveN = realWeekCount > 0 ? Math.min(N, realWeekCount) : N;
+  const perfParagraphs = _overallPerformanceParagraphs(state, effectiveN);
+  const obsEntries     = _rotatedErkenntnisEntries(state, effectiveN);
   const insights       = state.insights ?? [];
 
   if (!perfParagraphs.length && !obsEntries.length && !insights.length) return '';
@@ -3010,7 +3022,7 @@ function _renderErkenntnisseSection(state) {
     <button type="button" class="btn btn--ghost btn--sm erkenntnis-stepper__btn"
       data-action="erkenntnisse-horizont-inc"${N >= 52 ? ' disabled' : ''}>+</button>
   </div>
-  <p class="erkenntnis-stepper__hint">${h(_erkenntnisseHorizontLabel(N))}</p>`;
+  <p class="erkenntnis-stepper__hint">${h(_erkenntnisseHorizontLabel(effectiveN))}</p>`;
 
   const perfHtml = perfParagraphs.map(p => `<p class="erkenntnis-line">${h(p)}</p>`).join('');
 
@@ -3380,10 +3392,16 @@ function _corridorFor(state, exName) {
   return getProgressCorridorCalibration(sortedWeeks, exName);
 }
 
+// Sprint "Kategorie-1-Bugfixes", Fix 6: getProgressCorridorCalibration()
+// unterscheidet jetzt "zu wenig Daten" (null, kein Hinweis) von "genug
+// Daten, aber kein positiver Trend" ({noTrend:true}) — dezenter Hinweis
+// statt kommentarlosem Verschwinden des ganzen Korridor-Bereichs.
 function _corridorHintHtml(corridor) {
-  return corridor
-    ? '<p class="chart-corridor-hint">Schattierter Bereich: erwartete Entwicklung basierend auf deiner Steigerungsrate der letzten Wochen.</p>'
-    : '';
+  if (!corridor) return '';
+  if (corridor.noTrend) {
+    return '<p class="chart-corridor-hint chart-corridor-hint--flat">Kein klarer Trend erkennbar — dein Gewicht war zuletzt stabil.</p>';
+  }
+  return '<p class="chart-corridor-hint">Schattierter Bereich: erwartete Entwicklung basierend auf deiner Steigerungsrate der letzten Wochen.</p>';
 }
 
 function _updateExChart(state) {
@@ -3396,7 +3414,14 @@ function _updateExChart(state) {
     .sort((a, b) => a.startDate.localeCompare(b.startDate))
     .slice(-16);
   const corridor = _corridorFor(state, name);
-  const svg = renderProgressChart(name, calcWeeks, { compact: false, corridor });
+  // Nur ein Objekt MIT calibrationRate (also noTrend===false) darf an den
+  // Chart weitergereicht werden — der {noTrend:true}-Marker hat keine
+  // calibrationRate/startWeight-Kombination, die renderProgressChart()
+  // sinnvoll zeichnen könnte. Der Hinweistext unten nutzt trotzdem das
+  // ungefilterte `corridor`, um zwischen "kein Trend" und "keine Daten"
+  // unterscheiden zu können.
+  const chartCorridor = corridor && !corridor.noTrend ? corridor : null;
+  const svg = renderProgressChart(name, calcWeeks, { compact: false, corridor: chartCorridor });
   if (svg) {
     wrap.innerHTML = svg + _corridorHintHtml(corridor);
     _attachChartTooltips(wrap);
@@ -5448,7 +5473,12 @@ function _handleBlur(e) {
     if (document.activeElement === el) { _pendingAutoEval = null; return; }
     const { di: _di, ei: _ei, si: _si, reps } = _pendingAutoEval;
     _pendingAutoEval = null;
-    if (!Number.isFinite(reps) || reps <= 0) return;
+    // reps===0 MUSS auto-eval auslösen (0 Wdh = nicht geschafft = fail, siehe
+    // AUTO_EVAL_SET-Reducer) — vorher blockierte "reps <= 0" das explizit,
+    // ein Satz mit eingetragener 0 blieb für immer 'pending'. "< 0" statt
+    // "<= 0" reicht: leeres Feld -> parseFloat('') -> NaN -> von
+    // Number.isFinite() bereits abgefangen, kein Extra-Guard nötig.
+    if (!Number.isFinite(reps) || reps < 0) return;
     dispatch(A.AUTO_EVAL_SET, { di: _di, ei: _ei, si: _si, reps });
     // RPE-Nudge nach erfolgreicher Auto-Bewertung (identisch zu confirm-set)
     const aft    = getState();
@@ -5851,7 +5881,17 @@ function _createWeek() {
   const copyPrev = document.getElementById('nw-copy-prev')?.checked ?? true;
   if (!date) { showToast('Bitte Datum wählen', 'warn'); return; }
   const source = copyPrev ? 'prev' : 'template';
+  // WEEK_CREATE dedupet still (state.js: bricht ab wenn startDate schon
+  // existiert) — der Reducer gibt aber keinen Erfolgs-Indikator zurück.
+  // weeks.length davor/danach vergleichen statt blind Erfolg zu melden
+  // (Sprint "Kategorie-1-Bugfixes", Fix 2 — Ursache der gemeldeten
+  // Unzuverlässigkeit: Datumskollision quittierte bisher trotzdem "✓").
+  const beforeCount = getState().weeks.length;
   dispatch(A.WEEK_CREATE, { startDate: date, note, source });
+  if (getState().weeks.length === beforeCount) {
+    showToast('Für dieses Datum existiert bereits eine Woche', 'warn');
+    return;
+  }
   closeModal('modal-new-week');
   showToast(source === 'template' ? 'Neue Woche aus Vorlage erstellt ✓' : 'Neue Woche aus Vorwoche erstellt ✓', 'ok');
   const triggered = fireTrigger('NEUE_WOCHE_ERSTELLT', {});
@@ -6356,13 +6396,21 @@ function _getDayCompletionStats(di) {
     }
   }
   const pct = totalSets > 0 ? Math.round(successSets / totalSets * 100) : 0;
+  // effortTarget: Summe ALLER targetReps über alle Sätze der Übung, unabhängig
+  // vom Satz-Status (identisch zum "target = nSets × targetReps"-Muster im
+  // Fulfill-Meter, renderExercise()) — nicht nur der bewerteten Sätze wie
+  // vorher, sonst zieht ein noch offener (pending) Satz sein Soll nicht mit.
+  // effortAchieved: success UND fail zählen (Sprint "Kategorie-1-Bugfixes",
+  // Fix 5c/8) — ein fail-Satz mit z.B. 5 von 8 Ziel-Wdh war trotzdem echte
+  // Arbeit und darf nicht komplett verschwinden.
   let effortAchieved = 0, effortTarget = 0;
   for (const ex of day.exercises ?? []) {
     if (!ex.targetReps) continue;
+    const targetReps = parseFloat(ex.targetReps) || 0;
     for (const s of ex.sets ?? []) {
-      if (s.status === 'success') {
+      effortTarget += targetReps;
+      if (s.status === 'success' || s.status === 'fail') {
         effortAchieved += parseFloat(s.reps) || 0;
-        effortTarget   += parseFloat(ex.targetReps) || 0;
       }
     }
   }

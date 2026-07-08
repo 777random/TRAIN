@@ -148,15 +148,25 @@ export function progressTrendOutlier(state, N = 8) {
  * Kalibrierungs-Rate = Ø-Delta der letzten 4 Wochen (identisch zu curRate in
  * progressTrendOutlier() — bewusst NICHT histRate, da der Korridor sich an
  * der jüngsten, nicht der gesamten historischen Rate orientieren soll).
- * Liefert null wenn < 6 Wochen Historie ODER Kalibrierungs-Rate <= 0 — in
- * beiden Fällen zeigt der Chart keinen Korridor (siehe AC1/AC3).
- * @returns {{ calibrationRate: number, startWeight: number } | null}
+ *
+ * Liefert null nur bei ZU WENIG Historie (< 6 Wochen mit Gewichtsdaten) —
+ * dann gibt es schlicht keine Aussage zu treffen. Liefert bei genug Historie
+ * aber flacher/fallender Rate (curRate <= 0) ein { noTrend: true }-Objekt
+ * statt still null (Sprint "Kategorie-1-Bugfixes", Fix 6) — das sind zwei
+ * verschiedene Situationen ("keine Daten" vs. "Daten da, aber kein Trend"),
+ * die der Aufrufer unterschiedlich kommunizieren soll (siehe
+ * _corridorHintHtml() in ui.js: kein Hinweis vs. "Kein klarer Trend
+ * erkennbar"). Kein Korridor-Schattenbereich wird für noTrend gerendert —
+ * der Aufrufer muss calibrationRate/startWeight prüfen, bevor er das Objekt
+ * an renderProgressChart() weiterreicht.
+ * @returns {{ calibrationRate: number, startWeight: number, noTrend: false }
+ *   | { noTrend: true, startWeight: number } | null}
  */
 export function getProgressCorridorCalibration(sortedWeeks, exName) {
   const rw = _exerciseRateWindow(sortedWeeks, exName); // N=8 default → Korridor-Verhalten unverändert
   if (!rw) return null;
-  if (rw.curRate <= 0) return null;
-  return { calibrationRate: rw.curRate, startWeight: rw.lastWeight };
+  if (rw.curRate <= 0) return { noTrend: true, startWeight: rw.lastWeight };
+  return { calibrationRate: rw.curRate, startWeight: rw.lastWeight, noTrend: false };
 }
 
 /**

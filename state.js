@@ -987,12 +987,29 @@ function _currentWeek() {
  * Chronologically latest week by startDate — NOT curIdx (the week being
  * viewed) and NOT weeks[weeks.length-1] (array order, which can drift from
  * chronological order once future-dated test/placeholder weeks exist).
- * This is "the week that WEEK_CREATE(source='prev') will actually clone" —
- * any code planning next-week progression must agree on this same week.
+ * Used throughout for "the current/most recent week" (Plateau/Progression-
+ * Checks, KI-Empfehlungen im Neue-Woche-Modal, etc.). NICHT mehr die Woche,
+ * die WEEK_CREATE/AUTO_WEEK_CREATE als Vorlage klont, wenn diese eine
+ * Seed-Woche ist — siehe _templateWeekForNewWeek() unten (Sprint
+ * "Kategorie-1-Bugfixes", Fix 2).
  */
 export function getLatestWeek(weeks) {
   if (!weeks?.length) return null;
   return [...weeks].sort((a, b) => a.startDate.localeCompare(b.startDate))[weeks.length - 1];
+}
+
+/**
+ * Vorlagen-Woche für WEEK_CREATE(source='prev')/AUTO_WEEK_CREATE: die
+ * chronologisch letzte ECHTE (nicht-Seed) Woche. Seed-Wochen sind
+ * synthetische Onboarding-Platzhalter (Startwerte-Baseline, keine echten
+ * Trainingsdaten) — als Klon-Vorlage für eine neue Trainingswoche
+ * ungeeignet (Sprint "Kategorie-1-Bugfixes", Fix 2a). Fällt auf die
+ * chronologisch letzte Woche insgesamt zurück, falls ALLE Wochen Seed-
+ * Wochen sind (kann nicht "keine Vorlage" liefern, solange weeks.length>0).
+ */
+function _templateWeekForNewWeek(weeks) {
+  const sorted = [...weeks].sort((a, b) => b.startDate.localeCompare(a.startDate));
+  return sorted.find(w => !w.isSeedWeek) ?? sorted[0] ?? null;
 }
 
 /**
@@ -1269,7 +1286,7 @@ function reduce(state, action) {
 
       let days;
       if (source === 'prev' && state.weeks.length > 0) {
-        const lastWeek = getLatestWeek(state.weeks);
+        const lastWeek = _templateWeekForNewWeek(state.weeks);
         days = clone(lastWeek.days);
         _applyPlannedProgression(days);
       } else {
@@ -1307,7 +1324,7 @@ function reduce(state, action) {
       if (!p.startDate) break;
       if (state.weeks.find(w => w.startDate === p.startDate)) break; // dedupe
       if (!state.weeks.length) break; // braucht eine Vorwoche als Vorlage
-      const lastWeek = getLatestWeek(state.weeks);
+      const lastWeek = _templateWeekForNewWeek(state.weeks);
       const days = clone(lastWeek.days);
       days.forEach(d => (d.exercises ?? []).forEach(ex => {
         ex.nextWeekPlan = 0;
