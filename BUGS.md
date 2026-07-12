@@ -65,3 +65,5 @@
 | Gewicht steigt konstant | Plateau-Signal verdrängt Push/Pull | Konstantes Gewicht ODER <3 Wochen für Plateau-Bedingung |
 | Übungsname nicht in movementMap | pullSets=0 → Push/Pull-Guard greift | Bekannten Namen verwenden (z.B. "Rudern" statt "Barbell Row") |
 | curPct < 0.7 als Guard | Totes Code — Scale ist 0-100 | curPct < 70 verwenden |
+| Genau 2 Wochen identisches Gewicht | Kein Plateau (braucht 3+, verifiziert v160) | 3+ Wochen für Plateau-Tests verwenden |
+| Genau 8 Wochen ohne Deload | Präventiver Deload feuert (Schwelle ≥8, verifiziert v160) | Für Push/Pull-Tests weiterhin max. 7 Wochen (siehe oben) |

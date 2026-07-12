@@ -171,8 +171,21 @@ implementiert und mit beiden AllesFail-Fixtures re-verifiziert.
   bei DERSELBEN Übung 3 Wochen durchgehend scheitert, würde das Signal
   nicht auslösen.
 
-**Nächster Schritt:** Loop 3 weitere Edge-Cases ergänzen lassen
-(aktuell 6 von 15 angestrebten).
+**Loop 3 abgeschlossen — 15 von 15 Edge-Cases erreicht.** 9 neue Fixtures
+erstellt (NullGewicht, 9999Wdh, NullSätze, NullWochen,
+GenauZweiWochenPlateau, GenauAchtWochenDeload, InkonsistenteDaten,
+AlteDaten2020, 100Wochen), alle headless verifiziert: 0 uncaught errors,
+kein NaN/Infinity bei allen 9. Beide Grenzwert-Tests bestätigen die
+dokumentierten Schwellen exakt: 2 Wochen lösen KEIN Plateau aus (braucht
+3+), 8 Wochen lösen korrekt das präventive Deload-Signal aus (Schwelle
+"≥8"). Kein neuer Bug gefunden — Details in tests/fixtures/README.md.
+
+**Nächster Schritt:** keiner der drei ursprünglich geplanten Punkte
+(B17/AllesFail-Fixture/Loop 3) ist mehr offen. Nächste sinnvolle
+Kandidaten: echte Geräte-Verifikation (dragdrop.js Touch-Drag seit v156,
+B16-Fix seit v158 — beide nur headless getestet), oder Design für die
+in HANDOFF.md notierten bekannten Grenzen der B25-Lösung (Decisional-
+Balance für persistent_failure, Mehr-Übungen-Aggregation).
 
 **Offene Nebenfunde aus diesem Sprint (nicht behoben, nur notiert):**
 - Push/Pull-Ratio-Block in _renderMovementPattern() (ui.js, unterhalb der

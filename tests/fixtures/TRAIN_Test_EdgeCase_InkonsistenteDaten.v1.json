@@ -1,0 +1,165 @@
+{
+    "meta":  {
+                 "schemaVersion":  29,
+                 "savedAt":  "2026-07-12T12:00:00.000Z",
+                 "createdAt":  "2026-07-12T12:00:00.000Z"
+             },
+    "curIdx":  0,
+    "weeks":  [
+                  {
+                      "id":  1720260500001,
+                      "startDate":  "2026-07-06",
+                      "note":  "",
+                      "mode":  "standard",
+                      "days":  [
+                                   {
+                                       "id":  1720260500002,
+                                       "title":  "Tag A",
+                                       "subtitle":  "",
+                                       "warmup":  "",
+                                       "cooldown":  "",
+                                       "locked":  true,
+                                       "markedDone":  true,
+                                       "isVacation":  false,
+                                       "sleepHours":  8,
+                                       "energyLevel":  4,
+                                       "sessionRating":  4,
+                                       "exercises":  [
+                                                         {
+                                                             "name":  "BankdrÃ¼cken",
+                                                             "note":  "",
+                                                             "pauseSec":  90,
+                                                             "metric":  "reps",
+                                                             "sets":  [
+                                                                          {
+                                                                              "weight":  80,
+                                                                              "reps":  8,
+                                                                              "rpe":  6,
+                                                                              "status":  "success",
+                                                                              "done":  false,
+                                                                              "note":  ""
+                                                                          },
+                                                                          {
+                                                                              "weight":  80,
+                                                                              "reps":  8,
+                                                                              "rpe":  6,
+                                                                              "status":  "success",
+                                                                              "done":  true,
+                                                                              "note":  ""
+                                                                          }
+                                                                      ],
+                                                             "weightStep":  2.5,
+                                                             "nextWeekPlan":  0,
+                                                             "nextWeekPlanConfirmed":  false,
+                                                             "targetSets":  2,
+                                                             "targetReps":  8,
+                                                             "progressionType":  "weight",
+                                                             "progressionMode":  "weight_first",
+                                                             "targetRepsMax":  null,
+                                                             "prRepsHistory":  {
+
+                                                                               },
+                                                             "prWeight":  null,
+                                                             "prRepsAtMaxWeight":  null,
+                                                             "setType":  "straight",
+                                                             "tags":  [
+
+                                                                      ],
+                                                             "showPlates":  false,
+                                                             "substituteFor":  null,
+                                                             "archived":  false
+                                                         }
+                                                     ]
+                                   }
+                               ],
+                      "sessionLog":  [
+
+                                     ],
+                      "bodyData":  {
+
+                                   },
+                      "restDays":  [
+
+                                   ],
+                      "isSeedWeek":  false
+                  }
+              ],
+    "customTemplate":  [
+
+                       ],
+    "templates":  [
+
+                  ],
+    "prs":  {
+
+            },
+    "insights":  [
+
+                 ],
+    "favoriteExercises":  [
+
+                          ],
+    "customExercises":  [
+
+                        ],
+    "badges":  [
+
+               ],
+    "onboardingDone":  true,
+    "seenTips":  [
+
+                 ],
+    "plateauActions":  {
+
+                       },
+    "decisionLog":  [
+
+                    ],
+    "coachQuestion":  {
+                          "weekStart":  null,
+                          "questionId":  null,
+                          "answer":  null,
+                          "outcome":  null,
+                          "measuredWeekStart":  null
+                      },
+    "coachQuestionHistory":  [
+
+                             ],
+    "coachPerformance":  {
+                             "suggestions":  [
+
+                                             ]
+                         },
+    "lastReentryHandled":  null,
+    "longestStreakEver":  0,
+    "settings":  {
+                     "swipe":  true,
+                     "drag":  true,
+                     "heightCm":  null,
+                     "targetWeight":  null,
+                     "showBmi":  false,
+                     "deloadFactor":  0.75,
+                     "deloadFactorCustom":  null,
+                     "barbellWeight":  20,
+                     "plateStep":  2.5,
+                     "lastBackupDate":  null,
+                     "activeTags":  [
+
+                                    ],
+                     "vibrationEnabled":  true,
+                     "rpeEnabled":  true,
+                     "weeksSinceLastBackupReminder":  0,
+                     "maxSessionMs":  10800000,
+                     "autoStartPauseTimer":  true,
+                     "dismissedNamePairs":  [
+
+                                            ],
+                     "autoEval":  false,
+                     "autoWeek":  {
+                                      "enabled":  false,
+                                      "suggestProgress":  true,
+                                      "showReview":  true
+                                  },
+                     "erkenntnisseHorizont":  8
+                 }
+}
