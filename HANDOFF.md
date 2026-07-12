@@ -98,6 +98,11 @@ state.js                — Wochenerstellung isSeedWeek-Skip, Auto-Eval Guard (f
 ---
 
 ## NEXT (konkret nächster Schritt)
+**Ab sofort: LOOPS.md beim Session-Start automatisch ausführen**
+(Regressionstest → HANDOFF.md-Sync → Edge-Case-Audit, siehe LOOPS.md.
+Push nach Loop-Fixes braucht einmal pro Session eine Bestätigung —
+siehe Push-Policy in LOOPS.md.)
+
 **Sprint v158: Edge-Case-Audit mit den neuen Fixture-JSONs**
 - Die 5 neuen Dateien in tests/fixtures/ sind bisher nur schema-validiert
   (valides JSON, korrekter State-Shape), NICHT real gegen die laufende

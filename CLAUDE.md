@@ -38,6 +38,8 @@ Bei CSS-Änderungen: Cache-Buster in `index.html` erhöhen:
 | `BUGS.md` | Bug-Tracker: behoben / offen / bewusst kein Bug / bekannte Test-Fallstricke |
 | `DECISIONS.md` | Unveränderliche Produkt-/Architektur-Entscheidungen — nicht ohne neue explizite Entscheidung revidieren |
 | `AGENTS.md` | Parallelisierungs-Regeln für Multi-Agent Sprints |
+| `LOOPS.md` | Automatische Session-Loops (beim Start jeder Session ausführen) |
+| `SESSION_LOG.md` | Protokoll aller Sessions und Loop-Ergebnisse |
 
 Nach jedem Sprint: `HANDOFF.md` und `BUGS.md` aktualisieren (behobene Bugs verschieben, Commit-Hash eintragen, nächsten Schritt setzen).
 
