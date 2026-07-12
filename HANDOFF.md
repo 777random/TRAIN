@@ -16,7 +16,7 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
   Sprint-Text-Nummerierung)
 - CSS: ?v=184
 - SCHEMA: 29
-- Letzter Commit: siehe unten (B16 iOS-Zoom-Fix)
+- Letzter Commit: e312751 (B16 iOS-Zoom-Fix)
 - Alle 12 alten Test-Szenarien verifiziert ✓ + 5 neue Fixture-JSONs in
   tests/fixtures/ (siehe unten) — diese sind neu, noch nicht real
   gegen die App durchgetestet, nur schema-validiert
@@ -92,7 +92,7 @@ state.js                — Wochenerstellung isSeedWeek-Skip, Auto-Eval Guard (f
 | SESSION START in CLAUDE.md | c838d5f | Neue Sektion + veraltete Versionsangaben (v154→v157) korrigiert |
 | LOOP 2 Erweiterung | 5a9b935 | Prüft jetzt auch CLAUDE.md gegen sw.js/index.html, nicht nur HANDOFF.md |
 | Loop-2-Autosync | 56bdba1 | HANDOFF.md GEÄNDERT-Tabelle + Letzter-Commit nachgezogen |
-| B16 iOS-Zoom-Fix | (dieser Sprint) | Diagnose korrigiert (2 unabhängige Ursachen statt 1) + beide behoben: touch-action:manipulation auf +kg/+Wdh-Button, font-size 16px auf allen Set-Inputs |
+| B16 iOS-Zoom-Fix | e312751 | Diagnose korrigiert (2 unabhängige Ursachen statt 1) + beide behoben: touch-action:manipulation auf +kg/+Wdh-Button, font-size 16px auf allen Set-Inputs |
 
 ---
 
