@@ -40,7 +40,7 @@ TRAIN ist eine deutschsprachige PWA für Krafttraining. Pure Vanilla ES Modules 
 
 Bei CSS-Änderungen: Cache-Buster in `index.html` erhöhen:
 ```html
-<link rel="stylesheet" href="./styles.css?v=183">
+<link rel="stylesheet" href="./styles.css?v=184">
 ```
 
 ---
@@ -290,10 +290,7 @@ Unabhängig von Hauptkarte — erscheint auch neben Progression.
 ### Offen / In Arbeit:
 | Feature | Priorität |
 |---------|-----------|
-| iOS Doppelklick-Zoom Picker | Nächster Sprint (UX-Hoch) |
-| Heute anders — frisches Template | UX-Mittel |
 | Meter statt Wdh bei Übungen | UX-Mittel |
-| Edge-Case-Audit + Testszenarien | Stabilität |
 | Muskelkater als Coach-Input | Konzept |
 | Aufwärmen/Cooldown-Check | Konzept |
 | Coaching-Filter | Konzept |
