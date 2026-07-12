@@ -586,7 +586,11 @@ exercise { position: unset; }
 .set-cell { display: flex; flex-direction: column; gap: 2px; }
 .num-input {
   width: 100%; background: var(--c-surface2); border: 1px solid var(--c-border);
-  border-radius: var(--r-sm); color: var(--c-text); font-size: 14px;
+  border-radius: var(--r-sm); color: var(--c-text);
+  /* B16: <16px löst iOS' Zoom-bei-Fokus aus (unabhängig vom Doppeltipp-
+     Zoom am +kg-Button, siehe .btn-icon--kg) — 16px ist der niedrigste
+     Wert, der das vermeidet. */
+  font-size: 16px;
   text-align: center; padding: 5px 2px; min-height: 34px;
   appearance: textfield; -moz-appearance: textfield;
   transition: border-color var(--t-fast);
@@ -1101,7 +1105,12 @@ exercise { position: unset; }
 .chart-corridor-hint { font-size: 11px; color: var(--c-text-3); margin: 4px 0 0; }
 
 /* +kg-Button im Übungskopf */
-.btn-icon--kg { font-size: 11px; font-weight: 700; letter-spacing: -0.02em; opacity: 0.6; }
+/* B16: touch-action:manipulation verhindert, dass iOS' natives
+   Doppeltipp-Zoom-Gesture mit der eigenen 400ms-Doppeltipp-Erkennung
+   (ui.js _handleClick 'inc-weight') kollidiert — ohne das zoomt iOS
+   die Seite, wenn der Nutzer schnell zweimal tippt um den Picker zu
+   öffnen, statt nur den Picker zu öffnen. */
+.btn-icon--kg { font-size: 11px; font-weight: 700; letter-spacing: -0.02em; opacity: 0.6; touch-action: manipulation; }
 .btn-icon--kg:hover { opacity: 1; }
 .btn-icon--kg.is-planned:not(.is-confirmed) { color: var(--c-ok); opacity: 1; }
 .btn-icon--kg.is-confirmed { color: var(--c-ok); opacity: 1; box-shadow: 0 0 0 1.5px var(--c-ok); border-radius: var(--r-sm); }
@@ -1143,7 +1152,7 @@ exercise { position: unset; }
 .ex-kg-picker-btn:hover { background: var(--c-surface2); color: var(--c-text); border-color: var(--c-accent); }
 .ex-kg-picker-btn.is-selected { background: var(--c-accent); color: #000; border-color: var(--c-accent); }
 .ex-kg-picker-custom { display: flex; gap: 4px; align-items: center; width: 100%; }
-.ex-kg-picker-custom .num-input { width: 70px; height: 32px; font-size: 13px; }
+.ex-kg-picker-custom .num-input { width: 70px; height: 32px; }
 
 /* ⭐-Favorit-Button */
 .btn-fav {

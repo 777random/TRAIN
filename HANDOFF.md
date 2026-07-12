@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: Juli 2026 nach train-v157*
-*Nächste Version: train-v158*
+*Letzte Aktualisierung: Juli 2026 nach train-v158*
+*Nächste Version: train-v159*
 
 ---
 
@@ -11,13 +11,12 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v157 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v158 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
-- CSS: ?v=183
+- CSS: ?v=184
 - SCHEMA: 29
-- Letzter Commit: 5a9b935 (LOOPS.md Loop 2 um CLAUDE.md-Versionscheck
-  erweitert)
+- Letzter Commit: siehe unten (B16 iOS-Zoom-Fix)
 - Alle 12 alten Test-Szenarien verifiziert ✓ + 5 neue Fixture-JSONs in
   tests/fixtures/ (siehe unten) — diese sind neu, noch nicht real
   gegen die App durchgetestet, nur schema-validiert
@@ -34,6 +33,11 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 
 ## FILES (zuletzt angefasst)
 ```
+styles.css              — B16-Fix: .btn-icon--kg touch-action:manipulation
+                          (Doppeltipp-Zoom-Kollision), .num-input +
+                          .ex-kg-picker-custom .num-input auf 16px
+                          (Zoom-bei-Fokus)
+index.html / sw.js       — CACHE_VERSION train-v158, CSS ?v=184
 LOOPS.md                — NEU: 4 Session-Loops (3 aktiv, 1 inaktiv),
                           Push-Policy (Fix+Commit automatisch, Push mit
                           Bestätigung — Repo deployt direkt auf GitHub Pages)
@@ -87,6 +91,8 @@ state.js                — Wochenerstellung isSeedWeek-Skip, Auto-Eval Guard (f
 | LOOPS.md + SESSION_LOG.md | 18dab64 | 4 Session-Loops (Regressionstest, HANDOFF.md-Sync, Edge-Case-Audit, Bug-Diagnose-inaktiv), Push-Policy mit Bestätigungspflicht |
 | SESSION START in CLAUDE.md | c838d5f | Neue Sektion + veraltete Versionsangaben (v154→v157) korrigiert |
 | LOOP 2 Erweiterung | 5a9b935 | Prüft jetzt auch CLAUDE.md gegen sw.js/index.html, nicht nur HANDOFF.md |
+| Loop-2-Autosync | 56bdba1 | HANDOFF.md GEÄNDERT-Tabelle + Letzter-Commit nachgezogen |
+| B16 iOS-Zoom-Fix | (dieser Sprint) | Diagnose korrigiert (2 unabhängige Ursachen statt 1) + beide behoben: touch-action:manipulation auf +kg/+Wdh-Button, font-size 16px auf allen Set-Inputs |
 
 ---
 
@@ -137,9 +143,16 @@ siehe Push-Policy in LOOPS.md.)
   Front/Lateral Raise (Pull), Battle Ropes/Burpees (Core) — jeweils
   vertretbare Konvention, keine eindeutigen Fehler
 
-**Danach: iOS Doppelklick-Zoom beim Picker (B16)** — font-size < 16px in
-Picker-Feldern → Browser-Zoom bei Doppeltipp. Fix: touch-action:manipulation
-oder font-size ≥ 16px auf betroffenen Inputs. Siehe BUGS.md B16.
+**B16 (iOS Doppelklick-Zoom) behoben in train-v158** — siehe BUGS.md für
+die korrigierte Diagnose (zwei unabhängige Ursachen, nicht eine) und
+beide Fixes. Touch-Verhalten selbst noch nicht auf echtem Gerät
+verifiziert (headless kann das nicht) — bei Gelegenheit zusammen mit
+dem noch offenen dragdrop.js-Touch-Check (train-v156) auf einem echten
+iOS/Android-Gerät testen: Picker per Doppeltipp öffnen (kein Zoom?),
+Gewicht-Feld antippen (kein Zoom?).
+
+Kein UX-Hoch-Bug mehr offen in BUGS.md — Loop 3 (Edge-Case-Audit) ist
+damit ab der nächsten Session nicht mehr blockiert.
 
 ## VERIFIKATIONS-STATUS TOUCH-DRAG (train-v156, WICHTIG für nächste Session)
 

@@ -1,6 +1,6 @@
 # TRAIN — Bug-Tracking
 *Wird nach jedem Sprint aktualisiert*
-*Stand: Juli 2026 / train-v157*
+*Stand: Juli 2026 / train-v158*
 
 ---
 
@@ -26,6 +26,7 @@
 | B24 | dragdrop.js nie aktiviert → Touch-Drag defekt auf iOS/Android | v156 | a3752f8 | Polyfill in index.html verdrahtet — `<script src="./dragdrop.js">` + `MobileDragDrop.polyfill()` vor dem Module-Script. Abweichung von der Sprint-Vorlage: touchmove-preventDefault() nur während aktivem Drag (Flag über dragstart/dragend/drop), nicht global — eine bedingungslose preventDefault() hätte jegliches Scrollen auf Touch-Geräten dauerhaft blockiert. Touch-Verhalten selbst NICHT auf echtem Gerät verifiziert (siehe HANDOFF.md) — nur headless bestätigt: Skript lädt fehlerfrei, kein Uncaught-Error, `#app` erreicht `is-ready`. |
 | B22 | Erfolgsquote inkonsistent (3 verschiedene Formeln im UI) | v157 | e0b0f01 | success/(success+fail) vereinheitlicht, pending ausgeschlossen — als einzig korrekte Semantik (identisch zu `_weekSuccessScore()`) festgelegt. `_getDayCompletionStats()` (ui.js:6419): vorher `successSets/totalSets` (totalSets inkl. pending) → jetzt `successSets/(successSets+failSets)`, `pct:null` statt `0` wenn noch nichts bewertet. `_renderMovementPattern()` (ui.js:2302): Kategorie-Balken zählten vorher nur success-Sätze in Zähler UND Nenner (fail unsichtbar) → jetzt success+fail. `_weekSuccessScore()` bewusst unverändert gelassen (war bereits korrekt). Bewusst NICHT angefasst: Push/Pull-Ratio-Block in `_renderMovementPattern()` zählt weiterhin nur success — out of scope für diesen Sprint, potenzieller Folge-Fund. |
 | B23 | Beinbeuger (+ englische Synonyme) unter Squat statt Hinge | v157 | e0b0f01 | movementMap.js korrigiert: `'Beinbeuger'`, `'Leg Curl'`, `'Leg Curls'`, `'Hamstring Curl'` von Squat → Hinge (Hamstring-Curl ist hüftdominant, nicht kniedominant). Zusätzlicher Fund bei der Gelegenheit (nicht angefordert, aber eindeutig): `'Butterfly'` stand unter Pull, korrigiert zu Push — Widerspruch zu den bereits korrekt als Push klassifizierten `'KH Flys'`/`'Flys Kabel'` (Brust-Fly-Bewegung, nicht zu verwechseln mit `'Reverse Flys'`, korrekt unter Pull für hintere Schulter). Geprüfte, bewusst nicht geänderte Grenzfälle (Ausfallschritte/Lunges als Squat, Wadenheben als Hinge, Front/Lateral Raise als Pull, Battle Ropes/Burpees als Core) siehe Sprint-Notiz in HANDOFF.md. |
+| B16 | iOS Doppelklick-Zoom beim Picker | v158 | (dieser Sprint) | **Diagnose korrigiert/erweitert** — die ursprüngliche Notiz "font-size < 16px → Browser-Zoom" beschreibt tatsächlich ein anderes Phänomen (iOS' Zoom-bei-Fokus, ein Einzeltipp-Effekt) als der Bugname nahelegt (Doppeltipp-Zoom). Zwei unabhängige, echte Ursachen gefunden und beide behoben: (1) Der "+kg"/"+Wdh"-Button (`data-action="inc-weight"`, ui.js:1494) hat eine selbstgebaute 400ms-Doppeltipp-Erkennung (ui.js:4877-4917: einmal tippen = Steigerung bestätigen, zweimal tippen = Werte-Picker öffnen), aber kein `touch-action`, wodurch iOS' natives Doppeltipp-Zoom-Gesture gleichzeitig feuern kann — Fix: `touch-action: manipulation` auf `.btn-icon--kg` (styles.css). (2) `.num-input` (Basis-Klasse für alle Gewicht/Wdh/RPE-Sätze, vorher 14px) und `.ex-kg-picker-custom .num-input` (Custom-Wert-Feld im Picker-Popover, vorher 13px, Override entfernt) lagen unter 16px → Fix: 16px. Grid-Layout-Regression durch die Font-Size-Erhöhung geprüft und ausgeschlossen (A/B-Screenshot bei 390px-Breite, 14px vs. 16px identisch abgeschnitten am rechten Rand — vorbestehend, nicht neu). Regressionstest 10/10 grün nach beiden Fixes. Touch-Verhalten selbst NICHT auf echtem Gerät verifiziert (headless kann keine echten Touch-Events auslösen) — nur Layout und Code-Korrektheit bestätigt. |
 
 ---
 
@@ -33,7 +34,6 @@
 
 | ID | Beschreibung | Priorität | Notizen |
 |----|-------------|-----------|---------|
-| B16 | iOS Doppelklick-Zoom beim Picker | UX-Hoch | font-size < 16px → Browser-Zoom. Fix: touch-action oder font-size ≥ 16px |
 | B17 | Heute anders — kein frisches Template | UX-Mittel | Ausweichübung erbt Vorwoche-Daten statt leeres Template |
 | B18 | Meter statt Wdh fehlt als Progressionstyp | UX-Mittel | metric:'distance' für Übungen wie Laufen, Rudermaschine |
 | B19 | Outlook/Prognose bei konstantem Gewicht | Low | curRate ≤ 0 → kein Korridor. "Kein klarer Trend" erscheint korrekt (by design) |
