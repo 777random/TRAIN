@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: Juli 2026 nach train-v154*
-*Nächste Version: train-v155*
+*Letzte Aktualisierung: Juli 2026 nach train-v156*
+*Nächste Version: train-v157*
 
 ---
 
@@ -11,24 +11,42 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v154
-- CSS: ?v=180
+- CACHE_VERSION: train-v156 (v155 wurde nie vergeben — die Zwischensession
+  war reine Doku/Diagnose: AGENTS.md-Erstellung + dragdrop.js/
+  recommendationEngine.js-Diagnose, keine Code-Änderung, daher kein
+  Versions-Bump)
+- CSS: ?v=182 (?v=181 aus demselben Grund übersprungen)
 - SCHEMA: 29
-- Letzter Commit: 8686458 (ui.js:1183 Live-Hinweis success+fail-Fix)
-- Alle 12 Test-Szenarien verifiziert ✓
+- Letzter Commit: siehe Git-Historie (dieser Sprint: dragdrop.js
+  verdrahtet + recommendationEngine.js entfernt)
+- Alle 12 Test-Szenarien verifiziert ✓ (aus früheren Sprints — dieser
+  Sprint hat keine neuen Test-JSONs erzeugt, siehe NEXT)
 - Regressions-Test: 10/10 grün (raf=sync), 0 uncaught errors
+- Touch-Drag-Verhalten NICHT auf echtem Gerät/Emulator verifiziert —
+  headless kann Touch-Events nicht auslösen (siehe Abschnitt unten)
 - Framework-Score: 11/11
 
 ---
 
 ## FILES (zuletzt angefasst)
 ```
-ui.js                 — _nextGoalText() Live-Hinweis success+fail-Filter (8686458)
-consistencyUtils.js   — _weekConsistencyRatio() off-by-one fix (ab33633)
-weekReview.js         — _reachableDays() future-days fix (66c034d)
-weeklyFocus.js        — REENTRY_WINDOW_DAYS 14→7, Plateau vor PrePlateau (f1d4f54)
-state.js              — Wochenerstellung isSeedWeek-Skip, Auto-Eval Guard (f1d4f54)
-movementMap.js        — +32 englische Synonyme (8143086)
+index.html             — dragdrop.js Touch-Polyfill verdrahtet (Script-Tag +
+                          MobileDragDrop.polyfill() vor dem Module-Script),
+                          alter No-Op-touchmove-Listener zusammengeführt,
+                          CSS-Version → ?v=182
+sw.js                   — recommendationEngine.js aus Precache entfernt,
+                          dragdrop.js zu Precache hinzugefügt (jetzt
+                          ladungsrelevant), CACHE_VERSION → train-v156
+recommendationEngine.js — GELÖSCHT (ungenutzt, Inhalt redundant zu
+                          insightEngine.js — siehe BUGS.md)
+AGENTS.md               — recommendationEngine.js aus Abhängigkeitsmatrix
+                          entfernt, dragdrop.js-Einträge aktualisiert
+ui.js                   — _nextGoalText() Live-Hinweis success+fail-Filter (8686458)
+consistencyUtils.js     — _weekConsistencyRatio() off-by-one fix (ab33633)
+weekReview.js           — _reachableDays() future-days fix (66c034d)
+weeklyFocus.js          — REENTRY_WINDOW_DAYS 14→7, Plateau vor PrePlateau (f1d4f54)
+state.js                — Wochenerstellung isSeedWeek-Skip, Auto-Eval Guard (f1d4f54)
+movementMap.js          — +32 englische Synonyme (8143086)
 ```
 
 ---
@@ -46,6 +64,7 @@ movementMap.js        — +32 englische Synonyme (8143086)
 | Future Days Fix | 66c034d | _reachableDays < statt <=, Stepper-Scroll |
 | ConsistencyRatio Fix | ab33633 | _weekConsistencyRatio < statt <= |
 | Live-Hinweis Fix | 8686458 | _nextGoalText success+fail statt nur success (B08) |
+| Dragdrop verdrahtet + Cleanup | (dieser Sprint) | dragdrop.js Touch-Polyfill aktiviert (B24), recommendationEngine.js entfernt |
 
 ---
 
@@ -68,7 +87,47 @@ movementMap.js        — +32 englische Synonyme (8143086)
 ---
 
 ## NEXT (konkret nächster Schritt)
-**Sprint v155: iOS Doppelklick-Zoom beim Picker (B16)**
-- font-size < 16px in Picker-Feldern → Browser-Zoom bei Doppeltipp
-- Fix: touch-action:manipulation oder font-size ≥ 16px auf betroffenen Inputs
-- Siehe BUGS.md B16 für Details
+**Parallel-Sprint v157: Erfolgsquote-Vereinheitlichung + Beinbeuger-Kategorie
++ tests/fixtures/**
+- Erfolgsquote: mind. 3 verschiedene Formeln im UI (_weekSuccessScore,
+  _getDayCompletionStats, _renderMovementPattern) — Vereinheitlichung
+  oder zumindest saubere Doku der 3 Semantiken prüfen
+- movementMap.js: "Beinbeuger" steht unter Squat statt Hinge — fachlich
+  prüfen ob Umkategorisierung sinnvoll ist
+- Test-JSONs aus "01 Privat/TRAIN/Testing - Simulation/" nach
+  tests/fixtures/ ins Repo übernehmen (aktuell nicht git-getrackt)
+- Vor Start: AGENTS.md-Matrix konsultieren, ob diese drei Teilaufgaben
+  wirklich parallelisierbar sind (unterschiedliche Dateien, keine
+  gemeinsame Import-Kante) oder ob z.B. die Erfolgsquote-Aufgabe ui.js
+  anfasst und damit NICHT parallel zu anderen ui.js-Arbeiten laufen darf
+
+**Danach: iOS Doppelklick-Zoom beim Picker (B16)** — font-size < 16px in
+Picker-Feldern → Browser-Zoom bei Doppeltipp. Fix: touch-action:manipulation
+oder font-size ≥ 16px auf betroffenen Inputs. Siehe BUGS.md B16.
+
+## VERIFIKATIONS-STATUS TOUCH-DRAG (train-v156, WICHTIG für nächste Session)
+
+**Verifiziert (headless, diese Session):**
+- Regressionstest 10/10 grün, 0 uncaught errors
+- index.html lädt headless fehlerfrei durch (kein "Uncaught" im Chrome-
+  Log, `#app` erreicht Klasse `is-ready`, `#splash` wird korrekt entfernt)
+- dragdrop.js wird als klassisches Script vor dem Module-Script geladen
+  und wirft dabei keinen Fehler
+
+**NICHT verifiziert (headless kann keine echten Touch-Events auslösen):**
+- Ob `MobileDragDrop.polyfill()` auf einem echten Touch-Gerät tatsächlich
+  greift und das Drag-Reorder von Übungen funktioniert
+- Ob `holdToDrag: 400` sich richtig anfühlt (nicht zu kurz → Konflikt mit
+  Scrollen; nicht zu lang → Drag fühlt sich träge an)
+- Ob der neue `touchmove`-Listener (nur `preventDefault()` während
+  `_dragActive`) das Scroll-Verhalten außerhalb eines Drags unverändert
+  lässt — das war genau der Bug in der Sprint-Vorlage (dort hätte ein
+  bedingungsloses `preventDefault()` jegliches Scrollen permanent
+  blockiert; hier stattdessen an dragstart/dragend/drop gekoppelt)
+- Ob `forceApply: false` auf dem Zielgerät korrekt entscheidet (Polyfill
+  nur wo natives Touch-DnD fehlt)
+
+→ Vor dem nächsten Sprint: einmal auf echtem iOS/Android-Gerät oder in
+Chrome DevTools Mobile-Emulation (Device Toolbar, nicht nur Viewport-
+Resize — braucht echte Touch-Event-Simulation) eine Übung per Drag
+neu anordnen und dabei normales Scrollen der Seite testen.

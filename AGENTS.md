@@ -1,7 +1,7 @@
 # TRAIN — Parallel Agent Regeln
 # Wird nach jedem Multi-Agent Sprint
 # automatisch aktualisiert.
-# Letzte Aktualisierung: 2026-07-12 / train-v154
+# Letzte Aktualisierung: 2026-07-12 / train-v156
 
 ---
 
@@ -39,8 +39,7 @@ sondern der Einstiegspunkt, der `state.js`, `backup.js`, `ui.js`,
 | weekReviewModal.js | — | ui.js |
 | exerciseNameCleanup.js | — | ui.js |
 | registerSW.js | — | index.html |
-| dragdrop.js | — | **keine** (nirgends importiert, auch nicht in sw.js-Precache — vermutlich totes Legacy-Modul, siehe Hinweis unten) |
-| recommendationEngine.js | — | **keine** JS-Importe (nur in sw.js:41 Precache-Liste referenziert — wird gecacht, aber nie ausgeführt) |
+| dragdrop.js | — | **kein ES-Import** — seit train-v156 aber per `<script src="./dragdrop.js">` klassisch in index.html geladen (vor dem Module-Script) und in sw.js precached. Kein JS-Modul importiert es, aber es ist jetzt aktiv ladungsrelevant, nicht mehr totes Legacy-Modul. |
 | backup.js | state.js | ui.js, index.html |
 | timer.js | state.js | index.html (kein JS-Modul importiert es, nur der Einstiegspunkt) |
 | plateauDetector.js | setUtils.js | insightEngine.js, weeklyFocus.js |
@@ -59,7 +58,7 @@ Kettenglieder bis zum Blatt):**
 ```
 Tiefe 0: state.js, icons.js, setUtils.js, movementMap.js, progressChart.js,
          weekReview.js, weekReviewModal.js, exerciseNameCleanup.js,
-         registerSW.js, dragdrop.js*, recommendationEngine.js*
+         registerSW.js, dragdrop.js*
 Tiefe 1: backup.js, timer.js, plateauDetector.js, weightRecommendation.js
 Tiefe 2: insightEngine.js
 Tiefe 3: triggerEngine.js, consistencyUtils.js, progressInsights.js
@@ -67,8 +66,14 @@ Tiefe 4: overallPerformance.js
 Tiefe 5: weeklyFocus.js
 Tiefe 6: ui.js   ← importiert am meisten, höchstes Blast-Radius-Risiko
 ```
-*dragdrop.js/recommendationEngine.js haben Tiefe 0 nur weil sie
-isoliert sind — nicht weil sie aktiv genutzte Basis-Module wären.
+*dragdrop.js hat Tiefe 0 nur weil es isoliert ist — nicht weil es ein
+aktiv aus anderen Modulen genutztes Basis-Modul wäre. Seit train-v156
+per `<script src="./dragdrop.js">` in index.html geladen (kein ES-Import,
+daher taucht es in keiner "Importiert von"-Spalte auf, obwohl es jetzt
+aktiv genutzt wird — siehe HANDOFF.md).
+
+(recommendationEngine.js wurde in train-v156 entfernt — war ungenutzt,
+Inhalt bereits redundant in insightEngine.js. Kein Eintrag mehr hier.)
 
 Diese Tabelle ist die Grundlage für alle
 Parallelisierungs-Entscheidungen unten.
@@ -90,11 +95,11 @@ zueinander — basierend auf der Matrix oben:
 - **setUtils.js (falls angefasst) + movementMap.js / icons.js /
   progressChart.js / weekReview.js** — keine gegenseitigen Imports.
 - **dragdrop.js + irgendeine andere Datei** — dragdrop.js hat keine
-  Importer, jede Änderung dort ist isoliert (aber siehe Hinweis: die
-  Datei scheint aktuell ungenutzt zu sein — vor einer Änderung prüfen,
-  ob sie das überhaupt noch sein soll).
-- **recommendationEngine.js + irgendeine andere Datei** — dieselbe
-  Situation wie dragdrop.js (nur Precache, kein aktiver Import).
+  ES-Modul-Importer, jede Änderung dort ist isoliert. Seit train-v156
+  aber via `<script src="./dragdrop.js">` in index.html geladen — eine
+  gleichzeitige Änderung an index.html selbst zählt als Kollision (siehe
+  "NIE parallel" unten), nur die JS-Datei dragdrop.js allein bleibt frei
+  parallelisierbar.
 - **BUGS.md / HANDOFF.md / DECISIONS.md / CLAUDE.md + jede JS-Datei** —
   Markdown-Dokumente werden von keinem JS-Modul importiert.
 - **Mehrere Test-JSON-Dateien** (z.B. unter "Testing - Simulation/") —
