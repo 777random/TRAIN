@@ -31,6 +31,19 @@ Push after every commit: `git push`
 
 After every milestone: copy all project files (except `backups/` and `.git/`) into `backups/TRAIN_<YYYY-MM-DD>_<milestone-name>/`. The `backups/` folder is gitignored. Then commit and push to GitHub.
 
+## Project tracking docs
+
+Read these at the start of any session before starting work — they carry state this file doesn't:
+
+| File | Contents |
+|------|----------|
+| `HANDOFF.md` | Session handoff: current version state, files last touched, what's next |
+| `BUGS.md` | Bug tracker: behoben / offen / bewusst kein Bug / bekannte Testdaten-Fallstricke |
+| `DECISIONS.md` | Immutable product/architecture decisions with reasoning — don't relitigate these without an explicit new decision |
+| `CLAUDE_1.md` | Extended project context draft (coach architecture, design rules, feature status, roadmap) — overlaps with this file; not yet reconciled into it |
+
+After finishing a sprint: update `HANDOFF.md` and `BUGS.md` (move fixed bugs to "Behoben", add the new commit hash, set the next concrete step) the same way this session's ui.js:1183 fix was recorded.
+
 ## Architecture
 
 ### Module responsibilities
