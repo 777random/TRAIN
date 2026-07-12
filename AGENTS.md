@@ -1,7 +1,7 @@
 # TRAIN — Parallel Agent Regeln
 # Wird nach jedem Multi-Agent Sprint
 # automatisch aktualisiert.
-# Letzte Aktualisierung: 2026-07-12 / train-v156
+# Letzte Aktualisierung: 2026-07-12 / train-v157
 
 ---
 
@@ -87,11 +87,18 @@ Parallelisierungs-Entscheidungen unten.
 Dateipaare/-gruppen ohne direkte oder indirekte Import-Kante
 zueinander — basierend auf der Matrix oben:
 
-- **movementMap.js (reine Datenergänzung) + weekReview.js / progressChart.js
-  / icons.js / exerciseNameCleanup.js** — keine gegenseitigen Imports.
-  Achtung: Datenergänzung (neue MOVEMENT_MAP-Einträge), NICHT
-  Export-Umbenennung — das würde die 3 Importer (overallPerformance.js,
+- **movementMap.js (reine Datenergänzung ODER Wertkorrektur an
+  bestehenden Keys) + weekReview.js / progressChart.js / icons.js /
+  exerciseNameCleanup.js** — keine gegenseitigen Imports.
+  Achtung: Datenergänzung/Wertkorrektur, NICHT Export-Umbenennung oder
+  Entfernen eines Keys — das würde die 3 Importer (overallPerformance.js,
   ui.js, weeklyFocus.js) gleichzeitig betreffen.
+- **movementMap.js (Wertkorrektur an bestehenden Keys) + ui.js**, WENN die
+  gleichzeitige ui.js-Änderung nicht selbst category-abhängige Logik für
+  genau die geänderten Übungsnamen einführt/ändert — siehe "Muster 4"
+  unten für den verifizierten Beleg (train-v157) und die genaue
+  Abgrenzung. Trotz Import-Kante (ui.js importiert movementMap.js) in
+  diesem eingeschränkten Fall sicher.
 - **setUtils.js (falls angefasst) + movementMap.js / icons.js /
   progressChart.js / weekReview.js** — keine gegenseitigen Imports.
 - **dragdrop.js + irgendeine andere Datei** — dragdrop.js hat keine
@@ -192,6 +199,33 @@ Hinweis zur Matrix: progressInsights.js importiert insightEngine.js,
 nicht weeklyFocus.js, und wird selbst nicht von weeklyFocus.js
 importiert — die beiden Dateien haben tatsächlich keine direkte Kante,
 das Muster ist durch die Analyse bestätigt.
+
+### Muster 4 — ui.js + movementMap.js + tests/fixtures/ (ERSTER ECHTER
+MULTI-AGENT-SPRINT, verifiziert 2026-07-12, train-v157):
+```
+Agent 1: ui.js (Erfolgsquote-Formeln in zwei Funktionen vereinheitlicht)
+Agent 2: tests/fixtures/ (neuer Ordner, README + 5 JSON-Dateien)
+Agent 3: movementMap.js (Wertkorrektur an 5 bestehenden Einträgen)
+→ Konsolidierungs-Agent zuletzt (Regressionstest, Version, Docs, Commit)
+```
+Ergebnis: keine Kollision, Regressionstest 10/10 grün nach dem Merge.
+
+**Wichtige Matrix-Nuance, die dieser Sprint konkret bestätigt hat:**
+movementMap.js wird von ui.js importiert — nach der bisherigen Formel
+("sicher parallel wenn keine der beiden Dateien in der 'Importiert'-
+Spalte der anderen auftaucht") wäre ui.js + movementMap.js also NICHT
+uneingeschränkt sicher gewesen. In diesem konkreten Fall war es trotzdem
+unproblematisch, weil Agent 3 ausschließlich WERTE bestehender
+MOVEMENT_MAP-Einträge geändert hat (keine Export-Umbenennung, kein Key
+entfernt) und Agent 1s ui.js-Änderungen (Zähl-Formeln in
+_getDayCompletionStats/_renderMovementPattern) an keiner Stelle vom
+konkreten Wert eines bestimmten MOVEMENT_MAP-Eintrags abhingen. Präzisere
+Regel: **movementMap.js-Wertänderungen an bestehenden Keys sind parallel
+zu ui.js sicher, wenn die gleichzeitige ui.js-Änderung nicht selbst
+category-abhängige Logik für genau die geänderten Übungsnamen einführt
+oder ändert.** Reine Formel-/Aggregations-Änderungen (wie hier) sind
+unkritisch; eine ui.js-Änderung, die z.B. neue Kategorie-spezifische
+Schwellenwerte einführt, wäre es nicht.
 
 ---
 

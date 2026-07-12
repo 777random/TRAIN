@@ -2319,7 +2319,10 @@ function _renderMovementPattern(state) {
       for (const ex of day.exercises) {
         const baseName = ex.substituteFor ?? ex.name;
         const cat = customCatMap[baseName] ?? MOVEMENT_MAP[baseName] ?? 'Sonstige';
-        const n = ex.sets.filter(s => s.status === 'success').length;
+        // B22: success+fail zählen (pending ausgeschlossen) statt nur success —
+        // fail-Sätze sollen in der Kategorie-Verteilung sichtbar bleiben statt
+        // komplett zu verschwinden.
+        const n = ex.sets.filter(s => s.status === 'success' || s.status === 'fail').length;
         if (!n) continue;
         catSets[cat] = (catSets[cat] ?? 0) + n;
         totalSets += n;
@@ -6416,8 +6419,8 @@ export function mountApp(root) {
 function _getDayCompletionStats(di) {
   const state = getState();
   const day   = state.weeks[state.curIdx]?.days[di];
-  if (!day) return { successSets: 0, totalSets: 0, prCount: 0, pct: 0, quote: '' };
-  let successSets = 0, totalSets = 0, prCount = 0;
+  if (!day) return { successSets: 0, totalSets: 0, prCount: 0, pct: null, quote: '' };
+  let successSets = 0, failSets = 0, totalSets = 0, prCount = 0;
   for (const ex of day.exercises ?? []) {
     const exPR = state.prs?.[ex.name];
     for (const s of ex.sets ?? []) {
@@ -6428,10 +6431,17 @@ function _getDayCompletionStats(di) {
           s.weight > exPR.maxWeight ||
           (s.weight === exPR.maxWeight && (s.reps ?? 0) > (exPR.maxRepsAtMaxWeight ?? 0))
         )) prCount++;
+      } else if (s.status === 'fail') {
+        failSets++;
       }
     }
   }
-  const pct = totalSets > 0 ? Math.round(successSets / totalSets * 100) : 0;
+  // B22: success / (success+fail), pending ausgeschlossen — identische Semantik
+  // zu _weekSuccessScore(). Vorher successSets/totalSets, wo totalSets auch
+  // pending-Sätze enthielt und den Wert verwässerte. null statt 0 wenn noch
+  // keine Sätze bewertet wurden (kein Wert ist ehrlicher als eine falsche 0%).
+  const evaluatedSets = successSets + failSets;
+  const pct = evaluatedSets > 0 ? Math.round(successSets / evaluatedSets * 100) : null;
   // effortTarget: Summe ALLER targetReps über alle Sätze der Übung, unabhängig
   // vom Satz-Status (identisch zum "target = nSets × targetReps"-Muster im
   // Fulfill-Meter, renderExercise()) — nicht nur der bewerteten Sätze wie
@@ -6690,7 +6700,7 @@ function _showCompletionScreen(stats) {
       <div class="day-completion-screen__icon">💪</div>
       ${isVacation
         ? `<div class="day-completion-screen__pct" style="font-size:20px">🏖 Stark! Auch im Urlaub trainiert.</div>`
-        : `<div class="day-completion-screen__pct">${pct}%</div>`}
+        : pct !== null ? `<div class="day-completion-screen__pct">${pct}%</div>` : ''}
       ${successSets > 0 ? `<div class="day-completion-screen__sets">${successSets}/${totalSets} Sätze erfolgreich</div>` : ''}
       ${prCount > 0 ? `<div class="day-completion-screen__pr">🏆 ${prCount} neues PR${prCount > 1 ? 's' : ''}!</div>` : ''}
       ${!isVacation && effortPct !== null ? `<div class="day-completion-screen__effort">🎯 ${effortPct}% Zielerfüllung</div>` : ''}

@@ -1,0 +1,57 @@
+{
+  "meta": { "schemaVersion": 29, "savedAt": "2026-07-12T12:00:00.000Z", "createdAt": "2026-07-12T12:00:00.000Z" },
+  "curIdx": 0,
+  "weeks": [
+    {
+      "id": 1720260002001,
+      "startDate": "2026-07-06",
+      "note": "",
+      "mode": "standard",
+      "days": [
+        {
+          "id": 1720260002002,
+          "title": "Tag A",
+          "subtitle": "",
+          "warmup": "",
+          "cooldown": "",
+          "locked": false,
+          "markedDone": false,
+          "isVacation": false,
+          "sleepHours": null,
+          "energyLevel": null,
+          "sessionRating": null,
+          "exercises": []
+        }
+      ],
+      "sessionLog": [],
+      "bodyData": {},
+      "restDays": [],
+      "isSeedWeek": false
+    }
+  ],
+  "customTemplate": [],
+  "templates": [],
+  "prs": {},
+  "insights": [],
+  "favoriteExercises": [],
+  "customExercises": [],
+  "badges": [],
+  "onboardingDone": true,
+  "seenTips": [],
+  "plateauActions": {},
+  "decisionLog": [],
+  "coachQuestion": { "weekStart": null, "questionId": null, "answer": null, "outcome": null, "measuredWeekStart": null },
+  "coachQuestionHistory": [],
+  "coachPerformance": { "suggestions": [] },
+  "lastReentryHandled": null,
+  "longestStreakEver": 0,
+  "settings": {
+    "swipe": true, "drag": true, "heightCm": null, "targetWeight": null, "showBmi": false,
+    "deloadFactor": 0.75, "deloadFactorCustom": null, "barbellWeight": 20, "plateStep": 2.5,
+    "lastBackupDate": null, "activeTags": [], "vibrationEnabled": true, "rpeEnabled": true,
+    "weeksSinceLastBackupReminder": 0, "maxSessionMs": 10800000, "autoStartPauseTimer": true,
+    "dismissedNamePairs": [], "autoEval": false,
+    "autoWeek": { "enabled": false, "suggestProgress": true, "showReview": true },
+    "erkenntnisseHorizont": 8
+  }
+}

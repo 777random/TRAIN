@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: Juli 2026 nach train-v156*
-*Nächste Version: train-v157*
+*Letzte Aktualisierung: Juli 2026 nach train-v157*
+*Nächste Version: train-v158*
 
 ---
 
@@ -11,41 +11,52 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v156 (v155 wurde nie vergeben — die Zwischensession
-  war reine Doku/Diagnose: AGENTS.md-Erstellung + dragdrop.js/
-  recommendationEngine.js-Diagnose, keine Code-Änderung, daher kein
-  Versions-Bump)
-- CSS: ?v=182 (?v=181 aus demselben Grund übersprungen)
+- CACHE_VERSION: train-v157 (v155 wurde nie vergeben, siehe vorherige
+  Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
+  Sprint-Text-Nummerierung)
+- CSS: ?v=183
 - SCHEMA: 29
-- Letzter Commit: a3752f8 (dragdrop.js verdrahtet + recommendationEngine.js entfernt)
-- Alle 12 Test-Szenarien verifiziert ✓ (aus früheren Sprints — dieser
-  Sprint hat keine neuen Test-JSONs erzeugt, siehe NEXT)
+- Letzter Commit: siehe Git-Historie (dieser Sprint: Erfolgsquote
+  vereinheitlicht, Beinbeuger→Hinge, tests/fixtures/ angelegt)
+- Alle 12 alten Test-Szenarien verifiziert ✓ + 5 neue Fixture-JSONs in
+  tests/fixtures/ (siehe unten) — diese sind neu, noch nicht real
+  gegen die App durchgetestet, nur schema-validiert
 - Regressions-Test: 10/10 grün (raf=sync), 0 uncaught errors
-- Touch-Drag-Verhalten NICHT auf echtem Gerät/Emulator verifiziert —
-  headless kann Touch-Events nicht auslösen (siehe Abschnitt unten)
+- Touch-Drag-Verhalten (dragdrop.js, v156) weiterhin NICHT auf echtem
+  Gerät verifiziert (siehe Sprint v156 unten)
 - Framework-Score: 11/11
+- **Erster echter Multi-Agent-Sprint dieser Session:** 3 parallele
+  Fork-Agents (ui.js / movementMap.js / tests/fixtures/, disjunkt lt.
+  AGENTS.md-Matrix) + 1 Konsolidierungs-Durchgang. Keine Kollision
+  aufgetreten — Details in AGENTS.md "Bewährte Parallel-Muster".
 
 ---
 
 ## FILES (zuletzt angefasst)
 ```
-index.html             — dragdrop.js Touch-Polyfill verdrahtet (Script-Tag +
+ui.js                   — _getDayCompletionStats() + _renderMovementPattern():
+                          Erfolgsquote auf success/(success+fail) vereinheitlicht,
+                          pending ausgeschlossen (B22). _weekSuccessScore()
+                          bewusst unverändert (war bereits korrekt)
+movementMap.js           — 'Beinbeuger'/'Leg Curl'/'Leg Curls'/'Hamstring Curl'
+                          Squat→Hinge, 'Butterfly' Pull→Push (B23)
+tests/fixtures/          — NEU: README.md + 5 Test-JSON-Fixtures
+                          (iOS_Zoom, HeuteAnders, EdgeCase_LeerWoche,
+                          EdgeCase_AllesFail, EdgeCase_MaxGewicht)
+AGENTS.md                — erster echter Multi-Agent-Sprint dokumentiert
+                          (Bewährtes Muster + Matrix-Nuance movementMap.js+ui.js)
+index.html              — dragdrop.js Touch-Polyfill verdrahtet (Script-Tag +
                           MobileDragDrop.polyfill() vor dem Module-Script),
-                          alter No-Op-touchmove-Listener zusammengeführt,
-                          CSS-Version → ?v=182
+                          alter No-Op-touchmove-Listener zusammengeführt
 sw.js                   — recommendationEngine.js aus Precache entfernt,
                           dragdrop.js zu Precache hinzugefügt (jetzt
-                          ladungsrelevant), CACHE_VERSION → train-v156
+                          ladungsrelevant)
 recommendationEngine.js — GELÖSCHT (ungenutzt, Inhalt redundant zu
                           insightEngine.js — siehe BUGS.md)
-AGENTS.md               — recommendationEngine.js aus Abhängigkeitsmatrix
-                          entfernt, dragdrop.js-Einträge aktualisiert
-ui.js                   — _nextGoalText() Live-Hinweis success+fail-Filter (8686458)
 consistencyUtils.js     — _weekConsistencyRatio() off-by-one fix (ab33633)
 weekReview.js           — _reachableDays() future-days fix (66c034d)
 weeklyFocus.js          — REENTRY_WINDOW_DAYS 14→7, Plateau vor PrePlateau (f1d4f54)
 state.js                — Wochenerstellung isSeedWeek-Skip, Auto-Eval Guard (f1d4f54)
-movementMap.js          — +32 englische Synonyme (8143086)
 ```
 
 ---
@@ -64,6 +75,7 @@ movementMap.js          — +32 englische Synonyme (8143086)
 | ConsistencyRatio Fix | ab33633 | _weekConsistencyRatio < statt <= |
 | Live-Hinweis Fix | 8686458 | _nextGoalText success+fail statt nur success (B08) |
 | Dragdrop verdrahtet + Cleanup | a3752f8 | dragdrop.js Touch-Polyfill aktiviert (B24), recommendationEngine.js entfernt |
+| Parallel-Sprint: Erfolgsquote + Beinbeuger + Fixtures | (dieser Sprint) | B22 (Erfolgsquote), B23 (Beinbeuger→Hinge + Butterfly→Push), tests/fixtures/ neu — erster echter 3-Agent-Parallel-Sprint |
 
 ---
 
@@ -86,19 +98,28 @@ movementMap.js          — +32 englische Synonyme (8143086)
 ---
 
 ## NEXT (konkret nächster Schritt)
-**Parallel-Sprint v157: Erfolgsquote-Vereinheitlichung + Beinbeuger-Kategorie
-+ tests/fixtures/**
-- Erfolgsquote: mind. 3 verschiedene Formeln im UI (_weekSuccessScore,
-  _getDayCompletionStats, _renderMovementPattern) — Vereinheitlichung
-  oder zumindest saubere Doku der 3 Semantiken prüfen
-- movementMap.js: "Beinbeuger" steht unter Squat statt Hinge — fachlich
-  prüfen ob Umkategorisierung sinnvoll ist
-- Test-JSONs aus "01 Privat/TRAIN/Testing - Simulation/" nach
-  tests/fixtures/ ins Repo übernehmen (aktuell nicht git-getrackt)
-- Vor Start: AGENTS.md-Matrix konsultieren, ob diese drei Teilaufgaben
-  wirklich parallelisierbar sind (unterschiedliche Dateien, keine
-  gemeinsame Import-Kante) oder ob z.B. die Erfolgsquote-Aufgabe ui.js
-  anfasst und damit NICHT parallel zu anderen ui.js-Arbeiten laufen darf
+**Sprint v158: Edge-Case-Audit mit den neuen Fixture-JSONs**
+- Die 5 neuen Dateien in tests/fixtures/ sind bisher nur schema-validiert
+  (valides JSON, korrekter State-Shape), NICHT real gegen die laufende
+  App importiert/getestet. Nächster Schritt: jede Datei einmal über
+  Settings → JSON importieren einspielen und die in
+  tests/fixtures/README.md dokumentierte Erwartung verifizieren:
+  - TRAIN_Test_iOS_Zoom.v1.json → hängt an offenem B16 (Zoom-Bug)
+  - TRAIN_Test_HeuteAnders.v1.json → hängt an offenem B17
+  - TRAIN_Test_EdgeCase_LeerWoche.v1.json → kein Crash, Empty-State
+  - TRAIN_Test_EdgeCase_AllesFail.v1.json → Coach-Reaktion prüfen (sollte
+    kein "Steigerung sinnvoll" zeigen)
+  - TRAIN_Test_EdgeCase_MaxGewicht.v1.json → kein NaN/Overflow bei 1RM
+
+**Offene Nebenfunde aus diesem Sprint (nicht behoben, nur notiert):**
+- Push/Pull-Ratio-Block in _renderMovementPattern() (ui.js, unterhalb der
+  Kategorie-Balken) zählt weiterhin nur success-Sätze, nicht success+fail
+  — war nicht Teil von B22, potenzieller Folge-Fix
+- movementMap.js-Grenzfälle geprüft, bewusst NICHT geändert (Agent-3-Review):
+  Ausfallschritte/Lunges (Squat), Box Jumps (Squat) vs. Broad Jumps (Core),
+  Wadenheben/Calf Raise (Hinge), KB Turkish Get-Up/Windmill (Hinge),
+  Front/Lateral Raise (Pull), Battle Ropes/Burpees (Core) — jeweils
+  vertretbare Konvention, keine eindeutigen Fehler
 
 **Danach: iOS Doppelklick-Zoom beim Picker (B16)** — font-size < 16px in
 Picker-Feldern → Browser-Zoom bei Doppeltipp. Fix: touch-action:manipulation

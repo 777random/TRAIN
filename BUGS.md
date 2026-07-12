@@ -1,6 +1,6 @@
 # TRAIN — Bug-Tracking
 *Wird nach jedem Sprint aktualisiert*
-*Stand: Juli 2026 / train-v156*
+*Stand: Juli 2026 / train-v157*
 
 ---
 
@@ -24,6 +24,8 @@
 | B14 | Pull Ups (weight=0) triggert _checkRisingRpe nicht | — | — | Guard weights.some(w=>w===0) — by design, kein Bug |
 | B15 | isSeedWeek als Vorlage für neue Woche | v151 | f1d4f54 | _templateWeekForNewWeek() überspringt isSeedWeek |
 | B24 | dragdrop.js nie aktiviert → Touch-Drag defekt auf iOS/Android | v156 | a3752f8 | Polyfill in index.html verdrahtet — `<script src="./dragdrop.js">` + `MobileDragDrop.polyfill()` vor dem Module-Script. Abweichung von der Sprint-Vorlage: touchmove-preventDefault() nur während aktivem Drag (Flag über dragstart/dragend/drop), nicht global — eine bedingungslose preventDefault() hätte jegliches Scrollen auf Touch-Geräten dauerhaft blockiert. Touch-Verhalten selbst NICHT auf echtem Gerät verifiziert (siehe HANDOFF.md) — nur headless bestätigt: Skript lädt fehlerfrei, kein Uncaught-Error, `#app` erreicht `is-ready`. |
+| B22 | Erfolgsquote inkonsistent (3 verschiedene Formeln im UI) | v157 | (dieser Sprint) | success/(success+fail) vereinheitlicht, pending ausgeschlossen — als einzig korrekte Semantik (identisch zu `_weekSuccessScore()`) festgelegt. `_getDayCompletionStats()` (ui.js:6419): vorher `successSets/totalSets` (totalSets inkl. pending) → jetzt `successSets/(successSets+failSets)`, `pct:null` statt `0` wenn noch nichts bewertet. `_renderMovementPattern()` (ui.js:2302): Kategorie-Balken zählten vorher nur success-Sätze in Zähler UND Nenner (fail unsichtbar) → jetzt success+fail. `_weekSuccessScore()` bewusst unverändert gelassen (war bereits korrekt). Bewusst NICHT angefasst: Push/Pull-Ratio-Block in `_renderMovementPattern()` zählt weiterhin nur success — out of scope für diesen Sprint, potenzieller Folge-Fund. |
+| B23 | Beinbeuger (+ englische Synonyme) unter Squat statt Hinge | v157 | (dieser Sprint) | movementMap.js korrigiert: `'Beinbeuger'`, `'Leg Curl'`, `'Leg Curls'`, `'Hamstring Curl'` von Squat → Hinge (Hamstring-Curl ist hüftdominant, nicht kniedominant). Zusätzlicher Fund bei der Gelegenheit (nicht angefordert, aber eindeutig): `'Butterfly'` stand unter Pull, korrigiert zu Push — Widerspruch zu den bereits korrekt als Push klassifizierten `'KH Flys'`/`'Flys Kabel'` (Brust-Fly-Bewegung, nicht zu verwechseln mit `'Reverse Flys'`, korrekt unter Pull für hintere Schulter). Geprüfte, bewusst nicht geänderte Grenzfälle (Ausfallschritte/Lunges als Squat, Wadenheben als Hinge, Front/Lateral Raise als Pull, Battle Ropes/Burpees als Core) siehe Sprint-Notiz in HANDOFF.md. |
 
 ---
 

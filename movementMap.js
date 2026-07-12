@@ -14,7 +14,7 @@ export const MOVEMENT_MAP = {
   'Dips': 'Push', 'Liegestütz': 'Push', 'KB Press': 'Push', 'Push Press': 'Push',
   'Landmine Press': 'Push', 'Chest Press Maschine': 'Push', 'Shoulder Press Maschine': 'Push',
   'Trizepsdips': 'Push', 'Trizepsdrücken': 'Push', 'Skull Crushers': 'Push',
-  'KH Flys': 'Push', 'Flys Kabel': 'Push',
+  'KH Flys': 'Push', 'Flys Kabel': 'Push', 'Butterfly': 'Push',
   // Englische Synonyme für bereits vorhandene Push-Übungen oben (Sprint
   // "movementMap.js: fehlende Übungsnamen ergänzen") — reine Zusatz-
   // Schlüssel, keine neue Kategorie.
@@ -26,7 +26,7 @@ export const MOVEMENT_MAP = {
   'Kabelrudern': 'Pull', 'Rudern': 'Pull', 'Rudern Maschine': 'Pull',
   'KH Rudern': 'Pull', 'T-Bar Rudern': 'Pull', 'Pendlay Row': 'Pull',
   'Kabelbizeps': 'Pull', 'Bizepscurls': 'Pull', 'Hammercurls': 'Pull',
-  'Konzentrationscurls': 'Pull', 'Butterfly': 'Pull', 'Face Pulls': 'Pull',
+  'Konzentrationscurls': 'Pull', 'Face Pulls': 'Pull',
   'Reverse Flys': 'Pull', 'Frontheben': 'Pull', 'Seitheben': 'Pull',
   'KH Shrugs': 'Pull',
   // Englische Synonyme für bereits vorhandene Pull-Übungen oben.
@@ -42,21 +42,21 @@ export const MOVEMENT_MAP = {
   'Shrugs': 'Pull', 'Dumbbell Shrugs': 'Pull',
   'Kniebeuge': 'Squat', 'Frontkniebeuge': 'Squat', 'Bulgarische Kniebeuge': 'Squat',
   'Beinpresse': 'Squat', 'Hack Squat': 'Squat', 'Smith Maschine Kniebeuge': 'Squat',
-  'Beinstrecker': 'Squat', 'Beinbeuger': 'Squat', 'Ausfallschritte': 'Squat',
+  'Beinstrecker': 'Squat', 'Ausfallschritte': 'Squat',
   'Box Jumps': 'Squat', 'KB Goblet Squat': 'Squat',
   // Englische Synonyme für bereits vorhandene Squat-Übungen oben.
   'Squat': 'Squat', 'Back Squat': 'Squat', 'Barbell Squat': 'Squat', 'Front Squat': 'Squat',
   'Bulgarian Split Squat': 'Squat', 'Split Squat': 'Squat',
   'Leg Press': 'Squat', 'Leg Extension': 'Squat', 'Leg Extensions': 'Squat',
-  'Leg Curl': 'Squat', 'Leg Curls': 'Squat', 'Hamstring Curl': 'Squat',
   'Lunge': 'Squat', 'Lunges': 'Squat', 'Walking Lunges': 'Squat',
   'Kreuzheben': 'Hinge', 'Rumänisches Kreuzheben': 'Hinge', 'Sumo Kreuzheben': 'Hinge',
   'Hip Thrust': 'Hinge', 'KB Swings': 'Hinge', 'Kettlebell Swings': 'Hinge',
   'KB Clean': 'Hinge', 'KB Snatch': 'Hinge', 'KB Turkish Get-Up': 'Hinge',
-  'KB Windmill': 'Hinge', 'Wadenheben': 'Hinge',
+  'KB Windmill': 'Hinge', 'Wadenheben': 'Hinge', 'Beinbeuger': 'Hinge',
   // Englische Synonyme für bereits vorhandene Hinge-Übungen oben.
   'Deadlift': 'Hinge', 'Romanian Deadlift': 'Hinge', 'RDL': 'Hinge', 'Sumo Deadlift': 'Hinge',
   'Calf Raise': 'Hinge', 'Calf Raises': 'Hinge',
+  'Leg Curl': 'Hinge', 'Leg Curls': 'Hinge', 'Hamstring Curl': 'Hinge',
   'KB Carry': 'Carry',
   // Englische Synonyme für bereits vorhandene Carry-Übungen oben.
   'Farmer Carry': 'Carry', 'Farmers Carry': 'Carry', 'Kettlebell Carry': 'Carry',
