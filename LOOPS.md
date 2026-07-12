@@ -84,18 +84,23 @@ Ausführung:
   Prüfen ob "Letzter Commit" korrekt ist.
   Prüfen ob "Nächster Schritt" noch
   aktuell ist (nicht bereits erledigt).
+  Prüfen ob CACHE_VERSION und CSS-Version
+  in CLAUDE.md (erste Sektion) mit
+  sw.js und index.html übereinstimmen.
+  Falls nicht: CLAUDE.md aktualisieren.
 
 Wenn veraltet:
-  HANDOFF.md aktualisieren.
-  git add HANDOFF.md
-  git commit -m "chore: HANDOFF.md
+  HANDOFF.md und/oder CLAUDE.md aktualisieren.
+  git add HANDOFF.md CLAUDE.md
+  git commit -m "chore: HANDOFF.md/CLAUDE.md
   auto-sync"
   Push braucht Bestätigung (siehe
   Push-Policy oben) — reine Doku-Syncs
   sind risikoarm, aber die Regel gilt
   einheitlich für alle Loops.
 
-Stopp-Bedingung: HANDOFF.md ist aktuell
+Stopp-Bedingung: HANDOFF.md und CLAUDE.md
+  sind aktuell
 
 ---
 
