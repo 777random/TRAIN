@@ -1180,7 +1180,7 @@ function _nextGoalText(ex) {
   // Berechnung wie die bestehende fulfill-meter-Zeile weiter unten, nicht neu erfunden.
   const nSets = ex.sets.length;
   const soll  = nSets * target;
-  const ist   = ex.sets.filter(s => s.status === 'success').reduce((sum, s) => sum + (parseFloat(s.reps) || 0), 0);
+  const ist   = ex.sets.filter(s => s.status === 'success' || s.status === 'fail').reduce((sum, s) => sum + (parseFloat(s.reps) || 0), 0);
 
   if (ist < soll) {
     // Zustand A-fertig: alle Sätze durch, aber Gesamt-Soll verfehlt
