@@ -1664,7 +1664,15 @@ function renderExercise(wk, di, ei, state) {
 }
 // ─── Set row ─────────────────────────────────────────────────────────────────
 function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true) {
-  const prevSet    = prevEx?.sets?.[si] ?? null;
+  // B17: prevEx wird in renderExercise() bei einer Ausweichübung (substituteFor)
+  // bewusst über den NAMEN DER URSPRÜNGLICHEN Übung gesucht (siehe _lookupName
+  // dort) — für den Fulfill-Meter-Metrik-Check dort ist das sinnvoll, aber hier
+  // würde es die "Vorwoche"-Hints (Gewicht/Wdh übernehmen) mit Werten der
+  // URSPRÜNGLICHEN, nicht der heute tatsächlich ausgeführten Übung befüllen
+  // (z.B. Kniebeuge-Gewicht als Vorschlag für Beinpresse). Ausweichübung hat
+  // per Definition keine eigene Vorwochen-Historie — daher hier explizit kein
+  // Hint statt eines aus einer anderen Übung übernommenen.
+  const prevSet    = ex.substituteFor ? null : (prevEx?.sets?.[si] ?? null);
   const dlFactor   = getState().settings?.deloadFactor ?? 0.75;
   const dispW      = isDl ? Math.round(s.weight * dlFactor * 2) / 2 : s.weight;
   const metric  = ex.metric === 'sec' || ex.metric === 'm' ? ex.metric : 'reps';

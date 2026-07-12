@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: Juli 2026 nach train-v158*
-*Nächste Version: train-v159*
+*Letzte Aktualisierung: Juli 2026 nach train-v159*
+*Nächste Version: train-v160*
 
 ---
 
@@ -11,12 +11,12 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v158 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v159 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
-- CSS: ?v=184
+- CSS: ?v=184 (unverändert — v159 ist ein reiner JS-Fix, kein CSS)
 - SCHEMA: 29
-- Letzter Commit: e312751 (B16 iOS-Zoom-Fix)
+- Letzter Commit: siehe unten (B17 Fix)
 - Alle 12 alten Test-Szenarien verifiziert ✓ + 5 Fixture-JSONs in
   tests/fixtures/ jetzt ECHT importiert und verifiziert (nicht mehr nur
   schema-validiert) — Ergebnisse in tests/fixtures/README.md, Kurzfassung
@@ -34,6 +34,10 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 
 ## FILES (zuletzt angefasst)
 ```
+ui.js                   — B17-Fix: renderSetRow() unterdrückt "Vorwoche"-
+                          Adopt-Hints für Ausweichübungen (prevSet=null
+                          wenn ex.substituteFor gesetzt), prevEx selbst
+                          für Fulfill-Meter-Guard unangetastet
 styles.css              — B16-Fix: .btn-icon--kg touch-action:manipulation
                           (Doppeltipp-Zoom-Kollision), .num-input +
                           .ex-kg-picker-custom .num-input auf 16px
@@ -94,6 +98,8 @@ state.js                — Wochenerstellung isSeedWeek-Skip, Auto-Eval Guard (f
 | LOOP 2 Erweiterung | 5a9b935 | Prüft jetzt auch CLAUDE.md gegen sw.js/index.html, nicht nur HANDOFF.md |
 | Loop-2-Autosync | 56bdba1 | HANDOFF.md GEÄNDERT-Tabelle + Letzter-Commit nachgezogen |
 | B16 iOS-Zoom-Fix | e312751 | Diagnose korrigiert (2 unabhängige Ursachen statt 1) + beide behoben: touch-action:manipulation auf +kg/+Wdh-Button, font-size 16px auf allen Set-Inputs |
+| Edge-Case-Audit | 3466751 | Alle 5 Fixtures echt importiert + verifiziert, B17 dabei erstmals genauer diagnostiziert (Diagnose später selbst nochmal korrigiert, siehe nächste Zeile) |
+| B17 Fix | (dieser Sprint) | Eigene Fehldiagnose aus dem Edge-Case-Audit korrigiert ("positionsbasiert" war falsch — tatsächlich namensbasiert auf den falschen Namen, ex.substituteFor statt ex.name). Adopt-Hints in renderSetRow() unterdrückt wenn ex.substituteFor gesetzt ist, prevEx für Fulfill-Meter-Guard unangetastet gelassen. Re-verifiziert mit TRAIN_Test_HeuteAnders.v1.json. |
 
 ---
 
@@ -139,10 +145,15 @@ tests/fixtures/README.md. Kurzfassung:
 - EdgeCase_MaxGewicht: 1RM-Berechnung korrekt (~550kg via Epley), kein
   Overflow
 
-**Nächster Schritt (nicht mehr Teil von v158):** B17 fixen (Hint-Button
-namensbasiert statt positionsbasiert), ODER Loop 3 weitere Edge-Cases
-ergänzen lassen (aktuell 5 von 15), ODER eine schärfere
-AllesFail-Variante ohne Schlaf-Störfaktor bauen.
+**B17 behoben in train-v159** (siehe BUGS.md) — Korrektur einer eigenen
+Fehldiagnose aus dem Edge-Case-Audit inklusive (dort stand fälschlich
+"positionsbasiert", tatsächlich war es namensbasiert auf den falschen
+Namen). tests/fixtures/README.md entsprechend nachgezogen.
+
+**Nächster Schritt:** eine schärfere AllesFail-Variante ohne
+Schlaf-Störfaktor bauen (isoliert die Coach-Reaktion auf reine
+Fail-Sätze), ODER Loop 3 weitere Edge-Cases ergänzen lassen (aktuell 5
+von 15 angestrebten).
 
 **Offene Nebenfunde aus diesem Sprint (nicht behoben, nur notiert):**
 - Push/Pull-Ratio-Block in _renderMovementPattern() (ui.js, unterhalb der
