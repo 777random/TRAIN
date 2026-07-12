@@ -1,7 +1,22 @@
 # TRAIN — CLAUDE.md
 # Vollständiger Projektkontext für Claude Code
-# Stand: train-v154 / SCHEMA 29 / Juli 2026
-# Letztes Update: nach train-v154 Sprint
+# Stand: train-v157 / SCHEMA 29 / Juli 2026
+# Letztes Update: nach train-v157 Sprint
+
+---
+
+## SESSION START (IMMER ZUERST)
+
+Beim Start jeder Session diese Reihenfolge einhalten:
+
+1. Diese Dateien lesen:
+   CLAUDE.md, HANDOFF.md, BUGS.md, DECISIONS.md, AGENTS.md, LOOPS.md
+
+2. Alle AKTIVEN Loops in LOOPS.md ausführen
+
+3. Ergebnis in SESSION_LOG.md dokumentieren
+
+4. Erst dann mit der eigentlichen Aufgabe beginnen
 
 ---
 
@@ -15,7 +30,7 @@ TRAIN ist eine deutschsprachige PWA für Krafttraining. Pure Vanilla ES Modules 
 
 - Repo: https://github.com/777random/TRAIN
 - Deployed: https://777random.github.io/TRAIN/
-- Aktueller Stand: SCHEMA_VERSION 29 · CACHE_VERSION train-v154 · CSS ?v=180
+- Aktueller Stand: SCHEMA_VERSION 29 · CACHE_VERSION train-v157 · CSS ?v=183
 
 ---
 
@@ -25,7 +40,7 @@ TRAIN ist eine deutschsprachige PWA für Krafttraining. Pure Vanilla ES Modules 
 
 Bei CSS-Änderungen: Cache-Buster in `index.html` erhöhen:
 ```html
-<link rel="stylesheet" href="./styles.css?v=180">
+<link rel="stylesheet" href="./styles.css?v=183">
 ```
 
 ---
