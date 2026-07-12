@@ -16,7 +16,7 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
   Sprint-Text-Nummerierung)
 - CSS: ?v=184 (unverändert seit v158 — v159/v160 sind reine JS-Fixes)
 - SCHEMA: 29
-- Letzter Commit: siehe unten (B25 Fix — neues Coach-Signal _checkPersistentFailure)
+- Letzter Commit: 668b00a (B25 Fix — neues Coach-Signal _checkPersistentFailure)
 - Alle 12 alten Test-Szenarien verifiziert ✓ + 5 Fixture-JSONs in
   tests/fixtures/ jetzt ECHT importiert und verifiziert (nicht mehr nur
   schema-validiert) — Ergebnisse in tests/fixtures/README.md, Kurzfassung
@@ -104,7 +104,7 @@ state.js                — Wochenerstellung isSeedWeek-Skip, Auto-Eval Guard (f
 | B16 iOS-Zoom-Fix | e312751 | Diagnose korrigiert (2 unabhängige Ursachen statt 1) + beide behoben: touch-action:manipulation auf +kg/+Wdh-Button, font-size 16px auf allen Set-Inputs |
 | Edge-Case-Audit | 3466751 | Alle 5 Fixtures echt importiert + verifiziert, B17 dabei erstmals genauer diagnostiziert (Diagnose später selbst nochmal korrigiert, siehe nächste Zeile) |
 | B17 Fix | 6e1a203 | Eigene Fehldiagnose aus dem Edge-Case-Audit korrigiert ("positionsbasiert" war falsch — tatsächlich namensbasiert auf den falschen Namen, ex.substituteFor statt ex.name). Adopt-Hints in renderSetRow() unterdrückt wenn ex.substituteFor gesetzt ist, prevEx für Fulfill-Meter-Guard unangetastet gelassen. Re-verifiziert mit TRAIN_Test_HeuteAnders.v1.json. |
-| B25 Fix (mit Nutzer besprochen) | (dieser Sprint) | Neues Coach-Signal `_checkPersistentFailure()`, Priorität 2 (nach Reentry, vor Overload), Schwelle 0% Erfolg über 3 Wochen, konkrete Gewichtsempfehlung via deloadFactor+roundToPlate(). Neues Icon 🛑. Beide AllesFail-Fixtures neu verifiziert. |
+| B25 Fix (mit Nutzer besprochen) | 668b00a | Neues Coach-Signal `_checkPersistentFailure()`, Priorität 2 (nach Reentry, vor Overload), Schwelle 0% Erfolg über 3 Wochen, konkrete Gewichtsempfehlung via deloadFactor+roundToPlate(). Neues Icon 🛑. Beide AllesFail-Fixtures neu verifiziert. |
 
 ---
 
