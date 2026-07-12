@@ -40,7 +40,7 @@
 
 import { getLatestWeek } from './state.js';
 import { detectPlateaus } from './plateauDetector.js';
-import { getWeightRecommendation, isReadyForAutoSelect } from './weightRecommendation.js';
+import { getWeightRecommendation, isReadyForAutoSelect, roundToPlate } from './weightRecommendation.js';
 import { isFullSuccess } from './setUtils.js';
 import { _consistencyEligibleWeeks } from './consistencyUtils.js';
 import { computeVolumeTrend, computeConsistencyTrend, computeQualityTrend } from './overallPerformance.js';
@@ -755,12 +755,72 @@ function _fallback(state) {
  */
 export function computeWeeklyFocus(state) {
   return _checkReentry(state)
+    ?? _checkPersistentFailure(state)
     ?? _checkOverload(state)
     ?? _checkPlateau(state)
     ?? _checkPrePlateau(state)
     ?? _checkConsistencyGap(state)
     ?? _checkProgression(state)
     ?? _fallback(state);
+}
+
+// ─── Prio 2 (akute Kaskade): Konsistente Fehlschläge ────────────────────────
+// Gefunden bei Edge-Case-Audit v159 (B25, TRAIN_Test_EdgeCase_AllesFail_
+// GuterSchlaf.v1.json): ohne diesen Check fällt eine Übung, bei der über
+// mehrere Wochen kein einziger Satz gelingt, durch JEDE andere Signal-
+// Funktion durch (die alle auf status==='success' aufbauen, um Gewicht/
+// Trend zu berechnen) bis zum Fallback "Auf Kurs" — obwohl konsequentes
+// Totalversagen der eindeutigste denkbare Hinweis auf ein zu hohes Gewicht
+// ist. Steht bewusst VOR _checkOverload: bereits eingetretenes
+// Totalversagen ist dringlicher als ein nur drohendes Überlastungssignal
+// (Schlaf/RPE-Trend/sinkende Erfolgsquote — die setzen alle noch teilweise
+// erfolgreiche Sätze voraus, um überhaupt einen Trend zu berechnen).
+//
+// Schwelle (0% Erfolg, 3 Wochen) bewusst konservativ gewählt, um den
+// gefundenen Bug direkt abzudecken, ohne bei gelegentlichen Fehlschlägen
+// überzureagieren — analog zum 3-Wochen-Mindestfenster von _checkPlateau.
+function _checkPersistentFailure(state) {
+  const weeks = _nonDeloadWeeks(state);
+  if (weeks.length < 3) return null;
+  const last3 = weeks.slice(-3);
+  const exNames = [...new Set(last3.flatMap(w => w.days.flatMap(d => d.exercises.map(e => e.name))))];
+
+  for (const name of exNames) {
+    let succ = 0, fail = 0, weeksAttempted = 0, lastFailWeight = null;
+    for (const wk of last3) {
+      let wkEvaluated = 0;
+      for (const d of wk.days) for (const ex of d.exercises) if (ex.name === name) {
+        for (const s of ex.sets) {
+          if (s.status === 'success') { succ++; wkEvaluated++; }
+          else if (s.status === 'fail') {
+            fail++; wkEvaluated++;
+            if ((s.weight ?? 0) > 0) lastFailWeight = s.weight;
+          }
+        }
+      }
+      if (wkEvaluated > 0) weeksAttempted++;
+    }
+    // Muss in allen 3 Wochen tatsächlich versucht + bewertet worden sein —
+    // eine ausgelassene Woche soll nicht fälschlich mitzählen.
+    if (weeksAttempted < 3) continue;
+    if (succ === 0 && fail >= 3) {
+      const plateStep    = state.settings?.plateStep ?? 2.5;
+      const deloadFactor = state.settings?.deloadFactor ?? 0.75;
+      const suggestedWeight = lastFailWeight != null
+        ? roundToPlate(lastFailWeight * deloadFactor, plateStep)
+        : null;
+      return {
+        status: 'persistent_failure',
+        headline: 'Gewicht zu hoch',
+        reasoning: `Du hast bei ${name} in den letzten 3 Wochen keinen Satz erfolgreich abgeschlossen.`,
+        recommendation: suggestedWeight != null
+          ? `Gewicht bei ${name} auf ~${suggestedWeight} kg reduzieren`
+          : `Gewicht bei ${name} reduzieren`,
+        exerciseName: name,
+      };
+    }
+  }
+  return null;
 }
 
 // ─── Strukturelle Signale ────────────────────────────────────────────────────

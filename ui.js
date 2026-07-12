@@ -2437,13 +2437,14 @@ function _hasAnyTrainingData(state) {
 // computeStructuralSignals(), das eigene Icons je Signal-Typ nutzt, siehe
 // _structuralSignalHtml() unten).
 const _FOCUS_ICONS = {
-  reentry:        '🔄',
-  overload:       '🔋',
-  pre_plateau:    '📈',
-  consistencyGap: '📅',
-  plateau:        '⚠️',
-  progression:    '💪',
-  onTrack:        '✅',
+  reentry:            '🔄',
+  persistent_failure: '🛑',
+  overload:           '🔋',
+  pre_plateau:        '📈',
+  consistencyGap:     '📅',
+  plateau:            '⚠️',
+  progression:        '💪',
+  onTrack:            '✅',
 };
 
 // Icons/Kurztexte je strukturellem Signal-Typ (computeStructuralSignals()) —

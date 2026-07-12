@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: Juli 2026 nach train-v159*
-*Nächste Version: train-v160*
+*Letzte Aktualisierung: Juli 2026 nach train-v160*
+*Nächste Version: train-v161*
 
 ---
 
@@ -11,12 +11,12 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v159 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v160 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
-- CSS: ?v=184 (unverändert — v159 ist ein reiner JS-Fix, kein CSS)
+- CSS: ?v=184 (unverändert seit v158 — v159/v160 sind reine JS-Fixes)
 - SCHEMA: 29
-- Letzter Commit: 6e1a203 (B17 Fix)
+- Letzter Commit: siehe unten (B25 Fix — neues Coach-Signal _checkPersistentFailure)
 - Alle 12 alten Test-Szenarien verifiziert ✓ + 5 Fixture-JSONs in
   tests/fixtures/ jetzt ECHT importiert und verifiziert (nicht mehr nur
   schema-validiert) — Ergebnisse in tests/fixtures/README.md, Kurzfassung
@@ -34,7 +34,11 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 
 ## FILES (zuletzt angefasst)
 ```
-ui.js                   — B17-Fix: renderSetRow() unterdrückt "Vorwoche"-
+weeklyFocus.js           — B25-Fix: neue Funktion _checkPersistentFailure()
+                          (Prio 2, vor Overload), in computeWeeklyFocus()
+                          eingehängt. roundToPlate-Import ergänzt.
+ui.js                   — _FOCUS_ICONS um 'persistent_failure': '🛑' ergänzt.
+                          B17-Fix: renderSetRow() unterdrückt "Vorwoche"-
                           Adopt-Hints für Ausweichübungen (prevSet=null
                           wenn ex.substituteFor gesetzt), prevEx selbst
                           für Fulfill-Meter-Guard unangetastet
@@ -100,6 +104,7 @@ state.js                — Wochenerstellung isSeedWeek-Skip, Auto-Eval Guard (f
 | B16 iOS-Zoom-Fix | e312751 | Diagnose korrigiert (2 unabhängige Ursachen statt 1) + beide behoben: touch-action:manipulation auf +kg/+Wdh-Button, font-size 16px auf allen Set-Inputs |
 | Edge-Case-Audit | 3466751 | Alle 5 Fixtures echt importiert + verifiziert, B17 dabei erstmals genauer diagnostiziert (Diagnose später selbst nochmal korrigiert, siehe nächste Zeile) |
 | B17 Fix | 6e1a203 | Eigene Fehldiagnose aus dem Edge-Case-Audit korrigiert ("positionsbasiert" war falsch — tatsächlich namensbasiert auf den falschen Namen, ex.substituteFor statt ex.name). Adopt-Hints in renderSetRow() unterdrückt wenn ex.substituteFor gesetzt ist, prevEx für Fulfill-Meter-Guard unangetastet gelassen. Re-verifiziert mit TRAIN_Test_HeuteAnders.v1.json. |
+| B25 Fix (mit Nutzer besprochen) | (dieser Sprint) | Neues Coach-Signal `_checkPersistentFailure()`, Priorität 2 (nach Reentry, vor Overload), Schwelle 0% Erfolg über 3 Wochen, konkrete Gewichtsempfehlung via deloadFactor+roundToPlate(). Neues Icon 🛑. Beide AllesFail-Fixtures neu verifiziert. |
 
 ---
 
@@ -150,21 +155,24 @@ Fehldiagnose aus dem Edge-Case-Audit inklusive (dort stand fälschlich
 "positionsbasiert", tatsächlich war es namensbasiert auf den falschen
 Namen). tests/fixtures/README.md entsprechend nachgezogen.
 
-**🚨 B25 (NEU, UX-Hoch, NICHT gefixt) — wichtigster nächster Schritt:**
-Beim Bau einer schärferen AllesFail-Fixture (ohne Schlaf-Störfaktor,
-TRAIN_Test_EdgeCase_AllesFail_GuterSchlaf.v1.json) gefunden: Coach zeigt
-"Auf Kurs" trotz 4 Wochen komplettem Fail (RPE 9.5-10 durchgehend).
-Root Cause: die komplette computeWeeklyFocus()-Kaskade in weeklyFocus.js
-filtert überall auf `status === 'success'` — ohne Erfolge berechnet
-keine einzige Signal-Funktion irgendetwas, alles fällt durch bis zum
-Fallback. Das ist keine Kleinigkeit — es untergräbt die Kernmission
-("Decision Support"). Braucht eine Produktentscheidung (welches neue
-Signal? welche Schwelle? welche Formulierung?), siehe CLAUDE.md "zwei
-Pflichtfragen vor konzeptionell neuen Features" — daher bewusst NICHT
-selbst gefixt, sondern zur Diskussion vorgelegt. Details: BUGS.md B25.
+**B25 behoben in train-v160** (siehe BUGS.md) — Design mit Nutzer
+besprochen (Priorität + Schwelle), dann `_checkPersistentFailure()`
+implementiert und mit beiden AllesFail-Fixtures re-verifiziert.
 
-**Danach:** Loop 3 weitere Edge-Cases ergänzen lassen (aktuell 6 von 15
-angestrebten, seit der neuen AllesFail_GuterSchlaf-Fixture).
+**Bekannte Grenzen der v160-Lösung (nicht behoben, nur notiert):**
+- Keine Decisional-Balance (Stay/Change-Buttons) für `persistent_failure`
+  — `buildDecisionalBalance()` unterstützt bisher nur 'overload'/
+  'consistencyGap'. UI zeigt einfach keine Buttons (bestehendes
+  Fallback-Verhalten, kein Crash), aber ggf. für spätere Konsistenz
+  nachrüsten.
+- Schwelle prüft nur EINZELNE Übungen einzeln (0% über 3 Wochen für
+  eine bestimmte Übung), keine wochenübergreifende Gesamt-Erfolgsquote.
+  Ein Nutzer, der bei VIELEN verschiedenen Übungen wechselnd, aber nie
+  bei DERSELBEN Übung 3 Wochen durchgehend scheitert, würde das Signal
+  nicht auslösen.
+
+**Nächster Schritt:** Loop 3 weitere Edge-Cases ergänzen lassen
+(aktuell 6 von 15 angestrebten).
 
 **Offene Nebenfunde aus diesem Sprint (nicht behoben, nur notiert):**
 - Push/Pull-Ratio-Block in _renderMovementPattern() (ui.js, unterhalb der

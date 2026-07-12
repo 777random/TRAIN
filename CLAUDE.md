@@ -1,7 +1,7 @@
 # TRAIN — CLAUDE.md
 # Vollständiger Projektkontext für Claude Code
-# Stand: train-v157 / SCHEMA 29 / Juli 2026
-# Letztes Update: nach train-v157 Sprint
+# Stand: train-v160 / SCHEMA 29 / Juli 2026
+# Letztes Update: nach train-v160 Sprint
 
 ---
 
@@ -30,7 +30,7 @@ TRAIN ist eine deutschsprachige PWA für Krafttraining. Pure Vanilla ES Modules 
 
 - Repo: https://github.com/777random/TRAIN
 - Deployed: https://777random.github.io/TRAIN/
-- Aktueller Stand: SCHEMA_VERSION 29 · CACHE_VERSION train-v157 · CSS ?v=183
+- Aktueller Stand: SCHEMA_VERSION 29 · CACHE_VERSION train-v160 · CSS ?v=184
 
 ---
 
@@ -218,12 +218,16 @@ Set → { weight, reps, rpe, status ('pending'|'success'|'fail'), done }
 **Hauptkarte (akut) — `computeWeeklyFocus()`:**
 ```
 _checkReentry(1)
-?? _checkOverload(2)        // 3 Zweige: sleep, rpe, completion
-?? _checkPlateau(3)         // VOR PrePlateau (stärkerer Befund)
-?? _checkPrePlateau(4)
-?? _checkConsistencyGap(5)
-?? _checkProgression(6)
-?? _fallback(7)
+?? _checkPersistentFailure(2)  // seit v160 (B25): 0% Erfolg über 3 Wochen bei
+                                // einer Übung — VOR Overload, da eingetretenes
+                                // Totalversagen dringlicher ist als drohende
+                                // Überlastung
+?? _checkOverload(3)        // 3 Zweige: sleep, rpe, completion
+?? _checkPlateau(4)         // VOR PrePlateau (stärkerer Befund)
+?? _checkPrePlateau(5)
+?? _checkConsistencyGap(6)
+?? _checkProgression(7)
+?? _fallback(8)
 ```
 
 **Strukturkarte — `computeStructuralSignals()` (Array, 0-2 Signale):**
@@ -277,7 +281,7 @@ Unabhängig von Hauptkarte — erscheint auch neben Progression.
 ### Implementiert ✓:
 **Training-Tab:** Wochenstruktur, Pillen-Nav, Satz-Bewertung (auto+manuell), Gewichtsempfehlung, Progressions-Präferenz, PR-Erkennung, "Heute anders", Übung archivieren, Stoppuhr, Auto-Wochenerstellung, Deload/Urlaubsmodus, Körpergewicht, Schlaf+Energie.
 
-**Coach-Tab:** Hauptkarte (7 akute Signale) + Strukturkarte (3 strukturelle Signale), Adaptive Nachfrage-Karte, Coach-Bilanz Mini, Plateau-Konsequenz (EX_SET_NEXT_WEEK_PLAN).
+**Coach-Tab:** Hauptkarte (8 akute Signale, seit v160 inkl. Konsistente Fehlschläge) + Strukturkarte (3 strukturelle Signale), Adaptive Nachfrage-Karte, Coach-Bilanz Mini, Plateau-Konsequenz (EX_SET_NEXT_WEEK_PLAN).
 
 **Fortschritt-Tab:** Erkenntnisse (geclampt), Gesamtperformance, Push/Pull-Ratio, Übungsfortschritt-Chart mit Prognose, Streak (neutral), Abzeichen-Galerie, Körpergewicht-Chart, Bewegungsschaubild, Coach-Bilanz.
 
