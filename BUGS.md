@@ -23,7 +23,7 @@
 | B13 | barbell Row nicht als Pull erkannt | v149 | 8143086 | "Barbell Row" fehlte in movementMap.js |
 | B14 | Pull Ups (weight=0) triggert _checkRisingRpe nicht | — | — | Guard weights.some(w=>w===0) — by design, kein Bug |
 | B15 | isSeedWeek als Vorlage für neue Woche | v151 | f1d4f54 | _templateWeekForNewWeek() überspringt isSeedWeek |
-| B24 | dragdrop.js nie aktiviert → Touch-Drag defekt auf iOS/Android | v156 | (dieser Commit) | Polyfill in index.html verdrahtet — `<script src="./dragdrop.js">` + `MobileDragDrop.polyfill()` vor dem Module-Script. Abweichung von der Sprint-Vorlage: touchmove-preventDefault() nur während aktivem Drag (Flag über dragstart/dragend/drop), nicht global — eine bedingungslose preventDefault() hätte jegliches Scrollen auf Touch-Geräten dauerhaft blockiert. Touch-Verhalten selbst NICHT auf echtem Gerät verifiziert (siehe HANDOFF.md) — nur headless bestätigt: Skript lädt fehlerfrei, kein Uncaught-Error, `#app` erreicht `is-ready`. |
+| B24 | dragdrop.js nie aktiviert → Touch-Drag defekt auf iOS/Android | v156 | a3752f8 | Polyfill in index.html verdrahtet — `<script src="./dragdrop.js">` + `MobileDragDrop.polyfill()` vor dem Module-Script. Abweichung von der Sprint-Vorlage: touchmove-preventDefault() nur während aktivem Drag (Flag über dragstart/dragend/drop), nicht global — eine bedingungslose preventDefault() hätte jegliches Scrollen auf Touch-Geräten dauerhaft blockiert. Touch-Verhalten selbst NICHT auf echtem Gerät verifiziert (siehe HANDOFF.md) — nur headless bestätigt: Skript lädt fehlerfrei, kein Uncaught-Error, `#app` erreicht `is-ready`. |
 
 ---
 

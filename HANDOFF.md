@@ -17,8 +17,7 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
   Versions-Bump)
 - CSS: ?v=182 (?v=181 aus demselben Grund übersprungen)
 - SCHEMA: 29
-- Letzter Commit: siehe Git-Historie (dieser Sprint: dragdrop.js
-  verdrahtet + recommendationEngine.js entfernt)
+- Letzter Commit: a3752f8 (dragdrop.js verdrahtet + recommendationEngine.js entfernt)
 - Alle 12 Test-Szenarien verifiziert ✓ (aus früheren Sprints — dieser
   Sprint hat keine neuen Test-JSONs erzeugt, siehe NEXT)
 - Regressions-Test: 10/10 grün (raf=sync), 0 uncaught errors
@@ -64,7 +63,7 @@ movementMap.js          — +32 englische Synonyme (8143086)
 | Future Days Fix | 66c034d | _reachableDays < statt <=, Stepper-Scroll |
 | ConsistencyRatio Fix | ab33633 | _weekConsistencyRatio < statt <= |
 | Live-Hinweis Fix | 8686458 | _nextGoalText success+fail statt nur success (B08) |
-| Dragdrop verdrahtet + Cleanup | (dieser Sprint) | dragdrop.js Touch-Polyfill aktiviert (B24), recommendationEngine.js entfernt |
+| Dragdrop verdrahtet + Cleanup | a3752f8 | dragdrop.js Touch-Polyfill aktiviert (B24), recommendationEngine.js entfernt |
 
 ---
 
