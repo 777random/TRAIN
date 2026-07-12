@@ -17,9 +17,10 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 - CSS: ?v=184
 - SCHEMA: 29
 - Letzter Commit: e312751 (B16 iOS-Zoom-Fix)
-- Alle 12 alten Test-Szenarien verifiziert ✓ + 5 neue Fixture-JSONs in
-  tests/fixtures/ (siehe unten) — diese sind neu, noch nicht real
-  gegen die App durchgetestet, nur schema-validiert
+- Alle 12 alten Test-Szenarien verifiziert ✓ + 5 Fixture-JSONs in
+  tests/fixtures/ jetzt ECHT importiert und verifiziert (nicht mehr nur
+  schema-validiert) — Ergebnisse in tests/fixtures/README.md, Kurzfassung
+  unter NEXT unten
 - Regressions-Test: 10/10 grün (raf=sync), 0 uncaught errors
 - Touch-Drag-Verhalten (dragdrop.js, v156) weiterhin NICHT auf echtem
   Gerät verifiziert (siehe Sprint v156 unten)
@@ -120,18 +121,28 @@ state.js                — Wochenerstellung isSeedWeek-Skip, Auto-Eval Guard (f
 Push nach Loop-Fixes braucht einmal pro Session eine Bestätigung —
 siehe Push-Policy in LOOPS.md.)
 
-**Sprint v158: Edge-Case-Audit mit den neuen Fixture-JSONs**
-- Die 5 neuen Dateien in tests/fixtures/ sind bisher nur schema-validiert
-  (valides JSON, korrekter State-Shape), NICHT real gegen die laufende
-  App importiert/getestet. Nächster Schritt: jede Datei einmal über
-  Settings → JSON importieren einspielen und die in
-  tests/fixtures/README.md dokumentierte Erwartung verifizieren:
-  - TRAIN_Test_iOS_Zoom.v1.json → hängt an offenem B16 (Zoom-Bug)
-  - TRAIN_Test_HeuteAnders.v1.json → hängt an offenem B17
-  - TRAIN_Test_EdgeCase_LeerWoche.v1.json → kein Crash, Empty-State
-  - TRAIN_Test_EdgeCase_AllesFail.v1.json → Coach-Reaktion prüfen (sollte
-    kein "Steigerung sinnvoll" zeigen)
-  - TRAIN_Test_EdgeCase_MaxGewicht.v1.json → kein NaN/Overflow bei 1RM
+**Sprint v158: Edge-Case-Audit abgeschlossen** — alle 5 Fixtures echt
+importiert und verifiziert (headless, per fetch der echten JSON-Dateien
+aus tests/fixtures/, nicht neu abgetippt). Details in
+tests/fixtures/README.md. Kurzfassung:
+- Alle 5: 0 uncaught errors, kein Crash
+- iOS_Zoom: B16 in v158 behoben, Fixture bestätigt fehlerfreies Laden
+- HeuteAnders: **B17 präzisiert** — der "Vorwoche"-Hint-Button ist
+  positions- statt namensbasiert und zeigt Werte der ALTEN Übung für
+  die neue Ausweichübung. Feld selbst ist korrekt leer. Noch nicht
+  gefixt, nur genauer diagnostiziert.
+- EdgeCase_LeerWoche: kein Crash, "Übung hinzufügen"-Button statt
+  dediziertem Empty-State-Text — funktional ok, nur anders als erwartet
+- EdgeCase_AllesFail: Coach zeigt korrekt Schlaf-Overload statt
+  Progression — Achtung, Fixture hat Schlaf UND Fail-Sätze gleichzeitig
+  als Störfaktoren, keine isolierte Prüfung der Fail-Sätze-Reaktion
+- EdgeCase_MaxGewicht: 1RM-Berechnung korrekt (~550kg via Epley), kein
+  Overflow
+
+**Nächster Schritt (nicht mehr Teil von v158):** B17 fixen (Hint-Button
+namensbasiert statt positionsbasiert), ODER Loop 3 weitere Edge-Cases
+ergänzen lassen (aktuell 5 von 15), ODER eine schärfere
+AllesFail-Variante ohne Schlaf-Störfaktor bauen.
 
 **Offene Nebenfunde aus diesem Sprint (nicht behoben, nur notiert):**
 - Push/Pull-Ratio-Block in _renderMovementPattern() (ui.js, unterhalb der

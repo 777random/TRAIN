@@ -34,7 +34,7 @@
 
 | ID | Beschreibung | Priorität | Notizen |
 |----|-------------|-----------|---------|
-| B17 | Heute anders — kein frisches Template | UX-Mittel | Ausweichübung erbt Vorwoche-Daten statt leeres Template |
+| B17 | Heute anders — kein frisches Template | UX-Mittel | Ausweichübung erbt Vorwoche-Daten statt leeres Template. **Präzisiert durch Edge-Case-Audit v158** (TRAIN_Test_HeuteAnders.v1.json, siehe tests/fixtures/README.md): Das Eingabefeld selbst ist leer/frisch — der Bug sitzt im "Vorwoche"-Hint-Button, der positionsbasiert (gleicher Tag/Übungs-Slot) statt namensbasiert arbeitet und dadurch die Werte der ALTEN Übung (z.B. Kniebeuge: 100kg) als Vorschlag für die neue Ausweichübung (z.B. Beinpresse, noch nie trainiert) anzeigt. |
 | B18 | Meter statt Wdh fehlt als Progressionstyp | UX-Mittel | metric:'distance' für Übungen wie Laufen, Rudermaschine |
 | B19 | Outlook/Prognose bei konstantem Gewicht | Low | curRate ≤ 0 → kein Korridor. "Kein klarer Trend" erscheint korrekt (by design) |
 | B20 | getCompletionRate()/_scoreWeek() isFullSuccess | Low | Verwandter Bug-Typ. Bewusst zurückgestellt (Semantik: Anwesenheit, nicht Ziel) |

@@ -23,3 +23,14 @@ Eigentliche Aufgabe: Nutzer fragte "womit geht es jetzt weiter" —
   Grid-Layout-Regression durch Font-Size-Erhöhung per A/B-Screenshot
   geprüft und ausgeschlossen. Regressionstest 10/10 grün. Touch-Verhalten
   selbst weiterhin nicht auf echtem Gerät verifiziert.
+
+  Danach erneut "was als nächstes" gefragt — Nutzer wählte Edge-Case-
+  Audit statt manueller Geräte-Verifikation. Alle 5 tests/fixtures/-
+  Dateien echt importiert (headless, per fetch der echten JSON-Dateien)
+  und verifiziert statt nur schema-validiert. Ergebnis: 0 uncaught
+  errors bei allen 5, kein Crash. B17 dabei präzisiert (Vorwoche-Hint
+  ist positions- statt namensbasiert, zeigt falsche Übungs-Werte an —
+  noch nicht gefixt). EdgeCase_AllesFail-Fixture hat Schlaf+Fail-Sätze
+  als überlagernde Störfaktoren, testet nicht isoliert. Details in
+  tests/fixtures/README.md. Keine Code-Änderung, nur Doku (README.md,
+  BUGS.md B17, HANDOFF.md) — kein Versions-Bump nötig.
