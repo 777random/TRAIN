@@ -16,8 +16,8 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
   Sprint-Text-Nummerierung)
 - CSS: ?v=183
 - SCHEMA: 29
-- Letzter Commit: e0b0f01 (Erfolgsquote vereinheitlicht, Beinbeuger→Hinge,
-  tests/fixtures/ angelegt)
+- Letzter Commit: 5a9b935 (LOOPS.md Loop 2 um CLAUDE.md-Versionscheck
+  erweitert)
 - Alle 12 alten Test-Szenarien verifiziert ✓ + 5 neue Fixture-JSONs in
   tests/fixtures/ (siehe unten) — diese sind neu, noch nicht real
   gegen die App durchgetestet, nur schema-validiert
@@ -34,6 +34,14 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 
 ## FILES (zuletzt angefasst)
 ```
+LOOPS.md                — NEU: 4 Session-Loops (3 aktiv, 1 inaktiv),
+                          Push-Policy (Fix+Commit automatisch, Push mit
+                          Bestätigung — Repo deployt direkt auf GitHub Pages)
+SESSION_LOG.md          — NEU: leeres Protokoll, wird von Loops befüllt
+CLAUDE.md               — SESSION START Sektion ergänzt (Reihenfolge:
+                          Docs lesen → Loops ausführen → SESSION_LOG.md
+                          → eigentliche Aufgabe). Eigener Versionsstand
+                          war 2 Sprints lang veraltet, korrigiert
 ui.js                   — _getDayCompletionStats() + _renderMovementPattern():
                           Erfolgsquote auf success/(success+fail) vereinheitlicht,
                           pending ausgeschlossen (B22). _weekSuccessScore()
@@ -76,6 +84,9 @@ state.js                — Wochenerstellung isSeedWeek-Skip, Auto-Eval Guard (f
 | Live-Hinweis Fix | 8686458 | _nextGoalText success+fail statt nur success (B08) |
 | Dragdrop verdrahtet + Cleanup | a3752f8 | dragdrop.js Touch-Polyfill aktiviert (B24), recommendationEngine.js entfernt |
 | Parallel-Sprint: Erfolgsquote + Beinbeuger + Fixtures | e0b0f01 | B22 (Erfolgsquote), B23 (Beinbeuger→Hinge + Butterfly→Push), tests/fixtures/ neu — erster echter 3-Agent-Parallel-Sprint |
+| LOOPS.md + SESSION_LOG.md | 18dab64 | 4 Session-Loops (Regressionstest, HANDOFF.md-Sync, Edge-Case-Audit, Bug-Diagnose-inaktiv), Push-Policy mit Bestätigungspflicht |
+| SESSION START in CLAUDE.md | c838d5f | Neue Sektion + veraltete Versionsangaben (v154→v157) korrigiert |
+| LOOP 2 Erweiterung | 5a9b935 | Prüft jetzt auch CLAUDE.md gegen sw.js/index.html, nicht nur HANDOFF.md |
 
 ---
 
