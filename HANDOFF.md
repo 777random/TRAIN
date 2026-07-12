@@ -150,10 +150,21 @@ Fehldiagnose aus dem Edge-Case-Audit inklusive (dort stand fälschlich
 "positionsbasiert", tatsächlich war es namensbasiert auf den falschen
 Namen). tests/fixtures/README.md entsprechend nachgezogen.
 
-**Nächster Schritt:** eine schärfere AllesFail-Variante ohne
-Schlaf-Störfaktor bauen (isoliert die Coach-Reaktion auf reine
-Fail-Sätze), ODER Loop 3 weitere Edge-Cases ergänzen lassen (aktuell 5
-von 15 angestrebten).
+**🚨 B25 (NEU, UX-Hoch, NICHT gefixt) — wichtigster nächster Schritt:**
+Beim Bau einer schärferen AllesFail-Fixture (ohne Schlaf-Störfaktor,
+TRAIN_Test_EdgeCase_AllesFail_GuterSchlaf.v1.json) gefunden: Coach zeigt
+"Auf Kurs" trotz 4 Wochen komplettem Fail (RPE 9.5-10 durchgehend).
+Root Cause: die komplette computeWeeklyFocus()-Kaskade in weeklyFocus.js
+filtert überall auf `status === 'success'` — ohne Erfolge berechnet
+keine einzige Signal-Funktion irgendetwas, alles fällt durch bis zum
+Fallback. Das ist keine Kleinigkeit — es untergräbt die Kernmission
+("Decision Support"). Braucht eine Produktentscheidung (welches neue
+Signal? welche Schwelle? welche Formulierung?), siehe CLAUDE.md "zwei
+Pflichtfragen vor konzeptionell neuen Features" — daher bewusst NICHT
+selbst gefixt, sondern zur Diskussion vorgelegt. Details: BUGS.md B25.
+
+**Danach:** Loop 3 weitere Edge-Cases ergänzen lassen (aktuell 6 von 15
+angestrebten, seit der neuen AllesFail_GuterSchlaf-Fixture).
 
 **Offene Nebenfunde aus diesem Sprint (nicht behoben, nur notiert):**
 - Push/Pull-Ratio-Block in _renderMovementPattern() (ui.js, unterhalb der
