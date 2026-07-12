@@ -37,6 +37,7 @@ Bei CSS-Änderungen: Cache-Buster in `index.html` erhöhen:
 | `HANDOFF.md` | Session-Übergabe: aktueller Stand, zuletzt geänderte Files, nächster Schritt |
 | `BUGS.md` | Bug-Tracker: behoben / offen / bewusst kein Bug / bekannte Test-Fallstricke |
 | `DECISIONS.md` | Unveränderliche Produkt-/Architektur-Entscheidungen — nicht ohne neue explizite Entscheidung revidieren |
+| `AGENTS.md` | Parallelisierungs-Regeln für Multi-Agent Sprints |
 
 Nach jedem Sprint: `HANDOFF.md` und `BUGS.md` aktualisieren (behobene Bugs verschieben, Commit-Hash eintragen, nächsten Schritt setzen).
 
