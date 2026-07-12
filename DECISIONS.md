@@ -50,6 +50,19 @@
 **Begründung:** 14 Tage war zu lang — hindert echtes Coaching wenn normal weitertrainiert wird. Ein Athlet ist nach einer Woche wieder im Rhythmus.
 **Gilt:** Bis Nutzerdaten anderes zeigen.
 
+### 2026-07 — _checkPersistentFailure: Priorität 2 (zwischen Reentry und Overload)
+**Entscheidung:** _checkPersistentFailure() steht in der Kaskade VOR _checkOverload(). Trigger: 0% Erfolg über 3 non-deload Wochen bei EINER Übung (alle Sätze bewertet).
+**Begründung:** Eingetretenes Totalversagen ist dringlicher als drohende Überlastung. _checkOverload filtert intern auf success-Sätze — bei 0 Erfolgen liefert es null und die Kaskade würde bis Fallback durchfallen ("Auf Kurs" trotz 4 Wochen Totalversagen).
+**Bekannte Grenzen:**
+- Keine Decisional-Balance (**seit v161/B26 behoben** — buildDecisionalBalance() hat jetzt einen persistent_failure-Fall, siehe COACH-LOGIK-Eintrag unten)
+- Prüft nur EINZELNE Übungen — wechselndes Scheitern bei verschiedenen Übungen löst kein Signal aus (weiterhin offen)
+**Gilt:** Permanent bis gegenteilige Entscheidung.
+
+### 2026-07 — persistent_failure bekommt generische Decisional-Balance (nicht Plateau-Buttons)
+**Entscheidung:** persistent_failure nutzt buildDecisionalBalance() (stay/change, wie Overload/ConsistencyGap) statt einer eigenen Buttons-Familie wie Plateau ("Habe ich umgesetzt"/"Ignorieren", plateauActions).
+**Begründung:** Plateau hat mehrere konkurrierende Strategien (deload/volume/variation) — braucht deshalb eigene, differenzierte Buttons. persistent_failure hat nur einen einzigen klaren Hebel (Gewicht runter), das passt exakt in das bestehende stay/change-Muster. "Empfehlung folgen" dispatcht EX_SET_NEXT_WEEK_PLAN mit Delta `-(currentWeight * (1 - deloadFactor))`, gerundet auf weightStep — bewusst über den konfigurierbaren deloadFactor statt Plateaus eigenem hartkodierten 22.5%-Wert, damit die im Coach-Text angezeigte "~X kg"-Empfehlung exakt zum tatsächlich gesetzten Wert passt.
+**Gilt:** Permanent bis gegenteilige Entscheidung.
+
 ---
 
 ## GAMIFICATION

@@ -2810,16 +2810,24 @@ function renderCoachTab(state) {
   })() : '';
 
   // Aktions-Buttons AUSSERHALB von <details> — immer sichtbar wenn balance vorhanden
+  // B26: persistent_failure bekommt eigene Button-Beschriftung (exakte
+  // Formulierung aus der Sprint-Spec), ohne die generische Beschriftung für
+  // overload/consistencyGap anzufassen — sonst hätte ein Umstieg auf
+  // balance.stayOption.label/changeOption.label die Buttons dort unbeabsichtigt
+  // mitgeändert (deren label-Texte sind länger/anders formuliert als die
+  // bisherige Button-Beschriftung, siehe _balanceForOverload/ConsistencyGap).
+  const _stayBtnLabel   = focus.status === 'persistent_failure' ? 'Weiter wie bisher versuchen'   : 'Weiter wie bisher';
+  const _changeBtnLabel = focus.status === 'persistent_failure' ? 'Gewicht reduzieren (Empfehlung)' : 'Empfehlung folgen';
   const decisionBtnsHtml = balance ? `
   <div class="coach-decision-btns">
     <button type="button" class="btn btn--ghost btn--sm${stayClass}"
       data-action="decision-log-stay"
       data-type="${h(focus.status)}"
-      data-signal="${h(focus.reasoning)}">Weiter wie bisher</button>
+      data-signal="${h(focus.reasoning)}">${h(_stayBtnLabel)}</button>
     <button type="button" class="btn btn--ghost btn--sm${changeClass}"
       data-action="decision-log-change"
       data-type="${h(focus.status)}"
-      data-signal="${h(focus.reasoning)}">Empfehlung folgen</button>
+      data-signal="${h(focus.reasoning)}">${h(_changeBtnLabel)}</button>
   </div>
   ${hintHtml}` : '';
 
@@ -4543,7 +4551,8 @@ function _handleClick(e) {
       // Guard: nur loggen wenn der aktuelle Fokus überhaupt eine Decisional
       // Balance hat (z.B. nicht mehr bei 'plateau' — siehe plateauActions).
       const _dlState = getState();
-      if (!buildDecisionalBalance(computeWeeklyFocus(_dlState))) break;
+      const _dlFocus = computeWeeklyFocus(_dlState);
+      if (!buildDecisionalBalance(_dlFocus)) break;
       const _d = new Date();
       const _dow = _d.getDay();
       _d.setDate(_d.getDate() + (_dow === 0 ? -6 : 1 - _dow));
@@ -4554,8 +4563,43 @@ function _handleClick(e) {
         choice: action === 'decision-log-stay' ? 'stay' : 'change',
         decidedWeekStart,
       });
+
+      // B26: persistent_failure "Empfehlung folgen" setzt zusätzlich direkt
+      // einen EX_SET_NEXT_WEEK_PLAN für die betroffene Übung — identisches
+      // Dispatch-Muster wie die Plateau-deload-Strategie (di/ei per Name in
+      // der aktuellen Woche suchen, weekIdx mitgeben), aber mit dem bereits
+      // in _checkPersistentFailure() berechneten deloadFactor-Delta statt
+      // Plateaus eigenem hartkodierten 22.5%-Wert (bewusste Abweichung —
+      // sonst würde die im Coach-Text angezeigte "~X kg"-Empfehlung nicht
+      // zum tatsächlich gesetzten Wert passen).
+      if (_dlFocus.status === 'persistent_failure' && action === 'decision-log-change') {
+        const curWk = getLatestWeek(_dlState.weeks);
+        let _applied = false;
+        if (curWk && _dlFocus.currentWeight != null) {
+          const weekIdx = _dlState.weeks.indexOf(curWk);
+          for (let di = 0; di < curWk.days.length; di++) {
+            const ei = curWk.days[di].exercises.findIndex(ex => ex.name === _dlFocus.exerciseName);
+            if (ei === -1) continue;
+            const ex = curWk.days[di].exercises[ei];
+            const weightStep = ex.weightStep || 2.5;
+            const deloadFactor = _dlState.settings?.deloadFactor ?? 0.75;
+            const rawDelta = -(_dlFocus.currentWeight * (1 - deloadFactor));
+            const delta = Math.round(rawDelta / weightStep) * weightStep || -weightStep;
+            dispatch(A.EX_SET_NEXT_WEEK_PLAN, { di, ei, value: delta, weekIdx });
+            _applied = true;
+            break;
+          }
+        }
+        const _targetKg = _dlFocus.suggestedWeight ?? null;
+        showToast(_applied && _targetKg != null
+          ? `Gewicht für ${_dlFocus.exerciseName} nächste Woche auf ~${_targetKg} kg reduziert.`
+          : `Gewicht für ${_dlFocus.exerciseName} nächste Woche reduziert.`, 'ok');
+      } else if (_dlFocus.status === 'persistent_failure' && action === 'decision-log-stay') {
+        showToast('Entscheidung notiert — TRAIN beobachtet weiter.', 'ok');
+      } else {
+        showToast('Entscheidung gespeichert', 'ok');
+      }
       _checkDecisionOutcomes(getState());
-      showToast('Entscheidung gespeichert', 'ok');
       break;
     }
 

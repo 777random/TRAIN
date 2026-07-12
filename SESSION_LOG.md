@@ -2,7 +2,32 @@
 # Automatisch von Claude Code
 # befüllt beim Session-Start
 
-## 2026-07-12 train-v157
+## 2026-07-12 train-v161
+Loop 1: 10/10 grün ✓ (raf=sync), 0 uncaught errors. Kein Fix nötig.
+Loop 2: HANDOFF.md/CLAUDE.md waren aktuell (Vorsession bereits
+  korrigiert). Kein Fix nötig.
+Loop 3: 15/15 Edge-Cases bereits erreicht (Vorsession) — Stopp-Bedingung
+  erfüllt, kein weiterer Edge-Case in dieser Session erzeugt.
+Loop 4: übersprungen (inaktiv)
+Eigentliche Aufgabe: 3 Aufgaben sequenziell —
+  (1) DECISIONS.md-Lücke geschlossen: _checkPersistentFailure-Priorität
+      + persistent_failure-Balance-Design als 2 neue Einträge unter
+      COACH-LOGIK.
+  (2) B26: buildDecisionalBalance() um persistent_failure-Fall ergänzt.
+      Dabei aufgefallen: die Sprint-Vorlage nahm eine andere Objekt-Form
+      an ({status,stay,change}) als der echte Code tatsächlich nutzt
+      ({stayOption,changeOption,closing}) — nach dem echten Code
+      implementiert, nicht nach der Vorlage. "Empfehlung folgen"
+      dispatcht EX_SET_NEXT_WEEK_PLAN (Delta über deloadFactor, nicht
+      Plateaus hartkodierte 22.5% — bewusste Abweichung für Konsistenz
+      zwischen angezeigter Empfehlung und tatsächlich gesetztem Wert).
+      Beide Pfade (stay/change) headless verifiziert: Toasts, nextWeekPlan,
+      decisionLog-Eintrag korrekt.
+  (3) 26 ältere Test-JSONs unter tests/ (Nutzer hatte sie dorthin
+      kopiert) real headless importiert und geprüft — alle 26 laufen
+      fehlerfrei, alle bereits schemaVersion 29, keine "veraltet"-
+      Markierung nötig, keine neuen Bugs. tests/README.md neu erstellt.
+  Regressionstest 10/10 grün nach allen Änderungen.
 Loop 1: 10/10 grün ✓ (raf=sync), 0 uncaught errors. Kein Fix nötig.
 Loop 2: HANDOFF.md war veraltet ("Letzter Commit" zeigte e0b0f01,
   tatsächlich 5a9b935 — 3 Commits fehlten in GEÄNDERT-Tabelle: LOOPS.md,

@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: Juli 2026 nach train-v160*
-*Nächste Version: train-v161*
+*Letzte Aktualisierung: Juli 2026 nach train-v161*
+*Nächste Version: train-v162*
 
 ---
 
@@ -11,12 +11,14 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v160 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v161 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
-- CSS: ?v=184 (unverändert seit v158 — v159/v160 sind reine JS-Fixes)
+- CSS: ?v=185 (styles.css selbst unverändert seit v158 — Bump war Teil
+  der expliziten Sprint-Vorgabe, nicht durch eine echte CSS-Änderung
+  ausgelöst)
 - SCHEMA: 29
-- Letzter Commit: 668b00a (B25 Fix — neues Coach-Signal _checkPersistentFailure)
+- Letzter Commit: siehe unten (B26 — Decisional-Balance für persistent_failure)
 - Alle 12 alten Test-Szenarien verifiziert ✓ + 5 Fixture-JSONs in
   tests/fixtures/ jetzt ECHT importiert und verifiziert (nicht mehr nur
   schema-validiert) — Ergebnisse in tests/fixtures/README.md, Kurzfassung
@@ -34,6 +36,21 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 
 ## FILES (zuletzt angefasst)
 ```
+tests/README.md          — NEU: 26 ältere Test-JSONs (direkt unter tests/,
+                          nicht tests/fixtures/) validiert — alle 26 laufen
+                          fehlerfrei, alle bereits schemaVersion 29, keine
+                          "veraltet"-Markierung nötig, keine neuen Bugs
+DECISIONS.md             — 2 neue Einträge unter COACH-LOGIK:
+                          _checkPersistentFailure-Priorität + persistent_
+                          failure-Decisional-Balance-Design (B26)
+weeklyFocus.js            — B26: _balanceForPersistentFailure() ergänzt,
+                          in buildDecisionalBalance() eingehängt.
+                          _checkPersistentFailure() liefert jetzt zusätzlich
+                          currentWeight/suggestedWeight mit.
+ui.js                    — B26: Button-Beschriftung für persistent_failure
+                          override (Stay/Change), decision-log-stay/-change
+                          Handler dispatcht bei persistent_failure "change"
+                          zusätzlich EX_SET_NEXT_WEEK_PLAN + eigene Toasts.
 weeklyFocus.js           — B25-Fix: neue Funktion _checkPersistentFailure()
                           (Prio 2, vor Overload), in computeWeeklyFocus()
                           eingehängt. roundToPlate-Import ergänzt.
@@ -105,6 +122,8 @@ state.js                — Wochenerstellung isSeedWeek-Skip, Auto-Eval Guard (f
 | Edge-Case-Audit | 3466751 | Alle 5 Fixtures echt importiert + verifiziert, B17 dabei erstmals genauer diagnostiziert (Diagnose später selbst nochmal korrigiert, siehe nächste Zeile) |
 | B17 Fix | 6e1a203 | Eigene Fehldiagnose aus dem Edge-Case-Audit korrigiert ("positionsbasiert" war falsch — tatsächlich namensbasiert auf den falschen Namen, ex.substituteFor statt ex.name). Adopt-Hints in renderSetRow() unterdrückt wenn ex.substituteFor gesetzt ist, prevEx für Fulfill-Meter-Guard unangetastet gelassen. Re-verifiziert mit TRAIN_Test_HeuteAnders.v1.json. |
 | B25 Fix (mit Nutzer besprochen) | 668b00a | Neues Coach-Signal `_checkPersistentFailure()`, Priorität 2 (nach Reentry, vor Overload), Schwelle 0% Erfolg über 3 Wochen, konkrete Gewichtsempfehlung via deloadFactor+roundToPlate(). Neues Icon 🛑. Beide AllesFail-Fixtures neu verifiziert. |
+| Loop 3 Batch (9 neue Fixtures) | 5688ed3 | 15/15 Edge-Cases erreicht, beide Grenzwert-Tests (2-Wochen-Plateau, 8-Wochen-Deload) bestätigt, kein neuer Bug |
+| B26 + DECISIONS.md + tests/ validiert | (dieser Sprint) | Decisional-Balance für persistent_failure (EX_SET_NEXT_WEEK_PLAN-Dispatch, eigene Toasts), DECISIONS.md-Lücke geschlossen, 26 alte Test-JSONs in tests/ validiert (alle ✓, keine veraltet, keine neuen Bugs) |
 
 ---
 
@@ -180,12 +199,28 @@ dokumentierten Schwellen exakt: 2 Wochen lösen KEIN Plateau aus (braucht
 3+), 8 Wochen lösen korrekt das präventive Deload-Signal aus (Schwelle
 "≥8"). Kein neuer Bug gefunden — Details in tests/fixtures/README.md.
 
-**Nächster Schritt:** keiner der drei ursprünglich geplanten Punkte
-(B17/AllesFail-Fixture/Loop 3) ist mehr offen. Nächste sinnvolle
-Kandidaten: echte Geräte-Verifikation (dragdrop.js Touch-Drag seit v156,
-B16-Fix seit v158 — beide nur headless getestet), oder Design für die
-in HANDOFF.md notierten bekannten Grenzen der B25-Lösung (Decisional-
-Balance für persistent_failure, Mehr-Übungen-Aggregation).
+**B26 behoben in train-v161** (siehe BUGS.md/DECISIONS.md) —
+persistent_failure hat jetzt eine Decisional-Balance ("Weiter wie bisher
+versuchen" / "Gewicht reduzieren (Empfehlung)"). Empfehlung folgen setzt
+konkret EX_SET_NEXT_WEEK_PLAN für die betroffene Übung. Damit ist die in
+v160 notierte "Bekannte Grenze — keine Decisional-Balance" geschlossen.
+Die zweite Grenze (prüft nur einzelne Übungen, keine Mehr-Übungen-
+Aggregation) bleibt bewusst offen, siehe DECISIONS.md.
+
+**26 ältere Test-JSONs unter tests/ validiert** — alle 26 laufen
+fehlerfrei (0 uncaught errors, kein NaN/Infinity), alle bereits
+schemaVersion 29 (keine "veraltet"-Markierung nötig, obwohl viele
+Dateinamen ältere Sprint-Versionen referenzieren). Details in
+tests/README.md.
+
+**Nächster Schritt:** echte Geräte-Verifikation — zwei offene Punkte,
+die headless grundsätzlich nicht geprüft werden können:
+- dragdrop.js Touch-Drag (seit v156 offen)
+- B16-Fix (Doppeltipp-Zoom-Verhalten, seit v158 offen)
+
+Danach: Mehr-Übungen-Aggregation für persistent_failure (DECISIONS.md),
+oder B18 (Meter statt Wdh als Progressionstyp), das einzige verbliebene
+UX-Mittel-Feature in CLAUDE.md "Offen / In Arbeit".
 
 **Offene Nebenfunde aus diesem Sprint (nicht behoben, nur notiert):**
 - Push/Pull-Ratio-Block in _renderMovementPattern() (ui.js, unterhalb der

@@ -1,0 +1,736 @@
+{
+  "meta": {
+    "schemaVersion": 29,
+    "savedAt": "2026-06-23T10:00:00.000Z",
+    "createdAt": "2026-05-04T08:00:00.000Z"
+  },
+  "curIdx": 5,
+  "weeks": [
+    {
+      "id": 20260505000,
+      "startDate": "2026-05-05",
+      "note": "",
+      "mode": "standard",
+      "sessionLog": [],
+      "bodyData": {},
+      "restDays": [],
+      "label": "",
+      "isSeedWeek": false,
+      "days": [
+        {
+          "id": "A",
+          "title": "Tag A",
+          "subtitle": "",
+          "warmup": "",
+          "cooldown": "",
+          "markedDone": true,
+          "locked": true,
+          "sessionNote": "",
+          "sessionRating": null,
+          "sessionStartTs": null,
+          "sessionEndTs": null,
+          "sleepHours": null,
+          "energyLevel": null,
+          "isVacation": false,
+          "vacationPlan": null,
+          "exercises": [
+            {
+              "name": "Pull Ups",
+              "note": "",
+              "pauseSec": 90,
+              "sets": [
+                {
+                  "weight": 0,
+                  "reps": 8,
+                  "rpe": 7.0,
+                  "done": true,
+                  "status": "success"
+                },
+                {
+                  "weight": 0,
+                  "reps": 8,
+                  "rpe": 7.0,
+                  "done": true,
+                  "status": "success"
+                },
+                {
+                  "weight": 0,
+                  "reps": 8,
+                  "rpe": 7.0,
+                  "done": true,
+                  "status": "success"
+                }
+              ],
+              "_showCfg": false,
+              "nextWeekPlan": 0,
+              "weightStep": 0,
+              "metric": "reps",
+              "tags": [],
+              "supersetId": null,
+              "nextWeekPlanConfirmed": false,
+              "progressionType": "weight",
+              "oneRM": null,
+              "prWeight": null,
+              "prRepsAtMaxWeight": null,
+              "targetReps": 8,
+              "archived": false
+            },
+            {
+              "name": "Dips",
+              "note": "",
+              "pauseSec": 90,
+              "sets": [
+                {
+                  "weight": 0,
+                  "reps": 10,
+                  "rpe": 7.0,
+                  "done": true,
+                  "status": "success"
+                },
+                {
+                  "weight": 0,
+                  "reps": 10,
+                  "rpe": 7.0,
+                  "done": true,
+                  "status": "success"
+                },
+                {
+                  "weight": 0,
+                  "reps": 10,
+                  "rpe": 7.0,
+                  "done": true,
+                  "status": "success"
+                }
+              ],
+              "_showCfg": false,
+              "nextWeekPlan": 0,
+              "weightStep": 0,
+              "metric": "reps",
+              "tags": [],
+              "supersetId": null,
+              "nextWeekPlanConfirmed": false,
+              "progressionType": "weight",
+              "oneRM": null,
+              "prWeight": null,
+              "prRepsAtMaxWeight": null,
+              "targetReps": 10,
+              "archived": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 20260512000,
+      "startDate": "2026-05-12",
+      "note": "",
+      "mode": "standard",
+      "sessionLog": [],
+      "bodyData": {},
+      "restDays": [],
+      "label": "",
+      "isSeedWeek": false,
+      "days": [
+        {
+          "id": "A",
+          "title": "Tag A",
+          "subtitle": "",
+          "warmup": "",
+          "cooldown": "",
+          "markedDone": true,
+          "locked": true,
+          "sessionNote": "",
+          "sessionRating": null,
+          "sessionStartTs": null,
+          "sessionEndTs": null,
+          "sleepHours": null,
+          "energyLevel": null,
+          "isVacation": false,
+          "vacationPlan": null,
+          "exercises": [
+            {
+              "name": "Pull Ups",
+              "note": "",
+              "pauseSec": 90,
+              "sets": [
+                {
+                  "weight": 0,
+                  "reps": 8,
+                  "rpe": 7.5,
+                  "done": true,
+                  "status": "success"
+                },
+                {
+                  "weight": 0,
+                  "reps": 8,
+                  "rpe": 7.5,
+                  "done": true,
+                  "status": "success"
+                },
+                {
+                  "weight": 0,
+                  "reps": 8,
+                  "rpe": 7.5,
+                  "done": true,
+                  "status": "success"
+                }
+              ],
+              "_showCfg": false,
+              "nextWeekPlan": 0,
+              "weightStep": 0,
+              "metric": "reps",
+              "tags": [],
+              "supersetId": null,
+              "nextWeekPlanConfirmed": false,
+              "progressionType": "weight",
+              "oneRM": null,
+              "prWeight": null,
+              "prRepsAtMaxWeight": null,
+              "targetReps": 8,
+              "archived": false
+            },
+            {
+              "name": "Dips",
+              "note": "",
+              "pauseSec": 90,
+              "sets": [
+                {
+                  "weight": 0,
+                  "reps": 10,
+                  "rpe": 7.5,
+                  "done": true,
+                  "status": "success"
+                },
+                {
+                  "weight": 0,
+                  "reps": 10,
+                  "rpe": 7.5,
+                  "done": true,
+                  "status": "success"
+                },
+                {
+                  "weight": 0,
+                  "reps": 10,
+                  "rpe": 7.5,
+                  "done": true,
+                  "status": "success"
+                }
+              ],
+              "_showCfg": false,
+              "nextWeekPlan": 0,
+              "weightStep": 0,
+              "metric": "reps",
+              "tags": [],
+              "supersetId": null,
+              "nextWeekPlanConfirmed": false,
+              "progressionType": "weight",
+              "oneRM": null,
+              "prWeight": null,
+              "prRepsAtMaxWeight": null,
+              "targetReps": 10,
+              "archived": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 20260519000,
+      "startDate": "2026-05-19",
+      "note": "",
+      "mode": "standard",
+      "sessionLog": [],
+      "bodyData": {},
+      "restDays": [],
+      "label": "",
+      "isSeedWeek": false,
+      "days": [
+        {
+          "id": "A",
+          "title": "Tag A",
+          "subtitle": "",
+          "warmup": "",
+          "cooldown": "",
+          "markedDone": true,
+          "locked": true,
+          "sessionNote": "",
+          "sessionRating": null,
+          "sessionStartTs": null,
+          "sessionEndTs": null,
+          "sleepHours": null,
+          "energyLevel": null,
+          "isVacation": false,
+          "vacationPlan": null,
+          "exercises": [
+            {
+              "name": "Pull Ups",
+              "note": "",
+              "pauseSec": 90,
+              "sets": [
+                {
+                  "weight": 0,
+                  "reps": 8,
+                  "rpe": 8.0,
+                  "done": true,
+                  "status": "success"
+                },
+                {
+                  "weight": 0,
+                  "reps": 8,
+                  "rpe": 8.0,
+                  "done": true,
+                  "status": "success"
+                },
+                {
+                  "weight": 0,
+                  "reps": 8,
+                  "rpe": 8.0,
+                  "done": true,
+                  "status": "success"
+                }
+              ],
+              "_showCfg": false,
+              "nextWeekPlan": 0,
+              "weightStep": 0,
+              "metric": "reps",
+              "tags": [],
+              "supersetId": null,
+              "nextWeekPlanConfirmed": false,
+              "progressionType": "weight",
+              "oneRM": null,
+              "prWeight": null,
+              "prRepsAtMaxWeight": null,
+              "targetReps": 8,
+              "archived": false
+            },
+            {
+              "name": "Dips",
+              "note": "",
+              "pauseSec": 90,
+              "sets": [
+                {
+                  "weight": 0,
+                  "reps": 10,
+                  "rpe": 8.0,
+                  "done": true,
+                  "status": "success"
+                },
+                {
+                  "weight": 0,
+                  "reps": 10,
+                  "rpe": 8.0,
+                  "done": true,
+                  "status": "success"
+                },
+                {
+                  "weight": 0,
+                  "reps": 10,
+                  "rpe": 8.0,
+                  "done": true,
+                  "status": "success"
+                }
+              ],
+              "_showCfg": false,
+              "nextWeekPlan": 0,
+              "weightStep": 0,
+              "metric": "reps",
+              "tags": [],
+              "supersetId": null,
+              "nextWeekPlanConfirmed": false,
+              "progressionType": "weight",
+              "oneRM": null,
+              "prWeight": null,
+              "prRepsAtMaxWeight": null,
+              "targetReps": 10,
+              "archived": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 20260526000,
+      "startDate": "2026-05-26",
+      "note": "",
+      "mode": "standard",
+      "sessionLog": [],
+      "bodyData": {},
+      "restDays": [],
+      "label": "",
+      "isSeedWeek": false,
+      "days": [
+        {
+          "id": "A",
+          "title": "Tag A",
+          "subtitle": "",
+          "warmup": "",
+          "cooldown": "",
+          "markedDone": true,
+          "locked": true,
+          "sessionNote": "",
+          "sessionRating": null,
+          "sessionStartTs": null,
+          "sessionEndTs": null,
+          "sleepHours": null,
+          "energyLevel": null,
+          "isVacation": false,
+          "vacationPlan": null,
+          "exercises": [
+            {
+              "name": "Pull Ups",
+              "note": "",
+              "pauseSec": 90,
+              "sets": [
+                {
+                  "weight": 0,
+                  "reps": 8,
+                  "rpe": 8.0,
+                  "done": true,
+                  "status": "success"
+                },
+                {
+                  "weight": 0,
+                  "reps": 8,
+                  "rpe": 8.0,
+                  "done": true,
+                  "status": "success"
+                },
+                {
+                  "weight": 0,
+                  "reps": 8,
+                  "rpe": 8.0,
+                  "done": true,
+                  "status": "success"
+                }
+              ],
+              "_showCfg": false,
+              "nextWeekPlan": 0,
+              "weightStep": 0,
+              "metric": "reps",
+              "tags": [],
+              "supersetId": null,
+              "nextWeekPlanConfirmed": false,
+              "progressionType": "weight",
+              "oneRM": null,
+              "prWeight": null,
+              "prRepsAtMaxWeight": null,
+              "targetReps": 8,
+              "archived": false
+            },
+            {
+              "name": "Dips",
+              "note": "",
+              "pauseSec": 90,
+              "sets": [
+                {
+                  "weight": 0,
+                  "reps": 10,
+                  "rpe": 8.0,
+                  "done": true,
+                  "status": "success"
+                },
+                {
+                  "weight": 0,
+                  "reps": 10,
+                  "rpe": 8.0,
+                  "done": true,
+                  "status": "success"
+                },
+                {
+                  "weight": 0,
+                  "reps": 10,
+                  "rpe": 8.0,
+                  "done": true,
+                  "status": "success"
+                }
+              ],
+              "_showCfg": false,
+              "nextWeekPlan": 0,
+              "weightStep": 0,
+              "metric": "reps",
+              "tags": [],
+              "supersetId": null,
+              "nextWeekPlanConfirmed": false,
+              "progressionType": "weight",
+              "oneRM": null,
+              "prWeight": null,
+              "prRepsAtMaxWeight": null,
+              "targetReps": 10,
+              "archived": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 20260602000,
+      "startDate": "2026-06-02",
+      "note": "",
+      "mode": "standard",
+      "sessionLog": [],
+      "bodyData": {},
+      "restDays": [],
+      "label": "",
+      "isSeedWeek": false,
+      "days": [
+        {
+          "id": "A",
+          "title": "Tag A",
+          "subtitle": "",
+          "warmup": "",
+          "cooldown": "",
+          "markedDone": true,
+          "locked": true,
+          "sessionNote": "",
+          "sessionRating": null,
+          "sessionStartTs": null,
+          "sessionEndTs": null,
+          "sleepHours": null,
+          "energyLevel": null,
+          "isVacation": false,
+          "vacationPlan": null,
+          "exercises": [
+            {
+              "name": "Pull Ups",
+              "note": "",
+              "pauseSec": 90,
+              "sets": [
+                {
+                  "weight": 0,
+                  "reps": 8,
+                  "rpe": 8.5,
+                  "done": true,
+                  "status": "success"
+                },
+                {
+                  "weight": 0,
+                  "reps": 8,
+                  "rpe": 8.5,
+                  "done": true,
+                  "status": "success"
+                },
+                {
+                  "weight": 0,
+                  "reps": 8,
+                  "rpe": 8.5,
+                  "done": true,
+                  "status": "success"
+                }
+              ],
+              "_showCfg": false,
+              "nextWeekPlan": 0,
+              "weightStep": 0,
+              "metric": "reps",
+              "tags": [],
+              "supersetId": null,
+              "nextWeekPlanConfirmed": false,
+              "progressionType": "weight",
+              "oneRM": null,
+              "prWeight": null,
+              "prRepsAtMaxWeight": null,
+              "targetReps": 8,
+              "archived": false
+            },
+            {
+              "name": "Dips",
+              "note": "",
+              "pauseSec": 90,
+              "sets": [
+                {
+                  "weight": 0,
+                  "reps": 10,
+                  "rpe": 8.5,
+                  "done": true,
+                  "status": "success"
+                },
+                {
+                  "weight": 0,
+                  "reps": 10,
+                  "rpe": 8.5,
+                  "done": true,
+                  "status": "success"
+                },
+                {
+                  "weight": 0,
+                  "reps": 10,
+                  "rpe": 8.5,
+                  "done": true,
+                  "status": "success"
+                }
+              ],
+              "_showCfg": false,
+              "nextWeekPlan": 0,
+              "weightStep": 0,
+              "metric": "reps",
+              "tags": [],
+              "supersetId": null,
+              "nextWeekPlanConfirmed": false,
+              "progressionType": "weight",
+              "oneRM": null,
+              "prWeight": null,
+              "prRepsAtMaxWeight": null,
+              "targetReps": 10,
+              "archived": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 20260609000,
+      "startDate": "2026-06-09",
+      "note": "",
+      "mode": "standard",
+      "sessionLog": [],
+      "bodyData": {},
+      "restDays": [],
+      "label": "",
+      "isSeedWeek": false,
+      "days": [
+        {
+          "id": "A",
+          "title": "Tag A",
+          "subtitle": "",
+          "warmup": "",
+          "cooldown": "",
+          "markedDone": true,
+          "locked": true,
+          "sessionNote": "",
+          "sessionRating": null,
+          "sessionStartTs": null,
+          "sessionEndTs": null,
+          "sleepHours": null,
+          "energyLevel": null,
+          "isVacation": false,
+          "vacationPlan": null,
+          "exercises": [
+            {
+              "name": "Pull Ups",
+              "note": "",
+              "pauseSec": 90,
+              "sets": [
+                {
+                  "weight": 0,
+                  "reps": 8,
+                  "rpe": 9.0,
+                  "done": true,
+                  "status": "success"
+                },
+                {
+                  "weight": 0,
+                  "reps": 8,
+                  "rpe": 9.0,
+                  "done": true,
+                  "status": "success"
+                },
+                {
+                  "weight": 0,
+                  "reps": 8,
+                  "rpe": 9.0,
+                  "done": true,
+                  "status": "success"
+                }
+              ],
+              "_showCfg": false,
+              "nextWeekPlan": 0,
+              "weightStep": 0,
+              "metric": "reps",
+              "tags": [],
+              "supersetId": null,
+              "nextWeekPlanConfirmed": false,
+              "progressionType": "weight",
+              "oneRM": null,
+              "prWeight": null,
+              "prRepsAtMaxWeight": null,
+              "targetReps": 8,
+              "archived": false
+            },
+            {
+              "name": "Dips",
+              "note": "",
+              "pauseSec": 90,
+              "sets": [
+                {
+                  "weight": 0,
+                  "reps": 10,
+                  "rpe": 9.0,
+                  "done": true,
+                  "status": "success"
+                },
+                {
+                  "weight": 0,
+                  "reps": 10,
+                  "rpe": 9.0,
+                  "done": true,
+                  "status": "success"
+                },
+                {
+                  "weight": 0,
+                  "reps": 10,
+                  "rpe": 9.0,
+                  "done": true,
+                  "status": "success"
+                }
+              ],
+              "_showCfg": false,
+              "nextWeekPlan": 0,
+              "weightStep": 0,
+              "metric": "reps",
+              "tags": [],
+              "supersetId": null,
+              "nextWeekPlanConfirmed": false,
+              "progressionType": "weight",
+              "oneRM": null,
+              "prWeight": null,
+              "prRepsAtMaxWeight": null,
+              "targetReps": 10,
+              "archived": false
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "customTemplate": [],
+  "settings": {
+    "swipe": false,
+    "drag": false,
+    "targetWeight": 90,
+    "heightCm": 190,
+    "showBmi": false,
+    "deloadFactor": 0.75,
+    "deloadFactorCustom": null,
+    "barbellWeight": 20,
+    "lastBackupDate": 1781681922889,
+    "weeksSinceLastBackupReminder": 0,
+    "maxSessionMs": 10800000,
+    "vibrationEnabled": true,
+    "rpeEnabled": true,
+    "autoStartPauseTimer": true,
+    "autoEval": false,
+    "movementChartType": "bar",
+    "autoWeekCreate": false
+  },
+  "prs": {},
+  "templates": [],
+  "insights": [],
+  "favoriteExercises": [],
+  "badges": [],
+  "onboardingDone": true,
+  "seenTips": [],
+  "customExercises": [],
+  "lastReentryHandled": null,
+  "longestStreakEver": 0,
+  "decisionLog": [],
+  "plateauActions": {},
+  "coachPerformance": {
+    "suggestions": []
+  },
+  "coachQuestion": {
+    "weekStart": null,
+    "questionId": null,
+    "answer": null,
+    "outcome": null,
+    "measuredWeekStart": null
+  }
+}

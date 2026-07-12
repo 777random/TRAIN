@@ -1,0 +1,637 @@
+{
+  "meta": {
+    "schemaVersion": 29,
+    "savedAt": "2026-07-03T10:00:00.000Z",
+    "createdAt": "2026-05-04T08:00:00.000Z"
+  },
+  "curIdx": 6,
+  "weeks": [
+    {
+      "id": 20260505000,
+      "startDate": "2026-05-05",
+      "note": "",
+      "mode": "standard",
+      "sessionLog": [],
+      "bodyData": {},
+      "restDays": [],
+      "label": "",
+      "isSeedWeek": false,
+      "days": [
+        {
+          "id": "A",
+          "title": "Tag A",
+          "subtitle": "",
+          "warmup": "",
+          "cooldown": "",
+          "markedDone": true,
+          "locked": true,
+          "sessionNote": "",
+          "sessionRating": null,
+          "sessionStartTs": null,
+          "sessionEndTs": null,
+          "sleepHours": null,
+          "energyLevel": null,
+          "isVacation": false,
+          "vacationPlan": null,
+          "exercises": [
+            {
+              "name": "Incline DB Benchpress",
+              "note": "",
+              "pauseSec": 90,
+              "sets": [
+                {
+                  "weight": 26,
+                  "reps": 8,
+                  "rpe": 7.0,
+                  "done": true,
+                  "status": "success"
+                },
+                {
+                  "weight": 26,
+                  "reps": 8,
+                  "rpe": 7.0,
+                  "done": true,
+                  "status": "success"
+                },
+                {
+                  "weight": 26,
+                  "reps": 8,
+                  "rpe": 7.0,
+                  "done": true,
+                  "status": "success"
+                }
+              ],
+              "_showCfg": false,
+              "nextWeekPlan": 0,
+              "weightStep": 2.0,
+              "metric": "reps",
+              "tags": [],
+              "supersetId": null,
+              "nextWeekPlanConfirmed": false,
+              "progressionType": "weight",
+              "oneRM": null,
+              "prWeight": null,
+              "prRepsAtMaxWeight": null,
+              "targetReps": 8,
+              "archived": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 20260512000,
+      "startDate": "2026-05-12",
+      "note": "",
+      "mode": "standard",
+      "sessionLog": [],
+      "bodyData": {},
+      "restDays": [],
+      "label": "",
+      "isSeedWeek": false,
+      "days": [
+        {
+          "id": "A",
+          "title": "Tag A",
+          "subtitle": "",
+          "warmup": "",
+          "cooldown": "",
+          "markedDone": true,
+          "locked": true,
+          "sessionNote": "",
+          "sessionRating": null,
+          "sessionStartTs": null,
+          "sessionEndTs": null,
+          "sleepHours": null,
+          "energyLevel": null,
+          "isVacation": false,
+          "vacationPlan": null,
+          "exercises": [
+            {
+              "name": "Incline DB Benchpress",
+              "note": "",
+              "pauseSec": 90,
+              "sets": [
+                {
+                  "weight": 28,
+                  "reps": 8,
+                  "rpe": 7.0,
+                  "done": true,
+                  "status": "success"
+                },
+                {
+                  "weight": 28,
+                  "reps": 8,
+                  "rpe": 7.0,
+                  "done": true,
+                  "status": "success"
+                },
+                {
+                  "weight": 28,
+                  "reps": 8,
+                  "rpe": 7.0,
+                  "done": true,
+                  "status": "success"
+                }
+              ],
+              "_showCfg": false,
+              "nextWeekPlan": 0,
+              "weightStep": 2.0,
+              "metric": "reps",
+              "tags": [],
+              "supersetId": null,
+              "nextWeekPlanConfirmed": false,
+              "progressionType": "weight",
+              "oneRM": null,
+              "prWeight": null,
+              "prRepsAtMaxWeight": null,
+              "targetReps": 8,
+              "archived": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 20260519000,
+      "startDate": "2026-05-19",
+      "note": "",
+      "mode": "standard",
+      "sessionLog": [],
+      "bodyData": {},
+      "restDays": [],
+      "label": "",
+      "isSeedWeek": false,
+      "days": [
+        {
+          "id": "A",
+          "title": "Tag A",
+          "subtitle": "",
+          "warmup": "",
+          "cooldown": "",
+          "markedDone": true,
+          "locked": true,
+          "sessionNote": "",
+          "sessionRating": null,
+          "sessionStartTs": null,
+          "sessionEndTs": null,
+          "sleepHours": null,
+          "energyLevel": null,
+          "isVacation": false,
+          "vacationPlan": null,
+          "exercises": [
+            {
+              "name": "Incline DB Benchpress",
+              "note": "",
+              "pauseSec": 90,
+              "sets": [
+                {
+                  "weight": 30,
+                  "reps": 8,
+                  "rpe": 7.0,
+                  "done": true,
+                  "status": "success"
+                },
+                {
+                  "weight": 30,
+                  "reps": 8,
+                  "rpe": 7.0,
+                  "done": true,
+                  "status": "success"
+                },
+                {
+                  "weight": 30,
+                  "reps": 8,
+                  "rpe": 7.0,
+                  "done": true,
+                  "status": "success"
+                }
+              ],
+              "_showCfg": false,
+              "nextWeekPlan": 0,
+              "weightStep": 2.0,
+              "metric": "reps",
+              "tags": [],
+              "supersetId": null,
+              "nextWeekPlanConfirmed": false,
+              "progressionType": "weight",
+              "oneRM": null,
+              "prWeight": null,
+              "prRepsAtMaxWeight": null,
+              "targetReps": 8,
+              "archived": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 20260526000,
+      "startDate": "2026-05-26",
+      "note": "",
+      "mode": "standard",
+      "sessionLog": [],
+      "bodyData": {},
+      "restDays": [],
+      "label": "",
+      "isSeedWeek": false,
+      "days": [
+        {
+          "id": "A",
+          "title": "Tag A",
+          "subtitle": "",
+          "warmup": "",
+          "cooldown": "",
+          "markedDone": true,
+          "locked": true,
+          "sessionNote": "",
+          "sessionRating": null,
+          "sessionStartTs": null,
+          "sessionEndTs": null,
+          "sleepHours": null,
+          "energyLevel": null,
+          "isVacation": false,
+          "vacationPlan": null,
+          "exercises": [
+            {
+              "name": "Incline DB Benchpress",
+              "note": "",
+              "pauseSec": 90,
+              "sets": [
+                {
+                  "weight": 32,
+                  "reps": 8,
+                  "rpe": 7.0,
+                  "done": true,
+                  "status": "success"
+                },
+                {
+                  "weight": 32,
+                  "reps": 8,
+                  "rpe": 7.0,
+                  "done": true,
+                  "status": "success"
+                },
+                {
+                  "weight": 32,
+                  "reps": 8,
+                  "rpe": 7.0,
+                  "done": true,
+                  "status": "success"
+                }
+              ],
+              "_showCfg": false,
+              "nextWeekPlan": 0,
+              "weightStep": 2.0,
+              "metric": "reps",
+              "tags": [],
+              "supersetId": null,
+              "nextWeekPlanConfirmed": false,
+              "progressionType": "weight",
+              "oneRM": null,
+              "prWeight": null,
+              "prRepsAtMaxWeight": null,
+              "targetReps": 8,
+              "archived": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 20260602000,
+      "startDate": "2026-06-02",
+      "note": "",
+      "mode": "standard",
+      "sessionLog": [],
+      "bodyData": {},
+      "restDays": [],
+      "label": "",
+      "isSeedWeek": false,
+      "days": [
+        {
+          "id": "A",
+          "title": "Tag A",
+          "subtitle": "",
+          "warmup": "",
+          "cooldown": "",
+          "markedDone": true,
+          "locked": true,
+          "sessionNote": "",
+          "sessionRating": null,
+          "sessionStartTs": null,
+          "sessionEndTs": null,
+          "sleepHours": null,
+          "energyLevel": null,
+          "isVacation": false,
+          "vacationPlan": null,
+          "exercises": [
+            {
+              "name": "Incline DB Benchpress",
+              "note": "",
+              "pauseSec": 90,
+              "sets": [
+                {
+                  "weight": 34,
+                  "reps": 8,
+                  "rpe": 7.0,
+                  "done": true,
+                  "status": "success"
+                },
+                {
+                  "weight": 34,
+                  "reps": 8,
+                  "rpe": 7.0,
+                  "done": true,
+                  "status": "success"
+                },
+                {
+                  "weight": 34,
+                  "reps": 8,
+                  "rpe": 7.0,
+                  "done": true,
+                  "status": "success"
+                }
+              ],
+              "_showCfg": false,
+              "nextWeekPlan": 0,
+              "weightStep": 2.0,
+              "metric": "reps",
+              "tags": [],
+              "supersetId": null,
+              "nextWeekPlanConfirmed": false,
+              "progressionType": "weight",
+              "oneRM": null,
+              "prWeight": null,
+              "prRepsAtMaxWeight": null,
+              "targetReps": 8,
+              "archived": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 20260609000,
+      "startDate": "2026-06-09",
+      "note": "",
+      "mode": "standard",
+      "sessionLog": [],
+      "bodyData": {},
+      "restDays": [],
+      "label": "",
+      "isSeedWeek": false,
+      "days": [
+        {
+          "id": "A",
+          "title": "Tag A",
+          "subtitle": "",
+          "warmup": "",
+          "cooldown": "",
+          "markedDone": true,
+          "locked": true,
+          "sessionNote": "",
+          "sessionRating": null,
+          "sessionStartTs": null,
+          "sessionEndTs": null,
+          "sleepHours": null,
+          "energyLevel": null,
+          "isVacation": false,
+          "vacationPlan": null,
+          "exercises": [
+            {
+              "name": "Incline DB Benchpress",
+              "note": "",
+              "pauseSec": 90,
+              "sets": [
+                {
+                  "weight": 36,
+                  "reps": 8,
+                  "rpe": 7.0,
+                  "done": true,
+                  "status": "success"
+                },
+                {
+                  "weight": 36,
+                  "reps": 8,
+                  "rpe": 7.0,
+                  "done": true,
+                  "status": "success"
+                },
+                {
+                  "weight": 36,
+                  "reps": 8,
+                  "rpe": 7.0,
+                  "done": true,
+                  "status": "success"
+                }
+              ],
+              "_showCfg": false,
+              "nextWeekPlan": 0,
+              "weightStep": 2.0,
+              "metric": "reps",
+              "tags": [],
+              "supersetId": null,
+              "nextWeekPlanConfirmed": false,
+              "progressionType": "weight",
+              "oneRM": null,
+              "prWeight": null,
+              "prRepsAtMaxWeight": null,
+              "targetReps": 8,
+              "archived": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 20260616000,
+      "startDate": "2026-06-16",
+      "note": "",
+      "mode": "standard",
+      "sessionLog": [],
+      "bodyData": {},
+      "restDays": [],
+      "label": "",
+      "isSeedWeek": false,
+      "days": [
+        {
+          "id": "A",
+          "title": "Tag A",
+          "subtitle": "",
+          "warmup": "",
+          "cooldown": "",
+          "markedDone": true,
+          "locked": true,
+          "sessionNote": "",
+          "sessionRating": null,
+          "sessionStartTs": null,
+          "sessionEndTs": null,
+          "sleepHours": null,
+          "energyLevel": null,
+          "isVacation": false,
+          "vacationPlan": null,
+          "exercises": [
+            {
+              "name": "Incline DB Benchpress",
+              "note": "",
+              "pauseSec": 90,
+              "sets": [
+                {
+                  "weight": 38,
+                  "reps": 8,
+                  "rpe": 7.0,
+                  "done": true,
+                  "status": "success"
+                },
+                {
+                  "weight": 38,
+                  "reps": 8,
+                  "rpe": 7.0,
+                  "done": true,
+                  "status": "success"
+                },
+                {
+                  "weight": 38,
+                  "reps": 8,
+                  "rpe": 7.0,
+                  "done": true,
+                  "status": "success"
+                }
+              ],
+              "_showCfg": false,
+              "nextWeekPlan": 0,
+              "weightStep": 2.0,
+              "metric": "reps",
+              "tags": [],
+              "supersetId": null,
+              "nextWeekPlanConfirmed": false,
+              "progressionType": "weight",
+              "oneRM": null,
+              "prWeight": null,
+              "prRepsAtMaxWeight": null,
+              "targetReps": 8,
+              "archived": false
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "customTemplate": [],
+  "settings": {
+    "swipe": false,
+    "drag": false,
+    "targetWeight": 90,
+    "heightCm": 190,
+    "showBmi": false,
+    "deloadFactor": 0.75,
+    "deloadFactorCustom": null,
+    "barbellWeight": 20,
+    "lastBackupDate": 1781681922889,
+    "weeksSinceLastBackupReminder": 0,
+    "maxSessionMs": 10800000,
+    "vibrationEnabled": true,
+    "rpeEnabled": true,
+    "autoStartPauseTimer": true,
+    "autoEval": false,
+    "movementChartType": "bar",
+    "autoWeekCreate": false
+  },
+  "prs": {},
+  "templates": [],
+  "insights": [],
+  "favoriteExercises": [],
+  "badges": [],
+  "onboardingDone": true,
+  "seenTips": [],
+  "customExercises": [],
+  "lastReentryHandled": null,
+  "longestStreakEver": 0,
+  "decisionLog": [],
+  "plateauActions": {},
+  "coachPerformance": {
+    "suggestions": [
+      {
+        "id": 5000,
+        "weekStart": "2026-05-05",
+        "status": "progression",
+        "exerciseName": "Incline DB Benchpress",
+        "suggestedDelta": 2.0,
+        "fromWeight": 26.0,
+        "confidenceLevel": "HIGH",
+        "followed": true,
+        "outcome": "success",
+        "measuredWeekStart": "2026-05-12"
+      },
+      {
+        "id": 5001,
+        "weekStart": "2026-05-12",
+        "status": "progression",
+        "exerciseName": "Incline DB Benchpress",
+        "suggestedDelta": 2.0,
+        "fromWeight": 28.0,
+        "confidenceLevel": "MEDIUM",
+        "followed": true,
+        "outcome": "success",
+        "measuredWeekStart": "2026-05-19"
+      },
+      {
+        "id": 5002,
+        "weekStart": "2026-05-19",
+        "status": "progression",
+        "exerciseName": "Incline DB Benchpress",
+        "suggestedDelta": 2.0,
+        "fromWeight": 30.0,
+        "confidenceLevel": "HIGH",
+        "followed": true,
+        "outcome": "success",
+        "measuredWeekStart": "2026-05-26"
+      },
+      {
+        "id": 5003,
+        "weekStart": "2026-05-26",
+        "status": "progression",
+        "exerciseName": "Incline DB Benchpress",
+        "suggestedDelta": 2.0,
+        "fromWeight": 32.0,
+        "confidenceLevel": "MEDIUM",
+        "followed": true,
+        "outcome": "success",
+        "measuredWeekStart": "2026-06-02"
+      },
+      {
+        "id": 5004,
+        "weekStart": "2026-06-02",
+        "status": "progression",
+        "exerciseName": "Incline DB Benchpress",
+        "suggestedDelta": 2.0,
+        "fromWeight": 34.0,
+        "confidenceLevel": "HIGH",
+        "followed": true,
+        "outcome": "success",
+        "measuredWeekStart": "2026-06-09"
+      },
+      {
+        "id": 5005,
+        "weekStart": "2026-06-09",
+        "status": "progression",
+        "exerciseName": "Incline DB Benchpress",
+        "suggestedDelta": 2.0,
+        "fromWeight": 36.0,
+        "confidenceLevel": "MEDIUM",
+        "followed": true,
+        "outcome": "success",
+        "measuredWeekStart": "2026-06-16"
+      }
+    ]
+  },
+  "coachQuestion": {
+    "weekStart": null,
+    "questionId": null,
+    "answer": null,
+    "outcome": null,
+    "measuredWeekStart": null
+  },
+  "coachQuestionHistory": []
+}

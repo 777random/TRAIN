@@ -817,6 +817,11 @@ function _checkPersistentFailure(state) {
           ? `Gewicht bei ${name} auf ~${suggestedWeight} kg reduzieren`
           : `Gewicht bei ${name} reduzieren`,
         exerciseName: name,
+        // B26: currentWeight + suggestedWeight direkt mitgeben, damit
+        // buildDecisionalBalance()/ui.js sie nicht redundant neu berechnen
+        // müssen — beide sind bereits hier vorhanden.
+        currentWeight: lastFailWeight,
+        suggestedWeight,
       };
     }
   }
@@ -909,6 +914,27 @@ function _balanceForConsistencyGap(focus) {
   };
 }
 
+// B26: persistent_failure bekommt — anders als Plateau — eine generische
+// Decisional Balance statt einer eigenen Buttons-Familie, weil hier (im
+// Unterschied zu Plateau) keine mehrdeutige Strategie-Wahl (deload/volume/
+// variation) existiert, sondern nur ein einziger klarer Hebel (Gewicht
+// runter) — das passt exakt in das bestehende stay/change-Muster.
+function _balanceForPersistentFailure(focus) {
+  return {
+    stayOption: {
+      label: 'Weiter wie bisher versuchen',
+      pros: ['Plan bleibt eingehalten'],
+      cons: [`Wiederholtes Scheitern bei ${focus.exerciseName} bleibt bestehen`],
+    },
+    changeOption: {
+      label: 'Gewicht reduzieren (Empfehlung)',
+      pros: ['Realistische Basis für neuen Fortschritt'],
+      cons: ['Kurzfristig weniger Gewicht bewegt'],
+    },
+    closing: `Nach 3 Wochen komplettem Fehlschlag bei ${focus.exerciseName} spricht die Datenlage für eine Reduktion, nicht für "Augen zu und durch".`,
+  };
+}
+
 /**
  * @param {Object} focus  Rückgabe von computeWeeklyFocus() — NICHT für Einträge
  *   aus computeStructuralSignals() gedacht (die haben in ui.js keine Decisional
@@ -917,10 +943,12 @@ function _balanceForConsistencyGap(focus) {
  *   null für reentry/plateau/progression/onTrack — keine Decisional Balance
  *   dafür. Plateau hat mit "✓ Habe ich umgesetzt"/"Ignorieren" (plateauActions)
  *   bereits ein eigenes, nicht-redundantes Entscheidungs-Paar (Sprint: Plateau-
- *   Buttons konsolidieren).
+ *   Buttons konsolidieren). persistent_failure (seit B26) hat KEINE eigene
+ *   Buttons-Familie wie Plateau — nutzt bewusst die generische Balance.
  */
 export function buildDecisionalBalance(focus) {
   if (focus.status === 'overload') return _balanceForOverload(focus);
   if (focus.status === 'consistencyGap') return _balanceForConsistencyGap(focus);
+  if (focus.status === 'persistent_failure') return _balanceForPersistentFailure(focus);
   return null;
 }
