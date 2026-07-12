@@ -16,8 +16,8 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
   Sprint-Text-Nummerierung)
 - CSS: ?v=183
 - SCHEMA: 29
-- Letzter Commit: siehe Git-Historie (dieser Sprint: Erfolgsquote
-  vereinheitlicht, Beinbeuger→Hinge, tests/fixtures/ angelegt)
+- Letzter Commit: e0b0f01 (Erfolgsquote vereinheitlicht, Beinbeuger→Hinge,
+  tests/fixtures/ angelegt)
 - Alle 12 alten Test-Szenarien verifiziert ✓ + 5 neue Fixture-JSONs in
   tests/fixtures/ (siehe unten) — diese sind neu, noch nicht real
   gegen die App durchgetestet, nur schema-validiert
@@ -75,7 +75,7 @@ state.js                — Wochenerstellung isSeedWeek-Skip, Auto-Eval Guard (f
 | ConsistencyRatio Fix | ab33633 | _weekConsistencyRatio < statt <= |
 | Live-Hinweis Fix | 8686458 | _nextGoalText success+fail statt nur success (B08) |
 | Dragdrop verdrahtet + Cleanup | a3752f8 | dragdrop.js Touch-Polyfill aktiviert (B24), recommendationEngine.js entfernt |
-| Parallel-Sprint: Erfolgsquote + Beinbeuger + Fixtures | (dieser Sprint) | B22 (Erfolgsquote), B23 (Beinbeuger→Hinge + Butterfly→Push), tests/fixtures/ neu — erster echter 3-Agent-Parallel-Sprint |
+| Parallel-Sprint: Erfolgsquote + Beinbeuger + Fixtures | e0b0f01 | B22 (Erfolgsquote), B23 (Beinbeuger→Hinge + Butterfly→Push), tests/fixtures/ neu — erster echter 3-Agent-Parallel-Sprint |
 
 ---
 
