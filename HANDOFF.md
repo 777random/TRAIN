@@ -17,7 +17,7 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 - CSS: ?v=187 (unverändert diesen Sprint — nur ui.js angefasst,
   kein CSS-Bump nötig)
 - SCHEMA: 30 (unverändert diesen Sprint)
-- Letzter Commit: (dieser Sprint — B31, 1RM-Fallback-Fix)
+- Letzter Commit: 66455e0 (B31 — 1RM-Fallback-Fix)
 - **B31 behoben (train-v166):** `_renderAnalysis1RM()`-Fallback zeigte
   nie ein 1RM, wenn `state.prs` noch keinen Eintrag hatte (v.a. bei
   Ausweichübungen — der Fallback ist explizit dafür gebaut, griff aber
@@ -225,7 +225,7 @@ state.js                — Wochenerstellung isSeedWeek-Skip, Auto-Eval Guard (f
 | B30: Lighthouse CI + Prompt-Bibliothek + Loop 5 | d1241a6 | .github/workflows/test.yml (2. Job), lighthouserc.cjs (neu, .cjs statt .js — ESM/CJS-Konflikt real getestet und gelöst), prompts/ (7 Dateien), LOOPS.md (Loop 5), CLAUDE.md (Prompt-Bibliothek + Spec-Konvention), for-advisor.txt neu generiert. ID/Version-Korrektur: Sprint-Vorgabe nannte B28/v163 (beide bereits vergeben) — B30/v164 verwendet |
 | B18: Distanz/Zeit-Progression | 11eb62e | weightRecommendation.js (getMetricRecommendation), state.js (ex.metricStep, progressionType-Default, Migration v30), ui.js (New-Week-Modal-Branch + Skip-Guard-Fix + metrikabhängige Labels), neue Fixture. Design mit Nutzer besprochen (3 Fragen) vor Implementierung, Nebenbefund B31 dokumentiert |
 | B31-Diagnose (kein Code) | 8130e98 | Root Cause bestätigt + empirisch verifiziert, Fehlverifikation aus Loop-3-Audit (v157) korrigiert |
-| B31-Fix | (dieser Sprint) | ui.js:2426 Guard korrigiert, 3 Szenarien verifiziert (leeres prs, Substitution, metric-Regressionsschutz) |
+| B31-Fix | 66455e0 | ui.js:2426 Guard korrigiert, 3 Szenarien verifiziert (leeres prs, Substitution, metric-Regressionsschutz) |
 
 ---
 
