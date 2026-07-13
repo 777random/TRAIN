@@ -2,6 +2,20 @@
 # Automatisch von Claude Code
 # befüllt beim Session-Start
 
+## 2026-07-13 train-v161
+Loop 1: 10/10 grün ✓ (raf=sync), 0 uncaught errors. Kein Fix nötig.
+Loop 2: CLAUDE.md war veraltet (Stand/Header zeigten train-v160 · ?v=184,
+  sw.js/index.html tatsächlich train-v161 · ?v=185 — Konsolidierung nach
+  dem letzten Sprint hatte CLAUDE.md übersprungen). 3 Stellen korrigiert
+  (Header-Kommentar, "Aktueller Stand"-Zeile, CSS-Codebeispiel).
+  HANDOFF.md/BUGS.md/DECISIONS.md waren aktuell.
+Loop 3: übersprungen — Stopp-Bedingung (15/15) bereits erreicht.
+Loop 4: übersprungen (inaktiv)
+Eigentliche Aufgabe: Nutzer sagte "es soll weiter gehen" ohne konkrete
+  Aufgabe — SESSION-START-Protokoll ausgeführt, CLAUDE.md-Drift behoben,
+  Nutzer nach nächstem Schritt gefragt (Geräte-Verifikation vs.
+  Mehr-Übungen-Aggregation vs. B18).
+
 ## 2026-07-12 train-v161
 Loop 1: 10/10 grün ✓ (raf=sync), 0 uncaught errors. Kein Fix nötig.
 Loop 2: HANDOFF.md/CLAUDE.md waren aktuell (Vorsession bereits
