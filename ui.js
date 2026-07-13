@@ -2423,7 +2423,11 @@ function _renderAnalysis1RM(name, state) {
       d.exercises
         .filter(ex => ex.name === name || ex.substituteFor === name)
         .flatMap(ex => {
-          if (ex.metric && ex.metric !== 'kg') return [];
+          // B31-Fix: war 'kg' (nie ein gültiger ex.metric-Wert, Bedingung
+          // dadurch praktisch immer wahr → Fallback lieferte nie Daten,
+          // v.a. bei Ausweichübungen leer). 1RM-Schätzung ergibt nur für
+          // gewichtsgetrackte Übungen (metric 'reps') Sinn.
+          if (ex.metric && ex.metric !== 'reps') return [];
           return ex.sets
             .filter(s => s.status === 'success' && (s.reps ?? 0) >= 1 && (s.reps ?? 0) <= 10 && (s.weight ?? 0) > 0)
             .map(s => ({ w: s.weight, r: s.reps, est: s.weight * (1 + s.reps / 30) }));

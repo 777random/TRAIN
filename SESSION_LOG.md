@@ -2,6 +2,30 @@
 # Automatisch von Claude Code
 # befüllt beim Session-Start
 
+## 2026-07-13 train-v166
+Loop 1: 10/10 grün (nach 2 isolierten Flakes bei Prüfpunkt 8 während
+  der Testreihe — bekanntes Headless-Timing-Artefakt, unabhängig via
+  Playwright 18/18 bestätigt, kein Zusammenhang mit dem Fix).
+Loop 2: HANDOFF.md/CLAUDE.md waren aktuell. Kein Fix nötig.
+Loop 3/4: übersprungen (Stopp-Bedingung erreicht / inaktiv).
+Eigentliche Aufgabe: "ja, fix umsetzen" — B31 aus der Vorsession-
+  Diagnose implementiert. Fix: ui.js:2426 `!== 'kg'` → `!== 'reps'`
+  (die bereits vorab dokumentierte Empfehlung, hier ausgeführt statt
+  nur diagnostiziert). Vor dem Commit 3 gezielte Szenarien verifiziert
+  (nicht nur "regression grün" angenommen): (1) MaxGewicht-Fixture mit
+  leerem prs zeigt jetzt korrekt "~550.0 kg geschätzter 1RM (Epley ·
+  500 kg × 3 Wdh)". (2) Eigens gebauter Ausweichübungs-Test (echte
+  Kniebeuge-Session 100kg×5 in Woche 1, Beinpresse-Substitution
+  200kg×8 in Woche 2) zeigt jetzt korrekt das höhere Epley-Ergebnis
+  (253.3) aus der Substitutions-Woche — der Hauptfall, für den der
+  Fallback ursprünglich gebaut wurde, aber nie griff. (3) Regressions-
+  schutz: metric 'm'/'sec'-Übungen (DistanceProgression-Fixture) zeigen
+  weiterhin korrekt keinen 1RM-Hint. Alle 3 Szenarien 0 uncaught errors.
+  BUGS.md B31 von OFFEN nach BEHOBEN verschoben. Kein DECISIONS.md-
+  Eintrag nötig (reiner Bugfix, keine neue Architektur-Entscheidung).
+  CACHE_VERSION → train-v166 (kein CSS-Bump, styles.css nicht
+  angefasst, kein SCHEMA-Bump, keine Datenmodell-Änderung).
+
 ## 2026-07-13 train-v165 (B31-Diagnose, kein neuer Code-Sprint)
 Eigentliche Aufgabe: "B31 diagnostizieren" — reine Diagnose, keine
   Änderungen am Code (wie explizit gefordert). Root Cause: ui.js:2426

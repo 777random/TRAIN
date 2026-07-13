@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: Juli 2026 nach train-v165*
-*Nächste Version: train-v166*
+*Letzte Aktualisierung: Juli 2026 nach train-v166*
+*Nächste Version: train-v167*
 
 ---
 
@@ -11,14 +11,21 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v165 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v166 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
-- CSS: ?v=187 (unverändert diesen Sprint — nur state.js/ui.js/
-  weightRecommendation.js angefasst, kein CSS-Bump nötig)
-- SCHEMA: 30 (v29→v30: ex.metricStep ergänzt + progressionType-Default
-  korrigiert für metric 'm'/'sec', siehe B18)
-- Letzter Commit: 11eb62e (B18 — Distanz/Zeit-Progression)
+- CSS: ?v=187 (unverändert diesen Sprint — nur ui.js angefasst,
+  kein CSS-Bump nötig)
+- SCHEMA: 30 (unverändert diesen Sprint)
+- Letzter Commit: (dieser Sprint — B31, 1RM-Fallback-Fix)
+- **B31 behoben (train-v166):** `_renderAnalysis1RM()`-Fallback zeigte
+  nie ein 1RM, wenn `state.prs` noch keinen Eintrag hatte (v.a. bei
+  Ausweichübungen — der Fallback ist explizit dafür gebaut, griff aber
+  wegen eines Guard-Typos nie). Root Cause bereits in der Vorsession
+  vollständig diagnostiziert; dieser Sprint hat nur den bereits
+  empfohlenen Fix umgesetzt (`ui.js:2426` `!== 'kg'` → `!== 'reps'`) und
+  verifiziert (3 Szenarien: leeres prs, Ausweichübungs-Substitution,
+  Regressionsschutz für metric 'm'/'sec'). Details siehe BUGS.md B31.
 - **B18 behoben (train-v165):** Coach-Gewichtsempfehlung hatte für
   metric 'm'/'sec'-Übungen (Laufen, Rudermaschine, Plank etc.) nie eine
   Empfehlung geliefert (`getWeightRecommendation()`s `lastWeight<=0`-
@@ -63,6 +70,10 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 
 ## FILES (zuletzt angefasst)
 ```
+ui.js                    — B31-Fix: _renderAnalysis1RM()-Fallback-Guard
+                          ui.js:2426 von `!== 'kg'` auf `!== 'reps'`
+                          korrigiert (1RM-Schätzung zeigte nie Daten,
+                          v.a. bei Ausweichübungen)
 weightRecommendation.js  — B18: _recommendationCore() extrahiert (geteilte
                           Entscheidungslogik), neue getMetricRecommendation()
                           für metric 'm'/'sec'. getWeightRecommendation()
@@ -213,6 +224,8 @@ state.js                — Wochenerstellung isSeedWeek-Skip, Auto-Eval Guard (f
 | B29: Mehr-Übungen-Aggregation | 221da35 | _checkMultiExerciseFailure() in weeklyFocus.js (Strukturkarte), ui.js-Rendering, neue Fixture. Design mit Nutzer besprochen (3 Fragen, siehe DECISIONS.md) vor Implementierung |
 | B30: Lighthouse CI + Prompt-Bibliothek + Loop 5 | d1241a6 | .github/workflows/test.yml (2. Job), lighthouserc.cjs (neu, .cjs statt .js — ESM/CJS-Konflikt real getestet und gelöst), prompts/ (7 Dateien), LOOPS.md (Loop 5), CLAUDE.md (Prompt-Bibliothek + Spec-Konvention), for-advisor.txt neu generiert. ID/Version-Korrektur: Sprint-Vorgabe nannte B28/v163 (beide bereits vergeben) — B30/v164 verwendet |
 | B18: Distanz/Zeit-Progression | 11eb62e | weightRecommendation.js (getMetricRecommendation), state.js (ex.metricStep, progressionType-Default, Migration v30), ui.js (New-Week-Modal-Branch + Skip-Guard-Fix + metrikabhängige Labels), neue Fixture. Design mit Nutzer besprochen (3 Fragen) vor Implementierung, Nebenbefund B31 dokumentiert |
+| B31-Diagnose (kein Code) | 8130e98 | Root Cause bestätigt + empirisch verifiziert, Fehlverifikation aus Loop-3-Audit (v157) korrigiert |
+| B31-Fix | (dieser Sprint) | ui.js:2426 Guard korrigiert, 3 Szenarien verifiziert (leeres prs, Substitution, metric-Regressionsschutz) |
 
 ---
 
@@ -379,10 +392,18 @@ Guards aber nie). Empfohlener Fix (nicht umgesetzt, nur diagnostiziert):
 Zeile 2426 → `!== 'reps'`, oder Zeile ganz entfernen (der bestehende
 `weight>0`-Filter reicht bereits). Vollständige Diagnose siehe BUGS.md B31.
 
-**Nächster Schritt:** B31 fixen (jetzt vollständig diagnostiziert, kleiner
-Scope), oder echte Nutzer-Rekrutierung (strategische Priorität 1 laut
-CLAUDE.md) — keine offenen UX-Mittel-Features mehr in CLAUDE.md
-"Offen / In Arbeit" außer B31.
+**B31 behoben (train-v166):** Fix umgesetzt (`ui.js:2426` → `!== 'reps'`)
+und mit 3 Szenarien verifiziert: (1) MaxGewicht-Fixture (leeres `prs`)
+zeigt jetzt korrekt "~550.0 kg geschätzter 1RM". (2) Ausweichübungs-
+Substitution (eigener Test: echte Kniebeuge-Session + spätere
+Beinpresse-Substitution) zeigt jetzt korrekt das höhere Epley-Ergebnis
+aus der Substitutions-Woche — der Hauptfall, für den der Fallback
+ursprünglich gebaut wurde. (3) Regressionsschutz: metric 'm'/'sec' zeigt
+weiterhin korrekt keinen 1RM-Hint. Details siehe BUGS.md B31.
+
+**Nächster Schritt:** echte Nutzer-Rekrutierung (strategische Priorität
+1 laut CLAUDE.md) — keine offenen UX-Mittel-Bugs mehr in BUGS.md OFFEN,
+nur noch Low/UX-komplex-Priorität-Items übrig.
 
 **Offene Nebenfunde aus diesem Sprint (nicht behoben, nur notiert):**
 - Push/Pull-Ratio-Block in _renderMovementPattern() (ui.js, unterhalb der
