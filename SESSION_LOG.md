@@ -2,7 +2,47 @@
 # Automatisch von Claude Code
 # befüllt beim Session-Start
 
-## 2026-07-13 train-v163
+## 2026-07-13 train-v164
+Loop 1: 10/10 grün ✓, 0 uncaught errors. Kein Fix nötig.
+Loop 2: HANDOFF.md/CLAUDE.md waren aktuell (train-v163/?v=186, passend
+  zu sw.js/index.html vor diesem Sprint). Kein Fix nötig.
+Loop 3: übersprungen — Stopp-Bedingung (15/15, jetzt 16) längst erreicht.
+Loop 4: übersprungen (inaktiv)
+Eigentliche Aufgabe: 4 Aufgaben —
+  (1) Loop 5 (for-advisor.txt am Sessionende) in LOOPS.md ergänzt.
+  (2) Prompt-Bibliothek: prompts/ mit 7 Vorlagen angelegt (Sprint-
+      Vorgabe sprach von "6 Dateien" in der Akzeptanzliste, listete im
+      Detail aber 7 — Widerspruch in der Vorgabe selbst, alle 7 erstellt
+      statt einer zu fehlen oder eine wegzulassen).
+  (3) Lighthouse CI: zweiter GitHub-Actions-Job `lighthouse` (needs:
+      regression). Vor dem Committen lokal getestet (wie schon bei
+      B28 etabliert — nicht blind übernehmen) und zwei echte Probleme
+      gefunden: `lighthouserc.js` mit `export default` scheiterte an
+      package.json's `"type":"module"` (lhci lädt Config per CommonJS
+      `require()`) — als `.cjs` mit `module.exports` gelöst.
+      `categories:pwa`-Assertion hätte immer sinnlos gewarnt (diese
+      Lighthouse-Version hat seit v9 keine PWA-Kategorie mehr,
+      auditRan bleibt strukturell 0) — entfernt. Echte lokale Scores:
+      Performance 84, Accessibility 91 (klar über der blockierenden
+      0.8-Schwelle), Best Practices 96, SEO 100. Lokales `npx lhci
+      autorun` ist auf dieser Windows-Maschine ca. 4-von-5-Läufen von
+      einem chrome-launcher-EPERM-Cleanup-Fehler betroffen (Windows-
+      Eigenart, tritt nach erfolgreicher Messung auf, betrifft nicht
+      den ubuntu-latest-CI-Job) — als bekannte lokale Einschränkung
+      dokumentiert (BUGS.md B30), nicht weiter verfolgt.
+  (4) CLAUDE.md/LOOPS.md aktualisiert (Prompt-Bibliothek, Spec-
+      Konvention, CI-Status-Ergänzung, Loop 5).
+  ID/Versions-Korrektur: Sprint-Vorgabe nannte "B28"/"train-v163" für
+  den Lighthouse-Bug — beide bereits in dieser Session vergeben (B28 =
+  GitHub Actions CI, train-v163 = B29 Mehr-Übungen-Aggregation) —
+  B30/train-v164 verwendet, wie schon beim vorherigen Sprint (B27-
+  Kollision) nach demselben Muster korrigiert.
+  Regressionstest 10/10 grün, Playwright lokal 17/17 grün nach allen
+  Änderungen. Loop 5 direkt ausgeführt: for-advisor.txt komplett neu
+  generiert (3. Fassung, Stand v160→v164, alle 8 Abschnitte direkt aus
+  Code-Fakten statt nur aus Doku zusammengefasst — u.a. volle
+  computeWeeklyFocus()/computeStructuralSignals()-Bodies, alle 6
+  Prozentzahl-Stellen mit Datei:Zeile, vollständige MOVEMENT_MAP).
 Loop 1: 10/10 grün ✓ nach der Implementierung (1 isolierter Flake bei
   Prüfpunkt 8 währenddessen beobachtet, 3 weitere Läufe danach sauber —
   gleiches bekanntes Headless-Timing-Artefakt wie bei B28, kein

@@ -1,0 +1,15 @@
+Lies DECISIONS.md.
+Trage folgende Entscheidung ein:
+
+### [DATUM] — [TITEL]
+
+Entscheidung: [Was]
+Begründung: [Warum]
+Bekannte Grenzen: [Was nicht abgedeckt]
+Gilt: [Permanent / Bis zu X]
+
+Committe danach:
+git add DECISIONS.md
+git commit -m "docs: DECISIONS.md
+[Titel] (vXXX)"
+git push

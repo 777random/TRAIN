@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: Juli 2026 nach train-v163*
-*Nächste Version: train-v164*
+*Letzte Aktualisierung: Juli 2026 nach train-v164*
+*Nächste Version: train-v165*
 
 ---
 
@@ -11,19 +11,31 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v163 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v164 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
-- CSS: ?v=186 (unverändert diesen Sprint — nur ui.js/weeklyFocus.js
-  angefasst, styles.css selbst nicht, daher kein CSS-Bump nötig)
+- CSS: ?v=187 (styles.css selbst unverändert diesen Sprint — Bump als
+  expliziter Sprint-Marker laut Sprint-Vorgabe, gleiches Muster wie
+  schon bei v185/v186)
 - SCHEMA: 29
-- Letzter Commit: 221da35 (B29 — Mehr-Übungen-Aggregation)
-- **CI aktiv seit v162:** GitHub Actions (`.github/workflows/test.yml`)
-  läuft bei jedem Push auf main. Lokal testen: `npx playwright test`
-  — funktioniert jetzt (Node.js v24.18.0 LTS am 2026-07-13 via winget
-  installiert), 16/16 grün lokal bestätigt. Kein Branch-Protection-Gate
-  — der Workflow blockiert den Push nicht, sondern zeigt nur ein
-  Badge-Signal danach (README.md).
+- Letzter Commit: (dieser Sprint — B30, Lighthouse CI + Prompt-Bibliothek + Loop 5)
+- **CI aktiv seit v162, jetzt 2 Jobs:** GitHub Actions
+  (`.github/workflows/test.yml`) läuft bei jedem Push auf main.
+  `regression` (Playwright, alle 16 Fixtures) + neu `lighthouse`
+  (needs: regression, Lighthouse CI via `lighthouserc.cjs` —
+  Accessibility blockierend ≥0.8, Performance/Best-Practices nur warn).
+  Lokal getestete echte Scores: Performance 84, Accessibility 91,
+  Best Practices 96, SEO 100. Lokal testen: `npx playwright test` /
+  `npx lhci autorun` (Node.js v24.18.0 LTS seit 2026-07-13 installiert).
+  Kein Branch-Protection-Gate — der Workflow blockiert den Push nicht,
+  sondern zeigt nur ein Badge-Signal danach (README.md).
+- **Prompt-Bibliothek (prompts/, seit v164):** 7 wiederverwendbare
+  Prompt-Vorlagen (session-start, for-advisor, sprint-template,
+  diagnose-template, parallel-sprint, entscheidung-eintragen,
+  nutzer-feedback). Sprint-Vorgabe sprach von "6 Dateien", listete aber
+  7 im Detail — alle 7 erstellt.
+- **Loop 5 (seit v164):** generiert context-exports/for-advisor.txt am
+  Ende jeder Session automatisch (siehe LOOPS.md).
 - Alle 12 alten Test-Szenarien verifiziert ✓ + 5 Fixture-JSONs in
   tests/fixtures/ jetzt ECHT importiert und verifiziert (nicht mehr nur
   schema-validiert) — Ergebnisse in tests/fixtures/README.md, Kurzfassung
@@ -44,6 +56,22 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 
 ## FILES (zuletzt angefasst)
 ```
+LOOPS.md                 — NEU: Loop 5 (for-advisor.txt am Sessionende)
+prompts/                 — NEU: 7 Prompt-Vorlagen (session-start,
+                          for-advisor, sprint-template, diagnose-template,
+                          parallel-sprint, entscheidung-eintragen,
+                          nutzer-feedback)
+.github/workflows/test.yml — B30: zweiter Job `lighthouse` (needs: regression)
+lighthouserc.cjs         — NEU (B30): bewusst .cjs statt .js (package.json
+                          "type":"module" bricht sonst lhci's require()-
+                          Config-Loader). Keine categories:pwa-Assertion
+                          (Lighthouse-Version hat diese Kategorie nicht mehr)
+package.json             — @lhci/cli als devDependency ergänzt
+context-exports/for-advisor.txt — Loop 5 ausgeführt: komplett neu generiert
+                          (3. Fassung, Stand v160→v164)
+CLAUDE.md                — Prompt-Bibliothek + Spec-Konvention in
+                          ARBEITSREGELN ergänzt, prompts/ in Projektdokumente-
+                          Tabelle, Lighthouse-Hinweis in CI-Status
 weeklyFocus.js           — B29: neue Funktion _checkMultiExerciseFailure()
                           in computeStructuralSignals() eingehängt (Strukturkarte,
                           Priorität zuoberst). Kopfkommentar-Drift zur akuten
@@ -160,6 +188,7 @@ state.js                — Wochenerstellung isSeedWeek-Skip, Auto-Eval Guard (f
 | Geräte-Verifikation B16/dragdrop.js | ec33550 | B16 (Doppeltipp-Zoom) auf echtem Gerät bestanden. dragdrop.js Touch-Drag funktioniert weiterhin nicht — neu als B27 getrackt, bewusst zurückgestellt (Pfeile in Übungseinstellungen decken den Bedarf ab) |
 | B28: GitHub Actions CI + Playwright | 6b6a7af | .github/workflows/test.yml, playwright.config.js, tests/regression_core.spec.js, tests/fixtures.spec.js, package.json, README.md (neu). Details + bewusste Abweichungen von der Sprint-Vorlage siehe BUGS.md B28 |
 | B29: Mehr-Übungen-Aggregation | 221da35 | _checkMultiExerciseFailure() in weeklyFocus.js (Strukturkarte), ui.js-Rendering, neue Fixture. Design mit Nutzer besprochen (3 Fragen, siehe DECISIONS.md) vor Implementierung |
+| B30: Lighthouse CI + Prompt-Bibliothek + Loop 5 | (dieser Sprint) | .github/workflows/test.yml (2. Job), lighthouserc.cjs (neu, .cjs statt .js — ESM/CJS-Konflikt real getestet und gelöst), prompts/ (7 Dateien), LOOPS.md (Loop 5), CLAUDE.md (Prompt-Bibliothek + Spec-Konvention), for-advisor.txt neu generiert. ID/Version-Korrektur: Sprint-Vorgabe nannte B28/v163 (beide bereits vergeben) — B30/v164 verwendet |
 
 ---
 
@@ -281,9 +310,24 @@ siehe DECISIONS.md). Neue Fixture MultiExerciseFailure.v1.json isoliert
 verifiziert (headless: computeStructuralSignals() UND gerenderter
 Strukturkarte-Text geprüft, kein Overlap mit persistent_failure).
 
-**Nächster Schritt:** Node.js ist installiert, Loop 1 kann den
-Playwright-Pre-Check jetzt nutzen. Danach B18 (Meter statt Wdh als
-Progressionstyp) — das einzige verbliebene UX-Mittel-Feature in
+**B30 — Loop 5 + Prompt-Bibliothek + Lighthouse CI umgesetzt
+(train-v164):** Lighthouse CI lokal getestet (echte Scores: Performance
+84, Accessibility 91, Best Practices 96, SEO 100 — alle Schwellen
+bestanden), zwei reale Probleme gefunden und gelöst statt blind
+übernommen: (1) `lighthouserc.js` mit ESM-Syntax scheiterte an
+package.json's `"type":"module"` — als `.cjs` mit `module.exports`
+gelöst. (2) `categories:pwa`-Assertion hätte immer sinnlos gewarnt
+(Kategorie existiert in dieser Lighthouse-Version nicht mehr) —
+entfernt statt Dauer-Rauschen zu behalten. Prompt-Bibliothek (7 statt
+der in der Akzeptanzliste genannten 6 Dateien — Sprint-Vorgabe war in
+sich widersprüchlich, Detail-Liste hatte 7 Einträge) unter prompts/
+angelegt. Loop 5 in LOOPS.md ergänzt und einmal ausgeführt
+(for-advisor.txt komplett neu generiert, 3. Fassung).
+
+**Nächster Schritt:** Ersten Lighthouse-CI-Run in GitHub Actions
+beobachten (Scores dort dokumentieren — sollten den lokalen Werten
+nahekommen, ubuntu-latest statt Windows). Danach B18 (Meter statt Wdh
+als Progressionstyp) — das einzige verbliebene UX-Mittel-Feature in
 CLAUDE.md "Offen / In Arbeit" — oder echte Nutzer-Rekrutierung
 (strategische Priorität 1 laut CLAUDE.md).
 

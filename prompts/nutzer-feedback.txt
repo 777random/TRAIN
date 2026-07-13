@@ -1,0 +1,18 @@
+[Wird aktiviert sobald erste Nutzer da]
+
+Lies DECISIONS.md, BUGS.md.
+
+Analysiere folgendes Nutzer-Feedback:
+[FEEDBACK HIER EINFÜGEN]
+
+Für jeden Feedback-Punkt:
+1. Ist das ein Bug, Feature-Wunsch
+   oder Verständnisproblem?
+2. Betrifft es eine bestehende
+   DECISIONS.md-Entscheidung?
+3. Wie hoch ist die Priorität
+   (UX-Hoch/Mittel/Konzept)?
+4. Konkrete Empfehlung
+
+Ausgabe als priorisierte Liste
+für BUGS.md und HANDOFF.md.

@@ -1,7 +1,7 @@
 # TRAIN — CLAUDE.md
 # Vollständiger Projektkontext für Claude Code
-# Stand: train-v163 / SCHEMA 29 / Juli 2026
-# Letztes Update: nach train-v163 Sprint (Mehr-Übungen-Aggregation, B29)
+# Stand: train-v164 / SCHEMA 29 / Juli 2026
+# Letztes Update: nach train-v164 Sprint (Loop 5, Prompt-Bibliothek, Lighthouse CI)
 
 ---
 
@@ -40,7 +40,7 @@ TRAIN ist eine deutschsprachige PWA für Krafttraining. Pure Vanilla ES Modules 
 
 - Repo: https://github.com/777random/TRAIN
 - Deployed: https://777random.github.io/TRAIN/
-- Aktueller Stand: SCHEMA_VERSION 29 · CACHE_VERSION train-v163 · CSS ?v=186
+- Aktueller Stand: SCHEMA_VERSION 29 · CACHE_VERSION train-v164 · CSS ?v=187
 
 ---
 
@@ -50,7 +50,7 @@ TRAIN ist eine deutschsprachige PWA für Krafttraining. Pure Vanilla ES Modules 
 
 Bei CSS-Änderungen: Cache-Buster in `index.html` erhöhen:
 ```html
-<link rel="stylesheet" href="./styles.css?v=186">
+<link rel="stylesheet" href="./styles.css?v=187">
 ```
 
 ---
@@ -65,6 +65,7 @@ Bei CSS-Änderungen: Cache-Buster in `index.html` erhöhen:
 | `AGENTS.md` | Parallelisierungs-Regeln für Multi-Agent Sprints |
 | `LOOPS.md` | Automatische Session-Loops (beim Start jeder Session ausführen) |
 | `SESSION_LOG.md` | Protokoll aller Sessions und Loop-Ergebnisse |
+| `prompts/` | Wiederverwendbare Prompt-Vorlagen für Claude Code und externe Beratung |
 
 Nach jedem Sprint: `HANDOFF.md` und `BUGS.md` aktualisieren (behobene Bugs verschieben, Commit-Hash eintragen, nächsten Schritt setzen).
 
@@ -111,6 +112,23 @@ Roter Badge = blockierender Fehler → vor neuem Sprint fixen.
 er blockiert den Push selbst nicht, sondern liefert ein sichtbares Fehlersignal danach.
 Echtes Push-Blocking bräuchte Branch-Protection-Regeln (GitHub-Repo-Einstellung, nicht
 Teil dieses Workflows) — bewusst nicht eingerichtet, da main direkt gepusht wird (kein PR-Flow).
+Seit train-v164: zweiter Job `lighthouse` (Performance/Accessibility/Best-Practices via
+Lighthouse CI, `lighthouserc.cjs`) läuft nach `regression` (`needs: regression`).
+Accessibility ist blockierend (`error`, ≥0.8), Performance/Best-Practices nur `warn`.
+Keine `categories:pwa`-Assertion — diese Lighthouse-Version hat keine PWA-Kategorie mehr
+(seit Lighthouse v9 entfernt), eine solche Assertion würde nur bedeutungsloses Dauer-Warnen
+erzeugen (siehe BUGS.md B30).
+
+### Prompt-Bibliothek:
+Für jeden Sprint den passenden Prompt aus `prompts/` als Basis verwenden. Nie von null anfangen.
+Neue Prompt-Typen in `prompts/` hinzufügen wenn sie mehr als 2x manuell geschrieben wurden.
+
+### Spec-Konvention (neu):
+Bei komplexen Features:
+1. Produktentscheidung kommt von externem Berater (DECISIONS.md)
+2. Claude Code schreibt technische Spec basierend darauf
+3. Spec zeigen + auf Bestätigung warten bevor implementiert wird
+4. Erst nach Bestätigung: umsetzen
 
 ### Vor konzeptionell neuen Features — zwei Pflichtfragen:
 1. "Reduziert dieses Feature die Unsicherheit des Athleten bei seiner nächsten Trainingsentscheidung?"

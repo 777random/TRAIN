@@ -1,0 +1,37 @@
+Generiere context-exports/for-advisor.txt
+mit folgendem Inhalt (direkt aus Code,
+nicht aus Dokumentation):
+
+1. AKTUELLER CODE-STAND
+   - CACHE_VERSION, CSS, SCHEMA, Commit
+   - Letzter Sprint
+   - Offene Bugs (aus BUGS.md)
+
+2. COACH-KASKADE
+   - computeWeeklyFocus() vollständig
+   - computeStructuralSignals() vollständig
+   - Prioritäten + Begründungen
+
+3. ALLE PROZENTZAHLEN IM UI
+   - Datei:Zeile | Funktion |
+     Zähler/Nenner | isFullSuccess()?
+
+4. STATE-SHAPE ÄNDERUNGEN
+   - Vergleich CLAUDE.md vs STATE_INIT
+
+5. ABWEICHUNGEN VON CLAUDE.md
+   - Funktionsnamen, Schwellenwerte,
+     Logik die abweicht
+
+6. OFFENE TECHNISCHE SCHULDEN
+   - TODO/FIXME/HACK
+   - Duplizierte Funktionen
+   - Magic Numbers
+   - Inkonsistenzen
+
+7. MOVEMENTMAP VOLLSTÄNDIG
+   - Alle Einträge nach Kategorie
+
+8. TEST-INFRASTRUKTUR
+   - Alle Fixtures mit Status
+   - Letzter CI-Run

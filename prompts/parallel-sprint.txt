@@ -1,0 +1,34 @@
+Lies CLAUDE.md, HANDOFF.md, BUGS.md,
+DECISIONS.md, AGENTS.md, LOOPS.md.
+Führe alle aktiven Loops aus.
+
+Führe folgende Aufgaben PARALLEL aus.
+Jeder Agent arbeitet NUR in den
+angegebenen Dateien (siehe AGENTS.md).
+
+════════════════════════════════════════
+AGENT 1 — [TITEL]
+Dateien: [DATEI] (nur)
+════════════════════════════════════════
+[Aufgabe]
+
+════════════════════════════════════════
+AGENT 2 — [TITEL]
+Dateien: [DATEI] (nur)
+════════════════════════════════════════
+[Aufgabe]
+
+════════════════════════════════════════
+KONSOLIDIERUNGS-AGENT (nach allen)
+════════════════════════════════════════
+
+1. Regressions-Test 10/10 grün
+2. Playwright: npx playwright test
+3. CACHE_VERSION → [VERSION]
+   CSS ?v= → [VERSION]
+4. BUGS.md aktualisieren
+5. HANDOFF.md aktualisieren
+6. AGENTS.md: neues Muster ergänzen
+7. SESSION_LOG.md Eintrag
+8. Loop 5: for-advisor.txt generieren
+9. git add -A && git commit && git push

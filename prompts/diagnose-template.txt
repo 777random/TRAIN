@@ -1,0 +1,19 @@
+Lies CLAUDE.md, HANDOFF.md, BUGS.md.
+
+DIAGNOSE — [BUG-ID / TITEL]
+KEINE ÄNDERUNGEN — nur analysieren.
+
+KONTEXT
+[Was das Problem ist + was erwartet wird]
+
+FRAGEN
+1. [Konkrete Code-Frage]
+2. [Konkrete Code-Frage]
+3. [Konkrete Code-Frage]
+
+AUSGABE-FORMAT
+Pro Frage:
+- Datei:Zeile
+- Exakter Code
+- Root Cause
+- Empfohlener Fix

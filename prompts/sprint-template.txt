@@ -1,0 +1,47 @@
+Lies CLAUDE.md, HANDOFF.md, BUGS.md,
+DECISIONS.md, AGENTS.md, LOOPS.md.
+Führe alle aktiven Loops aus.
+
+Bevor du implementierst:
+Schreibe eine technische Spec und
+warte auf Bestätigung.
+
+Dann implementiere:
+
+════════════════════════════════════════
+AUFGABE — [TITEL]
+Dateien: [NUR DIESE DATEIEN]
+════════════════════════════════════════
+
+KONTEXT
+[Was das Problem ist]
+
+ENTSCHEIDUNG
+[Was implementiert werden soll]
+
+FIX
+[Konkrete Implementierung]
+
+════════════════════════════════════════
+KONSOLIDIERUNG
+════════════════════════════════════════
+
+1. Regressions-Test 10/10 grün
+2. Playwright: npx playwright test
+3. CACHE_VERSION → [VERSION]
+   CSS ?v= → [VERSION]
+4. BUGS.md aktualisieren
+5. HANDOFF.md aktualisieren
+6. SESSION_LOG.md Eintrag
+7. Loop 5: for-advisor.txt generieren
+8. git add -A && git commit -m
+   "[typ]: [beschreibung] (vXXX->vYYY)"
+   git push
+
+════════════════════════════════════════
+AKZEPTANZKRITERIEN
+════════════════════════════════════════
+
+[LISTE HIER]
+
+Nach Abschluss: Code-Review ✓/✗

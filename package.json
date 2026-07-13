@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "devDependencies": {
+    "@lhci/cli": "^0.14.0",
     "@playwright/test": "^1.48.0",
     "serve": "^14.2.0"
   }

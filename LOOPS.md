@@ -2,7 +2,7 @@
 # Claude Code führt diese Loops am
 # Anfang JEDER Session aus.
 # Danach erst die eigentliche Aufgabe.
-# Letzte Aktualisierung: 2026-07-13 / train-v162
+# Letzte Aktualisierung: 2026-07-13 / train-v164
 
 ---
 
@@ -172,6 +172,43 @@ gemeint, nicht als reiner JSON-Syntax-Check.
 
 ---
 
+## LOOP 5 — for-advisor.txt (AKTIV)
+Priorität: Am ENDE jeder Session (nicht am Anfang — nach der
+  eigentlichen Aufgabe, als letzter Schritt der Konsolidierung)
+
+Ausführung:
+  Kontext-Export generieren und speichern als:
+  context-exports/for-advisor.txt
+  (überschreibt vorherige Version)
+
+  Inhalt identisch zur bestehenden for-advisor.txt-Struktur (siehe
+  prompts/for-advisor.txt für die vollständige Vorlage):
+  1. Aktueller Code-Stand
+  2. Coach-Kaskade (vollständig)
+  3. Alle Prozentzahlen im UI
+  4. State-Shape Änderungen
+  5. Abweichungen von CLAUDE.md
+  6. Offene technische Schulden
+  7. MovementMap vollständig
+  8. Test-Infrastruktur
+
+  Datum + CACHE_VERSION oben in die Datei einfügen.
+
+  Direkt aus dem echten Code erzeugen, nicht nur aus CLAUDE.md/BUGS.md
+  zusammenfassen (siehe prompts/for-advisor.txt: "direkt aus Code,
+  nicht aus Dokumentation") — sonst würde der Export lediglich
+  bestehende Doku-Drifts mit-exportieren statt sie aufzudecken.
+
+SESSION_LOG.md Eintrag:
+  Loop 5: for-advisor.txt aktualisiert
+
+Stopp-Bedingung: Datei geschrieben
+
+Hinweis: context-exports/ ist gitignored (siehe .gitignore) — diese
+Datei wird nie mitgepusht, rein lokales Artefakt für externe Beratung.
+
+---
+
 ## LOOP 4 — Diagnose offener Bugs (INAKTIV)
 # Aktivieren wenn: alle UX-Hoch Bugs
 # behoben und Edge-Case-Audit abgeschlossen
@@ -209,6 +246,7 @@ Eintrag in SESSION_LOG.md hinzufügen:
   Loop 3: [N] Edge Cases, neu: [dateiname] / übersprungen
   Loop 4: [Bug-ID] diagnostiziert / übersprungen
   Eigentliche Aufgabe: [was gemacht wurde]
+  Loop 5: for-advisor.txt aktualisiert (am Ende der Session)
 
 ---
 
