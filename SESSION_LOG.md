@@ -43,6 +43,19 @@ Eigentliche Aufgabe: GitHub Actions CI + Playwright eingerichtet
   (regression_core.spec.js + fixtures.spec.js/15 Fixtures), 1m7s.
   https://github.com/777random/TRAIN/actions/runs/29247704723
 
+  Danach auf Nutzerwunsch Node.js v24.18.0 LTS installiert (winget,
+  --source winget um interaktiven MS-Store-Terms-Prompt zu vermeiden).
+  npm install + npx playwright install chromium liefen sauber durch.
+  Erster lokaler Testlauf zeigte einen Flake im Regressionstest (9/10
+  fehlgeschlagen beim ersten Versuch, "Cannot set properties of null" —
+  vermutlich Chromium-Kaltstart direkt nach dem 113-MB-Download,
+  retries:1 hat den Gesamtlauf trotzdem grün gemeldet). 4 Wiederholungen
+  danach (warm, retries=0) liefen alle sauber durch (~2.3s), GitHub
+  Actions selbst hatte in seinem eigenen Log nie einen Retry nötig —
+  als einmaliges lokales Kaltstart-Artefakt eingeordnet, nicht als
+  echte Race Condition. Voller Suite-Lauf lokal: 16/16 grün, ~30s.
+  LOOPS.md/HANDOFF.md/BUGS.md entsprechend aktualisiert.
+
 ## 2026-07-13 train-v161
 Loop 1: 10/10 grün ✓ (raf=sync), 0 uncaught errors. Kein Fix nötig.
 Loop 2: CLAUDE.md war veraltet (Stand/Header zeigten train-v160 · ?v=184,

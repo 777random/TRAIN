@@ -21,11 +21,10 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 - Letzter Commit: 6b6a7af (B28 — GitHub Actions CI)
 - **CI aktiv seit v162:** GitHub Actions (`.github/workflows/test.yml`)
   läuft bei jedem Push auf main. Lokal testen: `npx playwright test`
-  — **funktioniert auf dieser Maschine aktuell nicht**, kein Node.js/npm
-  installiert. GitHub Actions ist bis dahin der einzige Ort, an dem die
-  Playwright-Suite tatsächlich läuft. Kein Branch-Protection-Gate — der
-  Workflow blockiert den Push nicht, sondern zeigt nur ein Badge-Signal
-  danach (README.md).
+  — funktioniert jetzt (Node.js v24.18.0 LTS am 2026-07-13 via winget
+  installiert), 16/16 grün lokal bestätigt. Kein Branch-Protection-Gate
+  — der Workflow blockiert den Push nicht, sondern zeigt nur ein
+  Badge-Signal danach (README.md).
 - Alle 12 alten Test-Szenarien verifiziert ✓ + 5 Fixture-JSONs in
   tests/fixtures/ jetzt ECHT importiert und verifiziert (nicht mehr nur
   schema-validiert) — Ergebnisse in tests/fixtures/README.md, Kurzfassung

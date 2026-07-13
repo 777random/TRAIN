@@ -79,13 +79,17 @@ Nur pushen wenn grün. GitHub Actions (siehe
 unabhängige Sicherheitsnetz-Ebene NACH dem Push —
 kein Ersatz für den lokalen Check und kein
 Push-Blocker (siehe CLAUDE.md "CI-Status").
-**Bekannte Lücke:** auf dieser Maschine ist kein
-Node.js/npm installiert — der lokale Pre-Check kann
-hier faktisch nicht ausgeführt werden. Bis Node.js
-verfügbar ist, ist GitHub Actions nach dem Push der
-einzige Ort, an dem die Playwright-Suite tatsächlich
-läuft. Das im GEÄNDERT-Log/HANDOFF.md so vermerken,
-nicht stillschweigend überspringen.
+**Node.js installiert (2026-07-13, v24.18.0 LTS via winget).**
+Lokaler Pre-Check läuft jetzt tatsächlich: 16/16 grün (1
+Regressionstest + 15 Fixtures), ~30s. Einmalig direkt nach der
+Installation trat auf DIESER Maschine ein Flake im Regressionstest
+auf (Chromium-Kaltstart direkt nach dem Download, `retries:1` hat es
+aufgefangen) — 4 Wiederholungen danach (warm) liefen alle sauber
+durch, GitHub Actions selbst hatte nie einen Flake. Eingeordnet als
+einmaliges Kaltstart-Artefakt dieser Maschine, nicht als echte Race
+Condition im Test — falls es wiederkehrend auftritt, dann doch genauer
+diagnostizieren (RENDER_WAIT_MS in regression_core.html ggf. zu knapp
+bei langsamem Erststart).
 
 ---
 
