@@ -24,8 +24,11 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
   schema-validiert) — Ergebnisse in tests/fixtures/README.md, Kurzfassung
   unter NEXT unten
 - Regressions-Test: 10/10 grün (raf=sync), 0 uncaught errors
-- Touch-Drag-Verhalten (dragdrop.js, v156) weiterhin NICHT auf echtem
-  Gerät verifiziert (siehe Sprint v156 unten)
+- Touch-Drag-Verhalten (dragdrop.js, v156) jetzt auf echtem Gerät
+  verifiziert (2026-07-13): funktioniert NICHT (siehe B27, BUGS.md) —
+  bewusst zurückgestellt, da Pfeile in den Übungseinstellungen die
+  Reihenfolge bereits änderbar machen. B16 (Doppeltipp-Zoom) dagegen auf
+  echtem Gerät bestanden.
 - Framework-Score: 11/11
 - **Erster echter Multi-Agent-Sprint dieser Session:** 3 parallele
   Fork-Agents (ui.js / movementMap.js / tests/fixtures/, disjunkt lt.
@@ -213,14 +216,15 @@ schemaVersion 29 (keine "veraltet"-Markierung nötig, obwohl viele
 Dateinamen ältere Sprint-Versionen referenzieren). Details in
 tests/README.md.
 
-**Nächster Schritt:** echte Geräte-Verifikation — zwei offene Punkte,
-die headless grundsätzlich nicht geprüft werden können:
-- dragdrop.js Touch-Drag (seit v156 offen)
-- B16-Fix (Doppeltipp-Zoom-Verhalten, seit v158 offen)
+**Echte Geräte-Verifikation abgeschlossen (2026-07-13):**
+- B16 (Doppeltipp-Zoom) bestanden — beide Ursachen final bestätigt behoben
+- dragdrop.js Touch-Drag: funktioniert weiterhin NICHT — neu als B27
+  getrackt, bewusst zurückgestellt (Pfeile in den Übungseinstellungen
+  decken den Bedarf bereits ab, keine akute Diagnose nötig)
 
-Danach: Mehr-Übungen-Aggregation für persistent_failure (DECISIONS.md),
-oder B18 (Meter statt Wdh als Progressionstyp), das einzige verbliebene
-UX-Mittel-Feature in CLAUDE.md "Offen / In Arbeit".
+**Nächster Schritt:** Mehr-Übungen-Aggregation für persistent_failure
+(DECISIONS.md), oder B18 (Meter statt Wdh als Progressionstyp), das
+einzige verbliebene UX-Mittel-Feature in CLAUDE.md "Offen / In Arbeit".
 
 **Offene Nebenfunde aus diesem Sprint (nicht behoben, nur notiert):**
 - Push/Pull-Ratio-Block in _renderMovementPattern() (ui.js, unterhalb der
@@ -243,29 +247,22 @@ Gewicht-Feld antippen (kein Zoom?).
 Kein UX-Hoch-Bug mehr offen in BUGS.md — Loop 3 (Edge-Case-Audit) ist
 damit ab der nächsten Session nicht mehr blockiert.
 
-## VERIFIKATIONS-STATUS TOUCH-DRAG (train-v156, WICHTIG für nächste Session)
+## VERIFIKATIONS-STATUS TOUCH-DRAG (train-v156 → real-device-Ergebnis 2026-07-13)
 
-**Verifiziert (headless, diese Session):**
+**Verifiziert (headless):**
 - Regressionstest 10/10 grün, 0 uncaught errors
 - index.html lädt headless fehlerfrei durch (kein "Uncaught" im Chrome-
   Log, `#app` erreicht Klasse `is-ready`, `#splash` wird korrekt entfernt)
 - dragdrop.js wird als klassisches Script vor dem Module-Script geladen
   und wirft dabei keinen Fehler
 
-**NICHT verifiziert (headless kann keine echten Touch-Events auslösen):**
-- Ob `MobileDragDrop.polyfill()` auf einem echten Touch-Gerät tatsächlich
-  greift und das Drag-Reorder von Übungen funktioniert
-- Ob `holdToDrag: 400` sich richtig anfühlt (nicht zu kurz → Konflikt mit
-  Scrollen; nicht zu lang → Drag fühlt sich träge an)
-- Ob der neue `touchmove`-Listener (nur `preventDefault()` während
-  `_dragActive`) das Scroll-Verhalten außerhalb eines Drags unverändert
-  lässt — das war genau der Bug in der Sprint-Vorlage (dort hätte ein
-  bedingungsloses `preventDefault()` jegliches Scrollen permanent
-  blockiert; hier stattdessen an dragstart/dragend/drop gekoppelt)
-- Ob `forceApply: false` auf dem Zielgerät korrekt entscheidet (Polyfill
-  nur wo natives Touch-DnD fehlt)
-
-→ Vor dem nächsten Sprint: einmal auf echtem iOS/Android-Gerät oder in
-Chrome DevTools Mobile-Emulation (Device Toolbar, nicht nur Viewport-
-Resize — braucht echte Touch-Event-Simulation) eine Übung per Drag
-neu anordnen und dabei normales Scrollen der Seite testen.
+**Echtes Gerät, 2026-07-13 — Ergebnis: funktioniert NICHT.**
+Long-Press+Drag ändert die Übungsreihenfolge nicht. Als B27 in BUGS.md
+getrackt. Bewusst zurückgestellt statt tiefer diagnostiziert — die
+Pfeil-Buttons in den Übungseinstellungen lösen dasselbe Bedürfnis
+(Reihenfolge ändern) bereits zuverlässig, das Feature hat daher keine
+Priorität. Mögliche Ursachen für eine spätere Diagnose (nicht verfolgt):
+`holdToDrag: 400` zu lang/kurz, `dragstart` feuert auf Touch-Geräten
+nicht zuverlässig, `forceApply: false` entscheidet falsch, oder eine
+Versions-/Kompatibilitätsfrage mit der eingebundenen mobile-drag-drop
+2.3.0-rc.1 Build.

@@ -14,7 +14,12 @@ Loop 4: übersprungen (inaktiv)
 Eigentliche Aufgabe: Nutzer sagte "es soll weiter gehen" ohne konkrete
   Aufgabe — SESSION-START-Protokoll ausgeführt, CLAUDE.md-Drift behoben,
   Nutzer nach nächstem Schritt gefragt (Geräte-Verifikation vs.
-  Mehr-Übungen-Aggregation vs. B18).
+  Mehr-Übungen-Aggregation vs. B18). Nutzer wählte Geräte-Verifikation
+  und testete selbst auf echtem Gerät: B16 (Doppeltipp-Zoom) bestanden,
+  dragdrop.js Touch-Drag funktioniert weiterhin nicht (neu als B27
+  getrackt, bewusst zurückgestellt — Pfeile in Übungseinstellungen
+  decken den Bedarf bereits ab). BUGS.md/HANDOFF.md entsprechend
+  aktualisiert, kein Code geändert, kein Versions-Bump nötig.
 
 ## 2026-07-12 train-v161
 Loop 1: 10/10 grün ✓ (raf=sync), 0 uncaught errors. Kein Fix nötig.
