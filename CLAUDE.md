@@ -1,7 +1,7 @@
 # TRAIN — CLAUDE.md
 # Vollständiger Projektkontext für Claude Code
-# Stand: train-v167 / SCHEMA 30 / Juli 2026
-# Letztes Update: nach train-v167 Sprint (B32 Push/Pull-Ratio-Fix + B33 Lighthouse-Accessibility 91→95)
+# Stand: train-v168 / SCHEMA 30 / Juli 2026
+# Letztes Update: nach train-v168 Sprint (B34+B35 ARIA-Fixes, Accessibility 95→100)
 
 ---
 
@@ -40,7 +40,7 @@ TRAIN ist eine deutschsprachige PWA für Krafttraining. Pure Vanilla ES Modules 
 
 - Repo: https://github.com/777random/TRAIN
 - Deployed: https://777random.github.io/TRAIN/
-- Aktueller Stand: SCHEMA_VERSION 30 · CACHE_VERSION train-v167 · CSS ?v=188
+- Aktueller Stand: SCHEMA_VERSION 30 · CACHE_VERSION train-v168 · CSS ?v=188
 
 ---
 

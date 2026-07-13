@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: Juli 2026 nach train-v167*
-*Nächste Version: train-v168*
+*Letzte Aktualisierung: Juli 2026 nach train-v168*
+*Nächste Version: train-v169*
 
 ---
 
@@ -11,13 +11,29 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v167 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v168 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
-- CSS: ?v=188 (B33 — `--c-text-3` Kontrastfarbe angehoben)
+- CSS: ?v=188 (unverändert diesen Sprint — nur ui.js angefasst,
+  kein CSS-Bump nötig)
 - SCHEMA: 30 (unverändert diesen Sprint)
 - Letzter Commit: siehe `git log` (dieser Sprint noch nicht committet
   zum Zeitpunkt dieses Eintrags — folgt direkt im Anschluss)
+- **B34+B35 behoben (train-v168):** die beiden in B33 (v167) offen
+  gebliebenen Lighthouse-ARIA-Findings, jetzt in `ui.js` selbst gefixt
+  (voriger Sprint war bewusst auf index.html/styles.css beschränkt).
+  B34: `<main id="page-workout" role="tabpanel">` → `<section
+  id="page-workout" role="tabpanel">` (`_buildScaffold()`, ui.js) —
+  `role="tabpanel"` ist für `<main>` kein zulässiger ARIA-Wert, die
+  anderen 4 Tab-Seiten nutzten bereits `<section>`. Kein CSS/JS
+  referenziert das Element über den Tag `main` (per Grep bestätigt),
+  nur über `#page-workout` — risikofreie Änderung. B35: `<div
+  id="days-container" aria-label="Trainingstage">` bekam `role="region"`
+  ergänzt — macht das vorhandene `aria-label` semantisch gültig (ein
+  nacktes `<div>` hat implizit `role="generic"`, das keinen
+  Namen aus `aria-label` unterstützt). Ergebnis: Lighthouse
+  Accessibility 95 → **100**. Regressionstest 10/10 grün, Playwright
+  18/18 grün. Details siehe BUGS.md B34/B35.
 - **B32 behoben (train-v167):** Push/Pull-Ratio-Block in
   `_renderMovementPattern()` (ui.js) zählte als einzige der 4
   Erfolgsquote-Stellen im UI noch nicht success+fail (seit B22/v157
@@ -55,9 +71,10 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
   `regression` (Playwright, alle 16 Fixtures) + neu `lighthouse`
   (needs: regression, Lighthouse CI via `lighthouserc.cjs` —
   Accessibility blockierend ≥0.8, Performance/Best-Practices nur warn).
-  Lokal getestete echte Scores (Stand train-v167): Performance 84,
-  Accessibility 95 (B33: `--c-text-3`-Kontrast gefixt, war 91),
-  Best Practices 96, SEO 100. Lokal testen: `npx playwright test` /
+  Lokal getestete echte Scores (Stand train-v168): Performance 81-84,
+  Accessibility 100 (B34+B35: verbleibende ARIA-Findings aus B33
+  gefixt, war 95), Best Practices 96, SEO 100. Lokal testen:
+  `npx playwright test` /
   `npx lhci autorun` (Node.js v24.18.0 LTS seit 2026-07-13 installiert).
   Kein Branch-Protection-Gate — der Workflow blockiert den Push nicht,
   sondern zeigt nur ein Badge-Signal danach (README.md).
@@ -88,6 +105,13 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 
 ## FILES (zuletzt angefasst)
 ```
+ui.js                    — B34+B35-Fix (_buildScaffold()): <main
+                          id="page-workout"> → <section> (role="tabpanel"
+                          ist für <main> nicht zulässig), role="region"
+                          auf #days-container ergänzt (macht aria-label
+                          gültig)
+index.html / sw.js       — CACHE_VERSION train-v168 (kein CSS-Bump,
+                          styles.css nicht angefasst)
 ui.js                    — B32-Fix: _renderMovementPattern() Push/Pull-
                           Ratio-Block zählt jetzt success+fail statt nur
                           success (letzter Nebenfund aus B22)
@@ -252,7 +276,8 @@ state.js                — Wochenerstellung isSeedWeek-Skip, Auto-Eval Guard (f
 | B18: Distanz/Zeit-Progression | 11eb62e | weightRecommendation.js (getMetricRecommendation), state.js (ex.metricStep, progressionType-Default, Migration v30), ui.js (New-Week-Modal-Branch + Skip-Guard-Fix + metrikabhängige Labels), neue Fixture. Design mit Nutzer besprochen (3 Fragen) vor Implementierung, Nebenbefund B31 dokumentiert |
 | B31-Diagnose (kein Code) | 8130e98 | Root Cause bestätigt + empirisch verifiziert, Fehlverifikation aus Loop-3-Audit (v157) korrigiert |
 | B31-Fix | 66455e0 | ui.js:2426 Guard korrigiert, 3 Szenarien verifiziert (leeres prs, Substitution, metric-Regressionsschutz) |
-| B32+B33: Push/Pull-Ratio + Lighthouse Accessibility | — | Zweiter echter Multi-Agent-Sprint (2 parallele Agents: ui.js allein / index.html+styles.css allein, disjunkt lt. AGENTS.md). B32: letzter Erfolgsquote-Nebenfund aus B22 behoben. B33: Lighthouse Accessibility 91→95 via `--c-text-3`-Kontrast-Fix, 2 weitere ARIA-Findings als B34/B35 dokumentiert (JS-Fix nötig, außerhalb des Scopes). CACHE_VERSION → train-v167, CSS → ?v=188 |
+| B32+B33: Push/Pull-Ratio + Lighthouse Accessibility | e51ce3e | Zweiter echter Multi-Agent-Sprint (2 parallele Agents: ui.js allein / index.html+styles.css allein, disjunkt lt. AGENTS.md). B32: letzter Erfolgsquote-Nebenfund aus B22 behoben. B33: Lighthouse Accessibility 91→95 via `--c-text-3`-Kontrast-Fix, 2 weitere ARIA-Findings als B34/B35 dokumentiert (JS-Fix nötig, außerhalb des Scopes). CACHE_VERSION → train-v167, CSS → ?v=188 |
+| B34+B35: verbleibende ARIA-Fixes | — | Nutzer bat direkt im Anschluss, die in B33 zurückgestellten ARIA-Findings jetzt in ui.js zu fixen. `<main>` → `<section>` für #page-workout, `role="region"` auf #days-container. Lighthouse Accessibility 95→100. CACHE_VERSION → train-v168 (kein CSS-Bump) |
 
 ---
 
@@ -439,10 +464,14 @@ einen JS-Fix in `_buildScaffold()` (ui.js) und wurden bewusst nicht
 im Scope dieses Sprints (nur index.html/styles.css) umgesetzt, sondern
 als B34/B35 neu getrackt.
 
+**B34+B35 umgesetzt (train-v168):** die beiden in B33 zurückgestellten
+ARIA-Findings direkt im Anschluss gefixt, da der Nutzer explizit danach
+fragte. Lighthouse Accessibility jetzt bei **100** (war 91 vor diesem
+Zwei-Sprint-Bogen). Keine offenen Accessibility-Findings mehr bekannt.
+
 **Nächster Schritt:** echte Nutzer-Rekrutierung (strategische Priorität
 1 laut CLAUDE.md) — keine offenen UX-Mittel-Bugs mehr in BUGS.md OFFEN,
-nur noch Low/UX-komplex-Priorität-Items übrig (inkl. der neuen B34/B35,
-beide Low).
+nur noch Low/UX-komplex-Priorität-Items übrig.
 
 **Offene Nebenfunde aus diesem Sprint (nicht behoben, nur notiert):**
 - ~~Push/Pull-Ratio-Block in _renderMovementPattern() (ui.js, unterhalb der

@@ -6267,7 +6267,7 @@ function _buildScaffold(root) {
   </div>
 </nav>
 
-<main id="page-workout" class="page is-active" role="tabpanel" aria-label="Training">
+<section id="page-workout" class="page is-active" role="tabpanel" aria-label="Training">
   <div class="week-nav" aria-label="Wochennavigation">
     <button class="week-nav__btn" id="btn-prev-wk" data-action="nav-prev"
       aria-label="Vorherige Woche">${ic.chevronLeft()}</button>
@@ -6279,8 +6279,8 @@ function _buildScaffold(root) {
       aria-label="Nächste Woche">${ic.chevronRight()}</button>
   </div>
 
-  <div id="days-container" aria-label="Trainingstage"></div>
-</main>
+  <div id="days-container" role="region" aria-label="Trainingstage"></div>
+</section>
 
 <section id="page-coach" class="page" role="tabpanel" aria-label="Coach">
   <h1 class="page-title">Coach</h1>

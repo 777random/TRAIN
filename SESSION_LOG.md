@@ -2,6 +2,27 @@
 # Automatisch von Claude Code
 # befüllt beim Session-Start
 
+## 2026-07-13 train-v168
+Eigentliche Aufgabe: direkte Fortsetzung des train-v167-Sprints — Nutzer
+  bat darum, die beiden dort zurückgestellten Lighthouse-ARIA-Findings
+  (B34/B35) jetzt auch umzusetzen, nachdem sie in einfacher Sprache
+  erklärt wurden. Beide liegen in `_buildScaffold()` (ui.js):
+  B34: `<main id="page-workout" role="tabpanel">` → `<section
+  id="page-workout" role="tabpanel">` — `role="tabpanel"` ist für
+  `<main>` kein zulässiger ARIA-Wert, die anderen 4 Tab-Seiten nutzten
+  bereits `<section>`. Vor der Änderung per Grep bestätigt: kein
+  CSS/JS referenziert das Element über den Tag `main`, nur über
+  `#page-workout` — risikofrei.
+  B35: `<div id="days-container" aria-label="Trainingstage">` bekam
+  `role="region"` ergänzt — ein nacktes `<div>` hat implizit
+  `role="generic"`, das keinen zugänglichen Namen aus `aria-label`
+  ableiten darf; `role="region"` macht das Label gültig.
+  Verifiziert: Playwright 18/18 grün, danach `npx lhci autorun`
+  (1 von 1 Versuchen sauber durchgelaufen) zeigt Accessibility
+  95 → 100, keine verbleibenden Accessibility-Findings unter Score 1.
+  CACHE_VERSION → train-v168 (kein CSS-Bump, styles.css nicht
+  angefasst). BUGS.md B34/B35 von OFFEN nach BEHOBEN verschoben.
+
 ## 2026-07-13 train-v167
 Loop 1: 18/18 grün (npx playwright test, regression_core.spec.js +
   17 Fixtures), 0 uncaught errors. Kein Fix nötig.
