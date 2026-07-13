@@ -2,7 +2,7 @@
 # Claude Code führt diese Loops am
 # Anfang JEDER Session aus.
 # Danach erst die eigentliche Aufgabe.
-# Letzte Aktualisierung: 2026-07-12 / train-v157
+# Letzte Aktualisierung: 2026-07-13 / train-v162
 
 ---
 
@@ -71,6 +71,21 @@ Wenn NICHT 10/10:
 
 Stopp-Bedingung: 10/10 grün (Push kann
   unabhängig davon noch ausstehen)
+
+**Lokaler Pre-Check vor Push (seit train-v162):**
+  npx playwright test --reporter=list
+Nur pushen wenn grün. GitHub Actions (siehe
+.github/workflows/test.yml) ist eine zweite,
+unabhängige Sicherheitsnetz-Ebene NACH dem Push —
+kein Ersatz für den lokalen Check und kein
+Push-Blocker (siehe CLAUDE.md "CI-Status").
+**Bekannte Lücke:** auf dieser Maschine ist kein
+Node.js/npm installiert — der lokale Pre-Check kann
+hier faktisch nicht ausgeführt werden. Bis Node.js
+verfügbar ist, ist GitHub Actions nach dem Push der
+einzige Ort, an dem die Playwright-Suite tatsächlich
+läuft. Das im GEÄNDERT-Log/HANDOFF.md so vermerken,
+nicht stillschweigend überspringen.
 
 ---
 

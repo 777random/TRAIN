@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: Juli 2026 nach train-v161*
-*Nächste Version: train-v162*
+*Letzte Aktualisierung: Juli 2026 nach train-v162*
+*Nächste Version: train-v163*
 
 ---
 
@@ -11,14 +11,21 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v161 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v162 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
-- CSS: ?v=185 (styles.css selbst unverändert seit v158 — Bump war Teil
+- CSS: ?v=186 (styles.css selbst unverändert seit v158 — Bump war Teil
   der expliziten Sprint-Vorgabe, nicht durch eine echte CSS-Änderung
-  ausgelöst)
+  ausgelöst, gleiches Muster wie schon bei v185)
 - SCHEMA: 29
-- Letzter Commit: 48b7272 (B26 — Decisional-Balance für persistent_failure)
+- Letzter Commit: (dieser Sprint — B28, GitHub Actions CI)
+- **CI aktiv seit v162:** GitHub Actions (`.github/workflows/test.yml`)
+  läuft bei jedem Push auf main. Lokal testen: `npx playwright test`
+  — **funktioniert auf dieser Maschine aktuell nicht**, kein Node.js/npm
+  installiert. GitHub Actions ist bis dahin der einzige Ort, an dem die
+  Playwright-Suite tatsächlich läuft. Kein Branch-Protection-Gate — der
+  Workflow blockiert den Push nicht, sondern zeigt nur ein Badge-Signal
+  danach (README.md).
 - Alle 12 alten Test-Szenarien verifiziert ✓ + 5 Fixture-JSONs in
   tests/fixtures/ jetzt ECHT importiert und verifiziert (nicht mehr nur
   schema-validiert) — Ergebnisse in tests/fixtures/README.md, Kurzfassung
@@ -39,6 +46,21 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 
 ## FILES (zuletzt angefasst)
 ```
+.github/workflows/test.yml — NEU: GitHub Actions CI, läuft bei jedem
+                          Push/PR auf main (B28)
+playwright.config.js     — NEU: testDir tests/, iPhone-14-Viewport,
+                          webServer startet npx serve automatisch
+tests/regression_core.spec.js — NEU: Playwright-Wrapper um
+                          regression_core.html, liest <pre id="result">
+                          Klartext (nicht .test-result/.pass — Vorlage
+                          hatte falsche Selektoren angenommen)
+tests/fixtures.spec.js   — NEU: importiert alle 15 tests/fixtures/-JSONs
+                          einzeln, prüft 0 pageerror je Fixture
+package.json             — NEU: devDependencies @playwright/test + serve,
+                          "type":"module" (für playwright.config.js)
+README.md                — NEU (existierte vorher nicht): Titel + CI-Badge
+.gitignore               — node_modules/, package-lock.json,
+                          test-results/, playwright-report/ ergänzt
 tests/README.md          — NEU: 26 ältere Test-JSONs (direkt unter tests/,
                           nicht tests/fixtures/) validiert — alle 26 laufen
                           fehlerfrei, alle bereits schemaVersion 29, keine
@@ -127,6 +149,9 @@ state.js                — Wochenerstellung isSeedWeek-Skip, Auto-Eval Guard (f
 | B25 Fix (mit Nutzer besprochen) | 668b00a | Neues Coach-Signal `_checkPersistentFailure()`, Priorität 2 (nach Reentry, vor Overload), Schwelle 0% Erfolg über 3 Wochen, konkrete Gewichtsempfehlung via deloadFactor+roundToPlate(). Neues Icon 🛑. Beide AllesFail-Fixtures neu verifiziert. |
 | Loop 3 Batch (9 neue Fixtures) | 5688ed3 | 15/15 Edge-Cases erreicht, beide Grenzwert-Tests (2-Wochen-Plateau, 8-Wochen-Deload) bestätigt, kein neuer Bug |
 | B26 + DECISIONS.md + tests/ validiert | 48b7272 | Decisional-Balance für persistent_failure (EX_SET_NEXT_WEEK_PLAN-Dispatch, eigene Toasts), DECISIONS.md-Lücke geschlossen, 26 alte Test-JSONs in tests/ validiert (alle ✓, keine veraltet, keine neuen Bugs) |
+| CLAUDE.md Versions-Sync (Loop 2) | a061df1 | train-v160/?v=184 → train-v161/?v=185, war nach dem letzten Sprint übersprungen worden |
+| Geräte-Verifikation B16/dragdrop.js | ec33550 | B16 (Doppeltipp-Zoom) auf echtem Gerät bestanden. dragdrop.js Touch-Drag funktioniert weiterhin nicht — neu als B27 getrackt, bewusst zurückgestellt (Pfeile in Übungseinstellungen decken den Bedarf ab) |
+| B28: GitHub Actions CI + Playwright | (dieser Sprint) | .github/workflows/test.yml, playwright.config.js, tests/regression_core.spec.js, tests/fixtures.spec.js, package.json, README.md (neu). Details + bewusste Abweichungen von der Sprint-Vorlage siehe BUGS.md B28 |
 
 ---
 
@@ -222,9 +247,19 @@ tests/README.md.
   getrackt, bewusst zurückgestellt (Pfeile in den Übungseinstellungen
   decken den Bedarf bereits ab, keine akute Diagnose nötig)
 
-**Nächster Schritt:** Mehr-Übungen-Aggregation für persistent_failure
-(DECISIONS.md), oder B18 (Meter statt Wdh als Progressionstyp), das
-einzige verbliebene UX-Mittel-Feature in CLAUDE.md "Offen / In Arbeit".
+**B28 — GitHub Actions CI eingerichtet (train-v162):** Playwright-Suite
+läuft jetzt bei jedem Push auf main. Siehe BUGS.md B28 für alle
+Abweichungen von der Sprint-Vorlage (falsche DOM-Selektoren korrigiert,
+`--with-deps` ergänzt, pageerror-Listener-Reihenfolge korrigiert, u.a.).
+
+**Nächster Schritt:** ersten Push nach dem CI-Setup beobachten — GitHub
+Actions Tab prüfen ob der erste Workflow-Run grün durchläuft (via `gh
+run watch` oder im Browser). Falls rot: Log lesen, Ursache beheben,
+erneut pushen. Danach entweder Node.js lokal installieren (damit Loop 1
+den Playwright-Pre-Check wie in LOOPS.md vorgesehen tatsächlich
+ausführen kann), oder direkt weiter mit Mehr-Übungen-Aggregation für
+persistent_failure (DECISIONS.md) bzw. B18 (Meter statt Wdh als
+Progressionstyp).
 
 **Offene Nebenfunde aus diesem Sprint (nicht behoben, nur notiert):**
 - Push/Pull-Ratio-Block in _renderMovementPattern() (ui.js, unterhalb der

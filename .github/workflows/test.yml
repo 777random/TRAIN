@@ -1,0 +1,33 @@
+name: TRAIN Regression Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run regression tests
+        run: npx playwright test tests/regression_core.spec.js --reporter=list
+
+      - name: Run fixture import tests
+        run: npx playwright test tests/fixtures.spec.js --reporter=list

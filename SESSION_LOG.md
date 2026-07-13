@@ -2,6 +2,43 @@
 # Automatisch von Claude Code
 # befüllt beim Session-Start
 
+## 2026-07-13 train-v162
+Loop 1: 10/10 grün ✓ (raf=sync), 0 uncaught errors. Kein Fix nötig.
+Loop 2: HANDOFF.md/CLAUDE.md waren aktuell (im selben Session-
+  Durchgang bereits korrigiert). Kein Fix nötig.
+Loop 3: übersprungen — Stopp-Bedingung (15/15) bereits erreicht.
+Loop 4: übersprungen (inaktiv)
+Eigentliche Aufgabe: GitHub Actions CI + Playwright eingerichtet
+  (B28). Vor der Umsetzung echten DOM/Umgebungs-Check gemacht (wie in
+  der Sprint-Vorgabe selbst gefordert: "nicht blind übernehmen") —
+  4 reale Abweichungen von der Vorlage gefunden und korrigiert:
+  (1) regression_core.html gibt sein Ergebnis als Klartext in
+      <pre id="result"> aus, nicht als .test-result/.pass-Elemente —
+      Spec entsprechend umgeschrieben.
+  (2) npx playwright install braucht --with-deps auf ubuntu-latest,
+      sonst startet Chromium dort nicht.
+  (3) pageerror-Listener in fixtures.spec.js vor page.goto()
+      registriert statt danach (Vorlage hätte Fehler beim Reload
+      selbst verpasst).
+  (4) npm init -y + manueller Server-Start-Schritt entfernt, durch
+      committetes package.json + playwright.config.js webServer-Block
+      ersetzt (robuster als festes sleep 2).
+  Zusätzlich: README.md existierte noch nicht — neu angelegt (Titel +
+  Badge). Bug-ID der Vorgabe (B27) kollidierte mit dem bereits in
+  dieser Session vergebenen B27 (dragdrop.js) — B28 verwendet.
+  Bekannte Lücke: kein Node.js/npm auf dieser Maschine — lokaler
+  Playwright-Pre-Check (LOOPS.md Loop 1) kann hier nicht ausgeführt
+  werden, GitHub Actions ist bis dahin der einzige Ort, an dem die
+  Suite läuft. "Push blockieren" aus dem Ziel-Abschnitt der Vorgabe ist
+  ohne Branch-Protection-Regeln nicht erreichbar (reiner Repo-
+  Settings-Schritt, nicht Teil des Workflows) — bewusst nicht
+  eingerichtet, da main ohne PR-Flow direkt gepusht wird; CLAUDE.md
+  entsprechend präzisiert (Badge-Signal statt echtem Block).
+  CACHE_VERSION → train-v162, CSS → ?v=186 (kein echter App-Code
+  betroffen, Bump als expliziter Sprint-Marker wie schon bei v185).
+  Regressionstest 10/10 grün nach allen Änderungen (lokal, headless
+  Chrome — Playwright selbst nicht lokal lauffähig, siehe oben).
+
 ## 2026-07-13 train-v161
 Loop 1: 10/10 grün ✓ (raf=sync), 0 uncaught errors. Kein Fix nötig.
 Loop 2: CLAUDE.md war veraltet (Stand/Header zeigten train-v160 · ?v=184,

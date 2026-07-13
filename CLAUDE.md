@@ -1,7 +1,7 @@
 # TRAIN — CLAUDE.md
 # Vollständiger Projektkontext für Claude Code
-# Stand: train-v161 / SCHEMA 29 / Juli 2026
-# Letztes Update: nach train-v161 Sprint
+# Stand: train-v162 / SCHEMA 29 / Juli 2026
+# Letztes Update: nach train-v162 Sprint (GitHub Actions CI)
 
 ---
 
@@ -18,6 +18,16 @@ Beim Start jeder Session diese Reihenfolge einhalten:
 
 4. Erst dann mit der eigentlichen Aufgabe beginnen
 
+**Automatischer CI-Check (seit train-v162):** GitHub Actions führt bei
+jedem Push auf main automatisch aus:
+- `tests/regression_core.spec.js` (10 Kernprüfungen, via Playwright)
+- `tests/fixtures.spec.js` (alle Edge-Case-Fixtures in tests/fixtures/)
+
+Status sichtbar als Badge oben in README.md. Läuft zusätzlich zum
+lokalen Loop 1 — kein Ersatz dafür, da lokal kein Node.js verfügbar ist
+(siehe HANDOFF.md), CI ist damit aktuell der einzige Ort, an dem die
+Playwright-Suite tatsächlich läuft.
+
 ---
 
 ## WAS TRAIN IST
@@ -30,7 +40,7 @@ TRAIN ist eine deutschsprachige PWA für Krafttraining. Pure Vanilla ES Modules 
 
 - Repo: https://github.com/777random/TRAIN
 - Deployed: https://777random.github.io/TRAIN/
-- Aktueller Stand: SCHEMA_VERSION 29 · CACHE_VERSION train-v161 · CSS ?v=185
+- Aktueller Stand: SCHEMA_VERSION 29 · CACHE_VERSION train-v162 · CSS ?v=186
 
 ---
 
@@ -40,7 +50,7 @@ TRAIN ist eine deutschsprachige PWA für Krafttraining. Pure Vanilla ES Modules 
 
 Bei CSS-Änderungen: Cache-Buster in `index.html` erhöhen:
 ```html
-<link rel="stylesheet" href="./styles.css?v=185">
+<link rel="stylesheet" href="./styles.css?v=186">
 ```
 
 ---
@@ -93,6 +103,14 @@ Nach jedem Milestone: alle Projektdateien (außer `backups/` und `.git/`) nach `
 
 ### Chrome-Prozesse:
 Beim Testen: nur headless Chrome starten/beenden. Bestehende Chrome-Fenster des Users NICHT beenden.
+
+### CI-Status:
+Nach jedem Push: GitHub Actions Badge in README.md prüfen (oder `gh run list`/`gh run view`).
+Roter Badge = blockierender Fehler → vor neuem Sprint fixen.
+**Wichtig:** der Workflow läuft NACH dem Push (kein Branch-Protection-Gate eingerichtet) —
+er blockiert den Push selbst nicht, sondern liefert ein sichtbares Fehlersignal danach.
+Echtes Push-Blocking bräuchte Branch-Protection-Regeln (GitHub-Repo-Einstellung, nicht
+Teil dieses Workflows) — bewusst nicht eingerichtet, da main direkt gepusht wird (kein PR-Flow).
 
 ### Vor konzeptionell neuen Features — zwei Pflichtfragen:
 1. "Reduziert dieses Feature die Unsicherheit des Athleten bei seiner nächsten Trainingsentscheidung?"
