@@ -18,7 +18,7 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
   der expliziten Sprint-Vorgabe, nicht durch eine echte CSS-Änderung
   ausgelöst, gleiches Muster wie schon bei v185)
 - SCHEMA: 29
-- Letzter Commit: (dieser Sprint — B28, GitHub Actions CI)
+- Letzter Commit: 6b6a7af (B28 — GitHub Actions CI)
 - **CI aktiv seit v162:** GitHub Actions (`.github/workflows/test.yml`)
   läuft bei jedem Push auf main. Lokal testen: `npx playwright test`
   — **funktioniert auf dieser Maschine aktuell nicht**, kein Node.js/npm
@@ -151,7 +151,7 @@ state.js                — Wochenerstellung isSeedWeek-Skip, Auto-Eval Guard (f
 | B26 + DECISIONS.md + tests/ validiert | 48b7272 | Decisional-Balance für persistent_failure (EX_SET_NEXT_WEEK_PLAN-Dispatch, eigene Toasts), DECISIONS.md-Lücke geschlossen, 26 alte Test-JSONs in tests/ validiert (alle ✓, keine veraltet, keine neuen Bugs) |
 | CLAUDE.md Versions-Sync (Loop 2) | a061df1 | train-v160/?v=184 → train-v161/?v=185, war nach dem letzten Sprint übersprungen worden |
 | Geräte-Verifikation B16/dragdrop.js | ec33550 | B16 (Doppeltipp-Zoom) auf echtem Gerät bestanden. dragdrop.js Touch-Drag funktioniert weiterhin nicht — neu als B27 getrackt, bewusst zurückgestellt (Pfeile in Übungseinstellungen decken den Bedarf ab) |
-| B28: GitHub Actions CI + Playwright | (dieser Sprint) | .github/workflows/test.yml, playwright.config.js, tests/regression_core.spec.js, tests/fixtures.spec.js, package.json, README.md (neu). Details + bewusste Abweichungen von der Sprint-Vorlage siehe BUGS.md B28 |
+| B28: GitHub Actions CI + Playwright | 6b6a7af | .github/workflows/test.yml, playwright.config.js, tests/regression_core.spec.js, tests/fixtures.spec.js, package.json, README.md (neu). Details + bewusste Abweichungen von der Sprint-Vorlage siehe BUGS.md B28 |
 
 ---
 
