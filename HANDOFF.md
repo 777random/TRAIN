@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: Juli 2026 nach train-v166*
-*Nächste Version: train-v167*
+*Letzte Aktualisierung: Juli 2026 nach train-v167*
+*Nächste Version: train-v168*
 
 ---
 
@@ -11,13 +11,30 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v166 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v167 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
-- CSS: ?v=187 (unverändert diesen Sprint — nur ui.js angefasst,
-  kein CSS-Bump nötig)
+- CSS: ?v=188 (B33 — `--c-text-3` Kontrastfarbe angehoben)
 - SCHEMA: 30 (unverändert diesen Sprint)
-- Letzter Commit: 66455e0 (B31 — 1RM-Fallback-Fix)
+- Letzter Commit: siehe `git log` (dieser Sprint noch nicht committet
+  zum Zeitpunkt dieses Eintrags — folgt direkt im Anschluss)
+- **B32 behoben (train-v167):** Push/Pull-Ratio-Block in
+  `_renderMovementPattern()` (ui.js) zählte als einzige der 4
+  Erfolgsquote-Stellen im UI noch nicht success+fail (seit B22/v157
+  als offener Nebenfund notiert) — jetzt vereinheitlicht:
+  `ex.sets.filter(s => s.status === 'success' || s.status === 'fail')`.
+  `_weekSuccessScore()`/`_weekTrainingStatus()` bewusst unangetastet
+  (andere Semantik). Details siehe BUGS.md B32.
+- **B33 behoben (train-v167, teilweise):** Lighthouse Accessibility
+  91 → 95. `--c-text-3` (styles.css) von `#72727A` auf `#90909A`
+  angehoben — behebt den `color-contrast`-Fund (3.63 → ≥4.5:1 gegen
+  alle 3 Hintergründe, auf denen die Variable verwendet wird). Zwei
+  weitere Findings (`aria-allowed-role` auf `<main role="tabpanel">`,
+  `aria-prohibited-attr` auf `<div aria-label>` ohne gültige Rolle)
+  liegen in `_buildScaffold()` (ui.js) — außerhalb des für diesen
+  Sprint erlaubten Scopes (nur index.html/styles.css), daher nicht
+  gefixt, sondern als eigene Bugs B34/B35 (Low) neu getrackt. Details
+  siehe BUGS.md B33/B34/B35.
 - **B31 behoben (train-v166):** `_renderAnalysis1RM()`-Fallback zeigte
   nie ein 1RM, wenn `state.prs` noch keinen Eintrag hatte (v.a. bei
   Ausweichübungen — der Fallback ist explizit dafür gebaut, griff aber
@@ -38,7 +55,8 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
   `regression` (Playwright, alle 16 Fixtures) + neu `lighthouse`
   (needs: regression, Lighthouse CI via `lighthouserc.cjs` —
   Accessibility blockierend ≥0.8, Performance/Best-Practices nur warn).
-  Lokal getestete echte Scores: Performance 84, Accessibility 91,
+  Lokal getestete echte Scores (Stand train-v167): Performance 84,
+  Accessibility 95 (B33: `--c-text-3`-Kontrast gefixt, war 91),
   Best Practices 96, SEO 100. Lokal testen: `npx playwright test` /
   `npx lhci autorun` (Node.js v24.18.0 LTS seit 2026-07-13 installiert).
   Kein Branch-Protection-Gate — der Workflow blockiert den Push nicht,
@@ -70,6 +88,14 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 
 ## FILES (zuletzt angefasst)
 ```
+ui.js                    — B32-Fix: _renderMovementPattern() Push/Pull-
+                          Ratio-Block zählt jetzt success+fail statt nur
+                          success (letzter Nebenfund aus B22)
+styles.css               — B33-Fix: --c-text-3 #72727A → #90909A
+                          (color-contrast 3.63 → ≥4.5:1 gegen alle 3
+                          Hintergründe, auf denen die Variable verwendet
+                          wird)
+index.html / sw.js       — CACHE_VERSION train-v167, CSS ?v=188
 ui.js                    — B31-Fix: _renderAnalysis1RM()-Fallback-Guard
                           ui.js:2426 von `!== 'kg'` auf `!== 'reps'`
                           korrigiert (1RM-Schätzung zeigte nie Daten,
@@ -226,6 +252,7 @@ state.js                — Wochenerstellung isSeedWeek-Skip, Auto-Eval Guard (f
 | B18: Distanz/Zeit-Progression | 11eb62e | weightRecommendation.js (getMetricRecommendation), state.js (ex.metricStep, progressionType-Default, Migration v30), ui.js (New-Week-Modal-Branch + Skip-Guard-Fix + metrikabhängige Labels), neue Fixture. Design mit Nutzer besprochen (3 Fragen) vor Implementierung, Nebenbefund B31 dokumentiert |
 | B31-Diagnose (kein Code) | 8130e98 | Root Cause bestätigt + empirisch verifiziert, Fehlverifikation aus Loop-3-Audit (v157) korrigiert |
 | B31-Fix | 66455e0 | ui.js:2426 Guard korrigiert, 3 Szenarien verifiziert (leeres prs, Substitution, metric-Regressionsschutz) |
+| B32+B33: Push/Pull-Ratio + Lighthouse Accessibility | — | Zweiter echter Multi-Agent-Sprint (2 parallele Agents: ui.js allein / index.html+styles.css allein, disjunkt lt. AGENTS.md). B32: letzter Erfolgsquote-Nebenfund aus B22 behoben. B33: Lighthouse Accessibility 91→95 via `--c-text-3`-Kontrast-Fix, 2 weitere ARIA-Findings als B34/B35 dokumentiert (JS-Fix nötig, außerhalb des Scopes). CACHE_VERSION → train-v167, CSS → ?v=188 |
 
 ---
 
@@ -401,14 +428,26 @@ aus der Substitutions-Woche — der Hauptfall, für den der Fallback
 ursprünglich gebaut wurde. (3) Regressionsschutz: metric 'm'/'sec' zeigt
 weiterhin korrekt keinen 1RM-Hint. Details siehe BUGS.md B31.
 
+**B32+B33 umgesetzt (train-v167):** erster Sprint mit zwei echten
+parallelen Agents in getrennten Dateigruppen (ui.js allein / index.html+
+styles.css allein). B32 schließt den letzten offenen Erfolgsquote-
+Nebenfund aus B22. B33 hebt Lighthouse Accessibility von 91 auf 95 —
+lokal mit `npx lhci autorun` verifiziert (2 von 3 Läufen erfolgreich,
+1 Lauf am bekannten Windows-EPERM-Cleanup-Fehler gescheitert, siehe
+B30, kein neues Problem). Die verbleibenden 2 ARIA-Findings brauchen
+einen JS-Fix in `_buildScaffold()` (ui.js) und wurden bewusst nicht
+im Scope dieses Sprints (nur index.html/styles.css) umgesetzt, sondern
+als B34/B35 neu getrackt.
+
 **Nächster Schritt:** echte Nutzer-Rekrutierung (strategische Priorität
 1 laut CLAUDE.md) — keine offenen UX-Mittel-Bugs mehr in BUGS.md OFFEN,
-nur noch Low/UX-komplex-Priorität-Items übrig.
+nur noch Low/UX-komplex-Priorität-Items übrig (inkl. der neuen B34/B35,
+beide Low).
 
 **Offene Nebenfunde aus diesem Sprint (nicht behoben, nur notiert):**
-- Push/Pull-Ratio-Block in _renderMovementPattern() (ui.js, unterhalb der
+- ~~Push/Pull-Ratio-Block in _renderMovementPattern() (ui.js, unterhalb der
   Kategorie-Balken) zählt weiterhin nur success-Sätze, nicht success+fail
-  — war nicht Teil von B22, potenzieller Folge-Fix
+  — war nicht Teil von B22, potenzieller Folge-Fix~~ BEHOBEN train-v167 (B32)
 - movementMap.js-Grenzfälle geprüft, bewusst NICHT geändert (Agent-3-Review):
   Ausfallschritte/Lunges (Squat), Box Jumps (Squat) vs. Broad Jumps (Core),
   Wadenheben/Calf Raise (Hinge), KB Turkish Get-Up/Windmill (Hinge),

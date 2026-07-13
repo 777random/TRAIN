@@ -1,7 +1,7 @@
 # TRAIN — Parallel Agent Regeln
 # Wird nach jedem Multi-Agent Sprint
 # automatisch aktualisiert.
-# Letzte Aktualisierung: 2026-07-12 / train-v157
+# Letzte Aktualisierung: 2026-07-13 / train-v167
 
 ---
 
@@ -209,6 +209,33 @@ Agent 3: movementMap.js (Wertkorrektur an 5 bestehenden Einträgen)
 → Konsolidierungs-Agent zuletzt (Regressionstest, Version, Docs, Commit)
 ```
 Ergebnis: keine Kollision, Regressionstest 10/10 grün nach dem Merge.
+
+### Muster 5 — ui.js + index.html/styles.css (verifiziert 2026-07-13,
+train-v167):
+```
+Agent 1: ui.js (Push/Pull-Ratio-Zählformel vereinheitlicht, B32)
+Agent 2: index.html + styles.css (Lighthouse-Accessibility-Fixes, B33)
+→ Konsolidierungs-Agent zuletzt (Version, Docs, Commit)
+```
+Ergebnis: keine Kollision, Regressionstest 10/10 grün + Playwright 18/18
+grün nach dem Merge. Kein Eintrag vorher in der "IMMER parallel möglich"-
+Liste explizit für dieses Paar (nur "styles.css + jede JS-Datei AUSSER
+ui.js" war dort bereits abgedeckt — schließt ui.js selbst ausdrücklich
+aus) — hier trotzdem sicher, weil Agent 1 ausschließlich in ui.js und
+Agent 2 ausschließlich in index.html/styles.css schrieb, disjunkte
+Dateimengen ohne inhaltliche Berührung (Agent 2s Änderungen führten
+keine neuen Klassennamen ein, die ui.js hätte rendern müssen — reine
+Kontrastwert-Änderung einer bestehenden CSS-Variable + kein index.html-
+Markup-Fix, da die beiden gefundenen ARIA-Probleme tatsächlich in
+`_buildScaffold()` in ui.js liegen und außerhalb des Scopes blieben).
+Präzisere Regel analog zu Muster 4: **ui.js + index.html/styles.css
+sind parallel sicher, wenn die CSS/HTML-Änderung keine neuen
+Klassennamen/IDs einführt, auf die eine gleichzeitige ui.js-Änderung
+angewiesen wäre, und umgekehrt keine der beiden Änderungen Markup
+anfasst, das die andere Datei tatsächlich erzeugt** (hier: die
+ARIA-Probleme steckten in ui.js selbst, nicht in index.html — wichtig
+das vor der Umsetzung zu prüfen, sonst hätte Agent 2 fälschlich versucht,
+in ui.js-generiertes Markup über index.html zu "reparieren").
 
 **Wichtige Matrix-Nuance, die dieser Sprint konkret bestätigt hat:**
 movementMap.js wird von ui.js importiert — nach der bisherigen Formel

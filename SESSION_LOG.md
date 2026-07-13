@@ -2,6 +2,45 @@
 # Automatisch von Claude Code
 # befüllt beim Session-Start
 
+## 2026-07-13 train-v167
+Loop 1: 18/18 grün (npx playwright test, regression_core.spec.js +
+  17 Fixtures), 0 uncaught errors. Kein Fix nötig.
+Loop 2: HANDOFF.md/CLAUDE.md waren aktuell (train-v166/?v=187, passend
+  zu sw.js/index.html vor diesem Sprint). Kein Fix nötig.
+Loop 3: übersprungen — Stopp-Bedingung (15/15, tatsächlich bereits mehr)
+  längst erreicht, keine UX-Hoch-Bugs offen.
+Loop 4: übersprungen (inaktiv)
+Eigentliche Aufgabe: Zweiter echter Multi-Agent-Sprint (2 parallele
+  Agents, disjunkte Dateien lt. AGENTS.md-Matrix):
+  Agent 1 (ui.js): B32 — Push/Pull-Ratio-Block in
+  `_renderMovementPattern()` war die letzte der 4 Erfolgsquote-Stellen,
+  die seit B22 (v157) noch nicht auf success+fail vereinheitlicht war.
+  Fix: `ex.sets.filter(s => s.status === 'success')` →
+  `filter(s => s.status === 'success' || s.status === 'fail')`.
+  `_weekSuccessScore()`/`_weekTrainingStatus()` bewusst unangetastet
+  (andere Semantik, siehe DECISIONS.md).
+  Agent 2 (index.html + styles.css): Lighthouse Accessibility-Audit
+  (`npx lhci autorun`, lokal — bekannter Windows-EPERM-Cleanup-Fehler
+  siehe B30, 2 von 3 Läufen erfolgreich). Ausgangsscore 91, 3 Findings
+  unter Score 1: `color-contrast` (`.ob-tpl-sub` u.a., 3.63 statt 4.5:1,
+  Ursache `--c-text-3` gegen `--c-surface`), `aria-allowed-role`
+  (`<main role="tabpanel">`) und `aria-prohibited-attr` (`<div
+  aria-label>` ohne gültige Rolle). Nur der Kontrast-Fund lag im
+  erlaubten Scope (index.html/styles.css) — `--c-text-3` global von
+  `#72727A` auf `#90909A` angehoben (berechnet gegen alle 3
+  Hintergründe, auf denen die Variable verwendet wird, nicht nur gegen
+  den einen von Lighthouse gemeldeten). Die beiden ARIA-Findings liegen
+  in `_buildScaffold()` (ui.js), also außerhalb des Scopes — als B34/B35
+  dokumentiert, nicht gefixt (dem Ziel "≥95 oder Begründung" der
+  Sprint-Vorgabe entsprechend).
+  Ergebnis: Accessibility 91 → 95. Regressionstest 10/10 grün,
+  Playwright 18/18 grün nach beiden Fixes zusammen. Keine Kollision
+  zwischen den beiden Agents (disjunkte Dateien, siehe AGENTS.md
+  Muster 5, neu dokumentiert).
+  CACHE_VERSION → train-v167, CSS ?v=188.
+Loop 5: for-advisor.txt aktualisiert (Stand v167, B32/B33/B34/B35
+  eingepflegt).
+
 ## 2026-07-13 train-v166
 Loop 1: 10/10 grün (nach 2 isolierten Flakes bei Prüfpunkt 8 während
   der Testreihe — bekanntes Headless-Timing-Artefakt, unabhängig via

@@ -2381,7 +2381,7 @@ function _renderMovementPattern(state) {
       for (const ex of day.exercises) {
         const baseName = ex.substituteFor ?? ex.name;
         const cat = customCatMap[baseName] ?? MOVEMENT_MAP[baseName] ?? 'Sonstige';
-        const n = ex.sets.filter(s => s.status === 'success').length;
+        const n = ex.sets.filter(s => s.status === 'success' || s.status === 'fail').length;
         if (cat === 'Push') pushSets += n;
         else if (cat === 'Pull') pullSets += n;
       }
