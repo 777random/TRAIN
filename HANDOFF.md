@@ -252,14 +252,19 @@ läuft jetzt bei jedem Push auf main. Siehe BUGS.md B28 für alle
 Abweichungen von der Sprint-Vorlage (falsche DOM-Selektoren korrigiert,
 `--with-deps` ergänzt, pageerror-Listener-Reihenfolge korrigiert, u.a.).
 
-**Nächster Schritt:** ersten Push nach dem CI-Setup beobachten — GitHub
-Actions Tab prüfen ob der erste Workflow-Run grün durchläuft (via `gh
-run watch` oder im Browser). Falls rot: Log lesen, Ursache beheben,
-erneut pushen. Danach entweder Node.js lokal installieren (damit Loop 1
-den Playwright-Pre-Check wie in LOOPS.md vorgesehen tatsächlich
-ausführen kann), oder direkt weiter mit Mehr-Übungen-Aggregation für
-persistent_failure (DECISIONS.md) bzw. B18 (Meter statt Wdh als
-Progressionstyp).
+**Erster CI-Run erfolgreich (2026-07-13):** https://github.com/777random/TRAIN/actions/runs/29247704723
+— beide Jobs grün (regression_core.spec.js + fixtures.spec.js, alle 15
+Fixtures), 1m7s Laufzeit. Einzige Auffälligkeit: Info-Annotation von
+GitHub ("Node.js 20 is deprecated... forced to run on Node.js 24") —
+betrifft die Runtime der Actions selbst (checkout@v4/setup-node@v4),
+nicht unser `node-version: '20'`-Input für die Job-Steps — keine
+Handlung nötig, nur zur Kenntnis.
+
+**Nächster Schritt:** Node.js lokal installieren (damit Loop 1 den
+Playwright-Pre-Check wie in LOOPS.md vorgesehen tatsächlich ausführen
+kann, statt sich allein auf GitHub Actions zu verlassen), oder direkt
+weiter mit Mehr-Übungen-Aggregation für persistent_failure
+(DECISIONS.md) bzw. B18 (Meter statt Wdh als Progressionstyp).
 
 **Offene Nebenfunde aus diesem Sprint (nicht behoben, nur notiert):**
 - Push/Pull-Ratio-Block in _renderMovementPattern() (ui.js, unterhalb der

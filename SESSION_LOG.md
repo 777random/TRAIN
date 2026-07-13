@@ -38,6 +38,10 @@ Eigentliche Aufgabe: GitHub Actions CI + Playwright eingerichtet
   betroffen, Bump als expliziter Sprint-Marker wie schon bei v185).
   Regressionstest 10/10 grün nach allen Änderungen (lokal, headless
   Chrome — Playwright selbst nicht lokal lauffähig, siehe oben).
+  Gepusht (813eaf2, nach Nutzer-Bestätigung). Erster GitHub-Actions-Run
+  beobachtet (gh run watch): ✓ erfolgreich, beide Jobs grün
+  (regression_core.spec.js + fixtures.spec.js/15 Fixtures), 1m7s.
+  https://github.com/777random/TRAIN/actions/runs/29247704723
 
 ## 2026-07-13 train-v161
 Loop 1: 10/10 grün ✓ (raf=sync), 0 uncaught errors. Kein Fix nötig.
