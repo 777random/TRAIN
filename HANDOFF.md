@@ -18,7 +18,7 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
   expliziter Sprint-Marker laut Sprint-Vorgabe, gleiches Muster wie
   schon bei v185/v186)
 - SCHEMA: 29
-- Letzter Commit: (dieser Sprint — B30, Lighthouse CI + Prompt-Bibliothek + Loop 5)
+- Letzter Commit: d1241a6 (B30 — Lighthouse CI + Prompt-Bibliothek + Loop 5)
 - **CI aktiv seit v162, jetzt 2 Jobs:** GitHub Actions
   (`.github/workflows/test.yml`) läuft bei jedem Push auf main.
   `regression` (Playwright, alle 16 Fixtures) + neu `lighthouse`
@@ -188,7 +188,7 @@ state.js                — Wochenerstellung isSeedWeek-Skip, Auto-Eval Guard (f
 | Geräte-Verifikation B16/dragdrop.js | ec33550 | B16 (Doppeltipp-Zoom) auf echtem Gerät bestanden. dragdrop.js Touch-Drag funktioniert weiterhin nicht — neu als B27 getrackt, bewusst zurückgestellt (Pfeile in Übungseinstellungen decken den Bedarf ab) |
 | B28: GitHub Actions CI + Playwright | 6b6a7af | .github/workflows/test.yml, playwright.config.js, tests/regression_core.spec.js, tests/fixtures.spec.js, package.json, README.md (neu). Details + bewusste Abweichungen von der Sprint-Vorlage siehe BUGS.md B28 |
 | B29: Mehr-Übungen-Aggregation | 221da35 | _checkMultiExerciseFailure() in weeklyFocus.js (Strukturkarte), ui.js-Rendering, neue Fixture. Design mit Nutzer besprochen (3 Fragen, siehe DECISIONS.md) vor Implementierung |
-| B30: Lighthouse CI + Prompt-Bibliothek + Loop 5 | (dieser Sprint) | .github/workflows/test.yml (2. Job), lighthouserc.cjs (neu, .cjs statt .js — ESM/CJS-Konflikt real getestet und gelöst), prompts/ (7 Dateien), LOOPS.md (Loop 5), CLAUDE.md (Prompt-Bibliothek + Spec-Konvention), for-advisor.txt neu generiert. ID/Version-Korrektur: Sprint-Vorgabe nannte B28/v163 (beide bereits vergeben) — B30/v164 verwendet |
+| B30: Lighthouse CI + Prompt-Bibliothek + Loop 5 | d1241a6 | .github/workflows/test.yml (2. Job), lighthouserc.cjs (neu, .cjs statt .js — ESM/CJS-Konflikt real getestet und gelöst), prompts/ (7 Dateien), LOOPS.md (Loop 5), CLAUDE.md (Prompt-Bibliothek + Spec-Konvention), for-advisor.txt neu generiert. ID/Version-Korrektur: Sprint-Vorgabe nannte B28/v163 (beide bereits vergeben) — B30/v164 verwendet |
 
 ---
 
