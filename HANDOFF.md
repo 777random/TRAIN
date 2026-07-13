@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: Juli 2026 nach train-v162*
-*Nächste Version: train-v163*
+*Letzte Aktualisierung: Juli 2026 nach train-v163*
+*Nächste Version: train-v164*
 
 ---
 
@@ -11,14 +11,13 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v162 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v163 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
-- CSS: ?v=186 (styles.css selbst unverändert seit v158 — Bump war Teil
-  der expliziten Sprint-Vorgabe, nicht durch eine echte CSS-Änderung
-  ausgelöst, gleiches Muster wie schon bei v185)
+- CSS: ?v=186 (unverändert diesen Sprint — nur ui.js/weeklyFocus.js
+  angefasst, styles.css selbst nicht, daher kein CSS-Bump nötig)
 - SCHEMA: 29
-- Letzter Commit: 6b6a7af (B28 — GitHub Actions CI)
+- Letzter Commit: (dieser Sprint — B29, Mehr-Übungen-Aggregation)
 - **CI aktiv seit v162:** GitHub Actions (`.github/workflows/test.yml`)
   läuft bei jedem Push auf main. Lokal testen: `npx playwright test`
   — funktioniert jetzt (Node.js v24.18.0 LTS am 2026-07-13 via winget
@@ -45,6 +44,15 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 
 ## FILES (zuletzt angefasst)
 ```
+weeklyFocus.js           — B29: neue Funktion _checkMultiExerciseFailure()
+                          in computeStructuralSignals() eingehängt (Strukturkarte,
+                          Priorität zuoberst). Kopfkommentar-Drift zur akuten
+                          Kaskade korrigiert (fehlte persistent_failure seit v160)
+ui.js                    — B29: _structuralSignalHtml() um 'multi_exercise_failure'
+                          ergänzt (Text-only, kein Button)
+tests/fixtures/TRAIN_Test_EdgeCase_MultiExerciseFailure.v1.json — NEU:
+                          isolierter Test für B29 (3 Übungen à 17%, keine
+                          einzelne bei 0%)
 .github/workflows/test.yml — NEU: GitHub Actions CI, läuft bei jedem
                           Push/PR auf main (B28)
 playwright.config.js     — NEU: testDir tests/, iPhone-14-Viewport,
@@ -151,6 +159,7 @@ state.js                — Wochenerstellung isSeedWeek-Skip, Auto-Eval Guard (f
 | CLAUDE.md Versions-Sync (Loop 2) | a061df1 | train-v160/?v=184 → train-v161/?v=185, war nach dem letzten Sprint übersprungen worden |
 | Geräte-Verifikation B16/dragdrop.js | ec33550 | B16 (Doppeltipp-Zoom) auf echtem Gerät bestanden. dragdrop.js Touch-Drag funktioniert weiterhin nicht — neu als B27 getrackt, bewusst zurückgestellt (Pfeile in Übungseinstellungen decken den Bedarf ab) |
 | B28: GitHub Actions CI + Playwright | 6b6a7af | .github/workflows/test.yml, playwright.config.js, tests/regression_core.spec.js, tests/fixtures.spec.js, package.json, README.md (neu). Details + bewusste Abweichungen von der Sprint-Vorlage siehe BUGS.md B28 |
+| B29: Mehr-Übungen-Aggregation | (dieser Sprint) | _checkMultiExerciseFailure() in weeklyFocus.js (Strukturkarte), ui.js-Rendering, neue Fixture. Design mit Nutzer besprochen (3 Fragen, siehe DECISIONS.md) vor Implementierung |
 
 ---
 
@@ -259,11 +268,24 @@ betrifft die Runtime der Actions selbst (checkout@v4/setup-node@v4),
 nicht unser `node-version: '20'`-Input für die Job-Steps — keine
 Handlung nötig, nur zur Kenntnis.
 
-**Nächster Schritt:** Node.js lokal installieren (damit Loop 1 den
-Playwright-Pre-Check wie in LOOPS.md vorgesehen tatsächlich ausführen
-kann, statt sich allein auf GitHub Actions zu verlassen), oder direkt
-weiter mit Mehr-Übungen-Aggregation für persistent_failure
-(DECISIONS.md) bzw. B18 (Meter statt Wdh als Progressionstyp).
+**B29 — Mehr-Übungen-Aggregation umgesetzt (train-v163):** neue
+Funktion `_checkMultiExerciseFailure()` in computeStructuralSignals()
+(Strukturkarte, NICHT akute Kaskade) — schließt die in DECISIONS.md
+dokumentierte Grenze von `_checkPersistentFailure` (prüfte bisher nur
+EINE Übung). Schwelle: Gesamterfolgsquote ≤20% über ≥2 Übungen, letzte
+3 Nicht-Deload-Wochen. Reiner Informationstext (Top-3 schlechteste
+Übungen + Gewichtsempfehlung je Übung), kein Aktions-Button — hält die
+"Strukturkarte = rein informativ"-Konvention ein. Design vorab mit
+Nutzer besprochen (3 Fragen: Platzierung/Schwelle/Aktionsfähigkeit,
+siehe DECISIONS.md). Neue Fixture MultiExerciseFailure.v1.json isoliert
+verifiziert (headless: computeStructuralSignals() UND gerenderter
+Strukturkarte-Text geprüft, kein Overlap mit persistent_failure).
+
+**Nächster Schritt:** Node.js ist installiert, Loop 1 kann den
+Playwright-Pre-Check jetzt nutzen. Danach B18 (Meter statt Wdh als
+Progressionstyp) — das einzige verbliebene UX-Mittel-Feature in
+CLAUDE.md "Offen / In Arbeit" — oder echte Nutzer-Rekrutierung
+(strategische Priorität 1 laut CLAUDE.md).
 
 **Offene Nebenfunde aus diesem Sprint (nicht behoben, nur notiert):**
 - Push/Pull-Ratio-Block in _renderMovementPattern() (ui.js, unterhalb der

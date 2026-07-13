@@ -5,34 +5,40 @@
  * 1. computeWeeklyFocus() – AKUTE Kaskade, EIN priorisiertes Signal (erstes
  *    zutreffendes gewinnt), braucht diese Woche eine konkrete Reaktion:
  *      1. Wiedereinstieg    – state.lastReentryHandled (bestehend, 1:1 wiederverwendet)
- *      2. Überlastung       – Schlaf / RPE-Trend / Erfolgsquote (3 Zweige,
+ *      2. Konsistente Fehlschläge – EINE Übung bei 0% Erfolg über 3 Wochen
+ *                             (seit v160/B25) — VOR Überlastung, da eingetretenes
+ *                             Totalversagen dringlicher ist als drohende Überlastung
+ *      3. Überlastung       – Schlaf / RPE-Trend / Erfolgsquote (3 Zweige,
  *                             eigene Formulierung je Zweig, an S-02/S-04
  *                             angelehnte aber NICHT aus insightEngine.js
  *                             importierte Schwellenwerte)
- *      3. Plateau           – detectPlateaus() aus plateauDetector.js, 1:1
+ *      4. Plateau           – detectPlateaus() aus plateauDetector.js, 1:1
  *                             wiederverwendet. VOR Pre-Plateau (bestätigter,
  *                             stärkerer Befund hat Vorrang vor einer bloßen
  *                             Antizipation einer anderen Übung — Fix Problem 2)
- *      4. Pre-Plateau-Antizipation
- *      5. Konsistenz-Engpass – Anteil absolvierter Trainingstage über 6 Wochen,
+ *      5. Pre-Plateau-Antizipation
+ *      6. Konsistenz-Engpass – Anteil absolvierter Trainingstage über 6 Wochen,
  *                             nutzt state.js' isTrainingDay() für die Urlaubstage-
  *                             Ausschlussregel (einzige Quelle, nicht dupliziert)
- *      6. Progression       – isReadyForAutoSelect()/getWeightRecommendation()
+ *      7. Progression       – isReadyForAutoSelect()/getWeightRecommendation()
  *                             aus weightRecommendation.js, 1:1 wiederverwendet
  *      Fallback: "Auf Kurs"
  *
  * 2. computeStructuralSignals() – STRUKTURELLE Signale, Array von 0-N
  *    gleichzeitig aktiven Hinweisen (kein "erstes gewinnt"), brauchen KEINE
  *    wöchentliche Entscheidung, bleiben über mehrere Wochen relevant:
- *      A. Präventiver Deload  – aus _checkOverload() herausgelöst (war dort
+ *      A. Mehr-Übungen-Aggregation – verteiltes Scheitern über ≥2 Übungen,
+ *                               Gesamterfolgsquote ≤20% (seit v163) — Gegenstück
+ *                               zu Punkt 2 oben (dort: EINE Übung bei 0%)
+ *      B. Präventiver Deload  – aus _checkOverload() herausgelöst (war dort
  *                               vierter Zweig) — strukturell (8-Wochen-Horizont),
  *                               keine akute Entscheidung nötig
- *      B. Konsistenz-Qualität – hohe/stabile Frequenz bei sinkender Erfolgsquote,
+ *      C. Konsistenz-Qualität – hohe/stabile Frequenz bei sinkender Erfolgsquote,
  *                               nutzt computeConsistencyTrend()/computeQualityTrend()
  *                               aus overallPerformance.js, 1:1 wiederverwendet
- *      C. Push/Pull-Warnung   – deutliches muskuläres Ungleichgewicht über
+ *      D. Push/Pull-Warnung   – deutliches muskuläres Ungleichgewicht über
  *                               erkenntnisseHorizont-Wochen, MOVEMENT_MAP-basiert
- *    Maximal 2 gleichzeitig (Priorität A > B > C), Rendering in ui.js als
+ *    Maximal 2 gleichzeitig (Priorität A > B > C > D), Rendering in ui.js als
  *    eigene, optisch sekundäre Karte unabhängig von computeWeeklyFocus().
  *
  * Beide Funktionen sind pure, keine Seiteneffekte.
@@ -838,17 +844,88 @@ function _checkPersistentFailure(state) {
 // Priorität A > B > C nur für die Max.-2-Begrenzung relevant, nicht für
 // gegenseitigen Ausschluss.
 
+// ─── Mehr-Übungen-Aggregation (Design mit Nutzer besprochen) ────────────────
+// Ergänzt _checkPersistentFailure() (akut, EINE Übung bei 0% über 3 Wochen):
+// erkennt das Gegenstück — verteiltes Scheitern über MEHRERE Übungen, bei dem
+// keine einzelne Übung die 0%-Schwelle erreicht, die Gesamterfolgsquote aber
+// trotzdem alarmierend niedrig ist. War als "bekannte Grenze" in DECISIONS.md
+// dokumentiert (_checkPersistentFailure prüft nur einzelne Übungen). Bewusst
+// STRUKTURELL statt akut: ein andauerndes, breites Muster über viele Übungen
+// ist kein einzelnes akutes Ereignis wie eine durchgehend scheiternde Übung,
+// erzwingt daher keine Stay/Change-Entscheidung — reiner Informationstext
+// wie die anderen 3 strukturellen Signale (kein Aktions-Button, siehe
+// buildDecisionalBalance()-Docstring unten).
+// Schwelle bewusst weicher als der Einzelübungs-Check (≤20% statt 0%) — sonst
+// würde sich Scheitern realistisch über zu viele Übungen verteilen, um die
+// Schwelle je zu erreichen. Mindestens 2 UNTERSCHIEDLICHE betroffene Übungen
+// nötig, sonst ist es exakt der Fall, den _checkPersistentFailure bereits
+// abdeckt (keine doppelte Meldung derselben einen Übung in zwei Karten).
+function _checkMultiExerciseFailure(state) {
+  const weeks = _nonDeloadWeeks(state);
+  if (weeks.length < 3) return null;
+  const last3 = weeks.slice(-3);
+
+  let succ = 0, fail = 0;
+  const perExercise = new Map();
+  for (const wk of last3) {
+    for (const d of wk.days) for (const ex of d.exercises) {
+      let entry = perExercise.get(ex.name);
+      if (!entry) { entry = { succ: 0, fail: 0, lastFailWeight: null }; perExercise.set(ex.name, entry); }
+      for (const s of ex.sets) {
+        if (s.status === 'success') { succ++; entry.succ++; }
+        else if (s.status === 'fail') {
+          fail++; entry.fail++;
+          if ((s.weight ?? 0) > 0) entry.lastFailWeight = s.weight;
+        }
+      }
+    }
+  }
+
+  // Mindest-Stichprobe nötig, sonst würde z.B. 1 Satz/Woche über 3 Wochen
+  // einen False Positive erzeugen — grober Richtwert: mind. 5 bewertete
+  // Sätze/Woche im Schnitt (entspricht einem sehr leichten Trainingsminimum).
+  const totalEvaluated = succ + fail;
+  if (totalEvaluated < 15) return null;
+
+  const rate = succ / totalEvaluated;
+  if (rate > 0.20) return null;
+
+  const plateStep    = state.settings?.plateStep ?? 2.5;
+  const deloadFactor = state.settings?.deloadFactor ?? 0.75;
+
+  const affected = [...perExercise.entries()]
+    .filter(([, v]) => (v.succ + v.fail) >= 2 && v.fail > 0)
+    .map(([name, v]) => ({
+      name,
+      rate: v.succ / (v.succ + v.fail),
+      suggestedWeight: v.lastFailWeight != null ? roundToPlate(v.lastFailWeight * deloadFactor, plateStep) : null,
+    }));
+
+  if (affected.length < 2) return null;
+
+  const worst = affected.sort((a, b) => a.rate - b.rate).slice(0, 3);
+
+  return { rate: Math.round(rate * 100), totalEvaluated, worst };
+}
+
 /**
  * @param {Object} state
  * @returns {Array<Object>} 0-2 strukturelle Signale, höchstens 2 gleichzeitig
- *   (Priorität Präventiver Deload > Konsistenz-Qualität > Push/Pull bei
- *   Überzahl). Jedes Objekt trägt ein `type`-Feld
- *   ('deload_preventive'|'consistency_quality'|'push_pull') als Diskriminator
- *   fürs Rendering in ui.js, zusätzlich zu den jeweiligen Rohdaten
- *   (weeksSince/dominant/etc.) für die dortigen Kurztexte.
+ *   (Priorität Mehr-Übungen-Aggregation > Präventiver Deload >
+ *   Konsistenz-Qualität > Push/Pull bei Überzahl — die Aggregation steht
+ *   zuoberst, da ein datenbasierter breiter Totalausfall der konkreteste
+ *   Befund unter den strukturellen Signalen ist, analog zur Top-Priorität von
+ *   _checkPersistentFailure in der akuten Kaskade). Jedes Objekt trägt ein
+ *   `type`-Feld ('multi_exercise_failure'|'deload_preventive'|
+ *   'consistency_quality'|'push_pull') als Diskriminator fürs Rendering in
+ *   ui.js, zusätzlich zu den jeweiligen Rohdaten (weeksSince/dominant/etc.)
+ *   für die dortigen Kurztexte.
  */
 export function computeStructuralSignals(state) {
   const signals = [];
+
+  const multiFail = _checkMultiExerciseFailure(state);
+  if (multiFail) signals.push({ type: 'multi_exercise_failure', ...multiFail });
 
   const deload = _checkPreventiveDeload(state);
   if (deload) signals.push({ type: 'deload_preventive', ...deload });

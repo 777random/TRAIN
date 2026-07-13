@@ -2452,6 +2452,12 @@ const _FOCUS_ICONS = {
 // headline/reasoning/recommendation: die Strukturkarte ist optisch sekundär
 // und braucht keinen "Warum?"-Collapse (siehe renderCoachTab()).
 function _structuralSignalHtml(sig) {
+  if (sig.type === 'multi_exercise_failure') {
+    const names = sig.worst
+      .map(w => w.suggestedWeight != null ? `${w.name} (~${w.suggestedWeight}kg)` : w.name)
+      .join(', ');
+    return { icon: '🛑', text: `Erfolgsquote insgesamt nur ${sig.rate}% — am stärksten betroffen: ${names}.` };
+  }
   if (sig.type === 'deload_preventive') {
     return { icon: '🔄', text: `${sig.weeksSince} Wochen ohne Deload — Regenerationswoche einplanen.` };
   }

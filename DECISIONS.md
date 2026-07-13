@@ -55,12 +55,21 @@
 **Begründung:** Eingetretenes Totalversagen ist dringlicher als drohende Überlastung. _checkOverload filtert intern auf success-Sätze — bei 0 Erfolgen liefert es null und die Kaskade würde bis Fallback durchfallen ("Auf Kurs" trotz 4 Wochen Totalversagen).
 **Bekannte Grenzen:**
 - Keine Decisional-Balance (**seit v161/B26 behoben** — buildDecisionalBalance() hat jetzt einen persistent_failure-Fall, siehe COACH-LOGIK-Eintrag unten)
-- Prüft nur EINZELNE Übungen — wechselndes Scheitern bei verschiedenen Übungen löst kein Signal aus (weiterhin offen)
+- Prüft nur EINZELNE Übungen — wechselndes Scheitern bei verschiedenen Übungen löst kein Signal aus (**seit v163/B29 behoben** — computeStructuralSignals() hat jetzt _checkMultiExerciseFailure(), siehe COACH-LOGIK-Eintrag unten. Bewusst als eigenes STRUKTURELLES Signal, nicht als Erweiterung dieser akuten Funktion — siehe dortige Begründung)
 **Gilt:** Permanent bis gegenteilige Entscheidung.
 
 ### 2026-07 — persistent_failure bekommt generische Decisional-Balance (nicht Plateau-Buttons)
 **Entscheidung:** persistent_failure nutzt buildDecisionalBalance() (stay/change, wie Overload/ConsistencyGap) statt einer eigenen Buttons-Familie wie Plateau ("Habe ich umgesetzt"/"Ignorieren", plateauActions).
 **Begründung:** Plateau hat mehrere konkurrierende Strategien (deload/volume/variation) — braucht deshalb eigene, differenzierte Buttons. persistent_failure hat nur einen einzigen klaren Hebel (Gewicht runter), das passt exakt in das bestehende stay/change-Muster. "Empfehlung folgen" dispatcht EX_SET_NEXT_WEEK_PLAN mit Delta `-(currentWeight * (1 - deloadFactor))`, gerundet auf weightStep — bewusst über den konfigurierbaren deloadFactor statt Plateaus eigenem hartkodierten 22.5%-Wert, damit die im Coach-Text angezeigte "~X kg"-Empfehlung exakt zum tatsächlich gesetzten Wert passt.
+**Gilt:** Permanent bis gegenteilige Entscheidung.
+
+### 2026-07 — Mehr-Übungen-Aggregation: strukturell statt akut, ≤20%-Schwelle, reiner Text
+**Entscheidung:** _checkMultiExerciseFailure() (verteiltes Scheitern über ≥2 Übungen) lebt in computeStructuralSignals() (Strukturkarte), NICHT in der akuten Kaskade von computeWeeklyFocus(). Schwelle: Gesamterfolgsquote ≤20% über alle Übungen der letzten 3 Nicht-Deload-Wochen (mind. 15 bewertete Sätze, mind. 2 unterschiedliche betroffene Übungen mit je ≥2 Datenpunkten). Ausgabe: reiner Informationstext mit den 2-3 am schlechtesten performenden Übungen + je einer Gewichtsempfehlung — KEIN Aktions-Button, KEINE Decisional-Balance (buildDecisionalBalance() bleibt für Strukturkarte-Signale bewusst `null`, wie bei allen anderen 3 strukturellen Signalen).
+**Begründung (3 explizit besprochene Design-Fragen):**
+1. Platzierung: ein andauerndes, breites Muster über viele Übungen ist konzeptionell strukturell (wie Präventiver Deload/Konsistenz-Qualität/Push-Pull), kein einzelnes akutes Ereignis wie eine durchgehend scheiternde einzelne Übung (das deckt weiterhin _checkPersistentFailure ab, Priorität 2 in der akuten Kaskade).
+2. Schwelle bewusst weicher als der Einzelübungs-Check (≤20% statt 0%) — bei echter Verteilung über mehrere Übungen würde eine 0%-Schwelle in der Praxis kaum je erreicht.
+3. Kein Aktions-Button: die Strukturkarte ist laut bestehender Konvention (siehe buildDecisionalBalance()-Docstring) rein informativ, keine Karte dort hat bisher einen Button — eine Ausnahme nur für dieses eine neue Signal hätte die bestehende "Strukturkarte = keine Aktion"-Trennung durchbrochen.
+Priorität innerhalb der Strukturkarte: Mehr-Übungen-Aggregation > Präventiver Deload > Konsistenz-Qualität > Push/Pull — steht zuoberst, da ein datenbasierter breiter Totalausfall der konkreteste Befund unter den strukturellen Signalen ist (analog zur Top-Priorität von persistent_failure in der akuten Kaskade). Mindestens 2 unterschiedliche betroffene Übungen als Gate verhindert, dass dasselbe Einzelübungs-Scheitern doppelt gemeldet wird (einmal akut, einmal strukturell).
 **Gilt:** Permanent bis gegenteilige Entscheidung.
 
 ---

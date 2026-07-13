@@ -2,6 +2,46 @@
 # Automatisch von Claude Code
 # befüllt beim Session-Start
 
+## 2026-07-13 train-v163
+Loop 1: 10/10 grün ✓ nach der Implementierung (1 isolierter Flake bei
+  Prüfpunkt 8 währenddessen beobachtet, 3 weitere Läufe danach sauber —
+  gleiches bekanntes Headless-Timing-Artefakt wie bei B28, kein
+  Zusammenhang mit dem Code-Change). Playwright lokal: 17/17 grün.
+Loop 2: HANDOFF.md/CLAUDE.md aktuell gehalten (in diesem Durchgang
+  direkt mitgepflegt).
+Loop 3: übersprungen — Stopp-Bedingung (15/15) längst erreicht, die
+  16. Fixture war ein gezielter Feature-Test (B29), kein Loop-3-Edge-
+  Case-Zuwachs.
+Loop 4: übersprungen (inaktiv)
+Eigentliche Aufgabe: "Mehr-Übungen-Aggregation für persistent_failure"
+  (B29) — konzeptionell neues Feature, daher vor Implementierung Design
+  mit Nutzer besprochen (CLAUDE.md-Pflichtfragen): 3 AskUserQuestion-
+  Runden (Platzierung Strukturkarte vs. akut, Schwelle 0% vs. ≤20%,
+  Aktionsfähigkeit Text vs. Button) — jeweils empfohlene Option gewählt.
+  Beim Implementieren einen echten Architektur-Konflikt entdeckt und
+  VOR dem Schreiben von Code zurückgemeldet: buildDecisionalBalance()-
+  Docstring schließt Aktions-Buttons für Strukturkarte-Signale explizit
+  aus, "Top-3 mit Gewichtsempfehlung" hätte das gebrochen — Nutzer
+  entschied sich für reinen Text (hält Konvention ein).
+  Umsetzung: _checkMultiExerciseFailure() in weeklyFocus.js
+  (computeStructuralSignals(), Priorität zuoberst — konkretester Befund
+  unter den strukturellen Signalen), Rendering in ui.js
+  (_structuralSignalHtml()). Mindestens 2 unterschiedliche betroffene
+  Übungen als Gate, damit dasselbe Einzelübungs-Scheitern nicht doppelt
+  gemeldet wird (akut UND strukturell). Neue Fixture
+  MultiExerciseFailure.v1.json bewusst so konstruiert, dass KEINE
+  einzelne Übung 0% erreicht (je 17%) — isoliert den neuen Code, zeigt
+  klar keinen Overlap mit persistent_failure. Headless verifiziert: sowohl
+  computeStructuralSignals()-Rohdaten als auch der tatsächlich gerenderte
+  Strukturkarte-Text ("🛑 Erfolgsquote insgesamt nur 17%...").
+  Nebenbei: stale Kopfkommentar in weeklyFocus.js korrigiert (akute
+  Kaskade listete noch die alte 6-Punkte-Nummerierung von vor v160,
+  persistent_failure fehlte dort seit dessen Einführung).
+  DECISIONS.md: bestehende "Bekannte Grenze"-Zeile bei
+  _checkPersistentFailure als behoben markiert + neuer Eintrag mit den
+  3 Design-Entscheidungen. CACHE_VERSION → train-v163 (kein CSS-Bump,
+  styles.css nicht angefasst).
+
 ## 2026-07-13 train-v162
 Loop 1: 10/10 grün ✓ (raf=sync), 0 uncaught errors. Kein Fix nötig.
 Loop 2: HANDOFF.md/CLAUDE.md waren aktuell (im selben Session-
