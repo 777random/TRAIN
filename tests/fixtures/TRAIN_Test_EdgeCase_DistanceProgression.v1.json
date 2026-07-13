@@ -1,0 +1,178 @@
+{
+  "meta": { "schemaVersion": 30, "savedAt": "2026-07-13T12:00:00.000Z", "createdAt": "2026-07-13T12:00:00.000Z" },
+  "curIdx": 2,
+  "weeks": [
+    {
+      "id": 1720262003001,
+      "startDate": "2026-06-15",
+      "note": "",
+      "mode": "standard",
+      "days": [
+        {
+          "id": 1720262003002,
+          "title": "Cardio",
+          "subtitle": "",
+          "warmup": "",
+          "cooldown": "",
+          "locked": true,
+          "markedDone": false,
+          "isVacation": false,
+          "sleepHours": 7,
+          "energyLevel": 4,
+          "sessionRating": 3,
+          "exercises": [
+            {
+              "name": "Rudermaschine",
+              "note": "", "pauseSec": 90, "metric": "m",
+              "sets": [
+                { "weight": 0, "reps": 400, "rpe": 6.5, "status": "success", "done": true, "note": "" },
+                { "weight": 0, "reps": 400, "rpe": 6.5, "status": "success", "done": true, "note": "" }
+              ],
+              "metricStep": 50, "weightStep": 2.5, "nextWeekPlan": 0, "nextWeekPlanConfirmed": false,
+              "targetSets": 2, "targetReps": 400, "progressionType": "reps",
+              "progressionMode": "weight_first", "targetRepsMax": null, "prRepsHistory": {},
+              "prWeight": null, "prRepsAtMaxWeight": null, "setType": "straight",
+              "tags": [], "showPlates": false, "substituteFor": null, "archived": false
+            },
+            {
+              "name": "Plank",
+              "note": "", "pauseSec": 60, "metric": "sec",
+              "sets": [
+                { "weight": 0, "reps": 45, "rpe": 7, "status": "success", "done": true, "note": "" }
+              ],
+              "metricStep": 10, "weightStep": 2.5, "nextWeekPlan": 0, "nextWeekPlanConfirmed": false,
+              "targetSets": 1, "targetReps": 45, "progressionType": "reps",
+              "progressionMode": "weight_first", "targetRepsMax": null, "prRepsHistory": {},
+              "prWeight": null, "prRepsAtMaxWeight": null, "setType": "straight",
+              "tags": [], "showPlates": false, "substituteFor": null, "archived": false
+            }
+          ]
+        }
+      ],
+      "sessionLog": [], "bodyData": {}, "restDays": [], "isSeedWeek": false
+    },
+    {
+      "id": 1720262003003,
+      "startDate": "2026-06-22",
+      "note": "",
+      "mode": "standard",
+      "days": [
+        {
+          "id": 1720262003004,
+          "title": "Cardio",
+          "subtitle": "",
+          "warmup": "",
+          "cooldown": "",
+          "locked": true,
+          "markedDone": false,
+          "isVacation": false,
+          "sleepHours": 7,
+          "energyLevel": 4,
+          "sessionRating": 3,
+          "exercises": [
+            {
+              "name": "Rudermaschine",
+              "note": "", "pauseSec": 90, "metric": "m",
+              "sets": [
+                { "weight": 0, "reps": 400, "rpe": 6.5, "status": "success", "done": true, "note": "" },
+                { "weight": 0, "reps": 400, "rpe": 6.5, "status": "success", "done": true, "note": "" }
+              ],
+              "metricStep": 50, "weightStep": 2.5, "nextWeekPlan": 0, "nextWeekPlanConfirmed": false,
+              "targetSets": 2, "targetReps": 400, "progressionType": "reps",
+              "progressionMode": "weight_first", "targetRepsMax": null, "prRepsHistory": {},
+              "prWeight": null, "prRepsAtMaxWeight": null, "setType": "straight",
+              "tags": [], "showPlates": false, "substituteFor": null, "archived": false
+            },
+            {
+              "name": "Plank",
+              "note": "", "pauseSec": 60, "metric": "sec",
+              "sets": [
+                { "weight": 0, "reps": 45, "rpe": 7, "status": "success", "done": true, "note": "" }
+              ],
+              "metricStep": 10, "weightStep": 2.5, "nextWeekPlan": 0, "nextWeekPlanConfirmed": false,
+              "targetSets": 1, "targetReps": 45, "progressionType": "reps",
+              "progressionMode": "weight_first", "targetRepsMax": null, "prRepsHistory": {},
+              "prWeight": null, "prRepsAtMaxWeight": null, "setType": "straight",
+              "tags": [], "showPlates": false, "substituteFor": null, "archived": false
+            }
+          ]
+        }
+      ],
+      "sessionLog": [], "bodyData": {}, "restDays": [], "isSeedWeek": false
+    },
+    {
+      "id": 1720262003005,
+      "startDate": "2026-06-29",
+      "note": "",
+      "mode": "standard",
+      "days": [
+        {
+          "id": 1720262003006,
+          "title": "Cardio",
+          "subtitle": "",
+          "warmup": "",
+          "cooldown": "",
+          "locked": true,
+          "markedDone": false,
+          "isVacation": false,
+          "sleepHours": 7,
+          "energyLevel": 4,
+          "sessionRating": 3,
+          "exercises": [
+            {
+              "name": "Rudermaschine",
+              "note": "", "pauseSec": 90, "metric": "m",
+              "sets": [
+                { "weight": 0, "reps": 400, "rpe": 6.5, "status": "success", "done": true, "note": "" },
+                { "weight": 0, "reps": 400, "rpe": 6.5, "status": "success", "done": true, "note": "" }
+              ],
+              "metricStep": 50, "weightStep": 2.5, "nextWeekPlan": 0, "nextWeekPlanConfirmed": false,
+              "targetSets": 2, "targetReps": 400, "progressionType": "reps",
+              "progressionMode": "weight_first", "targetRepsMax": null, "prRepsHistory": {},
+              "prWeight": null, "prRepsAtMaxWeight": null, "setType": "straight",
+              "tags": [], "showPlates": false, "substituteFor": null, "archived": false
+            },
+            {
+              "name": "Plank",
+              "note": "", "pauseSec": 60, "metric": "sec",
+              "sets": [
+                { "weight": 0, "reps": 45, "rpe": 7, "status": "success", "done": true, "note": "" }
+              ],
+              "metricStep": 10, "weightStep": 2.5, "nextWeekPlan": 0, "nextWeekPlanConfirmed": false,
+              "targetSets": 1, "targetReps": 45, "progressionType": "reps",
+              "progressionMode": "weight_first", "targetRepsMax": null, "prRepsHistory": {},
+              "prWeight": null, "prRepsAtMaxWeight": null, "setType": "straight",
+              "tags": [], "showPlates": false, "substituteFor": null, "archived": false
+            }
+          ]
+        }
+      ],
+      "sessionLog": [], "bodyData": {}, "restDays": [], "isSeedWeek": false
+    }
+  ],
+  "customTemplate": [],
+  "templates": [],
+  "prs": {},
+  "insights": [],
+  "favoriteExercises": [],
+  "customExercises": [],
+  "badges": [],
+  "onboardingDone": true,
+  "seenTips": [],
+  "plateauActions": {},
+  "decisionLog": [],
+  "coachQuestion": { "weekStart": null, "questionId": null, "answer": null, "outcome": null, "measuredWeekStart": null },
+  "coachQuestionHistory": [],
+  "coachPerformance": { "suggestions": [] },
+  "lastReentryHandled": null,
+  "longestStreakEver": 0,
+  "settings": {
+    "swipe": true, "drag": true, "heightCm": null, "targetWeight": null, "showBmi": false,
+    "deloadFactor": 0.75, "deloadFactorCustom": null, "barbellWeight": 20, "plateStep": 2.5,
+    "lastBackupDate": null, "activeTags": [], "vibrationEnabled": true, "rpeEnabled": true,
+    "weeksSinceLastBackupReminder": 0, "maxSessionMs": 10800000, "autoStartPauseTimer": true,
+    "dismissedNamePairs": [], "autoEval": false,
+    "autoWeek": { "enabled": false, "suggestProgress": true, "showReview": true },
+    "erkenntnisseHorizont": 8
+  }
+}

@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: Juli 2026 nach train-v164*
-*Nächste Version: train-v165*
+*Letzte Aktualisierung: Juli 2026 nach train-v165*
+*Nächste Version: train-v166*
 
 ---
 
@@ -11,14 +11,21 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v164 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v165 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
-- CSS: ?v=187 (styles.css selbst unverändert diesen Sprint — Bump als
-  expliziter Sprint-Marker laut Sprint-Vorgabe, gleiches Muster wie
-  schon bei v185/v186)
-- SCHEMA: 29
-- Letzter Commit: d1241a6 (B30 — Lighthouse CI + Prompt-Bibliothek + Loop 5)
+- CSS: ?v=187 (unverändert diesen Sprint — nur state.js/ui.js/
+  weightRecommendation.js angefasst, kein CSS-Bump nötig)
+- SCHEMA: 30 (v29→v30: ex.metricStep ergänzt + progressionType-Default
+  korrigiert für metric 'm'/'sec', siehe B18)
+- Letzter Commit: (dieser Sprint — B18, Distanz/Zeit-Progression)
+- **B18 behoben (train-v165):** Coach-Gewichtsempfehlung hatte für
+  metric 'm'/'sec'-Übungen (Laufen, Rudermaschine, Plank etc.) nie eine
+  Empfehlung geliefert (`getWeightRecommendation()`s `lastWeight<=0`-
+  Guard griff immer, da diese Übungen kein Gewicht tracken). Neue
+  `getMetricRecommendation()` (weightRecommendation.js) + neues Feld
+  `ex.metricStep` + `progressionType`-Default korrigiert (`'reps'`
+  statt `'weight'` bei metric≠'reps'). Details siehe BUGS.md B18.
 - **CI aktiv seit v162, jetzt 2 Jobs:** GitHub Actions
   (`.github/workflows/test.yml`) läuft bei jedem Push auf main.
   `regression` (Playwright, alle 16 Fixtures) + neu `lighthouse`
@@ -56,6 +63,22 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 
 ## FILES (zuletzt angefasst)
 ```
+weightRecommendation.js  — B18: _recommendationCore() extrahiert (geteilte
+                          Entscheidungslogik), neue getMetricRecommendation()
+                          für metric 'm'/'sec'. getWeightRecommendation()
+                          Originalverhalten exakt erhalten (fixe Deltas
+                          2.5/1.25, nicht step-gekoppelt — per Test abgesichert)
+state.js                 — B18: EX_SET_METRIC_STEP-Action, ex.metricStep-
+                          Default + progressionType-Default korrigiert
+                          (EX_ADD, Urlaubspläne) für metric≠'reps'.
+                          Migration v29→v30 für bestehende Übungen
+ui.js                    — B18: New-Week-Modal branch't nach ex.metric
+                          (getWeightRecommendation/getMetricRecommendation),
+                          Skip-Guard-Bug korrigiert (hätte mit neuem
+                          progressionType-Default jede Distanz/Zeit-Übung
+                          übersprungen), Schrittweite-Picker + Chip/Toast/
+                          Button-Beschriftungen metrikabhängig (m/Sek statt kg)
+tests/fixtures/TRAIN_Test_EdgeCase_DistanceProgression.v1.json — NEU: B18-Fixture
 LOOPS.md                 — NEU: Loop 5 (for-advisor.txt am Sessionende)
 prompts/                 — NEU: 7 Prompt-Vorlagen (session-start,
                           for-advisor, sprint-template, diagnose-template,
@@ -189,6 +212,7 @@ state.js                — Wochenerstellung isSeedWeek-Skip, Auto-Eval Guard (f
 | B28: GitHub Actions CI + Playwright | 6b6a7af | .github/workflows/test.yml, playwright.config.js, tests/regression_core.spec.js, tests/fixtures.spec.js, package.json, README.md (neu). Details + bewusste Abweichungen von der Sprint-Vorlage siehe BUGS.md B28 |
 | B29: Mehr-Übungen-Aggregation | 221da35 | _checkMultiExerciseFailure() in weeklyFocus.js (Strukturkarte), ui.js-Rendering, neue Fixture. Design mit Nutzer besprochen (3 Fragen, siehe DECISIONS.md) vor Implementierung |
 | B30: Lighthouse CI + Prompt-Bibliothek + Loop 5 | d1241a6 | .github/workflows/test.yml (2. Job), lighthouserc.cjs (neu, .cjs statt .js — ESM/CJS-Konflikt real getestet und gelöst), prompts/ (7 Dateien), LOOPS.md (Loop 5), CLAUDE.md (Prompt-Bibliothek + Spec-Konvention), for-advisor.txt neu generiert. ID/Version-Korrektur: Sprint-Vorgabe nannte B28/v163 (beide bereits vergeben) — B30/v164 verwendet |
+| B18: Distanz/Zeit-Progression | (dieser Sprint) | weightRecommendation.js (getMetricRecommendation), state.js (ex.metricStep, progressionType-Default, Migration v30), ui.js (New-Week-Modal-Branch + Skip-Guard-Fix + metrikabhängige Labels), neue Fixture. Design mit Nutzer besprochen (3 Fragen) vor Implementierung, Nebenbefund B31 dokumentiert |
 
 ---
 
@@ -324,12 +348,27 @@ sich widersprüchlich, Detail-Liste hatte 7 Einträge) unter prompts/
 angelegt. Loop 5 in LOOPS.md ergänzt und einmal ausgeführt
 (for-advisor.txt komplett neu generiert, 3. Fassung).
 
-**Nächster Schritt:** Ersten Lighthouse-CI-Run in GitHub Actions
-beobachten (Scores dort dokumentieren — sollten den lokalen Werten
-nahekommen, ubuntu-latest statt Windows). Danach B18 (Meter statt Wdh
-als Progressionstyp) — das einzige verbliebene UX-Mittel-Feature in
-CLAUDE.md "Offen / In Arbeit" — oder echte Nutzer-Rekrutierung
-(strategische Priorität 1 laut CLAUDE.md).
+**Lighthouse-CI-Run bestätigt (train-v164):** https://github.com/777random/TRAIN/actions/runs/29256409055
+— beide Jobs grün, lighthouse-Job 45s, kein EPERM-Absturz (Windows-
+spezifisch, bestätigt).
+
+**B18 behoben (train-v165):** Distanz/Zeit-Progression für metric
+'m'/'sec' — siehe BUGS.md B18 für vollständige Details. Design vorab
+besprochen (3 Fragen: Scope beide Metriken, konfigurierbares
+metricStep, gleiche Auto-Vorauswahl-Schwellen — alle "Empfohlen"-
+Optionen gewählt). Beim Implementieren einen echten Blocker gefunden
+und VOR dem Testen korrigiert: der bestehende Skip-Guard in ui.js
+(`progressionType==='reps' → return`) hätte mit dem neuen
+progressionType-Default jede Distanz/Zeit-Übung übersprungen, bevor sie
+überhaupt geprüft wird. SCHEMA_VERSION → 30 (ex.metricStep + Migration
+für bestehende Übungen mit dem alten, bedeutungslosen 'weight'-Default).
+Nebenbefund B31 (ui.js:2426, `ex.metric !== 'kg'`-Typo) dokumentiert,
+nicht gefixt.
+
+**Nächster Schritt:** echte Nutzer-Rekrutierung (strategische Priorität
+1 laut CLAUDE.md) — keine offenen UX-Mittel-Features mehr in CLAUDE.md
+"Offen / In Arbeit" (nur noch Konzept-Stufe-Items). Alternativ B31
+diagnostizieren (Nebenbefund aus diesem Sprint, Low-Priorität).
 
 **Offene Nebenfunde aus diesem Sprint (nicht behoben, nur notiert):**
 - Push/Pull-Ratio-Block in _renderMovementPattern() (ui.js, unterhalb der

@@ -26,7 +26,7 @@ import {
 } from './backup.js';
 import * as ic from './icons.js';
 import { fireTrigger } from './triggerEngine.js';
-import { getWeightRecommendation, roundToPlate, isReadyForAutoSelect } from './weightRecommendation.js';
+import { getWeightRecommendation, getMetricRecommendation, roundToPlate, isReadyForAutoSelect } from './weightRecommendation.js';
 import { renderProgressChart, renderBodyWeightChart, renderRelativeStrengthChart } from './progressChart.js';
 import { buildWeekReview }        from './weekReview.js';
 import { showWeekReviewModal, renderWeekReviewHtml } from './weekReviewModal.js';
@@ -1233,6 +1233,10 @@ function renderExercise(wk, di, ei, state) {
 
   const step = ex.weightStep ?? 2.5;
   const metric = ex.metric === 'sec' || ex.metric === 'm' ? ex.metric : 'reps';
+  // B18: Schrittweite für Distanz/Zeit — Analogon zu ex.weightStep, aber
+  // eigenes Feld (ex.metricStep), da Gewicht und Distanz/Zeit nie gleichzeitig
+  // relevant sind (nie beide gleichzeitig anzeigen, siehe cfgRow unten).
+  const metricStepVal = ex.metricStep ?? (metric === 'm' ? 50 : metric === 'sec' ? 10 : 2.5);
   const _exCatOverride = (state.customExercises ?? []).find(c => c.name === ex.name)?.category ?? '';
 
   // Vorschlag: Ø erfolgreiche Wiederholungen der gleichen Übung aus der Vorwoche
@@ -1346,16 +1350,17 @@ function renderExercise(wk, di, ei, state) {
       <div class="weight-plan-row" role="group" aria-label="Steigerungsart">
         <span class="pause-row__label">Steigerung:</span>
         <div class="weight-step-opts">
+          ${metric === 'reps' ? `
           <button type="button"
             class="weight-step-btn${(ex.progressionType ?? 'weight') === 'weight' ? ' is-selected' : ''}"
             data-action="set-progression-type" data-di="${di}" data-ei="${ei}" data-val="weight"
             aria-pressed="${(ex.progressionType ?? 'weight') === 'weight'}"
-          >Gewicht ↑</button>
+          >Gewicht ↑</button>` : ''}
           <button type="button"
             class="weight-step-btn${(ex.progressionType ?? 'weight') === 'reps' ? ' is-selected' : ''}"
             data-action="set-progression-type" data-di="${di}" data-ei="${ei}" data-val="reps"
             aria-pressed="${(ex.progressionType ?? 'weight') === 'reps'}"
-          >Wdh ↑</button>
+          >${metric === 'sec' ? 'Zeit ↑' : metric === 'm' ? 'Distanz ↑' : 'Wdh ↑'}</button>
           <button type="button"
             class="weight-step-btn${(ex.progressionType ?? 'weight') === 'sets' ? ' is-selected' : ''}"
             data-action="set-progression-type" data-di="${di}" data-ei="${ei}" data-val="sets"
@@ -1443,7 +1448,7 @@ function renderExercise(wk, di, ei, state) {
             aria-pressed="${!!ex.supersetId}"
           >${ex.supersetId ? 'An (SS)' : 'Aus'}</button>
         </div>` : ''}
-        ${!locked ? `
+        ${!locked && metric === 'reps' ? `
         <div class="weight-plan-row" role="group" aria-label="Steigerungsrate">
           <span class="pause-row__label">Schrittweite:</span>
           <div class="weight-step-opts">
@@ -1452,6 +1457,18 @@ function renderExercise(wk, di, ei, state) {
                 class="weight-step-btn${step === s ? ' is-selected' : ''}"
                 data-action="set-step" data-di="${di}" data-ei="${ei}" data-step="${s}"
                 aria-pressed="${step === s}"
+              >${s === 0 ? 'Reset' : s}</button>`).join('')}
+          </div>
+        </div>` : ''}
+        ${!locked && metric !== 'reps' ? `
+        <div class="weight-plan-row" role="group" aria-label="Steigerungsrate">
+          <span class="pause-row__label">Schrittweite:</span>
+          <div class="weight-step-opts">
+            ${(metric === 'm' ? [0, 10, 25, 50, 100, 200] : [0, 5, 10, 15, 30, 60]).map(s => `
+              <button
+                class="weight-step-btn${metricStepVal === s ? ' is-selected' : ''}"
+                data-action="set-metric-step" data-di="${di}" data-ei="${ei}" data-step="${s}"
+                aria-pressed="${metricStepVal === s}"
               >${s === 0 ? 'Reset' : s}</button>`).join('')}
           </div>
         </div>` : ''}
@@ -1484,8 +1501,9 @@ function renderExercise(wk, di, ei, state) {
       const _isSets = _pt === 'sets';
       const _planVal = ex.nextWeekPlanConfirmed ? (ex.nextWeekPlan ?? 0) : (ex.nextWeekPlan || (_isReps || _isSets ? 1 : 0));
       const _weightVal = ex.nextWeekPlan || 0;
+      const _repsUnit = metric === 'sec' ? 'Sek' : metric === 'm' ? 'm' : 'Wdh';
       const _btnLabel = _isReps
-        ? `+${_planVal} Wdh${ex.nextWeekPlanConfirmed ? ' ✓' : ''}`
+        ? `+${_planVal} ${_repsUnit}${ex.nextWeekPlanConfirmed ? ' ✓' : ''}`
         : _isSets
           ? `+${_planVal} Satz${ex.nextWeekPlanConfirmed ? ' ✓' : ''}`
           : `${_weightVal >= 0 ? '+' : ''}${_weightVal}${ex.nextWeekPlanConfirmed ? ' ✓' : ''}`;
@@ -1514,8 +1532,8 @@ function renderExercise(wk, di, ei, state) {
         <button class="ex-kg-picker-btn ex-kg-picker-btn--other" data-action="kg-picker-show-custom" data-di="${di}" data-ei="${ei}">Anderer Wert</button>`}
       </div>` : ''}
       ${_isReps && _repsPickerKey === `${di}-${ei}` ? `
-      <div class="ex-kg-picker" role="group" aria-label="Wdh-Steigerung nächste Woche">
-        ${[0,1,2,3,4,5].map(v =>
+      <div class="ex-kg-picker" role="group" aria-label="${metric === 'reps' ? 'Wdh' : _repsUnit}-Steigerung nächste Woche">
+        ${(metric === 'reps' ? [0,1,2,3,4,5] : [0, metricStepVal / 2, metricStepVal, metricStepVal * 2].filter((v, i, a) => a.indexOf(v) === i)).map(v =>
           `<button class="ex-kg-picker-btn${ex.nextWeekPlan === v ? ' is-selected' : ''}"
             data-action="reps-picker-select" data-di="${di}" data-ei="${ei}" data-value="${v}"
           >${v === 0 ? '0' : '+' + v}</button>`).join('')}
@@ -5014,7 +5032,9 @@ function _handleClick(e) {
       const _rpVal = +el.dataset.value;
       dispatch(A.EX_SET_NEXT_WEEK_PLAN, { di: +di, ei: +ei, value: _rpVal });
       const _rpEx    = getState().weeks[getState().curIdx]?.days[+di]?.exercises[+ei];
-      const _rpLabel = (_rpEx?.progressionType ?? 'reps') === 'sets' ? 'Satz' : 'Wdh';
+      const _rpLabel = (_rpEx?.progressionType ?? 'reps') === 'sets'
+        ? 'Satz'
+        : _rpEx?.metric === 'sec' ? 'Sek' : _rpEx?.metric === 'm' ? 'm' : 'Wdh';
       showToast(`+${_rpVal} ${_rpLabel} nächste Woche bestätigt ✓`, 'ok');
       _repsPickerKey = null;
       scheduleRender();
@@ -5041,6 +5061,12 @@ function _handleClick(e) {
     case 'set-step': {
       const step = parseFloat(el.dataset.step);
       dispatch(A.EX_SET_STEP, { di: +di, ei: +ei, step, weekIdx: getState().curIdx });
+      break;
+    }
+
+    case 'set-metric-step': {
+      const step = parseFloat(el.dataset.step);
+      dispatch(A.EX_SET_METRIC_STEP, { di: +di, ei: +ei, step, weekIdx: getState().curIdx });
       break;
     }
 
@@ -5814,9 +5840,15 @@ function _recSubline(r, rpeEnabled) {
 }
 
 function _renderRecChip(r, rpeEnabled) {
+  // B18: Einheit + Halten-Text metrikabhängig — r.rec.recommendedWeight/
+  // r.rec.delta tragen bei metric 'm'/'sec' bewusst Distanz/Zeit-Werte
+  // (siehe getMetricRecommendation()-Docstring, gleiche Feldnamen wie
+  // Gewicht, nur die Anzeige-Einheit unterscheidet sich hier).
+  const unit    = r.metric === 'sec' ? 'Sek' : r.metric === 'm' ? 'm' : 'kg';
+  const holdTxt = r.metric === 'sec' || r.metric === 'm' ? 'Wert halten' : 'Gewicht halten';
   const actionText = r.rec.delta > 0
-    ? (r.confirmed ? `+${r.rec.delta}kg → ${r.rec.recommendedWeight}kg` : `+${r.rec.delta}kg empfohlen`)
-    : `Gewicht halten (${r.rec.recommendedWeight}kg)`;
+    ? (r.confirmed ? `+${r.rec.delta}${unit} → ${r.rec.recommendedWeight}${unit}` : `+${r.rec.delta}${unit} empfohlen`)
+    : `${holdTxt} (${r.rec.recommendedWeight}${unit})`;
 
   return `
     <button type="button" class="nw-weight-rec-chip${r.confirmed ? ' nw-weight-rec-chip--confirmed' : ''}"
@@ -5866,16 +5898,27 @@ function _prepNewWeekModal() {
         (day.exercises ?? []).forEach((ex, ei) => {
           if (seen.has(ex.name)) return;
           if (ex.substituteFor) return;
-          if ((ex.progressionType ?? 'weight') === 'reps') return;
+          const exMetric = ex.metric === 'sec' || ex.metric === 'm' ? ex.metric : 'reps';
+          // Bodyweight-Übungen mit progressionType='reps' (klassische "Wdh
+          // statt Gewicht steigern"-Wahl) bekommen bewusst keine Empfehlung
+          // — unverändertes Originalverhalten. Bei Distanz/Zeit-Übungen
+          // (metric 'm'/'sec') bedeutet progressionType='reps' dagegen
+          // "Distanz/Zeit steigern" (B18-Default, siehe state.js EX_ADD) —
+          // dafür gibt es unten jetzt eine eigene Empfehlung, kein Skip.
+          if (exMetric === 'reps' && (ex.progressionType ?? 'weight') === 'reps') return;
           seen.add(ex.name);
           const exProgressionMode = ex.progressionMode ?? 'weight_first';
           const exTargetRepsMax   = ex.targetRepsMax ?? null;
-          const plateStep = ex.weightStep || state.settings?.plateStep || 2.5;
-          const rec = getWeightRecommendation(ex.name, calcWeeks, plateStep, exProgressionMode, exTargetRepsMax);
+          const step = exMetric === 'reps'
+            ? (ex.weightStep || state.settings?.plateStep || 2.5)
+            : (ex.metricStep || (exMetric === 'm' ? 50 : 10));
+          const rec = exMetric === 'reps'
+            ? getWeightRecommendation(ex.name, calcWeeks, step, exProgressionMode, exTargetRepsMax)
+            : getMetricRecommendation(ex.name, calcWeeks, step, exProgressionMode, exTargetRepsMax);
           if (rec) {
             if (inRecoveryWindow && rec.delta > 0) {
               rec.delta = rec.delta * 1.5;
-              rec.recommendedWeight = roundToPlate(rec.lastWeight + rec.delta, plateStep);
+              rec.recommendedWeight = roundToPlate(rec.lastWeight + rec.delta, step);
               rec.boosted = true;
             }
             // Vom Nutzer in dieser Sitzung bereits abgewählte Übungen werden
@@ -5889,7 +5932,7 @@ function _prepNewWeekModal() {
             if (autoSelected && !alreadyConfirmedSame) {
               _autoSelections.push({ di, ei, value: rec.delta });
             }
-            aiRecs.push({ name: ex.name, rec, autoSelected, confirmed: autoSelected || alreadyConfirmedSame });
+            aiRecs.push({ name: ex.name, rec, metric: exMetric, autoSelected, confirmed: autoSelected || alreadyConfirmedSame });
           }
         });
       });
@@ -7076,9 +7119,12 @@ function _showOnboarding() {
             weight: 0, reps: tr, rpe: null, status: 'pending', done: false, note: '',
           })),
           weightStep: 2.5, nextWeekPlan: 0, nextWeekPlanConfirmed: false,
+          metricStep: ex.m === 'm' ? 50 : ex.m === 'sec' ? 10 : undefined,
           targetSets: n, targetReps: tr,
           _showCfg: false, setType: 'standard',
-          tags: [], showPlates: false, progressionType: 'weight', substituteFor: null,
+          tags: [], showPlates: false,
+          progressionType: (ex.m ?? 'reps') === 'reps' ? 'weight' : 'reps',
+          substituteFor: null,
           progressionMode: 'weight_first', targetRepsMax: null, prRepsHistory: {},
         };
       }),

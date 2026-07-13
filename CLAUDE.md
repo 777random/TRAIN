@@ -1,7 +1,7 @@
 # TRAIN — CLAUDE.md
 # Vollständiger Projektkontext für Claude Code
-# Stand: train-v164 / SCHEMA 29 / Juli 2026
-# Letztes Update: nach train-v164 Sprint (Loop 5, Prompt-Bibliothek, Lighthouse CI)
+# Stand: train-v165 / SCHEMA 30 / Juli 2026
+# Letztes Update: nach train-v165 Sprint (B18 Distanz/Zeit-Progression)
 
 ---
 
@@ -40,7 +40,7 @@ TRAIN ist eine deutschsprachige PWA für Krafttraining. Pure Vanilla ES Modules 
 
 - Repo: https://github.com/777random/TRAIN
 - Deployed: https://777random.github.io/TRAIN/
-- Aktueller Stand: SCHEMA_VERSION 29 · CACHE_VERSION train-v164 · CSS ?v=187
+- Aktueller Stand: SCHEMA_VERSION 30 · CACHE_VERSION train-v165 · CSS ?v=187
 
 ---
 
@@ -183,7 +183,7 @@ Flux-Pattern: `dispatch(A.ACTION_TYPE, payload)` → `reduce()` → `persistStat
 
 **Undo:** 20-Entry Stack mit Deep-Cloned Snapshots. Navigation Actions (`WEEK_NAVIGATE`, `SESSION_START` etc.) sind von Undo ausgeschlossen (`_NO_UNDO`).
 
-**Schema Migration:** `migrate()` läuft bei jedem `loadState()`. Neuen `case` Block hinzufügen wenn `SCHEMA_VERSION` erhöht wird. Aktuelle Version: **29**.
+**Schema Migration:** `migrate()` läuft bei jedem `loadState()`. Neuen `case` Block hinzufügen wenn `SCHEMA_VERSION` erhöht wird. Aktuelle Version: **30**.
 
 **State Shape (SCHEMA 29):**
 ```javascript
@@ -198,7 +198,7 @@ Flux-Pattern: `dispatch(A.ACTION_TYPE, payload)` → `reduce()` → `persistStat
       sleepHours, energyLevel, sessionRating,
       exercises: [{
         name, note, pauseSec, metric, sets,
-        weightStep, nextWeekPlan, nextWeekPlanConfirmed,
+        weightStep, metricStep, nextWeekPlan, nextWeekPlanConfirmed,
         targetReps, progressionType, archived,
         substituteFor
       }]
@@ -319,7 +319,7 @@ Unabhängig von Hauptkarte — erscheint auch neben Progression.
 ## FEATURE-STATUS
 
 ### Implementiert ✓:
-**Training-Tab:** Wochenstruktur, Pillen-Nav, Satz-Bewertung (auto+manuell), Gewichtsempfehlung, Progressions-Präferenz, PR-Erkennung, "Heute anders", Übung archivieren, Stoppuhr, Auto-Wochenerstellung, Deload/Urlaubsmodus, Körpergewicht, Schlaf+Energie.
+**Training-Tab:** Wochenstruktur, Pillen-Nav, Satz-Bewertung (auto+manuell), Gewichtsempfehlung (seit v165 auch Distanz/Zeit-Progression für metric 'm'/'sec' via getMetricRecommendation(), B18), Progressions-Präferenz, PR-Erkennung, "Heute anders", Übung archivieren, Stoppuhr, Auto-Wochenerstellung, Deload/Urlaubsmodus, Körpergewicht, Schlaf+Energie.
 
 **Coach-Tab:** Hauptkarte (8 akute Signale, seit v160 inkl. Konsistente Fehlschläge) + Strukturkarte (4 strukturelle Signale, seit v163 inkl. Mehr-Übungen-Aggregation), Adaptive Nachfrage-Karte, Coach-Bilanz Mini, Plateau-Konsequenz (EX_SET_NEXT_WEEK_PLAN).
 
@@ -330,7 +330,6 @@ Unabhängig von Hauptkarte — erscheint auch neben Progression.
 ### Offen / In Arbeit:
 | Feature | Priorität |
 |---------|-----------|
-| Meter statt Wdh bei Übungen | UX-Mittel |
 | Muskelkater als Coach-Input | Konzept |
 | Aufwärmen/Cooldown-Check | Konzept |
 | Coaching-Filter | Konzept |

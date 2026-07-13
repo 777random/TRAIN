@@ -2,6 +2,52 @@
 # Automatisch von Claude Code
 # befüllt beim Session-Start
 
+## 2026-07-13 train-v165
+Loop 1: 10/10 grün ✓, 0 uncaught errors. Kein Fix nötig.
+Loop 2: HANDOFF.md/CLAUDE.md waren aktuell (train-v164/?v=187, passend
+  zu sw.js/index.html vor diesem Sprint). Kein Fix nötig.
+Loop 3: übersprungen — Stopp-Bedingung längst erreicht.
+Loop 4: übersprungen (inaktiv)
+Eigentliche Aufgabe: "B18 angehen (Meter statt Wdh)" — Diagnose zuerst:
+  metric 'm'/'sec' war bereits vollständig UI-verdrahtet, die
+  eigentliche Lücke lag in getWeightRecommendation()'s lastWeight<=0-
+  Guard (liefert für Distanz/Zeit-Übungen immer null, da dort kein
+  Gewicht getrackt wird). Konzeptionell neues Feature — vor
+  Implementierung 3 Design-Fragen mit Nutzer besprochen (Scope beide
+  Metriken vs. nur Distanz, feste vs. konfigurierbare Schrittweite,
+  gleiche vs. eigene Auto-Vorauswahl-Schwelle), alle "Empfohlen"-
+  Optionen gewählt.
+  Umsetzung: weightRecommendation.js (_recommendationCore() extrahiert,
+  neue getMetricRecommendation() — bewusst gleiche Feldnamen wie
+  getWeightRecommendation() zurückgegeben, damit ui.js's Verbraucher-
+  code beide Ergebnisse identisch behandelt), state.js (ex.metricStep
+  neu, progressionType-Default korrigiert für metric≠'reps' an allen
+  Erstellungsstellen + Migration v29→v30), ui.js (New-Week-Modal-
+  Branch, Schrittweite-Picker, metrikabhängige Labels).
+  Regressionsschutz: getWeightRecommendation()s Originalverhalten
+  (fixe Deltas 2.5/1.25, unabhängig von plateStep) bewusst exakt
+  erhalten und per Test abgesichert — beim ersten Refactor-Versuch
+  hätte eine zu direkte Verallgemeinerung (delta=step statt fixem Wert)
+  das bestehende Verhalten für Nutzer mit nicht-Standard plateStep
+  unbemerkt verändert, noch vor dem Testen selbst korrigiert.
+  Echten Blocker während der Implementierung gefunden: bestehender
+  Skip-Guard in ui.js (`if progressionType==='reps' return`) hätte mit
+  dem neuen Default jede Distanz/Zeit-Übung übersprungen, bevor sie
+  geprüft wird — korrigiert (Guard gilt jetzt nur noch für
+  metric:'reps'-Übungen).
+  Nebenbefund bei der Diagnose (nicht Teil des Sprints, nur
+  dokumentiert): ui.js:2426 `ex.metric !== 'kg'` ist vermutlich immer
+  wahr (kein gültiger Metrik-Wert heißt je 'kg') — als B31 in BUGS.md
+  OFFEN getrackt, nicht gefixt (Nutzer bat explizit nur um B18).
+  Verifiziert: dedizierte Test-Harness (16 Checks: Empfehlungs-Kaskade,
+  Regressionsschutz, EX_ADD-Defaults, Migration) + End-to-End-UI-Test
+  (New-Week-Chip "+50m → 450m", targetReps korrekt erhöht statt
+  Gewicht) — alle grün. Neue Fixture DistanceProgression.v1.json.
+  Regressionstest 10/10 grün, Playwright lokal 18/18 grün.
+  SCHEMA_VERSION → 30, CACHE_VERSION → train-v165 (kein CSS-Bump,
+  styles.css nicht angefasst).
+Loop 5: for-advisor.txt am Ende der Session aktualisiert.
+
 ## 2026-07-13 train-v164
 Loop 1: 10/10 grün ✓, 0 uncaught errors. Kein Fix nötig.
 Loop 2: HANDOFF.md/CLAUDE.md waren aktuell (train-v163/?v=186, passend

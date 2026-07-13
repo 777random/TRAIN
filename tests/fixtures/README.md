@@ -12,9 +12,10 @@ Settings → JSON importieren → Datei auswählen → Erwartung prüfen
 
 Alle Szenarien wurden am 2026-07-12 erstmals ECHT importiert und headless
 verifiziert (nicht nur `JSON.parse()`-Syntax-Check). 15 von 15 angestrebten
-Edge-Cases erreicht (Loop 3, siehe LOOPS.md). Am 2026-07-13 kam eine 16.
-Fixture dazu (MultiExerciseFailure, B29 — gezielter Feature-Test, nicht Teil
-des ursprünglichen Loop-3-Ziels von 15).
+Edge-Cases erreicht (Loop 3, siehe LOOPS.md). Am 2026-07-13 kamen zwei
+weitere gezielte Feature-Test-Fixtures dazu (MultiExerciseFailure/B29,
+DistanceProgression/B18 — beide kein Teil des ursprünglichen
+Loop-3-Ziels von 15).
 
 | Datei | Zweck | Erwartung | Real-Test-Ergebnis |
 |-------|-------|-----------|---------------------|
@@ -34,6 +35,7 @@ des ursprünglichen Loop-3-Ziels von 15).
 | TRAIN_Test_EdgeCase_AlteDaten2020.v1.json | Woche mit startDate in 2020 (mehrere Jahre alt) | Kein Crash/Overflow in Datumsmathematik (relative Wochen-Labels, Tage-Fälligkeit) | Bestätigt: 0 uncaught errors, kein Crash bei weit zurückliegendem Datum. |
 | TRAIN_Test_EdgeCase_100Wochen.v1.json | 100 Wochen Historie für eine Übung (Stresstest) | Kein Performance-Crash, keine Array-Bugs bei großer Historie | Bestätigt: 0 uncaught errors, rendert korrekt auch mit 100 Wochen Daten (10s virtual-time-budget statt 6s, aber keine Fehler). |
 | TRAIN_Test_EdgeCase_MultiExerciseFailure.v1.json | 3 Übungen über 3 Wochen, je 1 Erfolg + 5 Fails (17% Erfolgsquote je Übung — bewusst NICHT 0%, damit keine einzelne Übung `_checkPersistentFailure` auslöst) — testet `_checkMultiExerciseFailure` (B29, Mehr-Übungen-Aggregation) isoliert | Strukturkarte zeigt `multi_exercise_failure`-Signal mit allen 3 Übungen + Gewichtsempfehlung; Hauptkarte zeigt NICHT `persistent_failure` (kein Overlap) | Bestätigt: `computeWeeklyFocus().status` = `onTrack` (Fallback, kein Overlap wie designt), `computeStructuralSignals()` enthält genau 1 Signal `multi_exercise_failure` mit `rate:17`, `totalEvaluated:18`, 3 Einträgen in `worst` (Kniebeuge ~75kg, Bankdrücken ~45kg, Rudern ~30kg). Rendertext in der Strukturkarte verifiziert: "🛑 Erfolgsquote insgesamt nur 17% — am stärksten betroffen: Kniebeuge (~75kg), Bankdrücken (~45kg), Rudern (~30kg)." 0 uncaught errors. |
+| TRAIN_Test_EdgeCase_DistanceProgression.v1.json | Rudermaschine (metric 'm', 400m/Satz) + Plank (metric 'sec', 45s/Satz) über 3 saubere Wochen, `progressionType:'reps'`, `metricStep` gesetzt (50/10) — testet B18 (Distanz/Zeit-Progression) | App darf mit metric 'm'/'sec' + neuem `metricStep`-Feld (SCHEMA 30) nicht abstürzen; New-Week-Modal sollte für die Distanz-Übung eine Empfehlung mit "m"-Einheit zeigen (separat per UI-Testharness verifiziert, nicht Teil dieser Fixture-Datei selbst) | Bestätigt: 0 uncaught errors beim Import + Coach-/Fortschritt-Tab-Öffnen. Separate UI-Verifikation (siehe BUGS.md B18): New-Week-Chip zeigt korrekt "+50m → 450m", targetReps wird nach Wochenerstellung korrekt erhöht (nicht Gewicht). |
 
 ## Bekannte Konstruktionsregeln (aus BUGS.md, gilt für alle neuen Szenarien)
 - `weight=0` bei einer Übung → `_checkRisingRpe` überspringt diese Übung (Guard `weights.some(w=>w===0)`)

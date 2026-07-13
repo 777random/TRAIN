@@ -72,6 +72,15 @@
 Priorität innerhalb der Strukturkarte: Mehr-Übungen-Aggregation > Präventiver Deload > Konsistenz-Qualität > Push/Pull — steht zuoberst, da ein datenbasierter breiter Totalausfall der konkreteste Befund unter den strukturellen Signalen ist (analog zur Top-Priorität von persistent_failure in der akuten Kaskade). Mindestens 2 unterschiedliche betroffene Übungen als Gate verhindert, dass dasselbe Einzelübungs-Scheitern doppelt gemeldet wird (einmal akut, einmal strukturell).
 **Gilt:** Permanent bis gegenteilige Entscheidung.
 
+### 2026-07 — B18: Distanz/Zeit-Progression (metric 'm'/'sec') — Scope, Schrittweite, Schwelle
+**Entscheidung:** Coach-Gewichtsempfehlung (`getWeightRecommendation()`) bekommt ein Gegenstück `getMetricRecommendation()` für Übungen mit `metric:'m'` (Distanz) UND `metric:'sec'` (Zeit) — nicht nur Distanz wie ursprünglich in BUGS.md notiert. Neues Feld `ex.metricStep` (konfigurierbar je Übung, wie `ex.weightStep`) statt fest codierter Schrittweite. Auto-Vorauswahl nutzt dieselben RPE-/Erfolgsquoten-Schwellen wie bei Gewicht (kein eigener, unbegründeter Schwellenwert).
+**Begründung (3 explizit besprochene Design-Fragen):**
+1. Scope beide Metriken: dieselbe Coaching-Lücke (kein Gewicht, aber trotzdem progressionsfähig) betrifft `sec` (z.B. Plank-Halten) genauso wie `m` — beide waren bereits identisch UI-verdrahtet, eine künstliche Beschränkung auf nur eine Metrik hätte keinen Mehrwert gehabt.
+2. Konfigurierbares `metricStep` statt fixem Default: konsistent mit dem bestehenden `ex.weightStep`-Muster — eine Rudermaschine-Einheit hat andere sinnvolle Schrittgrößen (50m) als ein Sprint (10m) oder ein Zeit-Halten (5-10s), das lässt sich nicht sinnvoll pauschal festlegen.
+3. Gleiche Auto-Vorauswahl-Schwellen: keine Datenbasis für eine eigene, speziellere Schwelle bei einer neuen, ungetesteten Progressionsart — Konsistenz mit der bestehenden, bewährten Logik ist der sicherere Default.
+**Technisches Detail:** `getMetricRecommendation()` gibt bewusst dieselben Feldnamen zurück wie `getWeightRecommendation()` (`recommendedWeight`/`lastWeight`, nicht `recommendedValue`/`lastValue`) — reiner Implementierungsdetail-Kompromiss, damit ui.js's bestehender Verbrauchercode (Chip-Rendering, Recovery-Boost, Auto-Vorauswahl-Bestätigung) beide Ergebnisse identisch behandelt, ohne an jeder Stelle zwischen Gewicht und Distanz/Zeit zu unterscheiden. `ex.progressionType` bekommt bei `metric!=='reps'` neu den Default `'reps'` statt `'weight'` (bumpt `targetReps` = Ziel-Distanz/-Zeit über den bereits bestehenden `_applyPlannedProgression()`-Pfad) — Migration v29→v30 korrigiert bestehende Übungen mit dem alten, bedeutungslosen Default.
+**Gilt:** Permanent bis gegenteilige Entscheidung.
+
 ---
 
 ## GAMIFICATION

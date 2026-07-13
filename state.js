@@ -24,7 +24,7 @@
 
 export const STORAGE_KEY        = 'train_v6';
 export const STORAGE_KEY_SHADOW = 'train_v6_shadow';
-export const SCHEMA_VERSION     = 29;
+export const SCHEMA_VERSION     = 30;
 
 export const BADGE_THRESHOLDS = [
   { id: 'badge_4',   weeks: 4,   title: 'Erster Schritt' },
@@ -838,6 +838,29 @@ function migrate(raw) {
     raw.meta = { ...raw.meta, schemaVersion: 29 };
   }
 
+  // v29 → v30 (B18): ex.metricStep für Distanz/Zeit-Übungen (metric 'm'/'sec')
+  // ergänzen, Analogon zu ex.weightStep. Zusätzlich: bei bestehenden Übungen
+  // mit metric 'm'/'sec' und progressionType noch auf dem unveränderten
+  // Default 'weight' — dort ist 'weight' bedeutungslos (kein Gewicht
+  // getrackt), 'reps' ist der sinnvolle Default (bumpt targetReps = Ziel-
+  // Distanz/-Zeit). NUR der unveränderte Default wird korrigiert — eine
+  // Übung, bei der der Nutzer bereits bewusst 'sets' gewählt hat, bleibt
+  // unangetastet.
+  if ((raw.meta?.schemaVersion ?? 0) < 30) {
+    const _fixMetricProgression = ex => {
+      if (ex.metric === 'm' && ex.metricStep === undefined) ex.metricStep = 50;
+      else if (ex.metric === 'sec' && ex.metricStep === undefined) ex.metricStep = 10;
+      if ((ex.metric === 'm' || ex.metric === 'sec') && ex.progressionType === 'weight') {
+        ex.progressionType = 'reps';
+      }
+    };
+    (raw.weeks ?? []).forEach(wk =>
+      (wk.days ?? []).forEach(day => (day.exercises ?? []).forEach(_fixMetricProgression))
+    );
+    (raw.customTemplate ?? []).forEach(day => (day.exercises ?? []).forEach(_fixMetricProgression));
+    raw.meta = { ...raw.meta, schemaVersion: 30 };
+  }
+
   // Always-apply defaults for settings added in later versions
   if (raw.settings.vibrationEnabled               === undefined) raw.settings.vibrationEnabled               = true;
   if (raw.settings.rpeEnabled                     === undefined) raw.settings.rpeEnabled                     = true;
@@ -1138,7 +1161,8 @@ export const A = Object.freeze({
   EX_SET_NEXT_WEEK_PLAN:'EX_SET_NEXT_WEEK_PLAN',// { di, ei, value, weekIdx?, progressionType? } – setzt nextWeekPlan + confirmed=true (+ optional progressionType, atomar); weekIdx default = curIdx
   EX_TOGGLE_NEXT_WEEK_CONFIRMED: 'EX_TOGGLE_NEXT_WEEK_CONFIRMED', // { di, ei, weekIdx? } – toggelt confirmed; weekIdx default = curIdx
   EX_AUTO_PRESELECT_NEXT_WEEK_PLAN: 'EX_AUTO_PRESELECT_NEXT_WEEK_PLAN', // { selections: [{di, ei, value}], weekIdx? } – Coach-Chip Vorauswahl, kein User-Tap; weekIdx default = curIdx
-  EX_SET_STEP:         'EX_SET_STEP',         // { di, ei, step }  – speichert Steigerungsrate
+  EX_SET_STEP:         'EX_SET_STEP',         // { di, ei, step }  – speichert Steigerungsrate (Gewicht, kg)
+  EX_SET_METRIC_STEP:  'EX_SET_METRIC_STEP',  // { di, ei, step }  – speichert Steigerungsrate für Distanz/Zeit (metric 'm'/'sec', B18)
   EX_SET_TARGETS:      'EX_SET_TARGETS',      // { di, ei, targetReps?, progressionMode?, targetRepsMax? }
   EX_SET_METRIC:       'EX_SET_METRIC',       // { di, ei, metric: 'reps'|'sec'|'m' }
   // Set
@@ -1551,7 +1575,8 @@ function reduce(state, action) {
           note:                  '',
           pauseSec:              90,
           metric:                t.metric,
-          progressionType:       'weight',
+          progressionType:       (t.metric ?? 'reps') === 'reps' ? 'weight' : 'reps',
+          metricStep:            t.metric === 'm' ? 50 : t.metric === 'sec' ? 10 : undefined,
           progressionMode:       'weight_first',
           targetRepsMax:         null,
           prRepsHistory:         {},
@@ -1588,7 +1613,8 @@ function reduce(state, action) {
               note:                  '',
               pauseSec:              90,
               metric:                t.metric,
-              progressionType:       'weight',
+              progressionType:       (t.metric ?? 'reps') === 'reps' ? 'weight' : 'reps',
+              metricStep:            t.metric === 'm' ? 50 : t.metric === 'sec' ? 10 : undefined,
               setType:               'straight',
               targetReps:            t.reps,
               nextWeekPlan:          0,
@@ -1616,9 +1642,17 @@ function reduce(state, action) {
     // ── Exercise ─────────────────────────────────────────────────────────────
     case A.EX_ADD: {
       const day = _currentWeek()?.days[p.di]; if (!day) break;
+      const m = p.metric ?? 'reps';
+      // B18: bei Distanz/Zeit-Übungen (metric 'm'/'sec') gibt es keine
+      // Gewichtsachse — 'weight' als progressionType wäre hier bedeutungslos
+      // (s.weight bleibt immer 0). 'reps' bumpt stattdessen ex.targetReps,
+      // was bei diesen Metriken die Ziel-Distanz/-Zeit ist — der sinnvolle
+      // Default. metricStep analog zu weightStep, je Metrik unterschiedlich
+      // sinnvoll (50m-Schritte vs. 10s-Schritte).
       day.exercises.push({
-        name: p.name, note: '', pauseSec: 90, metric: p.metric ?? 'reps',
-        progressionType: 'weight',
+        name: p.name, note: '', pauseSec: 90, metric: m,
+        progressionType: m === 'reps' ? 'weight' : 'reps',
+        metricStep: m === 'm' ? 50 : m === 'sec' ? 10 : undefined,
         progressionMode: 'weight_first', targetRepsMax: null, prRepsHistory: {},
         prWeight: null, prRepsAtMaxWeight: null,
         sets: [mkSet(), mkSet(), mkSet()],
@@ -1717,6 +1751,12 @@ function reduce(state, action) {
       const wk = p.weekIdx != null ? state.weeks[p.weekIdx] : _currentWeek();
       const ex = wk?.days[p.di]?.exercises[p.ei]; if (!ex) break;
       ex.weightStep = p.step;
+      break;
+    }
+    case A.EX_SET_METRIC_STEP: {
+      const wk = p.weekIdx != null ? state.weeks[p.weekIdx] : _currentWeek();
+      const ex = wk?.days[p.di]?.exercises[p.ei]; if (!ex) break;
+      ex.metricStep = p.step;
       break;
     }
     case A.EX_SET_METRIC: {
