@@ -25,6 +25,8 @@ Eigentliche Aufgabe: "ja, fix umsetzen" — B31 aus der Vorsession-
   Eintrag nötig (reiner Bugfix, keine neue Architektur-Entscheidung).
   CACHE_VERSION → train-v166 (kein CSS-Bump, styles.css nicht
   angefasst, kein SCHEMA-Bump, keine Datenmodell-Änderung).
+Loop 5: for-advisor.txt aktualisiert (Stand v166, B31-Fix eingepflegt,
+  alte "nicht gefixt"-Notiz zu B31 in technischen Schulden entfernt).
 
 ## 2026-07-13 train-v165 (B31-Diagnose, kein neuer Code-Sprint)
 Eigentliche Aufgabe: "B31 diagnostizieren" — reine Diagnose, keine
