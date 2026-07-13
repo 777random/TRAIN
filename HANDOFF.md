@@ -17,7 +17,7 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 - CSS: ?v=186 (unverändert diesen Sprint — nur ui.js/weeklyFocus.js
   angefasst, styles.css selbst nicht, daher kein CSS-Bump nötig)
 - SCHEMA: 29
-- Letzter Commit: (dieser Sprint — B29, Mehr-Übungen-Aggregation)
+- Letzter Commit: 221da35 (B29 — Mehr-Übungen-Aggregation)
 - **CI aktiv seit v162:** GitHub Actions (`.github/workflows/test.yml`)
   läuft bei jedem Push auf main. Lokal testen: `npx playwright test`
   — funktioniert jetzt (Node.js v24.18.0 LTS am 2026-07-13 via winget
@@ -159,7 +159,7 @@ state.js                — Wochenerstellung isSeedWeek-Skip, Auto-Eval Guard (f
 | CLAUDE.md Versions-Sync (Loop 2) | a061df1 | train-v160/?v=184 → train-v161/?v=185, war nach dem letzten Sprint übersprungen worden |
 | Geräte-Verifikation B16/dragdrop.js | ec33550 | B16 (Doppeltipp-Zoom) auf echtem Gerät bestanden. dragdrop.js Touch-Drag funktioniert weiterhin nicht — neu als B27 getrackt, bewusst zurückgestellt (Pfeile in Übungseinstellungen decken den Bedarf ab) |
 | B28: GitHub Actions CI + Playwright | 6b6a7af | .github/workflows/test.yml, playwright.config.js, tests/regression_core.spec.js, tests/fixtures.spec.js, package.json, README.md (neu). Details + bewusste Abweichungen von der Sprint-Vorlage siehe BUGS.md B28 |
-| B29: Mehr-Übungen-Aggregation | (dieser Sprint) | _checkMultiExerciseFailure() in weeklyFocus.js (Strukturkarte), ui.js-Rendering, neue Fixture. Design mit Nutzer besprochen (3 Fragen, siehe DECISIONS.md) vor Implementierung |
+| B29: Mehr-Übungen-Aggregation | 221da35 | _checkMultiExerciseFailure() in weeklyFocus.js (Strukturkarte), ui.js-Rendering, neue Fixture. Design mit Nutzer besprochen (3 Fragen, siehe DECISIONS.md) vor Implementierung |
 
 ---
 
