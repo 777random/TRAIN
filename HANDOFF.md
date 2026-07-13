@@ -365,10 +365,24 @@ für bestehende Übungen mit dem alten, bedeutungslosen 'weight'-Default).
 Nebenbefund B31 (ui.js:2426, `ex.metric !== 'kg'`-Typo) dokumentiert,
 nicht gefixt.
 
-**Nächster Schritt:** echte Nutzer-Rekrutierung (strategische Priorität
-1 laut CLAUDE.md) — keine offenen UX-Mittel-Features mehr in CLAUDE.md
-"Offen / In Arbeit" (nur noch Konzept-Stufe-Items). Alternativ B31
-diagnostizieren (Nebenbefund aus diesem Sprint, Low-Priorität).
+**B31 diagnostiziert (2026-07-13, keine Code-Änderung):** Root Cause
+bestätigt (ui.js:2426, `!== 'kg'` statt vermutlich `!== 'reps'` gemeint)
+und empirisch verifiziert (headless: `#chart-1rm-hint` bleibt leer für
+TRAIN_Test_EdgeCase_MaxGewicht.v1.json trotz klar qualifizierender
+500kg×3-Daten). Dabei eine falsche Verifikation aus dem Loop-3-Audit
+(v157) korrigiert — die dort bestätigte "~550.0 kg"-Anzeige war eine
+ANDERE `.orm-hint`-Instanz (Training-Tab, ui.js:1613), nicht die hier
+gemeinte Fortschritt-Tab-Anzeige. Hochgestuft von "Low" auf "UX-Mittel"
+— realer, reproduzierbarer Bug (v.a. bei Ausweichübungen: der Fallback
+ist explizit für `ex.substituteFor`-Fälle gebaut, greift wegen des
+Guards aber nie). Empfohlener Fix (nicht umgesetzt, nur diagnostiziert):
+Zeile 2426 → `!== 'reps'`, oder Zeile ganz entfernen (der bestehende
+`weight>0`-Filter reicht bereits). Vollständige Diagnose siehe BUGS.md B31.
+
+**Nächster Schritt:** B31 fixen (jetzt vollständig diagnostiziert, kleiner
+Scope), oder echte Nutzer-Rekrutierung (strategische Priorität 1 laut
+CLAUDE.md) — keine offenen UX-Mittel-Features mehr in CLAUDE.md
+"Offen / In Arbeit" außer B31.
 
 **Offene Nebenfunde aus diesem Sprint (nicht behoben, nur notiert):**
 - Push/Pull-Ratio-Block in _renderMovementPattern() (ui.js, unterhalb der

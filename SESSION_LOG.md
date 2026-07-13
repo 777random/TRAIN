@@ -2,6 +2,31 @@
 # Automatisch von Claude Code
 # befüllt beim Session-Start
 
+## 2026-07-13 train-v165 (B31-Diagnose, kein neuer Code-Sprint)
+Eigentliche Aufgabe: "B31 diagnostizieren" — reine Diagnose, keine
+  Änderungen am Code (wie explizit gefordert). Root Cause: ui.js:2426
+  `if (ex.metric && ex.metric !== 'kg') return [];` in
+  _renderAnalysis1RM()'s Fallback-Zweig — 'kg' ist nie ein gültiger
+  ex.metric-Wert, Bedingung damit praktisch immer wahr, Fallback liefert
+  immer [] statt Daten. Empirisch bestätigt (headless, per fetch der
+  echten TRAIN_Test_EdgeCase_MaxGewicht.v1.json-Fixture über
+  #chart-ex-select/#chart-1rm-hint, nicht nur Code gelesen): Hint bleibt
+  leer trotz klar qualifizierender 500kg×3-Daten. Dabei eine
+  Fehlverifikation aus dem Loop-3-Audit (v157) aufgedeckt und korrigiert
+  — die damals bestätigte "~550.0 kg"-Anzeige stammte aus einer ANDEREN
+  .orm-hint-Instanz (Training-Tab-Live-Ansicht, ui.js:1613, eigene
+  korrekte Berechnung), nicht aus der hier untersuchten Fortschritt-Tab-
+  Funktion. tests/fixtures/README.md entsprechend korrigiert. Realer
+  Haupt-Auslöser in Produktivnutzung identifiziert: Ausweichübungen — der
+  Fallback ist explizit für ex.substituteFor-Fälle gebaut (state.js
+  aktualisiert state.prs nur unter dem Namen der TATSÄCHLICH
+  ausgeführten Übung), greift aber wegen des Guards nie. Empfohlener Fix
+  dokumentiert (Zeile 2426 → !== 'reps', oder Zeile entfernen — der
+  bestehende weight>0-Filter reicht bereits), NICHT umgesetzt. BUGS.md
+  B31 von "Low" auf "UX-Mittel" hochgestuft (realer statt nur
+  theoretischer Bug). Kein Versions-Bump, kein Regressionstest nötig
+  (kein Code geändert).
+
 ## 2026-07-13 train-v165
 Loop 1: 10/10 grün ✓, 0 uncaught errors. Kein Fix nötig.
 Loop 2: HANDOFF.md/CLAUDE.md waren aktuell (train-v164/?v=187, passend
