@@ -432,6 +432,16 @@ function _gcEvent(name) {
   window.goatcounter?.count?.({ path: name, event: true });
 }
 
+/** True wenn die App bereits als installierte PWA läuft (Home-Bildschirm/Standalone). */
+function _isStandalone() {
+  return window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone === true;
+}
+
+/** iOS-Geräte haben kein `beforeinstallprompt` — dort nur Anleitung statt echtem Prompt möglich. */
+function _isIOS() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+}
+
 /** Show a top-centered tip banner; auto-closes after 4 s. */
 function _showTooltip(text) {
   document.getElementById('_train-micro-tooltip')?.remove();
@@ -4066,7 +4076,7 @@ function renderSettingsTab(state) {
   <div class="settings-section">
     <div class="settings-section__title">Info</div>
     <div class="settings-row">
-      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v174</div></div>
+      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v175</div></div>
     </div>
     <div class="settings-row">
       <div>
@@ -6692,6 +6702,13 @@ export function mountApp(root) {
     _gcEvent('js_error');
   });
 
+  // Von index.html gefeuert bei window 'appinstalled' (PWA tatsächlich zum
+  // Home-Bildschirm hinzugefügt, nicht nur der Prompt angezeigt) — deutlich
+  // aussagekräftigeres Nutzungs-Signal als reine Seitenaufrufe.
+  window.addEventListener('train:app-installed', () => {
+    _gcEvent('App installiert');
+  });
+
   scheduleRender();
   _showOnboarding();
 
@@ -7117,6 +7134,8 @@ function _showOnboarding() {
   let _optionalOpen    = false;   // <details> state — survives innerHTML rebuilds
   let _startwerteOpen  = false;   // <details> state for startwerte section
   let _startwerte      = {};      // { [exerciseName]: { weight, reps, rpe } }
+  let _obPhase         = 'setup'; // 'setup' | 'install' — Install-Screen läuft NACH der Vorlagen-Wahl, siehe _afterSetup()
+  let _iosHelpOpen     = false;   // Anleitung ausgeklappt (iOS hat kein beforeinstallprompt, nur manuelle Anleitung möglich)
 
   const el = document.createElement('div');
   el.id = 'onboarding';
@@ -7138,6 +7157,24 @@ function _showOnboarding() {
   document.body.appendChild(el);
 
   function _render() {
+    if (_obPhase === 'install') {
+      const isIOS = _isIOS();
+      el.innerHTML = `
+        <div class="ob-screen">
+          <div class="ob-logo">TRAIN</div>
+          <h2 class="ob-title ob-title--sm">Bereit loszulegen</h2>
+          <p class="ob-sub">Speichere TRAIN auf deinem Home-Bildschirm — startet dann wie eine echte App, ohne Browser-Leiste.</p>
+          <button class="btn btn--accent ob-btn" data-ob="${isIOS ? 'install-ios-help' : 'install-native'}">📲 Zum Home-Bildschirm hinzufügen</button>
+          ${isIOS && _iosHelpOpen ? `
+          <div class="ob-ios-help">
+            <div class="ob-ios-help__step"><span class="ob-ios-help__num">1</span> Tippe unten in Safari auf das Teilen-Symbol (Quadrat mit Pfeil nach oben)</div>
+            <div class="ob-ios-help__step"><span class="ob-ios-help__num">2</span> Wähle <strong>„Zum Home-Bildschirm"</strong></div>
+          </div>` : ''}
+          <button class="btn btn--ghost ob-btn ob-btn--sm" data-ob="continue">Später</button>
+        </div>`;
+      return;
+    }
+
     // Empfehlung-Logik (Sprint C1, train-v108): Fitness > Anfänger > Muskelaufbau > sonst
     const _recommendedIdx = (!_expLevel && !_mainGoal) ? null
       : _mainGoal === 'fitness'      ? 2
@@ -7263,11 +7300,38 @@ function _showOnboarding() {
         _render(); break;
       case 'load':
         if (_selTpl !== null) _applyTpl(_selTpl);
-        _finish(); break;
+        _afterSetup(); break;
       case 'skip':
-        _applyBlank(); _finish(); break;
+        _applyBlank(); _afterSetup(); break;
+      case 'install-native': {
+        const dp = window.__trainInstallPrompt;
+        if (!dp) { _finish(); break; }
+        dp.prompt();
+        dp.userChoice.finally(() => { window.__trainInstallPrompt = null; });
+        _finish();
+        break;
+      }
+      case 'install-ios-help':
+        _iosHelpOpen = !_iosHelpOpen;
+        _render(); break;
+      case 'continue':
+        _finish(); break;
     }
   });
+
+  // Install-Screen nur zeigen, wenn er auch etwas Sinnvolles tun kann: iOS
+  // (nur Anleitung möglich, kein echter Prompt) ODER ein von index.html
+  // eingefangenes beforeinstallprompt-Event liegt vor (Chrome/Edge/Android).
+  // Sonst (Desktop-Firefox, bereits installiert, ...) direkt fertigstellen
+  // statt einen Screen zu zeigen, der nichts bewirken kann.
+  function _afterSetup() {
+    if (!_isStandalone() && (_isIOS() || window.__trainInstallPrompt)) {
+      _obPhase = 'install';
+      _render();
+    } else {
+      _finish();
+    }
+  }
 
   // Laufzeit-Anpassung von Sätzen/Pause nach gewählter Erfahrungsstufe.
   // _ONBOARDING_TEMPLATES selbst bleibt unverändert — nur die beim Erstellen

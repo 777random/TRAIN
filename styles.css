@@ -2220,6 +2220,17 @@ details[open] > .deload-details__summary::before { content: '▾ '; }
 }
 .ob-btn { width: 100%; max-width: 320px; }
 .ob-btn--sm { font-size: 13px; opacity: .6; margin-top: calc(-1 * var(--sp-1)); }
+.ob-ios-help {
+  background: var(--c-surface); border: 1px solid var(--c-border);
+  border-radius: var(--r-md); padding: var(--sp-3) var(--sp-4);
+  width: 100%; max-width: 320px; display: flex; flex-direction: column; gap: var(--sp-2);
+}
+.ob-ios-help__step { display: flex; align-items: flex-start; gap: var(--sp-2); font-size: 13px; color: var(--c-text-2); line-height: 1.5; }
+.ob-ios-help__num {
+  flex-shrink: 0; width: 18px; height: 18px; border-radius: 50%;
+  background: var(--c-accent); color: var(--c-bg); font-size: 11px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
 .ob-tpl-list { display: flex; flex-direction: column; gap: var(--sp-3); width: 100%; }
 .ob-tpl-card {
   display: flex; align-items: center; gap: var(--sp-3);

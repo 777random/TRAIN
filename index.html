@@ -16,7 +16,7 @@
   <link rel="apple-touch-icon" sizes="192x192" href="./icon-192.png">
   <link rel="apple-touch-icon" sizes="512x512" href="./icon-512.png">
 
-  <link rel="stylesheet" href="./styles.css?v=190">
+  <link rel="stylesheet" href="./styles.css?v=191">
 
   <!-- modulepreload-Hints: ohne Bundler (bewusste Architekturentscheidung,
        siehe CLAUDE.md) entdeckt der Browser den ES-Module-Graphen sonst nur
@@ -126,6 +126,22 @@
     import { mountApp }                                    from './ui.js';
     import { mountTimer }                                  from './timer.js';
     import { registerServiceWorker, onStorageError, onSwUpdateReady } from './registerSW.js';
+
+    // Install-Button im Onboarding (Chrome/Edge/Android): der Browser feuert
+    // dieses Event nur EINMAL und nur wenn Manifest/SW/Icons die Kriterien
+    // erfüllen. preventDefault() unterdrückt die eigene Mini-Infobar des
+    // Browsers — wir zeigen stattdessen unseren eigenen Button im
+    // Onboarding (ui.js _showOnboarding()) und rufen dp.prompt() darüber
+    // auf. iOS Safari feuert dieses Event nie (keine solche API) — dort
+    // zeigt ui.js stattdessen eine manuelle Anleitung.
+    window.addEventListener('beforeinstallprompt', event => {
+      event.preventDefault();
+      window.__trainInstallPrompt = event;
+    });
+    window.addEventListener('appinstalled', () => {
+      window.__trainInstallPrompt = null;
+      window.dispatchEvent(new CustomEvent('train:app-installed'));
+    });
 
     const restored = loadState();
     if (!restored) {

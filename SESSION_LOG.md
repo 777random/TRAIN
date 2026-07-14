@@ -2,6 +2,57 @@
 # Automatisch von Claude Code
 # befüllt beim Session-Start
 
+## 2026-07-14 train-v175 (B54 — Install-Button im Onboarding)
+Eigentliche Aufgabe: direkter Anschluss an die Pre-Launch-Checkliste (B51-B53).
+  Nutzer fragte, ob im Onboarding ein Button platziert werden kann, der die
+  App automatisch auf den Home-Bildschirm bringt, damit der Nutzer das nicht
+  manuell machen muss. Zunächst als technische Frage beantwortet statt direkt
+  zu implementieren (exploratory-question-Stil, 2-3 Sätze): Android/Chrome/
+  Edge haben ein echtes Browser-API dafür (`beforeinstallprompt`, echter
+  Ein-Tap-Install-Dialog), iOS Safari hat diese API grundsätzlich NICHT
+  (Apple erlaubt Web-Apps technisch nicht, den nativen "Zum Home-Bildschirm"-
+  Dialog programmatisch auszulösen — kein Trick umgeht das). Realistischste
+  Umsetzung vorgeschlagen: Button erkennt die Plattform und löst entweder den
+  echten Prompt aus (Android) oder zeigt eine bebilderte Anleitung (iOS).
+  Nutzer bestätigte "Ja, umsetzen".
+  Umsetzung: index.html registriert `beforeinstallprompt`/`appinstalled`-
+  Listener ganz am Anfang des Modul-Scripts (Event kann jederzeit früh
+  feuern), `preventDefault()` unterdrückt die browsereigene Mini-Infobar,
+  das Event wird auf `window.__trainInstallPrompt` zwischengespeichert
+  (gleiches Muster wie das bereits bestehende `window.__trainExportJSON`).
+  `appinstalled` feuert ein neues `train:app-installed`-Browser-Event nach
+  dem bereits etablierten `train:show-update-banner`-Muster, auf das ui.js
+  reagiert und ein anonymes GoatCounter-Event "App installiert" feuert
+  (aussagekräftigeres Nutzungs-Signal als reine Seitenaufrufe, passt zur
+  B52-Analytics-Arbeit vom Vorsprint).
+  In ui.js `_showOnboarding()`: neue Onboarding-Phase `_obPhase='install'`,
+  die NACH der Vorlagen-Wahl greift (nicht davor — erst Wert zeigen, dann
+  installieren fragen ist die etablierte PWA-UX-Empfehlung), aber nur wenn
+  sie auch etwas bewirken kann — neue Helper `_isIOS()`/`_isStandalone()`
+  prüfen das: iOS zeigt eine Anleitung (Teilen-Symbol → Zum Home-Bildschirm),
+  ein vorhandenes `beforeinstallprompt` löst den echten nativen Dialog aus,
+  ansonsten (Desktop-Firefox, bereits als Standalone installiert) wird der
+  Screen komplett übersprungen und direkt fertiggestellt statt einen
+  wirkungslosen Button zu zeigen. Beim Bauen aufgefallen: mehrere CSS-Klassen
+  (`.ob-logo`, `.ob-sub`) existierten bereits in styles.css, wurden aber
+  nirgends in ui.js verwendet — vermutlich Reste eines früheren, komplexeren
+  Onboarding-Designs. Für den neuen Install-Screen wiederverwendet statt neue
+  Klassen zu erfinden, damit dieser bisher tote CSS-Code endlich bespielt
+  wird. Neue Klassen nur für das iOS-Anleitungs-Kästchen (`.ob-ios-help`)
+  ergänzt, da dafür kein passendes bestehendes Muster existierte.
+  Verifiziert per 3 gezielten Playwright-Szenarien (jeweils frischer Browser-
+  Context, simulierter `beforeinstallprompt` bzw. iOS-User-Agent bzw. keins
+  von beidem): Android-Fall ruft `prompt()` korrekt auf und schließt das
+  Onboarding; iOS-Fall zeigt die Anleitung erst nach Tap auf den Button,
+  "Später" schließt zuverlässig; Desktop/nicht-unterstützter Fall überspringt
+  den Install-Screen komplett und schließt sofort — keine der drei Varianten
+  zeigt fälschlich einen wirkungslosen Button. Zusätzlich per Screenshot
+  visuell geprüft (iOS-Anleitung sieht konsistent zum bestehenden Splash-
+  Screen-Branding aus). Regressionstest 10/10 grün, Playwright 18/18 grün.
+  CACHE_VERSION → train-v175, CSS → ?v=191 (kein SCHEMA-Bump — keine neuen
+  State-Felder, reine UI/Browser-API-Erweiterung). Versionsnummer in den
+  Einstellungen (Info-Sektion, aus B53) auf train-v175 nachgezogen.
+
 ## 2026-07-14 train-v174 (B51+B52+B53 — Pre-Launch-Checkliste)
 Eigentliche Aufgabe: Nutzer fragte, direkt im Anschluss an B49/B50, was vor
   dem Launch an die ersten ~20 echten Nutzer noch geprüft werden sollte, um

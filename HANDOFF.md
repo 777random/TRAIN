@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: Juli 2026 nach train-v174*
-*Nächste Version: train-v175*
+*Letzte Aktualisierung: Juli 2026 nach train-v175*
+*Nächste Version: train-v176*
 
 ---
 
@@ -11,13 +11,43 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v174 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v175 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
-- CSS: ?v=190 (neue `@font-face`-Regeln für selbst gehostete Fonts, B51)
+- CSS: ?v=191 (neue `.ob-ios-help`-Klassen für die iOS-Install-Anleitung, B54)
 - SCHEMA: 30 (unverändert diesen Sprint)
 - Letzter Commit: siehe `git log` (dieser Sprint noch nicht committet
   zum Zeitpunkt dieses Eintrags — folgt direkt im Anschluss)
+- **B54 umgesetzt (train-v175) — Install-Button im Onboarding:** direkter
+  Anschluss an die Pre-Launch-Checkliste — Nutzer fragte, ob sich "Zum
+  Home-Bildschirm hinzufügen" im Onboarding automatisieren lässt. Technische
+  Antwort zuerst gegeben (nicht direkt implementiert): Android/Chrome/Edge
+  haben `beforeinstallprompt` (echter Ein-Tap-Dialog), iOS Safari hat KEINE
+  solche API (Apple-Einschränkung, nicht umgehbar) — dort nur eine Anleitung
+  möglich. Nutzer bestätigte "Ja, umsetzen".
+  - index.html fängt `beforeinstallprompt` global ab (`preventDefault()` +
+    auf `window.__trainInstallPrompt` gespeichert, unterdrückt die
+    browsereigene Mini-Infobar zugunsten der eigenen UI), feuert bei
+    `appinstalled` ein `train:app-installed`-Event → GoatCounter-Event
+    "App installiert" (aussagekräftigeres Signal als reine Seitenaufrufe).
+  - Neuer Onboarding-Screen (`_obPhase='install'`, ui.js `_showOnboarding()`)
+    erscheint NACH der Vorlagen-Wahl (Best Practice: erst Wert zeigen, dann
+    installieren fragen), aber NUR wenn er wirklich etwas bewirken kann:
+    iOS (Anleitung) ODER ein eingefangenes `beforeinstallprompt` liegt vor.
+    Sonst (Desktop-Firefox, bereits installiert — `display-mode:standalone`/
+    `navigator.standalone` geprüft) wird der Screen komplett übersprungen
+    statt einen wirkungslosen Button zu zeigen.
+  - Reused bestehende Muster: `.ob-*`-CSS-Klassen (u.a. bisher tote Klassen
+    `.ob-logo`/`.ob-sub` erstmals bespielt statt neue zu erfinden),
+    `train:show-update-banner`-Event-Stil für die index.html↔ui.js-
+    Kommunikation.
+  - Verifiziert per Playwright in 3 Szenarien: simuliertes
+    `beforeinstallprompt` → Button ruft `prompt()` auf und schließt
+    Onboarding; iOS-User-Agent → Anleitung erscheint nach Tap, "Später"
+    schließt; weder/noch (Desktop) → Screen wird komplett übersprungen,
+    Onboarding schließt sofort. Regressionstest 10/10 grün, Playwright
+    18/18 grün. CACHE_VERSION → train-v175, CSS → ?v=191 (kein SCHEMA-Bump).
+
 - **B51+B52+B53 umgesetzt (train-v174) — Pre-Launch-Checkliste:** Nutzer
   fragte vor dem Launch an die ersten ~20 echten Nutzer, was noch geprüft
   werden sollte, um einen schlechten ersten Eindruck zu vermeiden, und ob
@@ -312,6 +342,15 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 
 ## FILES (zuletzt angefasst)
 ```
+index.html                — B54: beforeinstallprompt/appinstalled global
+                          abgefangen (window.__trainInstallPrompt,
+                          train:app-installed-Event).
+ui.js                     — B54: neue _isStandalone()/_isIOS()-Helper,
+                          _showOnboarding() um _obPhase='install'-Screen
+                          erweitert (_afterSetup(), neue data-ob Actions
+                          install-native/install-ios-help/continue), neuer
+                          train:app-installed-Listener (_gcEvent).
+styles.css                — B54: .ob-ios-help/.ob-ios-help__step/__num.
 index.html                — B51: Google-Fonts-Links entfernt, modulepreload-
                           Hints fuer alle ES-Module ergaenzt. B52: GoatCounter-
                           Script-Tag (Platzhalter-Site-Code), globaler
@@ -590,6 +629,7 @@ state.js                — Wochenerstellung isSeedWeek-Skip, Auto-Eval Guard (f
 | B48: Gewichtsempfehlung nutzt pro-Übung-Schrittweite | — | Nutzer meldete "technisch funktioniert, aber nicht mit gewünschter Logik" — Kniebeuge/Kreuzheben sollen 5kg-Schritte machen, Bankdrücken 1.25kg. getWeightRecommendation() hatte fullDelta/halfDelta fix auf 2.5/1.25 hartkodiert, ex.weightStep wurde nur zum Runden benutzt. Fix: fullDelta=weightStep, halfDelta=weightStep/2 (bleibt bei 1x wenn weightStep<=1.25, Nutzer-Entscheidung). 3 insightEngine.js-Stellen ebenfalls korrigiert (übergaben bisher undefined). Rückwärtskompatibel (Standard 2.5kg unverändert). CACHE_VERSION → train-v172 (kein CSS-Bump) |
 | B49+B50: individuelle Steigerungslogik (mit /plan geplant) | — | Anschluss an B48. B49: Schrittweite-Vorschlag aus geloggter Historie (Muster-Erkennung, Schwelle 3 Sprünge), rein sichtbarer Hinweis, nie automatisch angewendet — Nutzer-Idee "automatisch erkennen" wurde bewusst NICHT als stille Automatik umgesetzt (Nordstern-Konflikt), sondern als Vorschlag mit Übernehmen-Button. B50: anpassbare Steigerungsmenge im Empfehlungs-Chip ("Anderer Wert" statt nur Ein/Aus), kein Halbierungs-Preset (Kollision mit B48s internem halfDelta). Kritisches Risiko gefunden+gelöst: Auto-Preselect-Snapback bei Custom-Werten (_userCustomStepChoice-Tracking). Vollständig mit /plan durchgeplant (Explore+Plan-Agent), 3 Design-Fragen mit Nutzer abgestimmt. CACHE_VERSION → train-v173, CSS → ?v=189 |
 | B51+B52+B53: Pre-Launch-Checkliste (mit /plan geplant) | — | Nutzer fragte vor dem Launch an ~20 echte Nutzer, was noch geprüft werden sollte und ob es ein Branchen-Standard-Protokoll gibt. Direkte Code-Recherche fand 2 unbekannte Funde (Google-Fonts-Live-Aufruf widerspricht "kein Server"-Datenschutz-Positionierung; kein Impressum), mit `/plan` zu 7-Schritte-Checkliste durchgeplant. B51: Fonts selbst gehostet (fonts/, 4 woff2), App macht danach NULL externe Aufrufe außer GoatCounter. B52: GoatCounter-Analytics (Platzhalter-Site-Code) + Custom Events + globaler Error-Handler (Toast + anonymes Event) + Feedback-mailto-Zeile. B53: Info-Sektion erweitert (Version, Datenschutz, Impressum-Platzhalter) über bestehendes Akkordeon-Muster; unabhängig gefunden: manifest.json hatte gar kein icons-Array, icon-192/512.png existierten nirgends — neu generiert (Splash-Branding). Voller Lighthouse-Lauf: A11y 100, Best-Practices 100, SEO 100, Performance ~57-60 (Architektur-bedingt, kein Bundler — modulepreload-Hints ergänzt, Bundler bewusst außerhalb Scope). B27 erneut bestätigt als Nicht-Blocker. Offene TODOs vor echtem Launch: GoatCounter-Site-Code, Impressum-Kontaktdaten, Feedback-E-Mail, Nutzer-Null-Gerätetest (siehe STAND). CACHE_VERSION → train-v174, CSS → ?v=190 |
+| B54: Install-Button im Onboarding | — | Direkter Anschluss an die Pre-Launch-Checkliste. Nutzer fragte, ob "Zum Home-Bildschirm hinzufügen" im Onboarding automatisiert werden kann. Technische Antwort zuerst gegeben statt direkt zu implementieren: Android/Chrome/Edge haben `beforeinstallprompt` (echter Ein-Tap-Dialog), iOS Safari hat KEINE solche API (Apple-Einschränkung), dort nur Anleitung möglich. Nach Bestätigung umgesetzt: index.html fängt `beforeinstallprompt` global ab (unterdrückt Browser-Mini-Infobar zugunsten eigener UI), feuert bei `appinstalled` ein Event → GoatCounter "App installiert". Neuer Onboarding-Screen erscheint NACH der Vorlagen-Wahl, aber nur wenn er etwas bewirken kann (iOS-Anleitung ODER echter Prompt vorhanden) — sonst komplett übersprungen (kein wirkungsloser Button auf Desktop/nicht unterstützten Browsern, kein erneutes Zeigen wenn bereits installiert). Reused bestehende `.ob-*`-CSS (teils bisher toter Code erstmals bespielt) und das `train:show-update-banner`-Event-Muster. Verifiziert per Playwright in 3 Szenarien (Android-simuliert/iOS-simuliert/Desktop-unsupported). CACHE_VERSION → train-v175, CSS → ?v=191 |
 
 ---
 
@@ -612,18 +652,19 @@ state.js                — Wochenerstellung isSeedWeek-Skip, Auto-Eval Guard (f
 ---
 
 ## NEXT (konkret nächster Schritt)
-**B51+B52+B53 umgesetzt (train-v174) — Pre-Launch-Checkliste:** vollständige
-Umsetzung siehe STAND-Sektion oben. **Vier TODOs stehen noch aus, bevor die
-App tatsächlich live an die ersten Nutzer geht (nicht durch Code lösbar,
-brauchen Eingaben vom Nutzer):**
+**B54 umgesetzt (train-v175) — Install-Button im Onboarding:** vollständige
+Umsetzung siehe STAND-Sektion oben. Direkter Anschluss an B51-B53. Damit ist
+die Pre-Launch-Checkliste inhaltlich (code-seitig) vollständig abgeschlossen.
+**Vier TODOs stehen weiterhin aus, bevor die App tatsächlich live an die
+ersten Nutzer geht (nicht durch Code lösbar, brauchen Eingaben vom Nutzer):**
 1. Kostenlosen GoatCounter-Account anlegen (goatcounter.com) und den echten
    Site-Code in `index.html` anstelle von `<SITE-CODE>` eintragen.
 2. Impressum-Platzhalter in den Einstellungen (Info-Sektion, ui.js) mit
    echten Kontaktdaten füllen.
 3. Feedback-mailto-Adresse in derselben Sektion eintragen.
 4. "Nutzer-Null"-Gerätetest manuell auf einem echten Gerät durchführen
-   (Add-to-Homescreen, Splash Screen, Onboarding, erste Übung, Neustart-
-   Persistenz) — siehe Checkliste im Chat-Verlauf dieser Session.
+   (Add-to-Homescreen — jetzt per Install-Button aus dem Onboarding heraus
+   testbar, Splash Screen, Onboarding, erste Übung, Neustart-Persistenz).
 
 Danach ist die Pre-Launch-Checkliste vollständig abgeschlossen. **Nächster
 Schritt danach: zurück zur strategischen Priorität 1 (20 echte Nutzer
