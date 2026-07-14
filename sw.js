@@ -4,10 +4,8 @@
  * Strategy:
  *   • App shell (HTML, CSS, JS, fonts) → Cache-First with background refresh.
  *     The app loads instantly from cache; stale assets are replaced silently
- *     and become active on the next visit.
- *
- *   • Google Fonts (runtime) → StaleWhileRevalidate so the user always gets
- *     a font (even offline) while keeping it fresh in the background.
+ *     and become active on the next visit. Fonts are self-hosted (same-origin)
+ *     since train-v174 — no more separate Google-Fonts runtime-caching branch.
  *
  *   • Everything else → NetworkOnly (e.g., analytics, CDN scripts not listed
  *     in PRECACHE – they fail gracefully if offline).
@@ -18,8 +16,7 @@
  *   asset conflicts.
  */
 
-const CACHE_VERSION  = 'train-v173';
-const FONT_CACHE     = 'train-fonts-v1';
+const CACHE_VERSION  = 'train-v174';
 
 /**
  * App shell – every file the app needs to render its first frame offline.
@@ -37,6 +34,8 @@ const PRECACHE_URLS = [
   './styles.css',
   './registerSW.js',
   './manifest.json',
+  './icon-192.png',
+  './icon-512.png',
   './insightEngine.js',
   './triggerEngine.js',
   './weightRecommendation.js',
@@ -51,6 +50,10 @@ const PRECACHE_URLS = [
   './movementMap.js',
   './overallPerformance.js',
   './consistencyUtils.js',
+  './fonts/BebasNeue-latin.woff2',
+  './fonts/BebasNeue-latinext.woff2',
+  './fonts/DMSans-latin.woff2',
+  './fonts/DMSans-latinext.woff2',
   './badges/badge_4.png',
   './badges/badge_8.png',
   './badges/badge_12.png',
@@ -84,7 +87,7 @@ self.addEventListener('activate', event => {
       .then(keys =>
         Promise.all(
           keys
-            .filter(key => key !== CACHE_VERSION && key !== FONT_CACHE)
+            .filter(key => key !== CACHE_VERSION)
             .map(key => {
               console.log('[SW] Deleting old cache:', key);
               return caches.delete(key);
@@ -103,15 +106,6 @@ self.addEventListener('fetch', event => {
 
   // Only handle GET requests; let POST/PUT/DELETE pass through.
   if (request.method !== 'GET') return;
-
-  // ── Google Fonts – StaleWhileRevalidate ────────────────────────────────────
-  if (
-    url.hostname === 'fonts.googleapis.com' ||
-    url.hostname === 'fonts.gstatic.com'
-  ) {
-    event.respondWith(staleWhileRevalidate(request, FONT_CACHE));
-    return;
-  }
 
   // ── App shell – Cache-First with background refresh ────────────────────────
   if (url.origin === self.location.origin) {
@@ -145,31 +139,6 @@ async function cacheFirstWithRefresh(request, cacheName) {
     .catch(() => null); // offline – background refresh fails silently
 
   return cached ?? await networkFetch ?? new Response('Offline', { status: 503 });
-}
-
-/**
- * StaleWhileRevalidate.
- * Return whatever is in cache, and update cache from network in the background.
- */
-async function staleWhileRevalidate(request, cacheName) {
-  const cache  = await caches.open(cacheName);
-  const cached = await cache.match(request);
-
-  // Background revalidation – don't await
-  fetch(request)
-    .then(response => { if (response.ok) cache.put(request, response.clone()); })
-    .catch(() => {});
-
-  if (cached) return cached;
-
-  // Not cached yet – must wait for network (first visit)
-  try {
-    const response = await fetch(request);
-    if (response.ok) cache.put(request, response.clone());
-    return response;
-  } catch {
-    return new Response('', { status: 503 });
-  }
 }
 
 // ─── Message handling ─────────────────────────────────────────────────────────

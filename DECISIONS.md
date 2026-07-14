@@ -15,6 +15,25 @@
 **Begründung:** Datenschutz als USP, kein Server-Overhead, PWA-tauglich.
 **Gilt:** Bis Cloud-Sync explizit entschieden wird (zurückgestellt).
 
+### 2026-07 — Anonyme Nutzungs-Zählung (GoatCounter) statt kein Tracking
+**Entscheidung:** Vor Launch an echte Nutzer wurde GoatCounter (kostenlos,
+Open Source, cookielos, DSGVO-konform ohne Consent-Banner) als einziger
+externer Netzwerk-Aufruf der App eingeführt, um zu sehen wie viele
+Personen die App öffnen/regelmäßig nutzen (Custom Events "Woche
+erstellt"/"Onboarding abgeschlossen"). Zählt ausschließlich anonyme,
+aggregierte Nutzungs-Events — nie Trainingsdaten, nie personenbezogene
+Kennungen.
+**Begründung:** Ohne jegliches Tracking ist "wie viele Nutzer sind aktiv"
+auf einer rein statischen GitHub-Pages-App technisch nicht beantwortbar.
+Die Alternative (gar kein Signal) wurde als schlechter bewertet als ein
+bewusst minimales, privacy-first Tracking, das die "Lokal-first, kein
+Backend"-Positionierung (siehe oben) für die eigentlichen Trainingsdaten
+unangetastet lässt — nur Metadaten über App-Nutzung verlassen das Gerät,
+nie Workout-Inhalte.
+**Gilt:** Bis explizit anders entschieden. Neue Custom-Events dürfen nur
+Zähl-/Kategorie-Daten übertragen, nie Nutzdaten (Gewichte, Übungsnamen,
+Notizen etc.).
+
 ### 2026-07 — Progressive Overload = immer Nutzer-Entscheidung
 **Entscheidung:** EX_SET_NEXT_WEEK_PLAN greift erst bei manueller WEEK_CREATE(source:'prev'). AUTO_WEEK_CREATE wendet _applyPlannedProgression bewusst NICHT an.
 **Begründung:** Steigerung ist eine bewusste Entscheidung des Athleten, nie still automatisch.

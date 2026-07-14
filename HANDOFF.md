@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: Juli 2026 nach train-v173*
-*Nächste Version: train-v174*
+*Letzte Aktualisierung: Juli 2026 nach train-v174*
+*Nächste Version: train-v175*
 
 ---
 
@@ -11,14 +11,63 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v173 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v174 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
-- CSS: ?v=189 (neue Klassen `.nw-weight-rec-wrap`/`.nw-rec-adjust-btn`
-  für B50)
+- CSS: ?v=190 (neue `@font-face`-Regeln für selbst gehostete Fonts, B51)
 - SCHEMA: 30 (unverändert diesen Sprint)
 - Letzter Commit: siehe `git log` (dieser Sprint noch nicht committet
   zum Zeitpunkt dieses Eintrags — folgt direkt im Anschluss)
+- **B51+B52+B53 umgesetzt (train-v174) — Pre-Launch-Checkliste:** Nutzer
+  fragte vor dem Launch an die ersten ~20 echten Nutzer, was noch geprüft
+  werden sollte, um einen schlechten ersten Eindruck zu vermeiden, und ob
+  es ein Branchen-Standard-Protokoll dafür gibt. Direkte Code-Recherche
+  ergab zwei bis dahin unbekannte, konkrete Funde (Google-Fonts-Aufruf
+  widerspricht der eigenen Datenschutz-Positionierung; kein Impressum),
+  mit `/plan` sauber zu einer 7-Schritte-Checkliste durchgeplant, inkl.
+  einer abgestimmten Entscheidung für die "wie viele Nutzer aktiv"-Frage
+  (GoatCounter, siehe DECISIONS.md).
+  - **B51 (Fonts):** Bebas Neue + DM Sans selbst gehostet (`fonts/`,
+    4 woff2-Dateien) statt Live-Aufruf bei Google — App macht danach
+    nachweislich NULL externe Netzwerk-Aufrufe außer dem bewusst
+    gewählten GoatCounter (B52). sw.js: totes Google-Fonts-Runtime-
+    Caching (`FONT_CACHE`, `staleWhileRevalidate()`) mit entfernt statt
+    als toten Code stehen zu lassen.
+  - **B52 (Analytics + Error-Handler):** GoatCounter-Script-Tag
+    (Platzhalter-Site-Code, TODO vor Launch), Custom Events "Woche
+    erstellt"/"Onboarding abgeschlossen" an bestehenden Dispatch-Punkten,
+    neuer globaler `window.onerror`/`unhandledrejection`-Handler (Toast
+    + anonymes `js_error`-Event) über das bestehende
+    `train:show-update-banner`-Event-Muster nachgebaut. Feedback-Zeile
+    (mailto, Platzhalter-Adresse) in den Einstellungen ergänzt.
+  - **B53 (Impressum/Datenschutz/Icons):** Info-Sektion in den
+    Einstellungen erweitert (korrekte Versionsnummer, aufklappbare
+    Datenschutz-/Impressum-Zeilen über das bestehende
+    `.session-note-toggle`-Akkordeon-Muster). Unabhängig beim vollen
+    Lighthouse-Lauf gefunden: `manifest.json` hatte gar kein
+    `icons`-Array, `icon-192.png`/`icon-512.png` existierten nirgends —
+    "Zum Home-Bildschirm hinzufügen" hätte kein App-Icon gezeigt. Neue
+    Platzhalter-Icons generiert (Splash-Screen-Branding: dunkler
+    Hintergrund + "TRAIN"-Wortmarke in Lime), `manifest.json`/
+    `<link rel="icon">`/sw.js-Precache ergänzt. Lighthouse (alle
+    Kategorien, vorher nur Accessibility geprüft): Accessibility 100,
+    Best-Practices 100 (vorher 96, Favicon-Fix), SEO 100, Performance
+    ~57-60 unter Lighthouses simulierter Slow-4G-Drosselung — Ursache
+    ist die bewusste "kein Bundler"-Architektur (viele einzelne ES-
+    Module), `modulepreload`-Hints als risikofreie Optimierung ergänzt
+    (Effekt innerhalb der Mess-Rauschgrenze, aber unschädlich). Ein
+    Bundler wäre die einzige echte Abhilfe — bewusst NICHT umgesetzt,
+    da außerhalb des Scopes dieser Checkliste (kein offenes Performance-
+    Redesign). B27 (Touch-Drag) im Rahmen der Checkliste erneut geprüft
+    und bewusst als Nicht-Blocker bestätigt.
+  - **Offene TODOs vor echtem Launch (nicht durch Code lösbar):**
+    GoatCounter-Site-Code in index.html eintragen (Account unter
+    goatcounter.com), Impressum-Platzhalter in den Einstellungen mit
+    echten Kontaktdaten füllen, Feedback-mailto-Adresse eintragen,
+    "Nutzer-Null"-Gerätetest (Add-to-Homescreen, Onboarding, Persistenz)
+    manuell auf einem echten Gerät durchführen.
+  - Regressionstest 10/10 grün, Playwright 18/18 grün nach jedem Schritt.
+
 - **B49+B50 umgesetzt (train-v173):** Anschluss an B48 — Nutzer wollte
   wissen, ob die Schrittweite pro Übung automatisch erkannt werden kann
   ("höchst individuell"), UND einen Weg, die automatische Coach-
@@ -263,6 +312,34 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 
 ## FILES (zuletzt angefasst)
 ```
+index.html                — B51: Google-Fonts-Links entfernt, modulepreload-
+                          Hints fuer alle ES-Module ergaenzt. B52: GoatCounter-
+                          Script-Tag (Platzhalter-Site-Code), globaler
+                          window.onerror/unhandledrejection-Handler. B53:
+                          <link rel="icon">, CACHE_VERSION-Referenz.
+sw.js                     — B51: fonts/-Dateien in PRECACHE_URLS, totes
+                          Google-Fonts-Runtime-Caching (FONT_CACHE,
+                          staleWhileRevalidate()) entfernt. B53: icon-192/512
+                          PNG in PRECACHE_URLS. CACHE_VERSION train-v174.
+styles.css                — B51: neue @font-face-Regeln fuer selbst
+                          gehostete Bebas Neue/DM Sans (DM Sans als
+                          Variable-Font-Range 300-600). CSS ?v=190.
+ui.js                     — B52: neuer _gcEvent()-Helper, Aufrufe in
+                          _createWeek() ("Woche erstellt") und Onboarding-
+                          _finish() ("Onboarding abgeschlossen"), neuer
+                          train:js-error-Listener (Toast + _gcEvent).
+                          B53: renderSettingsTab() Info-Sektion erweitert
+                          (Version korrigiert, Datenschutz-/Impressum-
+                          Akkordeon ueber bestehendes .session-note-toggle-
+                          Muster).
+manifest.json             — B53: neues icons-Array (192/512, purpose:any).
+icon-192.png / icon-512.png — B53: neu erzeugt (Platzhalter, Splash-Screen-
+                          Branding), existierten vorher gar nicht trotz
+                          Referenz in index.html/manifest.json.
+fonts/                    — B51: neuer Ordner, 4 selbst gehostete woff2-
+                          Dateien (Bebas Neue + DM Sans, latin/latin-ext).
+BUGS.md/DECISIONS.md      — B51-B53 Eintraege, neue Architektur-Entscheidung
+                          "Anonyme Nutzungs-Zaehlung (GoatCounter)".
 insightEngine.js          — B49: neue exMetricHistory(),
                           detectRecurringStep(), detectRecurringWeightStep()
                           — Muster-Erkennung fuer Schrittweite-Vorschlag.
@@ -512,6 +589,7 @@ state.js                — Wochenerstellung isSeedWeek-Skip, Auto-Eval Guard (f
 | B47: PR-Tracking-Konsolidierung | — | Genauere Prüfung des zurückgestellten Funds 4 — Zeile-für-Zeile-Vergleich der 3 PR-Tracking-Kopien in state.js ergab einen echten Bug: SET_TOGGLE_DONE (häufigste Eingabeart) fehlte das ex.oneRM-Update, das CONFIRM_SET/AUTO_EVAL_SET (bit-identisch zueinander) beide hatten. Neue _applyPrTracking() in state.js, alle 3 Reducer delegieren dorthin. Verifiziert mit echtem dispatch(A.SET_TOGGLE_DONE): ex.oneRM null → 116.7. CACHE_VERSION → train-v171 (kein CSS-Bump) |
 | B48: Gewichtsempfehlung nutzt pro-Übung-Schrittweite | — | Nutzer meldete "technisch funktioniert, aber nicht mit gewünschter Logik" — Kniebeuge/Kreuzheben sollen 5kg-Schritte machen, Bankdrücken 1.25kg. getWeightRecommendation() hatte fullDelta/halfDelta fix auf 2.5/1.25 hartkodiert, ex.weightStep wurde nur zum Runden benutzt. Fix: fullDelta=weightStep, halfDelta=weightStep/2 (bleibt bei 1x wenn weightStep<=1.25, Nutzer-Entscheidung). 3 insightEngine.js-Stellen ebenfalls korrigiert (übergaben bisher undefined). Rückwärtskompatibel (Standard 2.5kg unverändert). CACHE_VERSION → train-v172 (kein CSS-Bump) |
 | B49+B50: individuelle Steigerungslogik (mit /plan geplant) | — | Anschluss an B48. B49: Schrittweite-Vorschlag aus geloggter Historie (Muster-Erkennung, Schwelle 3 Sprünge), rein sichtbarer Hinweis, nie automatisch angewendet — Nutzer-Idee "automatisch erkennen" wurde bewusst NICHT als stille Automatik umgesetzt (Nordstern-Konflikt), sondern als Vorschlag mit Übernehmen-Button. B50: anpassbare Steigerungsmenge im Empfehlungs-Chip ("Anderer Wert" statt nur Ein/Aus), kein Halbierungs-Preset (Kollision mit B48s internem halfDelta). Kritisches Risiko gefunden+gelöst: Auto-Preselect-Snapback bei Custom-Werten (_userCustomStepChoice-Tracking). Vollständig mit /plan durchgeplant (Explore+Plan-Agent), 3 Design-Fragen mit Nutzer abgestimmt. CACHE_VERSION → train-v173, CSS → ?v=189 |
+| B51+B52+B53: Pre-Launch-Checkliste (mit /plan geplant) | — | Nutzer fragte vor dem Launch an ~20 echte Nutzer, was noch geprüft werden sollte und ob es ein Branchen-Standard-Protokoll gibt. Direkte Code-Recherche fand 2 unbekannte Funde (Google-Fonts-Live-Aufruf widerspricht "kein Server"-Datenschutz-Positionierung; kein Impressum), mit `/plan` zu 7-Schritte-Checkliste durchgeplant. B51: Fonts selbst gehostet (fonts/, 4 woff2), App macht danach NULL externe Aufrufe außer GoatCounter. B52: GoatCounter-Analytics (Platzhalter-Site-Code) + Custom Events + globaler Error-Handler (Toast + anonymes Event) + Feedback-mailto-Zeile. B53: Info-Sektion erweitert (Version, Datenschutz, Impressum-Platzhalter) über bestehendes Akkordeon-Muster; unabhängig gefunden: manifest.json hatte gar kein icons-Array, icon-192/512.png existierten nirgends — neu generiert (Splash-Branding). Voller Lighthouse-Lauf: A11y 100, Best-Practices 100, SEO 100, Performance ~57-60 (Architektur-bedingt, kein Bundler — modulepreload-Hints ergänzt, Bundler bewusst außerhalb Scope). B27 erneut bestätigt als Nicht-Blocker. Offene TODOs vor echtem Launch: GoatCounter-Site-Code, Impressum-Kontaktdaten, Feedback-E-Mail, Nutzer-Null-Gerätetest (siehe STAND). CACHE_VERSION → train-v174, CSS → ?v=190 |
 
 ---
 
@@ -534,6 +612,23 @@ state.js                — Wochenerstellung isSeedWeek-Skip, Auto-Eval Guard (f
 ---
 
 ## NEXT (konkret nächster Schritt)
+**B51+B52+B53 umgesetzt (train-v174) — Pre-Launch-Checkliste:** vollständige
+Umsetzung siehe STAND-Sektion oben. **Vier TODOs stehen noch aus, bevor die
+App tatsächlich live an die ersten Nutzer geht (nicht durch Code lösbar,
+brauchen Eingaben vom Nutzer):**
+1. Kostenlosen GoatCounter-Account anlegen (goatcounter.com) und den echten
+   Site-Code in `index.html` anstelle von `<SITE-CODE>` eintragen.
+2. Impressum-Platzhalter in den Einstellungen (Info-Sektion, ui.js) mit
+   echten Kontaktdaten füllen.
+3. Feedback-mailto-Adresse in derselben Sektion eintragen.
+4. "Nutzer-Null"-Gerätetest manuell auf einem echten Gerät durchführen
+   (Add-to-Homescreen, Splash Screen, Onboarding, erste Übung, Neustart-
+   Persistenz) — siehe Checkliste im Chat-Verlauf dieser Session.
+
+Danach ist die Pre-Launch-Checkliste vollständig abgeschlossen. **Nächster
+Schritt danach: zurück zur strategischen Priorität 1 (20 echte Nutzer
+rekrutieren) — siehe CLAUDE.md.**
+
 **B49+B50 umgesetzt (train-v173):** Anschluss an B48, mit `/plan` durchgeplant
 (Explore+Plan-Agent, 3 Design-Fragen mit Nutzer abgestimmt). B49: sichtbarer
 Schrittweite-Vorschlag aus geloggter Historie (`detectRecurringStep()` in

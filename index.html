@@ -12,13 +12,45 @@
   <title>TRAIN</title>
 
   <link rel="manifest" href="./manifest.json">
+  <link rel="icon" href="./icon-192.png" type="image/png">
   <link rel="apple-touch-icon" sizes="192x192" href="./icon-192.png">
   <link rel="apple-touch-icon" sizes="512x512" href="./icon-512.png">
 
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./styles.css?v=189">
+  <link rel="stylesheet" href="./styles.css?v=190">
+
+  <!-- modulepreload-Hints: ohne Bundler (bewusste Architekturentscheidung,
+       siehe CLAUDE.md) entdeckt der Browser den ES-Module-Graphen sonst nur
+       Schritt für Schritt (jede import-Anweisung erst nach dem Parsen der
+       vorherigen Datei) — unter simulierter Mobilfunk-Latenz (Lighthouse-
+       Audit, Pre-Launch-Checkliste) summiert sich das zu einem langsamen
+       LCP/FCP. modulepreload lässt den Browser alle Module sofort parallel
+       anfragen, ohne Verhalten/Ausführungsreihenfolge zu ändern. -->
+  <link rel="modulepreload" href="./state.js">
+  <link rel="modulepreload" href="./backup.js">
+  <link rel="modulepreload" href="./ui.js">
+  <link rel="modulepreload" href="./timer.js">
+  <link rel="modulepreload" href="./icons.js">
+  <link rel="modulepreload" href="./registerSW.js">
+  <link rel="modulepreload" href="./insightEngine.js">
+  <link rel="modulepreload" href="./triggerEngine.js">
+  <link rel="modulepreload" href="./weightRecommendation.js">
+  <link rel="modulepreload" href="./progressChart.js">
+  <link rel="modulepreload" href="./weekReview.js">
+  <link rel="modulepreload" href="./weekReviewModal.js">
+  <link rel="modulepreload" href="./plateauDetector.js">
+  <link rel="modulepreload" href="./setUtils.js">
+  <link rel="modulepreload" href="./exerciseNameCleanup.js">
+  <link rel="modulepreload" href="./progressInsights.js">
+  <link rel="modulepreload" href="./weeklyFocus.js">
+  <link rel="modulepreload" href="./movementMap.js">
+  <link rel="modulepreload" href="./overallPerformance.js">
+  <link rel="modulepreload" href="./consistencyUtils.js">
+
+  <!-- Anonyme, cookielose Nutzungs-Zählung (GoatCounter) — einziger externer
+       Netzwerk-Aufruf der App, siehe Datenschutz-Hinweis in den Einstellungen.
+       TODO vor Launch: <SITE-CODE> durch echten GoatCounter-Site-Code ersetzen
+       (kostenloser Account auf https://www.goatcounter.com/). -->
+  <script data-goatcounter="https://<SITE-CODE>.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
 
   <style>
     #app { opacity: 0; transition: opacity 200ms ease; }
@@ -115,6 +147,20 @@
     window.__trainExportJSON = exportJSON;
     onStorageError(() => {
       document.getElementById('storage-warning')?.classList.add('is-visible');
+    });
+
+    // Globale Fehler-Sichtbarkeit (Pre-Launch-Checkliste): ohne diesen Handler
+    // bleiben Crashes für Nutzer stumm und für uns unsichtbar. Meldet nur
+    // Fehlermeldung/Dateiname an die Konsole (Debugging) und feuert das
+    // anonyme GoatCounter-Event 'js_error' (siehe ui.js train:js-error-
+    // Listener) — keine Nutzdaten verlassen das Gerät.
+    window.addEventListener('error', event => {
+      console.error('[TRAIN] Uncaught error:', event.error ?? event.message);
+      window.dispatchEvent(new CustomEvent('train:js-error'));
+    });
+    window.addEventListener('unhandledrejection', event => {
+      console.error('[TRAIN] Unhandled promise rejection:', event.reason);
+      window.dispatchEvent(new CustomEvent('train:js-error'));
     });
 
     onSwUpdateReady(event => {

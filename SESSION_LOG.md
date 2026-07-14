@@ -2,6 +2,108 @@
 # Automatisch von Claude Code
 # befüllt beim Session-Start
 
+## 2026-07-14 train-v174 (B51+B52+B53 — Pre-Launch-Checkliste)
+Eigentliche Aufgabe: Nutzer fragte, direkt im Anschluss an B49/B50, was vor
+  dem Launch an die ersten ~20 echten Nutzer noch geprüft werden sollte, um
+  einen schlechten ersten Eindruck zu vermeiden, und ob es dafür ein
+  Branchen-Standard-Protokoll gibt. Zunächst als Analyse-Frage beantwortet
+  (Recherche im Code statt Spekulation): zwei bis dahin unbekannte, konkrete
+  Funde ergaben sich direkt aus einer Volltextsuche über alle .js/.html-
+  Dateien — (1) Google Fonts liefen live über fonts.googleapis.com/
+  fonts.gstatic.com, der einzige externe Netzwerk-Aufruf der gesamten App,
+  was direkt der eigenen "kein Server/Datenschutz als USP"-Positionierung
+  (DECISIONS.md) widerspricht und in Deutschland ein bekanntes DSGVO-
+  Abmahnrisiko ist (LG München 2022); (2) kein Impressum/Datenschutz-
+  erklärung vorhanden, obwohl bei einem öffentlichen Angebot an mehrere
+  fremde Nutzer vermutlich nach §5 TMG erforderlich. Zusätzlich als
+  Nebenbefunde: kein Feedback-Kanal, kein globaler JS-Error-Handler, eine
+  seit langem eingefrorene falsche Versionsnummer in den Einstellungen.
+  Nutzer bat anschließend um `/plan`, um alle Punkte zu strukturieren und
+  eine Lösung für "wie sehe ich, wie viele Nutzer aktiv sind" zu finden.
+  Per AskUserQuestion wurde GoatCounter (kostenlos, cookielos, DSGVO-
+  konform ohne Consent-Banner) als Analytics-Ansatz gewählt (Alternativen:
+  Plausible/eigener Mini-Zähler/nur GitHub Insights) — die App läuft rein
+  statisch auf GitHub Pages (bestätigt in README.md/CLAUDE.md), es gibt
+  kein Backend, daher ist irgendeine Form von Tracking technisch die
+  einzige Möglichkeit, diese Frage zu beantworten. Trainingsdaten bleiben
+  dabei ausschließlich lokal — GoatCounter zählt nur anonyme Events.
+  Mit `/plan` zu einer 7-Schritte-Checkliste durchgeplant, dann sequenziell
+  umgesetzt:
+  - **B51 (Fonts):** Bebas Neue + DM Sans per curl mit Browser-User-Agent
+    von Google heruntergeladen (4 woff2-Dateien, identisch zu den zuvor
+    live ausgelieferten), unter fonts/ abgelegt, @font-face-Regeln in
+    styles.css ergänzt (DM Sans als Variable-Font-Range 300-600 statt 4x
+    derselben Datei — Google liefert für alle 4 statischen Gewichte
+    dieselbe Variable-Font-Datei aus, per curl-Diff bestätigt). Google-
+    Fonts-Links aus index.html entfernt. sw.js: totes Google-Fonts-
+    Runtime-Caching (FONT_CACHE-Konstante, staleWhileRevalidate()-Funktion,
+    dedizierter fetch-Handler-Zweig) komplett entfernt statt als toten Code
+    stehen zu lassen, da Fonts jetzt same-origin sind und über den
+    normalen App-Shell-Precache laufen. Verifiziert per Playwright:
+    document.fonts zeigt beide Familien als 'loaded', 0 failed requests,
+    grep über alle .js/.html zeigt danach keinen externen Aufruf mehr
+    außer dem bewusst gewählten GoatCounter.
+  - **B52 (Analytics + Error-Handler):** GoatCounter-Script-Tag mit
+    Platzhalter-Site-Code (TODO vor Launch). Neuer _gcEvent()-Helper in
+    ui.js, Custom Events "Woche erstellt" (_createWeek()) und "Onboarding
+    abgeschlossen" (Onboarding-_finish()) an bestehenden Dispatch-Punkten
+    angehängt, kein Reducer-Umbau. Neuer globaler window.error/
+    unhandledrejection-Handler in index.html feuert ein train:js-error-
+    Browser-Event, auf das ui.js reagiert (Toast + anonymes js_error-Event)
+    — reused exakt das bestehende train:show-update-banner-Muster statt
+    einen neuen Kommunikationsweg zu erfinden. Feedback-mailto-Zeile in
+    den Einstellungen ergänzt. Verifiziert per Playwright: synthetisches
+    train:js-error-Event zeigt zuverlässig den erwarteten Toast-Text.
+  - **B53 (Impressum/Datenschutz/Icons):** Info-Sektion in
+    renderSettingsTab() erweitert (korrekte Versionsnummer, aufklappbare
+    Datenschutz-/Impressum-Zeilen über das bereits bestehende
+    .session-note-toggle/.session-note-body-Akkordeon-Muster, bisher nur
+    für Aufwärmen/Cooldown-Notizen genutzt — keine neue CSS nötig).
+    Unabhängig beim vollen Lighthouse-Lauf entdeckt: manifest.json hatte
+    gar kein icons-Array, und icon-192.png/icon-512.png — von index.html
+    UND manifest.json referenziert — existierten im gesamten Projekt
+    nirgends. "Zum Home-Bildschirm hinzufügen" hätte also gar kein
+    App-Icon gezeigt, potenziell der schlechteste denkbare erste Eindruck
+    für eine PWA. Da ein echtes Icon-Design eine Branding-Entscheidung ist,
+    die dem Nutzer gehört, wurde stattdessen ein funktionaler Platzhalter
+    erzeugt: identisch zum bereits etablierten Splash-Screen-Branding
+    (dunkler Hintergrund, "TRAIN"-Wortmarke in Bebas Neue/Lime), per
+    Playwright-Screenshot einer gerenderten HTML-Vorlage in beiden
+    benötigten Größen gerendert (kein fertiges Icon-Design, klar als
+    Platzhalter dokumentiert). manifest.json/index.html/sw.js
+    entsprechend ergänzt.
+  - Voller Lighthouse-Lauf (bisher nur gezielt Accessibility geprüft):
+    Accessibility 100, Best-Practices 96→100 (Fix: fehlender
+    <link rel="icon"> verursachte automatischen favicon.ico-404, von
+    Lighthouse als Konsolen-Fehler gewertet), SEO 100 (ungeprüft aber
+    bereits perfekt), Performance ~57-60 unter Lighthouses simulierter
+    Slow-4G-Mobilthrottling (150ms RTT, ~1.6Mbps) — Root Cause identifiziert:
+    die bewusste "kein Bundler"-Architektur (CLAUDE.md) bedeutet ~20
+    einzelne ES-Module-Dateien, die der Browser unter dieser simulierten
+    Drosselung nacheinander/parallel anfragen muss, bevor der erste Frame
+    rendert (Bootup-Time/Main-Thread-Arbeit selbst sind unauffällig, 0.1s/
+    1.0s — reines Netzwerk-Problem). modulepreload-Hints für alle
+    App-Module in index.html als risikofreie Optimierung ergänzt (Browser
+    kann parallel statt sequenziell laden) — gemessene Verbesserung lag
+    innerhalb der Mess-Rauschgrenze (mehrere Lighthouse-Windows-EPERM-
+    Cleanup-Flakes während der Messungen, dokumentiertes B30-Muster,
+    JSON-Resultate trotzdem korrekt geschrieben vor dem Crash). Bewusst
+    KEIN Bundler eingeführt — wäre die einzige echte Abhilfe, aber eine
+    offene Architektur-Änderung außerhalb des Scopes dieser Checkliste.
+    Reale Nutzer mit normalem WLAN/LTE dürften deutlich bessere Ladezeiten
+    erleben als dieses simulierte Worst-Case-Szenario.
+  - B27 (Touch-Drag-Reorder) im Rahmen der Checkliste erneut geprüft und
+    bewusst als Nicht-Blocker für den Launch bestätigt (Pfeile decken den
+    Bedarf ab).
+  DECISIONS.md: neuer Eintrag unter ARCHITEKTUR ("Anonyme Nutzungs-Zählung
+  (GoatCounter) statt kein Tracking") mit der Abwägung Datenschutz vs.
+  Sichtbarkeit. Regressionstest 10/10 grün, Playwright 18/18 grün nach
+  jedem der 3 Fixes einzeln geprüft. CACHE_VERSION → train-v174, CSS →
+  ?v=190 (kein SCHEMA-Bump — keine neuen State-Felder).
+  Vier TODOs bleiben vor dem echten Launch offen (nicht durch Code lösbar):
+  GoatCounter-Site-Code eintragen, Impressum-Kontaktdaten eintragen,
+  Feedback-E-Mail eintragen, "Nutzer-Null"-Gerätetest manuell durchführen.
+
 ## 2026-07-14 train-v173 (B49+B50 — Schrittweite-Vorschlag aus Historie + anpassbarer Empfehlungs-Chip)
 Eigentliche Aufgabe: direkter Anschluss an B48. Nutzer korrigierte mich
   zunächst explizit, dass sein 1.25kg-Bankdrücken-Beispiel aus B48 nur

@@ -422,6 +422,16 @@ function showToast(msg, type = 'info', durationMs = 2600) {
 }
 
 
+/**
+ * Feuert ein anonymes GoatCounter-Custom-Event (nur Zählung, keine Nutzdaten
+ * — reine "wie oft passiert X" Metrik, siehe Datenschutz-Hinweis in den
+ * Einstellungen). window.goatcounter existiert nur wenn das Script in
+ * index.html geladen wurde (kein Fehler falls Tracking blockiert/offline).
+ */
+function _gcEvent(name) {
+  window.goatcounter?.count?.({ path: name, event: true });
+}
+
 /** Show a top-centered tip banner; auto-closes after 4 s. */
 function _showTooltip(text) {
   document.getElementById('_train-micro-tooltip')?.remove();
@@ -4056,12 +4066,45 @@ function renderSettingsTab(state) {
   <div class="settings-section">
     <div class="settings-section__title">Info</div>
     <div class="settings-row">
-      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN v9.0</div></div>
+      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v174</div></div>
     </div>
     <div class="settings-row">
       <div>
         <div class="settings-row__label">Zuletzt gespeichert</div>
         <div class="settings-row__desc">${state.meta.savedAt ? new Date(state.meta.savedAt).toLocaleString('de-DE') : '–'}</div>
+      </div>
+    </div>
+    <div class="settings-row">
+      <div>
+        <div class="settings-row__label">Feedback</div>
+        <div class="settings-row__desc">Bug gefunden oder Idee? <a href="mailto:DEINE-EMAIL@beispiel.de?subject=TRAIN%20Feedback" style="color:var(--c-accent)">Schreib mir</a></div>
+      </div>
+    </div>
+    <div class="session-note-block">
+      <button class="session-note-toggle" onclick="this.nextElementSibling.classList.toggle('is-open'); this.classList.toggle('is-expanded')">
+        <span>Datenschutz</span>
+      </button>
+      <div class="session-note-body">
+        <div class="settings-row__desc" style="padding:var(--sp-2) 0">
+          Deine Trainingsdaten bleiben ausschließlich lokal auf diesem Gerät
+          gespeichert (Browser-Storage) — kein Konto, kein Server, keine
+          Übertragung deiner Workout-Daten an Dritte. Für anonyme Nutzungs-
+          Zählung (wie viele Personen die App öffnen) wird GoatCounter
+          eingesetzt — cookielos, ohne personenbezogene Daten, ohne
+          Werbe-Tracking. Schriftarten werden selbst gehostet, es findet kein
+          Aufruf bei Google statt.
+        </div>
+      </div>
+    </div>
+    <div class="session-note-block">
+      <button class="session-note-toggle" onclick="this.nextElementSibling.classList.toggle('is-open'); this.classList.toggle('is-expanded')">
+        <span>Impressum</span>
+      </button>
+      <div class="session-note-body">
+        <div class="settings-row__desc" style="padding:var(--sp-2) 0">
+          TODO: vor Veröffentlichung ausfüllen — Name und Kontaktmöglichkeit
+          (z.B. E-Mail oder Anschrift) des Betreibers.
+        </div>
       </div>
     </div>
   </div>`;
@@ -6181,6 +6224,7 @@ function _createWeek() {
   }
   closeModal('modal-new-week');
   showToast(source === 'template' ? 'Neue Woche aus Vorlage erstellt ✓' : 'Neue Woche aus Vorwoche erstellt ✓', 'ok');
+  _gcEvent('Woche erstellt');
   const triggered = fireTrigger('NEUE_WOCHE_ERSTELLT', {});
   for (const ins of triggered) {
     if (ins.immediate) showToast(ins.message, ins.type === 'warning' ? 'warn' : 'ok', 5000);
@@ -6638,6 +6682,14 @@ export function mountApp(root) {
     (e.detail ?? []).forEach((badge, i) => {
       setTimeout(() => _showBadgeOverlay(badge), i * 5500);
     });
+  });
+
+  // Von index.html gefeuert bei window.onerror/unhandledrejection (Pre-Launch-
+  // Checkliste) — Nutzer bekommt einen Hinweis statt einer stillen Fehler-
+  // fläche, zusätzlich anonymes GoatCounter-Zähl-Event (keine Nutzdaten).
+  window.addEventListener('train:js-error', () => {
+    showToast('Etwas ist schiefgelaufen — bitte kurz neu laden.', 'warn', 4000);
+    _gcEvent('js_error');
   });
 
   scheduleRender();
@@ -7308,6 +7360,7 @@ function _showOnboarding() {
     }
     _onboardingActive = false;
     dispatch(A.ONBOARDING_DONE, {});
+    _gcEvent('Onboarding abgeschlossen');
     el.remove();
   }
 
