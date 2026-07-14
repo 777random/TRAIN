@@ -16,8 +16,8 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
   Sprint-Text-Nummerierung)
 - CSS: ?v=191 (neue `.ob-ios-help`-Klassen für die iOS-Install-Anleitung, B54)
 - SCHEMA: 30 (unverändert diesen Sprint)
-- Letzter Commit: siehe `git log` (dieser Sprint noch nicht committet
-  zum Zeitpunkt dieses Eintrags — folgt direkt im Anschluss)
+- Letzter Commit: `cd9c4a5` (Loop 5 — for-advisor.txt Regenerierung).
+  B54 selbst: `8bcaffd`. Beide gepusht.
 - **B54 umgesetzt (train-v175) — Install-Button im Onboarding:** direkter
   Anschluss an die Pre-Launch-Checkliste — Nutzer fragte, ob sich "Zum
   Home-Bildschirm hinzufügen" im Onboarding automatisieren lässt. Technische
