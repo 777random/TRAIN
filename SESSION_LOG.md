@@ -53,6 +53,17 @@ Eigentliche Aufgabe: direkter Anschluss an die Pre-Launch-Checkliste (B51-B53).
   State-Felder, reine UI/Browser-API-Erweiterung). Versionsnummer in den
   Einstellungen (Info-Sektion, aus B53) auf train-v175 nachgezogen.
 
+Loop 5: for-advisor.txt aktualisiert (Stand v175, 10. Fassung — deckt jetzt
+  B47-B54 ab, vorherige Fassung war Stand v170/B44-B46). Direkt gegen den
+  aktuellen Code verifiziert (Coach-Kaskade, Prozentzahlen-Tabelle,
+  MovementMap unverändert seit v170 bestätigt; CLAUDE.md-Sync per Grep
+  bestätigt, kein Drift; externe Netzwerk-Aufrufe geprüft — nur noch
+  GoatCounter; aktueller CI-Run 29339573665 abgerufen, beide Jobs grün).
+  Neue Abschnitt-6-Einträge: Performance-Score-Root-Cause (Architektur,
+  kein Bundler), Platzhalter-App-Icons, GoatCounter-Platzhalter-Site-Code,
+  offene Domain-Frage. Session-Ende, ausgelöst durch Nutzer-Anfrage
+  "content export?" nach expliziter Ankündigung, die Session zu schließen.
+
 ## 2026-07-14 train-v174 (B51+B52+B53 — Pre-Launch-Checkliste)
 Eigentliche Aufgabe: Nutzer fragte, direkt im Anschluss an B49/B50, was vor
   dem Launch an die ersten ~20 echten Nutzer noch geprüft werden sollte, um
