@@ -36,6 +36,7 @@ import { computeErkenntnisLines, getProgressCorridorCalibration } from './progre
 import { buildCategoryMap, resolveCategory } from './movementMap.js';
 import { computeQualityTrend, computeConsistencyTrend, computeVolumeTrend, computeBreadthProgress } from './overallPerformance.js';
 import { weekSuccessCounts } from './setUtils.js';
+import { getSortedWeeks, exWeightHistory, exMetricHistory, detectRecurringStep } from './insightEngine.js';
 
 // ─── Module-level UI state (transient, never persisted) ──────────────────────
 
@@ -1258,6 +1259,24 @@ function renderExercise(wk, di, ei, state) {
       }
     }
   }
+
+  // Vorschlag: wiederholt identischer Sprung in der geloggten Historie
+  // (2026-07-14) — reiner Hinweis neben der Schrittweite-Einstellung, wird
+  // NIE automatisch übernommen, nur per explizitem Tap auf "Übernehmen"
+  // (dispatcht dieselbe EX_SET_STEP/EX_SET_METRIC_STEP-Action wie die
+  // manuellen Schrittweite-Buttons). Gilt für Gewicht UND Distanz/Zeit.
+  let _stepSuggestionHtml = '';
+  if (!locked) {
+    const _sortedWks    = getSortedWeeks(state);
+    const _stepHistory  = metric === 'reps' ? exWeightHistory(_sortedWks, ex.name) : exMetricHistory(_sortedWks, ex.name);
+    const _stepPattern  = detectRecurringStep(_stepHistory);
+    const _currentStep  = metric === 'reps' ? step : metricStepVal;
+    if (_stepPattern && _stepPattern.step !== _currentStep) {
+      const _stepUnit   = metric === 'sec' ? 'Sek' : metric === 'm' ? 'm' : 'kg';
+      const _stepAction = metric === 'reps' ? 'adopt-suggested-step' : 'adopt-suggested-metric-step';
+      _stepSuggestionHtml = `<span class="target-suggestion">Du hast wiederholt um ${_stepPattern.step}${_stepUnit} gesteigert (${_stepPattern.occurrences}x) — als Schrittweite übernehmen?</span><button type="button" class="btn-adopt-target" data-action="${_stepAction}" data-di="${di}" data-ei="${ei}" data-value="${_stepPattern.step}">Übernehmen</button>`;
+    }
+  }
   const metricHdr = metric === 'sec' ? 'Sek' : metric === 'm' ? 'm' : 'Wdh';
 
   // ── Substitut-Banner + Inline-Formular ──────────────────────────────────────
@@ -1460,6 +1479,7 @@ function renderExercise(wk, di, ei, state) {
                 aria-pressed="${step === s}"
               >${s === 0 ? 'Reset' : s}</button>`).join('')}
           </div>
+          ${_stepSuggestionHtml}
         </div>` : ''}
         ${!locked && metric !== 'reps' ? `
         <div class="weight-plan-row" role="group" aria-label="Steigerungsrate">
@@ -1472,6 +1492,7 @@ function renderExercise(wk, di, ei, state) {
                 aria-pressed="${metricStepVal === s}"
               >${s === 0 ? 'Reset' : s}</button>`).join('')}
           </div>
+          ${_stepSuggestionHtml}
         </div>` : ''}
         ${(state.customExercises ?? []).some(c => c.name === ex.name && c.metric != null) ? `
         <button type="button" class="btn btn--ghost btn--sm" data-action="edit-custom-ex" data-di="${di}" data-ei="${ei}" style="margin-top:var(--sp-2)">
@@ -4188,6 +4209,14 @@ function _handleClick(e) {
     scheduleRender();
   }
 
+  // Feature B (2026-07-14): "Anderer Wert"-Picker im Neue-Woche-Modal auf
+  // Außerhalb-Tap schließen — eigener Re-Render-Aufruf nötig (_prepNewWeekModal(),
+  // nicht scheduleRender()), da das Modal einen eigenen Render-Pfad hat.
+  if (_recChipCustomOpenName !== null && !e.target.closest('.nw-weight-rec-wrap')) {
+    _recChipCustomOpenName = null;
+    _prepNewWeekModal();
+  }
+
   // Close confirm-set no-target popup on outside tap
   document.querySelectorAll('.confirm-set-no-target').forEach(el => {
     if (!el.contains(e.target)) { clearTimeout(el._timer); el.remove(); }
@@ -4333,6 +4362,8 @@ function _handleClick(e) {
       const _hasCompleted = _lastWk?.days.some(d => d.markedDone);
       _moreRecsOpen = false;
       _userDismissedAutoSelect = new Set();
+      _userCustomStepChoice = new Map();
+      _recChipCustomOpenName = null;
       if (_hasCompleted) {
         const _review = buildWeekReview(_lastWk, _st.weeks, _st.favoriteExercises ?? []);
         showWeekReviewModal(_review, () => { _prepNewWeekModal(); openModal('modal-new-week'); });
@@ -4393,15 +4424,22 @@ function _handleClick(e) {
       const _recWk   = getLatestWeek(_recSt.weeks);
       if (!_recWk) break;
       const _recWkIdx = _recSt.weeks.indexOf(_recWk);
+      // Feature B (2026-07-14): wenn ein Custom-Wert bestätigt ist, muss der
+      // Klick auf den Chip selbst GEGEN den Custom-Wert prüfen (nicht gegen
+      // recDelta) — sonst würde ein Tap auf einen bereits mit Custom-Wert
+      // bestätigten Chip diesen fälschlich auf den vollen Empfehlungswert
+      // überschreiben statt ihn abzuwählen.
+      const _expectedValue = _userCustomStepChoice.has(recName) ? _userCustomStepChoice.get(recName) : recDelta;
       (_recWk.days ?? []).forEach((day, _rdi) => {
         (day.exercises ?? []).forEach((ex, _rei) => {
           if (ex.name !== recName) return;
-          const wasConfirmed = ex.nextWeekPlanConfirmed && ex.nextWeekPlan === recDelta;
+          const wasConfirmed = ex.nextWeekPlanConfirmed && ex.nextWeekPlan === _expectedValue;
           if (wasConfirmed) {
             // Nutzer wählt GERADE ab — merken, bevor der Re-Render unten die
             // Auto-Vorauswahl-Berechnung erneut ausführt (sonst snapt der
             // Chip im selben Klick sofort wieder zurück, siehe Diagnose).
             _userDismissedAutoSelect.add(recName);
+            _userCustomStepChoice.delete(recName); // Custom-Wahl verwerfen bei Abwahl
             dispatch(A.EX_TOGGLE_NEXT_WEEK_CONFIRMED, { di: _rdi, ei: _rei, weekIdx: _recWkIdx });
           } else {
             dispatch(A.EX_SET_NEXT_WEEK_PLAN, { di: _rdi, ei: _rei, value: recDelta, weekIdx: _recWkIdx });
@@ -4409,6 +4447,44 @@ function _handleClick(e) {
         });
       });
       _prepNewWeekModal(); // full re-render: name prefix, action text, subline all stay in sync
+      break;
+    }
+
+    // Feature B (2026-07-14): öffnet den "Anderer Wert"-Eingabemodus für den
+    // Empfehlungs-Chip im "Neue Woche"-Modal — reine UI-State-Änderung,
+    // kein Dispatch.
+    case 'rec-chip-show-custom': {
+      _recChipCustomOpenName = el.dataset.name;
+      _prepNewWeekModal();
+      setTimeout(() => document.getElementById('rec-chip-custom-input')?.focus(), 50);
+      break;
+    }
+
+    case 'rec-chip-custom-confirm': {
+      const _recName      = el.dataset.name;
+      const _customInput  = document.getElementById('rec-chip-custom-input');
+      const _customVal    = parseFloat(_customInput?.value);
+      if (!Number.isFinite(_customVal) || _customVal < 0) break;
+
+      const _recSt2   = getState();
+      const _recWk2   = getLatestWeek(_recSt2.weeks);
+      if (!_recWk2) break;
+      const _recWkIdx2 = _recSt2.weeks.indexOf(_recWk2);
+      let _recUnit = 'kg';
+      (_recWk2.days ?? []).forEach((day, _rdi) => {
+        (day.exercises ?? []).forEach((ex, _rei) => {
+          if (ex.name !== _recName) return;
+          _recUnit = ex.metric === 'sec' ? 'Sek' : ex.metric === 'm' ? 'm' : 'kg';
+          dispatch(A.EX_SET_NEXT_WEEK_PLAN, { di: _rdi, ei: _rei, value: _customVal, weekIdx: _recWkIdx2 });
+        });
+      });
+      // Markiert den Custom-Wert EXPLIZIT — verhindert, dass die nächste
+      // _prepNewWeekModal()-Auswertung ihn stillschweigend auf den vollen
+      // rec.delta zurücksetzt (siehe _prepNewWeekModal()-Kommentar unten).
+      _userCustomStepChoice.set(_recName, _customVal);
+      _recChipCustomOpenName = null;
+      showToast(`+${_customVal}${_recUnit} nächste Woche bestätigt (angepasst)`, 'ok');
+      _prepNewWeekModal();
       break;
     }
 
@@ -5062,6 +5138,20 @@ function _handleClick(e) {
 
     case 'set-metric-step': {
       const step = parseFloat(el.dataset.step);
+      dispatch(A.EX_SET_METRIC_STEP, { di: +di, ei: +ei, step, weekIdx: getState().curIdx });
+      break;
+    }
+
+    // Übernimmt den Historie-Vorschlag (2026-07-14) — dispatcht dieselbe
+    // Action wie die manuellen Schrittweite-Buttons, kein Sonderpfad.
+    case 'adopt-suggested-step': {
+      const step = parseFloat(el.dataset.value);
+      dispatch(A.EX_SET_STEP, { di: +di, ei: +ei, step, weekIdx: getState().curIdx });
+      break;
+    }
+
+    case 'adopt-suggested-metric-step': {
+      const step = parseFloat(el.dataset.value);
       dispatch(A.EX_SET_METRIC_STEP, { di: +di, ei: +ei, step, weekIdx: getState().curIdx });
       break;
     }
@@ -5808,6 +5898,21 @@ let _moreRecsOpen = false; // collapsible "weitere Übungen" state, reset on mod
 // genutzt wird.
 let _userDismissedAutoSelect = new Set();
 
+// Feature B (2026-07-14): Übungsname, dessen Empfehlungs-Chip im
+// "Neue Woche"-Modal gerade den "Anderer Wert"-Eingabemodus zeigt. Nur einer
+// gleichzeitig offen — eigene Variable, unabhängig vom In-Session-
+// "+kg"-Picker (_kgPickerKey), da beide in verschiedenen Modals leben.
+let _recChipCustomOpenName = null;
+
+// Feature B (2026-07-14): Übungsnamen, bei denen der Nutzer in DIESER
+// Modal-Sitzung explizit einen eigenen (von rec.delta abweichenden) Wert
+// bestätigt hat — Map exName -> gewählter Delta-Wert. Verhindert, dass
+// _prepNewWeekModal()'s Auto-Vorauswahl-Berechnung den Custom-Wert bei
+// jedem Re-Render stillschweigend wieder auf den vollen Empfehlungswert
+// zurücksetzt (Analogon zu _userDismissedAutoSelect, gleicher Reset-
+// Zeitpunkt bei 'open-new-week').
+let _userCustomStepChoice = new Map();
+
 /**
  * Extracts the numeric RPE/Erfolgsquote values from rec.reasons[] (already
  * formatted text from getWeightRecommendation) for the compact subline —
@@ -5842,24 +5947,59 @@ function _renderRecChip(r, rpeEnabled) {
   // Gewicht, nur die Anzeige-Einheit unterscheidet sich hier).
   const unit    = r.metric === 'sec' ? 'Sek' : r.metric === 'm' ? 'm' : 'kg';
   const holdTxt = r.metric === 'sec' || r.metric === 'm' ? 'Wert halten' : 'Gewicht halten';
+
+  // Feature B (2026-07-14): ein vom Nutzer explizit gewählter Wert (statt
+  // "voller Vorschlag" oder "gar nicht") überschreibt nur die ANZEIGE/den
+  // Bestätigungs-Zustand — die eigentliche Empfehlung (r.rec.delta) bleibt
+  // unverändert, damit "was der Coach empfohlen hätte" weiterhin sichtbar/
+  // nachvollziehbar bleibt (_recSubline zeigt weiterhin die Original-
+  // Begründung). nextWeekPlan ist immer ein DELTA, kein Zielwert — der
+  // angezeigte Zielwert bei Custom-Delta ist daher lastWeight + effectiveDelta,
+  // mit lastWeight = recommendedWeight - rec.delta (siehe state.js
+  // _applyPlannedProgression()).
+  const customValue    = _userCustomStepChoice.get(r.name);
+  const effectiveDelta = customValue !== undefined ? customValue : r.rec.delta;
+  const isCustom        = customValue !== undefined && customValue !== r.rec.delta;
+  const lastValue        = r.rec.recommendedWeight - r.rec.delta;
+  const effectiveTarget  = lastValue + effectiveDelta;
+
   const actionText = r.rec.delta > 0
-    ? (r.confirmed ? `+${r.rec.delta}${unit} → ${r.rec.recommendedWeight}${unit}` : `+${r.rec.delta}${unit} empfohlen`)
+    ? (r.confirmed ? `+${effectiveDelta}${unit} → ${effectiveTarget}${unit}${isCustom ? ' (angepasst)' : ''}` : `+${r.rec.delta}${unit} empfohlen`)
     : `${holdTxt} (${r.rec.recommendedWeight}${unit})`;
 
+  const isPickerOpen = _recChipCustomOpenName === r.name;
+
   return `
-    <button type="button" class="nw-weight-rec-chip${r.confirmed ? ' nw-weight-rec-chip--confirmed' : ''}"
-      data-action="toggle-weight-rec"
-      data-name="${h(r.name)}"
-      data-weight="${r.rec.recommendedWeight}"
-      data-delta="${r.rec.delta}"
-      aria-pressed="${r.confirmed}"
-      aria-label="Empfehlung für ${h(r.name)} übernehmen">
-      <div class="nw-rec-top">
-        <span class="nw-rec-name">${r.confirmed ? '✓ ' : ''}${h(r.name)}</span>
-        <span class="nw-rec-action">${h(actionText)}</span>
-      </div>
-      <div class="nw-rec-subline">${h(_recSubline(r, rpeEnabled))}</div>
-    </button>`;
+    <div class="nw-weight-rec-wrap">
+      <button type="button" class="nw-weight-rec-chip${r.confirmed ? ' nw-weight-rec-chip--confirmed' : ''}"
+        data-action="toggle-weight-rec"
+        data-name="${h(r.name)}"
+        data-weight="${r.rec.recommendedWeight}"
+        data-delta="${r.rec.delta}"
+        aria-pressed="${r.confirmed}"
+        aria-label="Empfehlung für ${h(r.name)} übernehmen">
+        <div class="nw-rec-top">
+          <span class="nw-rec-name">${r.confirmed ? '✓ ' : ''}${h(r.name)}</span>
+          <span class="nw-rec-action">${h(actionText)}</span>
+        </div>
+        <div class="nw-rec-subline">${h(_recSubline(r, rpeEnabled))}</div>
+      </button>
+      ${r.rec.delta > 0 ? `
+      <button type="button" class="nw-rec-adjust-btn" data-action="rec-chip-show-custom" data-name="${h(r.name)}"
+        aria-label="Anderen Wert für ${h(r.name)} eingeben" aria-expanded="${isPickerOpen}"
+      >Anderer Wert</button>` : ''}
+      ${isPickerOpen ? `
+      <div class="ex-kg-picker" role="group" aria-label="Eigene Steigerung für ${h(r.name)}">
+        <div class="ex-kg-picker-custom">
+          <input type="number" inputmode="decimal" min="0" step="0.25"
+            id="rec-chip-custom-input" class="num-input" placeholder="${unit}"
+            value="${isCustom ? effectiveDelta : ''}"
+            aria-label="Eigener Steigerungswert"
+          />
+          <button type="button" class="ex-kg-picker-btn" data-action="rec-chip-custom-confirm" data-name="${h(r.name)}">OK</button>
+        </div>
+      </div>` : ''}
+    </div>`;
 }
 
 function _prepNewWeekModal() {
@@ -5922,9 +6062,19 @@ function _prepNewWeekModal() {
             // trotz state.nextWeekPlanConfirmed===false einen "bestätigt"-
             // Zustand (visueller Mismatch) und _autoSelections würde sie
             // ohnehin sofort wieder bestätigen (der eigentliche Snap-Back-Bug).
+            // Feature B (2026-07-14): dasselbe gilt jetzt für einen explizit
+            // gewählten Custom-Wert (_userCustomStepChoice) — ohne diese
+            // Prüfung würde JEDER Re-Render (z.B. durch "Weitere anzeigen")
+            // den Custom-Wert stillschweigend wieder auf den vollen
+            // Empfehlungswert zurücksetzen.
+            const hasCustomChoice = _userCustomStepChoice.has(ex.name);
             const autoSelected = !_userDismissedAutoSelect.has(ex.name)
+              && !hasCustomChoice
               && rec.delta > 0 && isReadyForAutoSelect(ex.name, calcWeeks, exProgressionMode, exTargetRepsMax);
-            const alreadyConfirmedSame = ex.nextWeekPlanConfirmed && ex.nextWeekPlan === rec.delta;
+            const customMatch = hasCustomChoice && ex.nextWeekPlanConfirmed
+              && ex.nextWeekPlan === _userCustomStepChoice.get(ex.name);
+            const alreadyConfirmedSame = customMatch
+              || (ex.nextWeekPlanConfirmed && ex.nextWeekPlan === rec.delta);
             if (autoSelected && !alreadyConfirmedSame) {
               _autoSelections.push({ di, ei, value: rec.delta });
             }

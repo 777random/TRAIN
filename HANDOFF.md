@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: Juli 2026 nach train-v172*
-*Nächste Version: train-v173*
+*Letzte Aktualisierung: Juli 2026 nach train-v173*
+*Nächste Version: train-v174*
 
 ---
 
@@ -11,14 +11,48 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v172 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v173 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
-- CSS: ?v=188 (unverändert diesen Sprint — nur JS angefasst,
-  kein CSS-Bump nötig)
+- CSS: ?v=189 (neue Klassen `.nw-weight-rec-wrap`/`.nw-rec-adjust-btn`
+  für B50)
 - SCHEMA: 30 (unverändert diesen Sprint)
 - Letzter Commit: siehe `git log` (dieser Sprint noch nicht committet
   zum Zeitpunkt dieses Eintrags — folgt direkt im Anschluss)
+- **B49+B50 umgesetzt (train-v173):** Anschluss an B48 — Nutzer wollte
+  wissen, ob die Schrittweite pro Übung automatisch erkannt werden kann
+  ("höchst individuell"), UND einen Weg, die automatische Coach-
+  Empfehlung im Wochenwechsel-Modal auf einen eigenen Wert anzupassen
+  (Beispiel: "App schlägt +5kg vor, ich traue mir nur +2,5kg zu"). Vor
+  der Umsetzung mit `/plan` sauber durchgeplant (Explore-Agent für
+  Code-Recherche, Plan-Agent für den Entwurf, 3 Design-Fragen mit
+  Nutzer abgestimmt).
+  - **B49 (Schrittweite-Vorschlag):** neue Muster-Erkennung
+    (`detectRecurringStep()`/`exMetricHistory()`/`detectRecurringWeightStep()`
+    in insightEngine.js, Schwelle 3 identische Sprünge bei ≥4 Wochen)
+    zeigt einen sichtbaren Hinweis neben der Schrittweite-Einstellung
+    ("du hast wiederholt um Xkg gesteigert — übernehmen?"), NIE
+    automatisch angewendet (Nordstern-Prinzip: App schlägt vor, Athlet
+    entscheidet). Wiederverwendet das bestehende `.target-suggestion`-
+    Muster, dispatcht die bereits existierende `EX_SET_STEP`/
+    `EX_SET_METRIC_STEP`-Action.
+  - **B50 (anpassbarer Chip):** der Empfehlungs-Chip im "Neue Woche"-
+    Modal (`_renderRecChip()`) hat jetzt zusätzlich zum bisherigen
+    Ein/Aus einen "Anderer Wert"-Button (wiederverwendet das
+    `.ex-kg-picker`-Muster). Bewusst KEIN festes Halbierungs-Preset
+    (Begründung: Kollision mit dem internen `halfDelta`-Konzept aus
+    B48, siehe DECISIONS.md).
+  - **Kritisches Architektur-Risiko gefunden und gelöst:**
+    `_prepNewWeekModal()` dispatcht bei jedem Re-Render erneut die
+    Auto-Vorauswahl — ein Custom-Wert wäre ohne Gegenmaßnahme beim
+    nächsten Re-Render stillschweigend auf den vollen Empfehlungswert
+    zurückgesprungen. Neues Tracking `_userCustomStepChoice` (analog
+    zu `_userDismissedAutoSelect`) verhindert das — explizit mit
+    Playwright nachgestellt (Custom-Wert setzen → Re-Render erzwingen
+    → Wert bleibt stabil → Woche erstellen → tatsächliches Gewicht
+    stimmt mit dem Custom-Wert überein, nicht mit der vollen
+    Empfehlung).
+  - Details siehe BUGS.md B49/B50, DECISIONS.md (Design-Entscheidungen).
 - **B48 behoben (train-v172):** Nutzer meldete, dass die automatische
   Coach-Gewichtsempfehlung "technisch funktioniert, aber nicht mit der
   gewünschten Logik" — schwere Grundübungen (Kniebeuge, Kreuzheben)
@@ -229,6 +263,20 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 
 ## FILES (zuletzt angefasst)
 ```
+insightEngine.js          — B49: neue exMetricHistory(),
+                          detectRecurringStep(), detectRecurringWeightStep()
+                          — Muster-Erkennung fuer Schrittweite-Vorschlag.
+ui.js                     — B49: Vorschlags-UI neben Schrittweite-Buttons
+                          (adopt-suggested-step/-metric-step Handler).
+                          B50: _renderRecChip() komplett umgebaut (Anderer-
+                          Wert-Button + Picker), neue Modul-Variablen
+                          _recChipCustomOpenName/_userCustomStepChoice,
+                          neue Handler rec-chip-show-custom/-custom-confirm,
+                          toggle-weight-rec + _prepNewWeekModal() erweitert
+                          (Auto-Preselect-Snapback-Fix), neuer Outside-Tap-
+                          Handler fuer den Custom-Picker.
+styles.css                — B50: .nw-weight-rec-wrap, .nw-rec-adjust-btn.
+index.html / sw.js        — CACHE_VERSION train-v173, CSS ?v=189.
 weightRecommendation.js   — B48: fullDelta/halfDelta in
                           getWeightRecommendation() werden jetzt aus
                           ex.weightStep abgeleitet statt fix 2.5/1.25.
@@ -463,6 +511,7 @@ state.js                — Wochenerstellung isSeedWeek-Skip, Auto-Eval Guard (f
 | Geräte-Verifikation + Konsolidierungs-Sprint: B44-B46 | — | Nutzer testete B36/B37/B39 auf echtem Gerät (alle bestätigt), B38 zunächst als unerwartet gemeldet — Diagnose ergab kein Bug, aber einen 3. duplizierten "welche Tage geplant"-Berechnungsort (B44). Nutzer bat um systematischen Konsolidierungs-Audit statt Einzelfix — Read-Only-Fork fand 4 Cluster, 3 konsolidiert (B44 isTrainingDay-Filter, B45 weekSuccessCounts() in setUtils.js ersetzt 2 unabhängige Erfolgsquote-Formeln, B46 buildCategoryMap()/resolveCategory() in movementMap.js ersetzt 2 Duplikate + schließt eine fehlende Kategorie-Override-Stelle in overallPerformance.js), 1 Fund (PR-Erkennung, evtl. 3. Kopie) zur genaueren Prüfung zurückgestellt. CACHE_VERSION → train-v170 (kein CSS-Bump) |
 | B47: PR-Tracking-Konsolidierung | — | Genauere Prüfung des zurückgestellten Funds 4 — Zeile-für-Zeile-Vergleich der 3 PR-Tracking-Kopien in state.js ergab einen echten Bug: SET_TOGGLE_DONE (häufigste Eingabeart) fehlte das ex.oneRM-Update, das CONFIRM_SET/AUTO_EVAL_SET (bit-identisch zueinander) beide hatten. Neue _applyPrTracking() in state.js, alle 3 Reducer delegieren dorthin. Verifiziert mit echtem dispatch(A.SET_TOGGLE_DONE): ex.oneRM null → 116.7. CACHE_VERSION → train-v171 (kein CSS-Bump) |
 | B48: Gewichtsempfehlung nutzt pro-Übung-Schrittweite | — | Nutzer meldete "technisch funktioniert, aber nicht mit gewünschter Logik" — Kniebeuge/Kreuzheben sollen 5kg-Schritte machen, Bankdrücken 1.25kg. getWeightRecommendation() hatte fullDelta/halfDelta fix auf 2.5/1.25 hartkodiert, ex.weightStep wurde nur zum Runden benutzt. Fix: fullDelta=weightStep, halfDelta=weightStep/2 (bleibt bei 1x wenn weightStep<=1.25, Nutzer-Entscheidung). 3 insightEngine.js-Stellen ebenfalls korrigiert (übergaben bisher undefined). Rückwärtskompatibel (Standard 2.5kg unverändert). CACHE_VERSION → train-v172 (kein CSS-Bump) |
+| B49+B50: individuelle Steigerungslogik (mit /plan geplant) | — | Anschluss an B48. B49: Schrittweite-Vorschlag aus geloggter Historie (Muster-Erkennung, Schwelle 3 Sprünge), rein sichtbarer Hinweis, nie automatisch angewendet — Nutzer-Idee "automatisch erkennen" wurde bewusst NICHT als stille Automatik umgesetzt (Nordstern-Konflikt), sondern als Vorschlag mit Übernehmen-Button. B50: anpassbare Steigerungsmenge im Empfehlungs-Chip ("Anderer Wert" statt nur Ein/Aus), kein Halbierungs-Preset (Kollision mit B48s internem halfDelta). Kritisches Risiko gefunden+gelöst: Auto-Preselect-Snapback bei Custom-Werten (_userCustomStepChoice-Tracking). Vollständig mit /plan durchgeplant (Explore+Plan-Agent), 3 Design-Fragen mit Nutzer abgestimmt. CACHE_VERSION → train-v173, CSS → ?v=189 |
 
 ---
 
@@ -485,6 +534,21 @@ state.js                — Wochenerstellung isSeedWeek-Skip, Auto-Eval Guard (f
 ---
 
 ## NEXT (konkret nächster Schritt)
+**B49+B50 umgesetzt (train-v173):** Anschluss an B48, mit `/plan` durchgeplant
+(Explore+Plan-Agent, 3 Design-Fragen mit Nutzer abgestimmt). B49: sichtbarer
+Schrittweite-Vorschlag aus geloggter Historie (`detectRecurringStep()` in
+insightEngine.js, Schwelle 3 wiederholte Sprünge), nie automatisch angewendet
+— nur "Übernehmen"-Button, analog zum bestehenden `.target-suggestion`-Muster.
+B50: anpassbare Steigerungsmenge im "Neue Woche"-Empfehlungs-Chip ("Anderer
+Wert"-Eingabe statt nur Ein/Aus), kein Halbierungs-Preset (Kollision mit B48s
+internem halfDelta). Kritisches Architektur-Risiko (Auto-Preselect-Snapback
+bei Custom-Werten) in der Planungsphase gefunden und mit `_userCustomStepChoice`-
+Tracking gelöst, per dediziertem Playwright-Test verifiziert. Details siehe
+BUGS.md B49/B50, DECISIONS.md. Damit sind sowohl der Konsolidierungs-Audit
+(B44-B47) als auch die individuelle-Steigerungslogik-Anschlussarbeit (B48-B50)
+vollständig abgearbeitet. **Nächster Schritt: zurück zur strategischen
+Priorität 1 (20 echte Nutzer) — siehe CLAUDE.md.**
+
 **B48 umgesetzt (train-v172):** Coach-Gewichtsempfehlung nutzt jetzt
 die pro Übung eingestellte Schrittweite für die Sprunggröße, statt
 eines fixen 2.5/1.25kg-Deltas — vom Nutzer selbst gemeldetes

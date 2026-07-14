@@ -58,6 +58,62 @@ export function exWeightHistory(sortedWeeks, exName) {
   });
 }
 
+// Analogon zu exWeightHistory() für Distanz/Zeit-Übungen (metric 'm'/'sec') —
+// liest s.reps (trägt bei diesen Metriken die Distanz/Zeit) statt s.weight,
+// identisches Muster zu getMetricRecommendation() (weightRecommendation.js).
+export function exMetricHistory(sortedWeeks, exName) {
+  return sortedWeeks.map(wk => {
+    let max = 0;
+    for (const d of wk.days)
+      for (const ex of d.exercises)
+        if (ex.name === exName)
+          for (const s of ex.sets)
+            if (s.status === 'success' && (parseFloat(s.reps) || 0) > max) max = parseFloat(s.reps);
+    return max;
+  });
+}
+
+/**
+ * Erkennt ein wiederkehrendes Steigerungs-Muster in einer bereits extrahierten
+ * Wochen-Zeitreihe (aus exWeightHistory()/exMetricHistory()) — reine
+ * rückblickende Beobachtung, unabhängig von der aktuell eingestellten
+ * Schrittweite (ex.weightStep/ex.metricStep). Modal-Wert-Extraktion analog
+ * zum Muster in Insight P-02 weiter unten in dieser Datei.
+ *
+ * Schwelle: mindestens 3 identische positive Wochen-zu-Woche-Sprünge bei
+ * mindestens 4 dokumentierten Wochen — 2 Treffer wären bei den gängigen
+ * Standardwerten (2.5/5kg) zu leicht zufällig, 3 ist konsistent mit der
+ * plateauWeeks=3-Konvention in plateauDetector.js.
+ *
+ * @param {number[]} history – chronologisch aufsteigende Werte (0 = keine Daten)
+ * @returns {{ step: number, occurrences: number } | null}
+ */
+export function detectRecurringStep(history) {
+  const nonZero = history.filter(w => w > 0);
+  if (nonZero.length < 4) return null;
+
+  const deltas = [];
+  for (let i = 1; i < nonZero.length; i++) {
+    const d = Math.round((nonZero[i] - nonZero[i - 1]) * 100) / 100;
+    if (d > 0) deltas.push(d);
+  }
+  if (deltas.length < 3) return null;
+
+  const counts = new Map();
+  for (const d of deltas) counts.set(d, (counts.get(d) ?? 0) + 1);
+  let bestStep = null, bestCount = 0;
+  for (const [stepVal, count] of counts) {
+    if (count > bestCount) { bestStep = stepVal; bestCount = count; }
+  }
+  if (bestCount < 3) return null;
+  return { step: bestStep, occurrences: bestCount };
+}
+
+/** Bequemlichkeits-Wrapper: Gewichts-Historie direkt aus sortedWeeks+exName ableiten. */
+export function detectRecurringWeightStep(sortedWeeks, exName) {
+  return detectRecurringStep(exWeightHistory(sortedWeeks, exName));
+}
+
 // Average RPE of success sets for an exercise in a week, optionally at a given weight
 function exAvgRpe(wk, exName, targetWeight) {
   const rpes = [];

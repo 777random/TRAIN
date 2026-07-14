@@ -2,6 +2,62 @@
 # Automatisch von Claude Code
 # befüllt beim Session-Start
 
+## 2026-07-14 train-v173 (B49+B50 — Schrittweite-Vorschlag aus Historie + anpassbarer Empfehlungs-Chip)
+Eigentliche Aufgabe: direkter Anschluss an B48. Nutzer korrigierte mich
+  zunächst explizit, dass sein 1.25kg-Bankdrücken-Beispiel aus B48 nur
+  eine Illustration war und nicht als feste Regel im Code verankert
+  werden sollte — daraufhin nach echter individueller Konfigurierbarkeit
+  gefragt, mit der Idee, die Schrittweite aus der geloggten Gewichts-
+  Historie der Übung automatisch zu lernen. Auf Nachfrage "prüfe kritisch
+  ob das der beste Weg ist" habe ich die reale Risiken einer stillen
+  Automatik benannt (Kaltstart-Problem, mehrdeutige Delta-Wahl bei
+  wechselnden Historien, Rausch-Fortpflanzung, Transparenzverlust —
+  Kollision mit dem Nordstern "Athlet entscheidet, App schlägt nur vor")
+  und stattdessen einen sichtbaren, nicht automatisch angewendeten
+  Vorschlag vorgeschlagen. Nutzer stimmte zu und bat zusätzlich um eine
+  frei editierbare Alternative im Wochen-Empfehlungs-Chip (Beispiel:
+  System schlägt 5kg vor, Athlet traut sich nur 2.5kg zu).
+  Mit `/plan` formal durchgeplant (Explore-Agent + Plan-Agent), davor
+  explizit nach "was fehlt noch / blinder Fleck" gefragt — dabei ein
+  echtes Architektur-Risiko VOR der Implementierung gefunden:
+  `_prepNewWeekModal()` dispatcht bei jedem Re-Render erneut das
+  Auto-Preselect, ein selbst gewählter Custom-Wert wäre ohne Gegenmaß-
+  nahme beim nächsten Render auf den vollen Vorschlag zurückgesprungen.
+  3 Design-Fragen per AskUserQuestion mit Nutzer abgestimmt (Feature A
+  nur in "Erweitert"-Sektion, Feature A für Gewicht UND Distanz/Zeit
+  gleichzeitig, Feature B ohne Halbierungs-Preset).
+  Umsetzung Feature A (B49): `exMetricHistory()`, `detectRecurringStep()`,
+  `detectRecurringWeightStep()` neu in insightEngine.js (Schwelle: 3
+  identische positive Sprünge bei ≥4 Historien-Punkten). Neuer sichtbarer
+  Vorschlagstext im etablierten `.target-suggestion`/`.btn-adopt-target`-
+  Muster bei den Schrittweite-Buttons (Gewicht + Distanz/Zeit), neue
+  Handler `adopt-suggested-step`/`adopt-suggested-metric-step` dispatchen
+  die bereits existierenden `EX_SET_STEP`/`EX_SET_METRIC_STEP`-Actions
+  (keine neue Action nötig — reiner sichtbarer Vorschlag, nie automatisch
+  angewendet).
+  Umsetzung Feature B (B50): `_renderRecChip()` umgebaut um einen
+  "Anderer Wert"-Eingabepfad (wiederverwendet das etablierte
+  `.ex-kg-picker`-Muster), neue Modul-Variablen `_recChipCustomOpenName`/
+  `_userCustomStepChoice` (analog zu `_kgPickerKey`/
+  `_userDismissedAutoSelect`), neue Handler `rec-chip-show-custom`/
+  `rec-chip-custom-confirm`. `_prepNewWeekModal()`-Auto-Preselect-Logik
+  um Custom-Wert-Prüfung erweitert (löst das zuvor identifizierte Risiko).
+  Beim Testen zusätzlich einen echten Implementierungs-Lücke gefunden:
+  der neue Custom-Picker hatte noch keinen Outside-Click-Close-Handler
+  (anders als der bestehende `.ex-kg-wrap`) — nachgerüstet in `_handleClick`.
+  Verifiziert per Node-Skripten (reine Funktionsaufrufe: Muster-Erkennung
+  mit synthetischer Historie, EX_SET_NEXT_WEEK_PLAN-Dispatch +
+  _applyPlannedProgression()-Pfad) UND echten Playwright-UI-Interaktionen
+  (nicht nur localStorage-Shortcuts) inklusive eines dedizierten Tests für
+  das Auto-Preselect-Snapback-Risiko (Re-Render via toggle-more-recs,
+  Custom-Wert bleibt erhalten). Regressionstest 10/10 grün, volle
+  Playwright-Suite 18/18 grün.
+  DECISIONS.md: neuer Eintrag unter COACH-LOGIK (B49/B50) mit der
+  Design-Entscheidung (sichtbarer Vorschlag statt Automatik, kein
+  Halbierungs-Preset). CACHE_VERSION → train-v173, CSS → ?v=189
+  (kein SCHEMA-Bump — keine neuen State-Felder, `ex.nextWeekPlan`/
+  `ex.weightStep`/`ex.metricStep` existieren bereits).
+
 ## 2026-07-14 train-v172 (B48 — Gewichtsempfehlung pro-Übung-Schrittweite)
 Eigentliche Aufgabe: Nutzer meldete ein selbst bemerktes Logik-Problem
   (nicht aus einem Audit) — die automatische Coach-Gewichtsempfehlung

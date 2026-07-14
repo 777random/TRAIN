@@ -32,7 +32,7 @@ sondern der Einstiegspunkt, der `state.js`, `backup.js`, `ui.js`,
 |-------|-----------|---------------------|
 | state.js | — | backup.js, consistencyUtils.js, timer.js, triggerEngine.js, ui.js, weeklyFocus.js, weekReview.js (seit train-v170, siehe unten), index.html |
 | icons.js | — | ui.js |
-| setUtils.js | — | plateauDetector.js, weeklyFocus.js, weightRecommendation.js, weekReview.js (seit train-v170, siehe unten) |
+| setUtils.js | — | plateauDetector.js, weeklyFocus.js, weightRecommendation.js, weekReview.js (seit train-v170, siehe unten), ui.js (seit train-v171 — B45-Konsolidierung: `weekSuccessCounts()`) |
 | movementMap.js | — | overallPerformance.js, ui.js, weeklyFocus.js |
 | progressChart.js | — | ui.js |
 | weekReview.js | setUtils.js, state.js (seit train-v170 — B44/B45-Konsolidierung: `isTrainingDay()` für `_reachableDays()`, `weekSuccessCounts()` für `_calcSuccessScore()`; beide reine, zustandslose Funktionen, kein `getState()`/`dispatch()` — Datei ist weiterhin "State-frei" im ursprünglich gemeinten Sinn) | ui.js |
@@ -44,13 +44,13 @@ sondern der Einstiegspunkt, der `state.js`, `backup.js`, `ui.js`,
 | timer.js | state.js | index.html (kein JS-Modul importiert es, nur der Einstiegspunkt) |
 | plateauDetector.js | setUtils.js | insightEngine.js, weeklyFocus.js |
 | weightRecommendation.js | setUtils.js | insightEngine.js, ui.js, weeklyFocus.js |
-| insightEngine.js | weightRecommendation.js, plateauDetector.js | consistencyUtils.js, overallPerformance.js, progressInsights.js, triggerEngine.js |
+| insightEngine.js | weightRecommendation.js, plateauDetector.js | consistencyUtils.js, overallPerformance.js, progressInsights.js, triggerEngine.js, ui.js (seit train-v173 — B49: `getSortedWeeks`, `exWeightHistory`, `exMetricHistory`, `detectRecurringStep` für den Schrittweite-Vorschlag) |
 | triggerEngine.js | insightEngine.js, state.js | ui.js |
 | consistencyUtils.js | state.js, insightEngine.js | overallPerformance.js, weeklyFocus.js |
 | progressInsights.js | insightEngine.js | overallPerformance.js, ui.js |
 | overallPerformance.js | insightEngine.js, consistencyUtils.js, progressInsights.js, movementMap.js | ui.js, weeklyFocus.js |
 | weeklyFocus.js | state.js, plateauDetector.js, weightRecommendation.js, setUtils.js, consistencyUtils.js, overallPerformance.js, movementMap.js | ui.js |
-| ui.js | state.js, backup.js, icons.js, triggerEngine.js, weightRecommendation.js, progressChart.js, weekReview.js, weekReviewModal.js, weeklyFocus.js, exerciseNameCleanup.js, progressInsights.js, movementMap.js, overallPerformance.js | — (Einstiegspunkt via index.html) |
+| ui.js | state.js, backup.js, icons.js, triggerEngine.js, weightRecommendation.js, progressChart.js, weekReview.js, weekReviewModal.js, weeklyFocus.js, exerciseNameCleanup.js, progressInsights.js, movementMap.js, overallPerformance.js, insightEngine.js (seit train-v173), setUtils.js (seit train-v171) | — (Einstiegspunkt via index.html) |
 | sw.js | — (kein ES-Import; referenziert Dateipfade als Precache-Liste) | — (via registerSW.js als Service Worker registriert, kein JS-Import) |
 
 **Abhängigkeitstiefe (0 = keine internen Imports, aufsteigend = mehr

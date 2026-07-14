@@ -1,7 +1,7 @@
 # TRAIN — CLAUDE.md
 # Vollständiger Projektkontext für Claude Code
-# Stand: train-v172 / SCHEMA 30 / Juli 2026
-# Letztes Update: nach train-v172 Sprint (B48 — Gewichtsempfehlung nutzt pro-Übung-Schrittweite statt fixem Delta)
+# Stand: train-v173 / SCHEMA 30 / Juli 2026
+# Letztes Update: nach train-v173 Sprint (B49 Schrittweite-Vorschlag aus Historie + B50 anpassbarer Empfehlungs-Chip)
 
 ---
 
@@ -40,7 +40,7 @@ TRAIN ist eine deutschsprachige PWA für Krafttraining. Pure Vanilla ES Modules 
 
 - Repo: https://github.com/777random/TRAIN
 - Deployed: https://777random.github.io/TRAIN/
-- Aktueller Stand: SCHEMA_VERSION 30 · CACHE_VERSION train-v172 · CSS ?v=188
+- Aktueller Stand: SCHEMA_VERSION 30 · CACHE_VERSION train-v173 · CSS ?v=189
 
 ---
 
@@ -50,7 +50,7 @@ TRAIN ist eine deutschsprachige PWA für Krafttraining. Pure Vanilla ES Modules 
 
 Bei CSS-Änderungen: Cache-Buster in `index.html` erhöhen:
 ```html
-<link rel="stylesheet" href="./styles.css?v=188">
+<link rel="stylesheet" href="./styles.css?v=189">
 ```
 
 ---
@@ -163,7 +163,7 @@ Bei unklarem Root Cause immer erst Diagnose → Ergebnis abwarten → dann Fix. 
 | `consistencyUtils.js` | `_weekConsistencyRatio()` — Shared Module (verhindert Circular Import overallPerformance ↔ weeklyFocus). |
 | `overallPerformance.js` | `computeVolumeTrend/QualityTrend/ConsistencyTrend`. |
 | `progressInsights.js` | Erkenntnisse-Sektion. |
-| `insightEngine.js` | Toast-Regeln, Insights. |
+| `insightEngine.js` | Toast-Regeln, Insights. Seit train-v173 auch `detectRecurringStep()`/`exMetricHistory()`/`detectRecurringWeightStep()` — Muster-Erkennung für Schrittweite-Vorschläge (B49), rein rückblickend, nie automatisch angewendet. |
 | `movementMap.js` | Übungsname → Kategorie (Push/Pull/Squat/Hinge/Core/Carry). 50+ Übungen inkl. 32 englische Synonyme. Seit train-v170 auch `buildCategoryMap()`/`resolveCategory()` — einzige Quelle für den Kategorie-Override-Lookup (`state.customExercises`-Override vor `MOVEMENT_MAP`-Fallback), genutzt von ui.js, weeklyFocus.js UND overallPerformance.js. |
 | `progressChart.js` | Übungsfortschritt-Chart. |
 | `weekReview.js` | Wochenrückblick. |
@@ -319,7 +319,7 @@ Unabhängig von Hauptkarte — erscheint auch neben Progression.
 ## FEATURE-STATUS
 
 ### Implementiert ✓:
-**Training-Tab:** Wochenstruktur, Pillen-Nav, Satz-Bewertung (auto+manuell), Gewichtsempfehlung (seit v165 auch Distanz/Zeit-Progression für metric 'm'/'sec' via getMetricRecommendation(), B18), Progressions-Präferenz, PR-Erkennung, "Heute anders", Übung archivieren, Stoppuhr, Auto-Wochenerstellung, Deload/Urlaubsmodus, Körpergewicht, Schlaf+Energie.
+**Training-Tab:** Wochenstruktur, Pillen-Nav, Satz-Bewertung (auto+manuell), Gewichtsempfehlung (seit v165 auch Distanz/Zeit-Progression für metric 'm'/'sec' via getMetricRecommendation(), B18; seit v172 pro-Übung-Schrittweite statt fixem Delta, B48), Schrittweite-Vorschlag aus Historie (v173, B49, nur sichtbarer Hinweis), anpassbare Steigerungsmenge im Empfehlungs-Chip (v173, B50), Progressions-Präferenz, PR-Erkennung, "Heute anders", Übung archivieren, Stoppuhr, Auto-Wochenerstellung, Deload/Urlaubsmodus, Körpergewicht, Schlaf+Energie.
 
 **Coach-Tab:** Hauptkarte (8 akute Signale, seit v160 inkl. Konsistente Fehlschläge) + Strukturkarte (4 strukturelle Signale, seit v163 inkl. Mehr-Übungen-Aggregation), Adaptive Nachfrage-Karte, Coach-Bilanz Mini, Plateau-Konsequenz (EX_SET_NEXT_WEEK_PLAN).
 
