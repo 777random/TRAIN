@@ -49,7 +49,18 @@ export function _weekConsistencyRatio(wk) {
     .filter(({ day }) => isTrainingDay(day))
     .filter(({ day, di }) => day.markedDone || _dayISODate(wk, di) < todayISO);
   if (due.length === 0) return null; // reine Ruhewoche ODER noch kein Tag fällig
-  const done = due.filter(({ day }) => day.markedDone || day.isVacation).length;
+  const done = due.filter(({ day }) => {
+    if (day.markedDone) return true;
+    // Urlaubstage zählen nur als erledigt, wenn tatsächlich bewertete Sätze
+    // vorliegen — ein nie absolvierter "leichter" Urlaubstag darf nicht
+    // automatisch als 100% erledigt zählen, im Widerspruch zu
+    // _weekTrainingStatus() (state.js), die für denselben Tag echte
+    // Aktivität (mind. 1 bewerteter Satz) verlangt.
+    if (day.isVacation) {
+      return day.exercises.some(ex => ex.sets.some(s => s.status === 'success' || s.status === 'fail'));
+    }
+    return false;
+  }).length;
   return done / due.length;
 }
 

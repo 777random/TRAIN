@@ -108,12 +108,12 @@ function _recommendationCore(lastValue, weekSets, progressionMode, targetRepsMax
     reason = 'Letzte Einheit war intensiv, Wert halten';
     reasons.push({ icon: '⚠', text: `Erfolgsquote ${srPct}%`, isRpe: false });
     if (avgRpe !== null) reasons.push({ icon: 'ℹ', text: `Ø RPE ${avgRpe.toFixed(1)}`, isRpe: true });
-  } else if (avgRpe !== null && avgRpe <= 7 && successRate >= 0.9) {
+  } else if (avgRpe !== null && avgRpe <= 7.5 && successRate >= 0.8) {
     delta  = fullDelta;
     reason = 'RPE war niedrig, Steigerung möglich';
     reasons.push({ icon: '✓', text: `Ø RPE ${avgRpe.toFixed(1)} — Luft nach oben`, isRpe: true });
     reasons.push({ icon: '✓', text: `Erfolgsquote ${srPct}%`, isRpe: false });
-  } else if (avgRpe !== null && avgRpe >= 7.5 && avgRpe <= 8.5 && successRate >= 0.8) {
+  } else if (avgRpe !== null && avgRpe > 7.5 && avgRpe <= 8.5 && successRate >= 0.8) {
     delta  = halfDelta;
     reason = 'Gute Form, kleine Steigerung';
     reasons.push({ icon: '✓', text: `Ø RPE ${avgRpe.toFixed(1)} — gute Form`, isRpe: true });

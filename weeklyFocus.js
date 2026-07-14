@@ -685,9 +685,12 @@ function _checkPushPullBalance(state) {
   for (const wk of lastN) {
     for (const day of wk.days) {
       for (const ex of day.exercises) {
+        if (ex.archived) continue;
         const baseName = ex.substituteFor ?? ex.name;
         const cat = customCatMap[baseName] ?? MOVEMENT_MAP[baseName];
-        const n = ex.sets.filter(s => s.status === 'success').length;
+        // B22/B32-Konvention: success+fail zählen (pending ausgeschlossen),
+        // identisch zur ui.js-Zwillingsfunktion _renderMovementPattern().
+        const n = ex.sets.filter(s => s.status === 'success' || s.status === 'fail').length;
         if (cat === 'Push') pushSets += n;
         else if (cat === 'Pull') pullSets += n;
       }

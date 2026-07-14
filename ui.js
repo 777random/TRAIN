@@ -2343,6 +2343,7 @@ function _renderMovementPattern(state) {
   for (const wk of last4) {
     for (const day of wk.days) {
       for (const ex of day.exercises) {
+        if (ex.archived) continue;
         const baseName = ex.substituteFor ?? ex.name;
         const cat = customCatMap[baseName] ?? MOVEMENT_MAP[baseName] ?? 'Sonstige';
         // B22: success+fail zählen (pending ausgeschlossen) statt nur success —
@@ -2379,6 +2380,7 @@ function _renderMovementPattern(state) {
   for (const wk of lastN) {
     for (const day of wk.days) {
       for (const ex of day.exercises) {
+        if (ex.archived) continue;
         const baseName = ex.substituteFor ?? ex.name;
         const cat = customCatMap[baseName] ?? MOVEMENT_MAP[baseName] ?? 'Sonstige';
         const n = ex.sets.filter(s => s.status === 'success' || s.status === 'fail').length;

@@ -2,6 +2,62 @@
 # Automatisch von Claude Code
 # befüllt beim Session-Start
 
+## 2026-07-14 train-v169
+Eigentliche Aufgabe: Nutzer wollte vor dem Shippen sichergehen — "keine
+  Bugs oder Logikfehler oder anderes". Nutzer wählte explizit den
+  "Kompletten Deep-Check" (statt nur bestehende Tests bestätigen oder
+  nur Code-Lesen).
+  4 parallele, rein lesende Diagnose-Agents gestartet (Muster 1 aus
+  AGENTS.md — sicher parallel, da nur lesend):
+  - Fork A: Coach-Kaskade (weeklyFocus.js, plateauDetector.js,
+    weightRecommendation.js) — 3 Funde.
+  - Fork B: Fortschritt-Tab-Berechnungen (progressChart.js,
+    overallPerformance.js, consistencyUtils.js, PR/Streak/Badges) —
+    3 Funde.
+  - Fork C: Training-Tab-Bedienung (Satz-Bewertung, Progressions-
+    Präferenz, Heute-anders, Archivieren, Auto-Wochenerstellung,
+    Deload/Urlaub, Timer) — 2 Funde, davon 2 empirisch per Playwright
+    bestätigt.
+  - Fork D: Persistenz/Migration/Undo/Backup (state.js migrate(),
+    _NO_UNDO, backup.js, dual-localStorage) — 3 Funde, migrate() selbst
+    mit synthetischem Uralt-State real durchgetestet (0 uncaught
+    errors, alle Felder korrekt migriert).
+  Alle 4 Forks räumten ihre Wegwerf-Test-Dateien selbständig auf
+  (git status nach Abschluss sauber, keine _verify_*/_audit_*-Reste).
+  10 Funde konsolidiert, mit Nutzer besprochen (2 gezielte Fragen zu
+  den mehrdeutigen Fällen):
+  - 4 eindeutige Bugs → sofort alle reparieren (Nutzer-Entscheidung).
+  - Tote Plateau-Strategie "Variation" (B41) → nur dokumentieren
+    (Nutzer-Entscheidung, größerer Umbau nötig für echten Fix).
+  - RPE-Schwellen-Inkonsistenz bei Gewichtsempfehlung (B40) →
+    begradigen (Nutzer-Entscheidung).
+  5 Fixes sequenziell umgesetzt, JEDER einzeln mit Playwright (18/18)
+  verifiziert bevor der nächste begann:
+  - B36: weeklyFocus.js `_checkPushPullBalance()` success+fail
+    (war seit B32 aus dem Sync mit ui.js gefallen — 2 Forks fanden das
+    unabhängig).
+  - B37: archivierte Übungen in 3 Zählstellen (2× ui.js, 1×
+    weeklyFocus.js) jetzt ausgeschlossen, wie bereits bei
+    `_weekSuccessScore()`.
+  - B38: consistencyUtils.js `_weekConsistencyRatio()` — Urlaubstage
+    zählen nur noch bei markedDone ODER echter Aktivität als erledigt.
+  - B39: state.js `_NO_UNDO` — 4 Einstellungs-Actions ergänzt.
+  - B40: weightRecommendation.js `_recommendationCore()` — RPE-Grenze
+    7→7.5, Erfolgsquoten-Schwelle 0.9→0.8 für die "niedriges RPE"-
+    Bedingung (schließt Lücke, beseitigt Inversion).
+  Zusätzlich zu den Playwright-Läufen: 3 wegwerfbare Node-Skripte
+  gebaut (nicht committet, nach jedem Lauf gelöscht), die direkt die
+  betroffenen pure functions aufrufen und das tatsächliche Vor/Nach-
+  Verhalten zeigen — z.B. RPE 7.0/85% liefert jetzt delta:2.5 (vorher
+  0), RPE 8.0/85% weiterhin delta:1.25 (Inversion damit nachweislich
+  weg, nicht nur behauptet).
+  Nebenbei CLAUDE.md-Doku-Drift korrigiert: "Relative Stärke" (P4P)
+  stand fälschlich unter "Offen/Konzept", ist aber bereits vollständig
+  implementiert (Fund aus Fork B).
+  CACHE_VERSION → train-v169 (kein CSS-Bump, styles.css nicht
+  angefasst, kein SCHEMA-Bump). Finaler Kombi-Regressionslauf:
+  Playwright 18/18 grün, git status sauber.
+
 ## 2026-07-13 train-v168
 Eigentliche Aufgabe: direkte Fortsetzung des train-v167-Sprints — Nutzer
   bat darum, die beiden dort zurückgestellten Lighthouse-ARIA-Findings

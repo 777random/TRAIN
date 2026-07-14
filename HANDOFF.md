@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: Juli 2026 nach train-v168*
-*Nächste Version: train-v169*
+*Letzte Aktualisierung: Juli 2026 nach train-v169*
+*Nächste Version: train-v170*
 
 ---
 
@@ -11,14 +11,51 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v168 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v169 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
-- CSS: ?v=188 (unverändert diesen Sprint — nur ui.js angefasst,
+- CSS: ?v=188 (unverändert diesen Sprint — nur JS angefasst,
   kein CSS-Bump nötig)
 - SCHEMA: 30 (unverändert diesen Sprint)
 - Letzter Commit: siehe `git log` (dieser Sprint noch nicht committet
   zum Zeitpunkt dieses Eintrags — folgt direkt im Anschluss)
+- **Deep-Check-Audit vor Produktions-Release (train-v169):** auf
+  Nutzer-Wunsch ("sauberes Produkt shippen, keine Bugs/Logikfehler")
+  4 parallele, rein lesende Diagnose-Agents (Muster 1 aus AGENTS.md)
+  haben Coach-Kaskade, Fortschritt-Tab-Berechnungen, Training-Tab-
+  Bedienung und Persistenz/Migration/Backup durchleuchtet — teils per
+  Code-Lesen, teils per echten Playwright-Testläufen. 10 Funde
+  insgesamt, davon 5 als eindeutige, risikoarme Fixes umgesetzt
+  (B36-B40), 1 mit Nutzer besprochen und bewusst nur dokumentiert
+  (B41 — bräuchte größeren Umbau), 3 als Kleinkram notiert (B42/B43 +
+  ein CLAUDE.md-Doku-Drift zu "Relative Stärke", das Feature ist
+  entgegen der Doku bereits fertig implementiert). Jeder der 5 Fixes
+  einzeln umgesetzt und einzeln mit Playwright (18/18) verifiziert,
+  zusätzlich 4 pure-function-Node-Skripte gebaut (nicht committet, nach
+  Verifikation gelöscht), die das tatsächliche VOR/NACH-Verhalten der
+  Berechnungen zeigen (nicht nur "stürzt nicht ab"):
+  - B36: `_checkPushPullBalance()` (weeklyFocus.js) zählte noch
+    success-only statt success+fail wie die B32-reparierte
+    Zwillingsfunktion in ui.js — Coach-Tab und Fortschritt-Tab konnten
+    sich für dieselbe Woche widersprechen.
+  - B37: archivierte Übungen wurden in 3 Zählstellen (2× ui.js, 1×
+    weeklyFocus.js) weiterhin mitgezählt, obwohl `_weekSuccessScore()`
+    sie schon korrekt ausschloss.
+  - B38: `_weekConsistencyRatio()` zählte jeden nicht-Rest-Urlaubstag
+    automatisch als erledigt, auch ohne jede tatsächliche Aktivität —
+    im Widerspruch zur Streak-Berechnung, die für denselben Tag echte
+    Aktivität verlangt.
+  - B39: 4 reine Einstellungs-Aktionen fehlten in `_NO_UNDO` und konnten
+    den einzigen globalen Undo-Slot blockieren — ein Einstellungs-Tap
+    nach einer versehentlichen Löschung machte die Löschung
+    unwiderruflich.
+  - B40: Gewichtsempfehlung hatte eine unbehandelte RPE-Lücke
+    (7.0–7.5) und eine Inversion (besseres RPE konnte bei gleicher
+    Erfolgsquote eine schlechtere Empfehlung als schlechteres RPE
+    ergeben) — mit Nutzer besprochen, Schwellen begradigt.
+  Details zu allen 10 Funden siehe BUGS.md (B36-B43). Regressionstest
+  10/10 grün, Playwright 18/18 grün nach jedem einzelnen Fix und im
+  finalen Kombi-Lauf.
 - **B34+B35 behoben (train-v168):** die beiden in B33 (v167) offen
   gebliebenen Lighthouse-ARIA-Findings, jetzt in `ui.js` selbst gefixt
   (voriger Sprint war bewusst auf index.html/styles.css beschränkt).
@@ -105,6 +142,30 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 
 ## FILES (zuletzt angefasst)
 ```
+weeklyFocus.js            — B36-Fix: _checkPushPullBalance() zählt jetzt
+                          success+fail statt nur success (wie ui.js seit
+                          B32). B37-Fix: archivierte Übungen (ex.archived)
+                          werden jetzt ausgeschlossen.
+ui.js                    — B37-Fix: archivierte Übungen in
+                          _renderMovementPattern() (Kategorie-Balken UND
+                          Push/Pull-Ratio) ausgeschlossen.
+consistencyUtils.js      — B38-Fix: _weekConsistencyRatio() zählt
+                          Urlaubstage nur noch bei markedDone ODER
+                          mindestens 1 bewertetem Satz als erledigt,
+                          nicht mehr automatisch.
+state.js                 — B39-Fix: SETTING_TOGGLE/SETTING_SET/
+                          AUTOWEEK_SET/TOGGLE_FAVORITE zu _NO_UNDO
+                          hinzugefügt.
+weightRecommendation.js  — B40-Fix: _recommendationCore() RPE-Grenze
+                          7 → 7.5 erweitert (Lücke geschlossen),
+                          Erfolgsquoten-Schwelle 0.9 → 0.8 gesenkt
+                          (Inversion beseitigt).
+CLAUDE.md                — Doku-Drift korrigiert: "Relative Stärke"
+                          (P4P) war fälschlich unter "Offen/Konzept"
+                          gelistet, ist aber bereits vollständig
+                          implementiert (gefunden im Deep-Check-Audit).
+index.html / sw.js       — CACHE_VERSION train-v169 (kein CSS-Bump,
+                          styles.css nicht angefasst)
 ui.js                    — B34+B35-Fix (_buildScaffold()): <main
                           id="page-workout"> → <section> (role="tabpanel"
                           ist für <main> nicht zulässig), role="region"
@@ -277,7 +338,8 @@ state.js                — Wochenerstellung isSeedWeek-Skip, Auto-Eval Guard (f
 | B31-Diagnose (kein Code) | 8130e98 | Root Cause bestätigt + empirisch verifiziert, Fehlverifikation aus Loop-3-Audit (v157) korrigiert |
 | B31-Fix | 66455e0 | ui.js:2426 Guard korrigiert, 3 Szenarien verifiziert (leeres prs, Substitution, metric-Regressionsschutz) |
 | B32+B33: Push/Pull-Ratio + Lighthouse Accessibility | e51ce3e | Zweiter echter Multi-Agent-Sprint (2 parallele Agents: ui.js allein / index.html+styles.css allein, disjunkt lt. AGENTS.md). B32: letzter Erfolgsquote-Nebenfund aus B22 behoben. B33: Lighthouse Accessibility 91→95 via `--c-text-3`-Kontrast-Fix, 2 weitere ARIA-Findings als B34/B35 dokumentiert (JS-Fix nötig, außerhalb des Scopes). CACHE_VERSION → train-v167, CSS → ?v=188 |
-| B34+B35: verbleibende ARIA-Fixes | — | Nutzer bat direkt im Anschluss, die in B33 zurückgestellten ARIA-Findings jetzt in ui.js zu fixen. `<main>` → `<section>` für #page-workout, `role="region"` auf #days-container. Lighthouse Accessibility 95→100. CACHE_VERSION → train-v168 (kein CSS-Bump) |
+| B34+B35: verbleibende ARIA-Fixes | fe71d80 | Nutzer bat direkt im Anschluss, die in B33 zurückgestellten ARIA-Findings jetzt in ui.js zu fixen. `<main>` → `<section>` für #page-workout, `role="region"` auf #days-container. Lighthouse Accessibility 95→100. CACHE_VERSION → train-v168 (kein CSS-Bump) |
+| Deep-Check-Audit vor Release: B36-B40 | — | Nutzer wollte vor dem Shippen sichergehen, "keine Bugs oder Logikfehler". 4 parallele read-only Diagnose-Agents (Coach-Kaskade / Fortschritt-Berechnungen / Training-Bedienung / Persistenz), 10 Funde, 5 eindeutige Fixes umgesetzt (Push/Pull-Konsistenz weeklyFocus.js↔ui.js, archivierte Übungen ausgeschlossen, Urlaubstag-Konsistenz-Widerspruch, Undo-Stack-Lücke, RPE-Schwellen-Inversion+Lücke bei Gewichtsempfehlung), 1 Fund bewusst nur dokumentiert (tote Plateau-Strategie "Variation"), 3 Kleinkram-Funde notiert. Jeder Fix einzeln mit Playwright + gezielten Node-Skripten verifiziert (tatsächliches Vor/Nach-Verhalten, nicht nur Regressionstest-grün). CACHE_VERSION → train-v169 (kein CSS-Bump) |
 
 ---
 
@@ -469,9 +531,28 @@ ARIA-Findings direkt im Anschluss gefixt, da der Nutzer explizit danach
 fragte. Lighthouse Accessibility jetzt bei **100** (war 91 vor diesem
 Zwei-Sprint-Bogen). Keine offenen Accessibility-Findings mehr bekannt.
 
+**Deep-Check-Audit vor Release umgesetzt (train-v169):** Nutzer wollte
+vor dem Shippen sichergehen, dass keine Bugs/Logikfehler mehr in der
+App stecken. 4 parallele read-only Diagnose-Agents haben die komplette
+App durchleuchtet (Coach-Kaskade, Fortschritt-Berechnungen, Training-
+Tab-Bedienung, Persistenz/Migration/Backup) — Code-Lesen UND echte
+Playwright-Testläufe, nicht nur "stürzt nicht ab" sondern "zeigt das
+Richtige an". 10 Funde, mit Nutzer besprochen: 5 eindeutige Bugs sofort
+gefixt (B36-B40, siehe BUGS.md für Details), 1 struktureller Fund
+bewusst nur dokumentiert statt gefixt (B41, tote Plateau-Strategie
+"Variation" — bräuchte größeren Umbau), 3 kleinere Funde notiert
+(B42/B43 + ein CLAUDE.md-Doku-Drift). Jeder der 5 Fixes einzeln
+umgesetzt, mit Playwright UND gezielten Node-Skripten verifiziert
+(tatsächliches Vor/Nach-Verhalten der betroffenen Berechnung gezeigt,
+nicht nur Regressionstest-grün angenommen). Regressionstest 10/10 grün,
+Playwright 18/18 grün nach jedem einzelnen Fix und im finalen Kombi-Lauf.
+
 **Nächster Schritt:** echte Nutzer-Rekrutierung (strategische Priorität
 1 laut CLAUDE.md) — keine offenen UX-Mittel-Bugs mehr in BUGS.md OFFEN,
-nur noch Low/UX-komplex-Priorität-Items übrig.
+nur noch Low/UX-komplex-Priorität-Items übrig. Der App-Zustand ist nach
+diesem Deep-Check-Audit so sauber wie mit vertretbarem Aufwand lokal
+feststellbar — verbleibende offene Punkte sind bewusste, dokumentierte
+Zurückstellungen, keine unbekannten Baustellen.
 
 **Offene Nebenfunde aus diesem Sprint (nicht behoben, nur notiert):**
 - ~~Push/Pull-Ratio-Block in _renderMovementPattern() (ui.js, unterhalb der

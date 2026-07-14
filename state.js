@@ -220,6 +220,11 @@ const _NO_UNDO = new Set([
   'EX_AUTO_PRESELECT_NEXT_WEEK_PLAN',
   'PLATEAU_ACTION', 'DECISION_LOG_ADD', 'DECISION_LOG_OUTCOME',
   'SET_ERKENNTNISSE_HORIZONT', 'COACH_ANSWER', 'COACH_PERF_LOG', 'COACH_PERF_MEASURE', 'COACH_QUESTION_OUTCOME',
+  // Reine Einstellungs-Umschalter — sollen den einzigen globalen Undo-Slot
+  // nicht belegen, sonst kann ein versehentlicher Tap auf einen Schalter
+  // (z.B. Vibration an/aus) eine kurz zuvor eigentlich noch rückgängig
+  // machbare echte Löschung (Übung/Tag/Woche) endgültig unerreichbar machen.
+  'SETTING_TOGGLE', 'SETTING_SET', 'AUTOWEEK_SET', 'TOGGLE_FAVORITE',
 ]);
 
 /** Returns true when there is at least one undo snapshot available. */

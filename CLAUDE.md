@@ -1,7 +1,7 @@
 # TRAIN — CLAUDE.md
 # Vollständiger Projektkontext für Claude Code
-# Stand: train-v168 / SCHEMA 30 / Juli 2026
-# Letztes Update: nach train-v168 Sprint (B34+B35 ARIA-Fixes, Accessibility 95→100)
+# Stand: train-v169 / SCHEMA 30 / Juli 2026
+# Letztes Update: nach train-v169 Sprint (Deep-Check-Audit: B36-B40 Logikfehler behoben)
 
 ---
 
@@ -40,7 +40,7 @@ TRAIN ist eine deutschsprachige PWA für Krafttraining. Pure Vanilla ES Modules 
 
 - Repo: https://github.com/777random/TRAIN
 - Deployed: https://777random.github.io/TRAIN/
-- Aktueller Stand: SCHEMA_VERSION 30 · CACHE_VERSION train-v168 · CSS ?v=188
+- Aktueller Stand: SCHEMA_VERSION 30 · CACHE_VERSION train-v169 · CSS ?v=188
 
 ---
 
@@ -323,7 +323,7 @@ Unabhängig von Hauptkarte — erscheint auch neben Progression.
 
 **Coach-Tab:** Hauptkarte (8 akute Signale, seit v160 inkl. Konsistente Fehlschläge) + Strukturkarte (4 strukturelle Signale, seit v163 inkl. Mehr-Übungen-Aggregation), Adaptive Nachfrage-Karte, Coach-Bilanz Mini, Plateau-Konsequenz (EX_SET_NEXT_WEEK_PLAN).
 
-**Fortschritt-Tab:** Erkenntnisse (geclampt), Gesamtperformance, Push/Pull-Ratio, Übungsfortschritt-Chart mit Prognose, Streak (neutral), Abzeichen-Galerie, Körpergewicht-Chart, Bewegungsschaubild, Coach-Bilanz.
+**Fortschritt-Tab:** Erkenntnisse (geclampt), Gesamtperformance, Push/Pull-Ratio, Übungsfortschritt-Chart mit Prognose, Streak (neutral), Abzeichen-Galerie, Körpergewicht-Chart, Bewegungsschaubild, Coach-Bilanz, Relative Stärke / Pound-for-Pound (`renderRelativeStrengthChart()`, progressChart.js + `_weeklyP4PSeries()`, ui.js — war fälschlich noch unter "Offen/Konzept" gelistet, Doku-Drift im Deep-Check-Audit v169 gefunden).
 
 **Technisch:** iOS Safe Area, Auto-Backup, Service Worker (user-gated Update), movementMap (+32 englische Synonyme), isFullSuccess(), consistencyUtils.js.
 
@@ -333,7 +333,7 @@ Unabhängig von Hauptkarte — erscheint auch neben Progression.
 | Muskelkater als Coach-Input | Konzept |
 | Aufwärmen/Cooldown-Check | Konzept |
 | Coaching-Filter | Konzept |
-| Wilks Score / relative Stärke | Konzept |
+| Wilks Score (relative Stärke als P4P ist bereits implementiert, siehe oben — Wilks-Formel selbst nicht) | Konzept |
 | RPE 9-10 + manuelle Steigerung → Warnung | Konzept |
 | Periodisierungs-Empfehlung | Konzept-komplex |
 | Sperrbildschirm-Integration | Nach echten Nutzern |
