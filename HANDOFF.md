@@ -666,6 +666,18 @@ ersten Nutzer geht (nicht durch Code lösbar, brauchen Eingaben vom Nutzer):**
    (Add-to-Homescreen — jetzt per Install-Button aus dem Onboarding heraus
    testbar, Splash Screen, Onboarding, erste Übung, Neustart-Persistenz).
 
+**Offene Entscheidung (noch nicht umgesetzt, nur besprochen):** Nutzer fand
+die GitHub-Pages-URL (`777random.github.io/TRAIN`) unprofessionell und
+fragte nach Alternativen. Einschätzung gegeben: für einen Testlauf mit ~20
+direkt eingeladenen Nutzern nicht kritisch (kein Kaltakquise-Kontext, in dem
+die Domain misstrauisch wirken würde), GoatCounters Domain-Feld ist nur ein
+Label ohne technische Kopplung — kann jederzeit ohne Datenverlust geändert
+werden. Falls gewünscht: eigene Domain (~10-15€/Jahr) + `CNAME`-Datei im
+Repo + DNS-Eintrag beim Registrar würde "github.io" komplett aus der URL
+entfernen, kein Hosting-Wechsel nötig, ~15 Min. Setup + DNS-Wartezeit. Noch
+keine Entscheidung getroffen — beim nächsten Mal nachfragen, ob das gewünscht
+ist, oder direkt mit der GitHub-URL in den Testlauf starten.
+
 Danach ist die Pre-Launch-Checkliste vollständig abgeschlossen. **Nächster
 Schritt danach: zurück zur strategischen Priorität 1 (20 echte Nutzer
 rekrutieren) — siehe CLAUDE.md.**
