@@ -2,6 +2,42 @@
 # Automatisch von Claude Code
 # befüllt beim Session-Start
 
+## 2026-07-14 train-v172 (B48 — Gewichtsempfehlung pro-Übung-Schrittweite)
+Eigentliche Aufgabe: Nutzer meldete ein selbst bemerktes Logik-Problem
+  (nicht aus einem Audit) — die automatische Coach-Gewichtsempfehlung
+  soll bei schweren Grundübungen (Kniebeuge, Kreuzheben) in 5kg-Schritten
+  steigern, bei leichteren Übungen (Bankdrücken) in 1.25kg-Schritten.
+  Status-quo-Vergleich zuerst (wie vom Nutzer verlangt): das Schrittweite-
+  Feld pro Übung (ex.weightStep) existiert bereits und wird vom manuellen
+  "+kg"-Button schon korrekt genutzt — aber getWeightRecommendation()
+  (die automatische Empfehlung) hatte die Sprunggröße fest auf 2.5kg
+  ("volle Steigerung")/1.25kg ("kleine Steigerung") hartkodiert,
+  unabhängig von der eingestellten Schrittweite — die wurde nur zum
+  Runden des Endergebnisses benutzt. Interessanter Fund dabei:
+  getMetricRecommendation() (das B18-Gegenstück für Distanz/Zeit-
+  Übungen) macht es bereits richtig (Schrittweite = Sprunggröße) — das
+  Muster existierte im selben File schon, nur nicht für Gewicht.
+  Design-Frage geklärt: bei bereits kleiner Schrittweite (Bankdrücken,
+  1.25kg) macht eine weitere Halbierung (0.625kg) keinen Sinn — Nutzer
+  entschied: "kleine Steigerung" bleibt dann bei 1x Schrittweite.
+  Umsetzung: weightRecommendation.js — fullDelta=weightStep,
+  halfDelta = weightStep<=1.25 ? weightStep : weightStep/2. Zusätzlich
+  3 Insight-Trigger-Stellen (insightEngine.js, A-01/A-01b/A-02 Toast-
+  Vorschläge) korrigiert, die bisher `undefined` statt der Übungs-
+  Schrittweite übergaben und damit denselben pauschalen Default nutzten
+  — im Sinne von "überall konsistent, nicht nur an der Hauptstelle".
+  Verifiziert per Node-Skript (echte getWeightRecommendation()-Aufrufe,
+  nicht nur Unit-Test der internen Formel): Kniebeuge (Schrittweite 5)
+  liefert jetzt +5 (volle Steigerung) bzw. +2.5 (kleine Steigerung),
+  Bankdrücken (Schrittweite 1.25) liefert +1.25 in beiden Fällen (keine
+  Halbierung), Standard-Schrittweite (2.5, unveränderter Fall) liefert
+  weiterhin exakt +2.5/+1.25 wie vor der Änderung — Rückwärtskompatibi-
+  lität bestätigt.
+  DECISIONS.md: neuer Eintrag unter COACH-LOGIK (B48) mit der
+  Design-Entscheidung. Regressionstest 10/10 grün, Playwright 18/18
+  grün. CACHE_VERSION → train-v172 (kein CSS-Bump, kein SCHEMA-Bump —
+  keine neuen State-Felder, nur Berechnungslogik geändert).
+
 ## 2026-07-14 train-v171 (B47 — PR-Tracking-Bug)
 Eigentliche Aufgabe: der im vorherigen Konsolidierungs-Sprint
   zurückgestellte Fund 4 ("PR-Erkennung evtl. 3 statt 2 Kopien") sollte

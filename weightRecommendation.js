@@ -26,11 +26,16 @@ export function roundToPlate(weight, step = 2.5) {
  * @param {number|null} targetRepsMax
  * @param {number} step – Rundungsschritt (plateStep für Gewicht, metricStep für Distanz/Zeit)
  * @param {number} fullDelta – Steigerung bei "Luft nach oben"/hoher Erfolgsquote.
- *   Bei Gewicht bewusst FEST 2.5 (unverändertes Originalverhalten, unabhängig
- *   von plateStep — plateStep rundet nur das Ergebnis, ändert nicht die
- *   Schrittgröße selbst). Bei Distanz/Zeit gibt es keine solche Konvention —
- *   dort ist der konfigurierte metricStep selbst die sinnvolle Schrittgröße.
- * @param {number} halfDelta – kleinere Steigerung bei "gute Form" (Standard: fullDelta/2)
+ *   Seit 2026-07-14 bei Gewicht UND Distanz/Zeit identisch: die pro Übung
+ *   konfigurierte Schrittweite selbst (ex.weightStep bzw. ex.metricStep) —
+ *   vorher war der Gewichts-Pfad bewusst FEST auf 2.5 gesetzt (siehe BUGS.md
+ *   für die Historie), das ignorierte aber genau die Schrittweiten-Einstellung,
+ *   die Nutzer für schwere Grundübungen (z.B. 5kg bei Kniebeuge/Kreuzheben)
+ *   vs. leichtere Übungen (z.B. 1.25kg bei Bankdrücken) bewusst pflegen.
+ * @param {number} halfDelta – kleinere Steigerung bei "gute Form". Standard
+ *   fullDelta/2, AUSSER die Schrittweite ist selbst schon ≤1.25 (kleinste
+ *   gängige Hantelscheibe) — dann bleibt halfDelta = fullDelta (eine weitere
+ *   Halbierung wäre nicht mehr sinnvoll auflegbar).
  * @returns {{ recommendedValue: number, reason: string, reasons: Array, delta: number, lastValue: number }}
  */
 function _recommendationCore(lastValue, weekSets, progressionMode, targetRepsMax, step, fullDelta, halfDelta) {
@@ -186,7 +191,17 @@ export function getWeightRecommendation(exerciseName, weeks, plateStep = 2.5, pr
   const lastWeight = Math.max(...lastSets.map(s => s.weight ?? 0));
   if (lastWeight <= 0) return null;
 
-  const core = _recommendationCore(lastWeight, weekSets, progressionMode, targetRepsMax, plateStep, 2.5, 1.25);
+  // Sprunggröße richtet sich seit 2026-07-14 nach der pro Übung eingestellten
+  // Schrittweite (ex.weightStep) statt eines fixen 2.5/1.25-Werts — analog
+  // zu getMetricRecommendation() unten, die das für Distanz/Zeit-Übungen
+  // schon immer so gemacht hat. "Kleine Steigerung" = die Hälfte der
+  // Schrittweite, AUSSER die Schrittweite ist selbst schon so klein (≤1.25kg,
+  // die kleinste gängige Hantelscheibe), dass eine Halbierung praktisch nicht
+  // auflegbar wäre — dann bleibt "kleine Steigerung" bei 1x Schrittweite
+  // (Nutzer-Entscheidung, siehe BUGS.md).
+  const fullDelta = plateStep;
+  const halfDelta = plateStep <= 1.25 ? plateStep : plateStep / 2;
+  const core = _recommendationCore(lastWeight, weekSets, progressionMode, targetRepsMax, plateStep, fullDelta, halfDelta);
   return {
     recommendedWeight: core.recommendedValue,
     reason: core.reason,

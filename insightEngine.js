@@ -906,7 +906,8 @@ export const INSIGHTS = [
       const candidates = [];
       for (const name of exNames) {
         const exInst = curWk.days.flatMap(d => d.exercises).find(e => e.name === name);
-        const rec = getWeightRecommendation(name, calcWeeks, undefined, exInst?.progressionMode ?? 'weight_first', exInst?.targetRepsMax ?? null);
+        const exStep = exInst?.weightStep ?? state.settings?.plateStep ?? 2.5;
+        const rec = getWeightRecommendation(name, calcWeeks, exStep, exInst?.progressionMode ?? 'weight_first', exInst?.targetRepsMax ?? null);
         if (rec && rec.delta > 0) candidates.push({ name, rec });
       }
       candidates.sort((a, b) => b.rec.delta - a.rec.delta);
@@ -939,7 +940,8 @@ export const INSIGHTS = [
       const candidates = [];
       for (const name of exNames2) {
         const exInst = curWk.days.flatMap(d => d.exercises).find(e => e.name === name);
-        const rec = getWeightRecommendation(name, calcWeeks, undefined, exInst?.progressionMode ?? 'weight_first', exInst?.targetRepsMax ?? null);
+        const exStep = exInst?.weightStep ?? state.settings?.plateStep ?? 2.5;
+        const rec = getWeightRecommendation(name, calcWeeks, exStep, exInst?.progressionMode ?? 'weight_first', exInst?.targetRepsMax ?? null);
         if (rec && rec.delta > 0) candidates.push({ name, rec });
       }
       candidates.sort((a, b) => b.rec.delta - a.rec.delta);
@@ -970,7 +972,8 @@ export const INSIGHTS = [
       const exNames = favs3.length > 0 ? allExNames3.filter(n => favs3.includes(n)) : allExNames3;
       for (const name of exNames) {
         const exInst = curWk.days.flatMap(d => d.exercises).find(e => e.name === name);
-        const rec = getWeightRecommendation(name, calcWeeks, undefined, exInst?.progressionMode ?? 'weight_first', exInst?.targetRepsMax ?? null);
+        const exStep = exInst?.weightStep ?? state.settings?.plateStep ?? 2.5;
+        const rec = getWeightRecommendation(name, calcWeeks, exStep, exInst?.progressionMode ?? 'weight_first', exInst?.targetRepsMax ?? null);
         if (rec && rec.delta === 0) {
           return {
             id: 'A-02', type: 'recovery', priority: 8,

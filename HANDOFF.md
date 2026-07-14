@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: Juli 2026 nach train-v171*
-*Nächste Version: train-v172*
+*Letzte Aktualisierung: Juli 2026 nach train-v172*
+*Nächste Version: train-v173*
 
 ---
 
@@ -11,7 +11,7 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v171 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v172 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
 - CSS: ?v=188 (unverändert diesen Sprint — nur JS angefasst,
@@ -19,6 +19,25 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 - SCHEMA: 30 (unverändert diesen Sprint)
 - Letzter Commit: siehe `git log` (dieser Sprint noch nicht committet
   zum Zeitpunkt dieses Eintrags — folgt direkt im Anschluss)
+- **B48 behoben (train-v172):** Nutzer meldete, dass die automatische
+  Coach-Gewichtsempfehlung "technisch funktioniert, aber nicht mit der
+  gewünschten Logik" — schwere Grundübungen (Kniebeuge, Kreuzheben)
+  sollen in 5kg-Schritten steigern, leichtere Übungen (Bankdrücken) in
+  1.25kg-Schritten. Das Schrittweite-Feld pro Übung existierte bereits
+  (vom manuellen "+kg"-Button schon korrekt genutzt), aber
+  `getWeightRecommendation()` ignorierte es bei der Sprunggröße selbst —
+  intern immer fest 2.5kg ("volle Steigerung")/1.25kg ("kleine
+  Steigerung"), die Schrittweite wurde nur zum Runden des Ergebnisses
+  benutzt. Bei größeren Schrittweiten konnte das zu einer scheinbaren
+  "Steigerung" von +0kg führen. Fix: `fullDelta`/`halfDelta` werden
+  jetzt aus `ex.weightStep` abgeleitet (analog zu
+  `getMetricRecommendation()`, die das für Distanz/Zeit-Übungen schon
+  immer so machte) — mit Nutzer abgestimmter Regel: bei bereits kleiner
+  Schrittweite (≤1.25kg) bleibt "kleine Steigerung" bei 1× statt weiter
+  zu halbieren. 3 Insight-Trigger-Stellen (insightEngine.js) ebenfalls
+  korrigiert, die bisher denselben pauschalen Default nutzten.
+  Rückwärtskompatibel: Standard-Schrittweite 2.5kg liefert weiterhin
+  exakt +2.5/+1.25 wie vorher. Details siehe BUGS.md B48/DECISIONS.md.
 - **B47 behoben (train-v171):** die zurückgestellte Prüfung der
   PR-Erkennung ("Fund 4" aus dem Konsolidierungs-Audit) ergab einen
   ECHTEN Bug, nicht nur Duplikations-Risiko: von den 3 unabhängigen
@@ -210,6 +229,14 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 
 ## FILES (zuletzt angefasst)
 ```
+weightRecommendation.js   — B48: fullDelta/halfDelta in
+                          getWeightRecommendation() werden jetzt aus
+                          ex.weightStep abgeleitet statt fix 2.5/1.25.
+                          halfDelta bleibt bei 1x wenn weightStep<=1.25.
+insightEngine.js          — B48: 3 Insight-Trigger (A-01/A-01b/A-02)
+                          übergeben jetzt die echte Übungs-Schrittweite
+                          statt undefined an getWeightRecommendation().
+index.html / sw.js        — CACHE_VERSION train-v172 (kein CSS-Bump)
 state.js                  — B47: neue _applyPrTracking(state, ex, weight,
                           reps) — SET_TOGGLE_DONE/CONFIRM_SET/AUTO_EVAL_SET
                           delegieren jetzt alle dorthin. SET_TOGGLE_DONE
@@ -435,6 +462,7 @@ state.js                — Wochenerstellung isSeedWeek-Skip, Auto-Eval Guard (f
 | Deep-Check-Audit vor Release: B36-B40 | — | Nutzer wollte vor dem Shippen sichergehen, "keine Bugs oder Logikfehler". 4 parallele read-only Diagnose-Agents (Coach-Kaskade / Fortschritt-Berechnungen / Training-Bedienung / Persistenz), 10 Funde, 5 eindeutige Fixes umgesetzt (Push/Pull-Konsistenz weeklyFocus.js↔ui.js, archivierte Übungen ausgeschlossen, Urlaubstag-Konsistenz-Widerspruch, Undo-Stack-Lücke, RPE-Schwellen-Inversion+Lücke bei Gewichtsempfehlung), 1 Fund bewusst nur dokumentiert (tote Plateau-Strategie "Variation"), 3 Kleinkram-Funde notiert. Jeder Fix einzeln mit Playwright + gezielten Node-Skripten verifiziert (tatsächliches Vor/Nach-Verhalten, nicht nur Regressionstest-grün). CACHE_VERSION → train-v169 (kein CSS-Bump) |
 | Geräte-Verifikation + Konsolidierungs-Sprint: B44-B46 | — | Nutzer testete B36/B37/B39 auf echtem Gerät (alle bestätigt), B38 zunächst als unerwartet gemeldet — Diagnose ergab kein Bug, aber einen 3. duplizierten "welche Tage geplant"-Berechnungsort (B44). Nutzer bat um systematischen Konsolidierungs-Audit statt Einzelfix — Read-Only-Fork fand 4 Cluster, 3 konsolidiert (B44 isTrainingDay-Filter, B45 weekSuccessCounts() in setUtils.js ersetzt 2 unabhängige Erfolgsquote-Formeln, B46 buildCategoryMap()/resolveCategory() in movementMap.js ersetzt 2 Duplikate + schließt eine fehlende Kategorie-Override-Stelle in overallPerformance.js), 1 Fund (PR-Erkennung, evtl. 3. Kopie) zur genaueren Prüfung zurückgestellt. CACHE_VERSION → train-v170 (kein CSS-Bump) |
 | B47: PR-Tracking-Konsolidierung | — | Genauere Prüfung des zurückgestellten Funds 4 — Zeile-für-Zeile-Vergleich der 3 PR-Tracking-Kopien in state.js ergab einen echten Bug: SET_TOGGLE_DONE (häufigste Eingabeart) fehlte das ex.oneRM-Update, das CONFIRM_SET/AUTO_EVAL_SET (bit-identisch zueinander) beide hatten. Neue _applyPrTracking() in state.js, alle 3 Reducer delegieren dorthin. Verifiziert mit echtem dispatch(A.SET_TOGGLE_DONE): ex.oneRM null → 116.7. CACHE_VERSION → train-v171 (kein CSS-Bump) |
+| B48: Gewichtsempfehlung nutzt pro-Übung-Schrittweite | — | Nutzer meldete "technisch funktioniert, aber nicht mit gewünschter Logik" — Kniebeuge/Kreuzheben sollen 5kg-Schritte machen, Bankdrücken 1.25kg. getWeightRecommendation() hatte fullDelta/halfDelta fix auf 2.5/1.25 hartkodiert, ex.weightStep wurde nur zum Runden benutzt. Fix: fullDelta=weightStep, halfDelta=weightStep/2 (bleibt bei 1x wenn weightStep<=1.25, Nutzer-Entscheidung). 3 insightEngine.js-Stellen ebenfalls korrigiert (übergaben bisher undefined). Rückwärtskompatibel (Standard 2.5kg unverändert). CACHE_VERSION → train-v172 (kein CSS-Bump) |
 
 ---
 
@@ -457,6 +485,13 @@ state.js                — Wochenerstellung isSeedWeek-Skip, Auto-Eval Guard (f
 ---
 
 ## NEXT (konkret nächster Schritt)
+**B48 umgesetzt (train-v172):** Coach-Gewichtsempfehlung nutzt jetzt
+die pro Übung eingestellte Schrittweite für die Sprunggröße, statt
+eines fixen 2.5/1.25kg-Deltas — vom Nutzer selbst gemeldetes
+Logik-Problem (nicht aus einem Audit), siehe BUGS.md B48/DECISIONS.md
+für die Design-Entscheidung. Damit sind sowohl der Konsolidierungs-
+Audit (B44-B47) als auch dieser direkt gemeldete Fund abgearbeitet.
+
 **Konsolidierungs-Sprint B44-B47 abgeschlossen (train-v171).** Fund 4
 aus dem Audit (PR-Erkennung) wurde genauer geprüft — Zeile-für-Zeile-
 Vergleich ergab: `CONFIRM_SET`/`AUTO_EVAL_SET` bit-identisch,

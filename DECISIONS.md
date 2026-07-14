@@ -81,6 +81,11 @@ Priorität innerhalb der Strukturkarte: Mehr-Übungen-Aggregation > Präventiver
 **Technisches Detail:** `getMetricRecommendation()` gibt bewusst dieselben Feldnamen zurück wie `getWeightRecommendation()` (`recommendedWeight`/`lastWeight`, nicht `recommendedValue`/`lastValue`) — reiner Implementierungsdetail-Kompromiss, damit ui.js's bestehender Verbrauchercode (Chip-Rendering, Recovery-Boost, Auto-Vorauswahl-Bestätigung) beide Ergebnisse identisch behandelt, ohne an jeder Stelle zwischen Gewicht und Distanz/Zeit zu unterscheiden. `ex.progressionType` bekommt bei `metric!=='reps'` neu den Default `'reps'` statt `'weight'` (bumpt `targetReps` = Ziel-Distanz/-Zeit über den bereits bestehenden `_applyPlannedProgression()`-Pfad) — Migration v29→v30 korrigiert bestehende Übungen mit dem alten, bedeutungslosen Default.
 **Gilt:** Permanent bis gegenteilige Entscheidung.
 
+### 2026-07 — B48: Gewichtsempfehlung nutzt pro-Übung-Schrittweite statt fixem 2.5/1.25-Delta
+**Entscheidung:** `getWeightRecommendation()`s Sprunggröße (`fullDelta`/`halfDelta`) wird jetzt aus der pro Übung eingestellten Schrittweite (`ex.weightStep`) abgeleitet — `fullDelta = weightStep`, `halfDelta = weightStep / 2`, AUSSER `weightStep` ist selbst schon ≤1.25 kg (kleinste gängige Hantelscheibe), dann bleibt `halfDelta = weightStep` (keine weitere Halbierung).
+**Begründung:** Nutzer meldete, dass schwere Grundübungen (Kniebeuge, Kreuzheben) sinnvoll in 5kg-Schritten steigern sollten, leichtere/isolierende Übungen (Bankdrücken) dagegen in 1.25kg-Schritten — das Schrittweite-Feld existierte dafür bereits pro Übung und wurde vom manuellen "+kg"-Button auch schon korrekt genutzt, aber die AUTOMATISCHE Coach-Empfehlung ignorierte es und rechnete immer mit einem fest hartkodierten 2.5/1.25-Delta, das nur am Ende auf die Schrittweite gerundet wurde — das konnte bei größeren Schrittweiten zu einer scheinbaren "Steigerung" von +0kg führen (auf die nächste große Stufe abgerundet).
+**Gilt:** Permanent bis gegenteilige Entscheidung. Rückwärtskompatibel: die verbreitete Standard-Schrittweite 2.5kg liefert weiterhin exakt +2.5/+1.25 wie vor dieser Änderung.
+
 ---
 
 ## GAMIFICATION
