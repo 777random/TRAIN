@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: Juli 2026 nach train-v170*
-*Nächste Version: train-v171*
+*Letzte Aktualisierung: Juli 2026 nach train-v171*
+*Nächste Version: train-v172*
 
 ---
 
@@ -11,7 +11,7 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v170 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v171 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
 - CSS: ?v=188 (unverändert diesen Sprint — nur JS angefasst,
@@ -19,6 +19,23 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 - SCHEMA: 30 (unverändert diesen Sprint)
 - Letzter Commit: siehe `git log` (dieser Sprint noch nicht committet
   zum Zeitpunkt dieses Eintrags — folgt direkt im Anschluss)
+- **B47 behoben (train-v171):** die zurückgestellte Prüfung der
+  PR-Erkennung ("Fund 4" aus dem Konsolidierungs-Audit) ergab einen
+  ECHTEN Bug, nicht nur Duplikations-Risiko: von den 3 unabhängigen
+  PR-Tracking-Kopien in state.js (`SET_TOGGLE_DONE`, `CONFIRM_SET`,
+  `AUTO_EVAL_SET`) waren die letzten beiden bit-identisch, aber
+  `SET_TOGGLE_DONE` — der manuelle ✓-Button, die häufigste Eingabeart —
+  hatte das `ex.oneRM`-Update komplett vergessen. Der Trainings-Tab-
+  1RM-Hinweis hat zwar einen Live-Fallback, der das im laufenden Betrieb
+  kaschiert, aber `ex.oneRM` ist als wochenübergreifendes historisches
+  Maximum gedacht (bleibt beim Wochenwechsel bewusst erhalten) — Nutzer,
+  die nur über den ✓-Button bestätigen, sahen den Hinweis in einer
+  neuen, leeren Woche schlicht verschwinden statt den Vorwochen-Bestwert
+  zu zeigen. Fix: neue gemeinsame `_applyPrTracking()` in state.js,
+  alle 3 Reducer delegieren jetzt dorthin. Verifiziert mit echtem
+  `dispatch(A.SET_TOGGLE_DONE, ...)`: `ex.oneRM` war vorher `null`, ist
+  jetzt korrekt `116.7` (Epley: 100kg × (1+5/30)). Details siehe
+  BUGS.md B47.
 - **Konsolidierungs-Sprint (train-v170):** Nutzer bat nach der Geräte-
   Verifikation um eine systematische Prüfung des ganzen Codes auf
   Berechnungen, die an mehreren Stellen unabhängig implementiert sind und
@@ -193,6 +210,12 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 
 ## FILES (zuletzt angefasst)
 ```
+state.js                  — B47: neue _applyPrTracking(state, ex, weight,
+                          reps) — SET_TOGGLE_DONE/CONFIRM_SET/AUTO_EVAL_SET
+                          delegieren jetzt alle dorthin. SET_TOGGLE_DONE
+                          bekam dabei das fehlende ex.oneRM-Update ergänzt
+                          (echter Bugfix, nicht nur Konsolidierung).
+index.html / sw.js        — CACHE_VERSION train-v171 (kein CSS-Bump)
 setUtils.js               — B45: neue weekSuccessCounts(week) — einzige
                           Quelle für Erfolgsquote, archiviert-bewusst.
 ui.js                     — B45: _weekSuccessScore() delegiert jetzt an
@@ -411,6 +434,7 @@ state.js                — Wochenerstellung isSeedWeek-Skip, Auto-Eval Guard (f
 | B34+B35: verbleibende ARIA-Fixes | fe71d80 | Nutzer bat direkt im Anschluss, die in B33 zurückgestellten ARIA-Findings jetzt in ui.js zu fixen. `<main>` → `<section>` für #page-workout, `role="region"` auf #days-container. Lighthouse Accessibility 95→100. CACHE_VERSION → train-v168 (kein CSS-Bump) |
 | Deep-Check-Audit vor Release: B36-B40 | — | Nutzer wollte vor dem Shippen sichergehen, "keine Bugs oder Logikfehler". 4 parallele read-only Diagnose-Agents (Coach-Kaskade / Fortschritt-Berechnungen / Training-Bedienung / Persistenz), 10 Funde, 5 eindeutige Fixes umgesetzt (Push/Pull-Konsistenz weeklyFocus.js↔ui.js, archivierte Übungen ausgeschlossen, Urlaubstag-Konsistenz-Widerspruch, Undo-Stack-Lücke, RPE-Schwellen-Inversion+Lücke bei Gewichtsempfehlung), 1 Fund bewusst nur dokumentiert (tote Plateau-Strategie "Variation"), 3 Kleinkram-Funde notiert. Jeder Fix einzeln mit Playwright + gezielten Node-Skripten verifiziert (tatsächliches Vor/Nach-Verhalten, nicht nur Regressionstest-grün). CACHE_VERSION → train-v169 (kein CSS-Bump) |
 | Geräte-Verifikation + Konsolidierungs-Sprint: B44-B46 | — | Nutzer testete B36/B37/B39 auf echtem Gerät (alle bestätigt), B38 zunächst als unerwartet gemeldet — Diagnose ergab kein Bug, aber einen 3. duplizierten "welche Tage geplant"-Berechnungsort (B44). Nutzer bat um systematischen Konsolidierungs-Audit statt Einzelfix — Read-Only-Fork fand 4 Cluster, 3 konsolidiert (B44 isTrainingDay-Filter, B45 weekSuccessCounts() in setUtils.js ersetzt 2 unabhängige Erfolgsquote-Formeln, B46 buildCategoryMap()/resolveCategory() in movementMap.js ersetzt 2 Duplikate + schließt eine fehlende Kategorie-Override-Stelle in overallPerformance.js), 1 Fund (PR-Erkennung, evtl. 3. Kopie) zur genaueren Prüfung zurückgestellt. CACHE_VERSION → train-v170 (kein CSS-Bump) |
+| B47: PR-Tracking-Konsolidierung | — | Genauere Prüfung des zurückgestellten Funds 4 — Zeile-für-Zeile-Vergleich der 3 PR-Tracking-Kopien in state.js ergab einen echten Bug: SET_TOGGLE_DONE (häufigste Eingabeart) fehlte das ex.oneRM-Update, das CONFIRM_SET/AUTO_EVAL_SET (bit-identisch zueinander) beide hatten. Neue _applyPrTracking() in state.js, alle 3 Reducer delegieren dorthin. Verifiziert mit echtem dispatch(A.SET_TOGGLE_DONE): ex.oneRM null → 116.7. CACHE_VERSION → train-v171 (kein CSS-Bump) |
 
 ---
 
@@ -433,14 +457,14 @@ state.js                — Wochenerstellung isSeedWeek-Skip, Auto-Eval Guard (f
 ---
 
 ## NEXT (konkret nächster Schritt)
-**Konsolidierungs-Sprint B44-B46 abgeschlossen (train-v170).** Nächster
-konkreter Schritt: Fund 4 aus dem Konsolidierungs-Audit noch genauer
-prüfen — PR-Erkennungs-Logik (prWeight/prRepsAtMaxWeight/prRepsHistory)
-existiert möglicherweise an 3 statt der bisher dokumentierten 2 Stellen
-(SET_TOGGLE_DONE, CONFIRM_SET, und scheinbar auch AUTO_EVAL_SET in
-state.js) — Zeile-für-Zeile-Vergleich noch nicht gemacht, daher noch
-keine Konsolidierungs-Empfehlung. Danach: zurück zur strategischen
-Priorität 1 (20 echte Nutzer).
+**Konsolidierungs-Sprint B44-B47 abgeschlossen (train-v171).** Fund 4
+aus dem Audit (PR-Erkennung) wurde genauer geprüft — Zeile-für-Zeile-
+Vergleich ergab: `CONFIRM_SET`/`AUTO_EVAL_SET` bit-identisch,
+`SET_TOGGLE_DONE` hatte einen echten Bug (fehlendes `ex.oneRM`-Update).
+Behoben als B47, siehe oben/BUGS.md. Damit sind alle 4 Funde aus dem
+Konsolidierungs-Audit abgearbeitet — keine offenen Duplikations-Risiken
+mehr aus dieser Prüfung bekannt. Nächster Schritt: zurück zur
+strategischen Priorität 1 (20 echte Nutzer).
 
 **Ab sofort: LOOPS.md beim Session-Start automatisch ausführen**
 (Regressionstest → HANDOFF.md-Sync → Edge-Case-Audit, siehe LOOPS.md.

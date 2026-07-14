@@ -2,6 +2,39 @@
 # Automatisch von Claude Code
 # befüllt beim Session-Start
 
+## 2026-07-14 train-v171 (B47 — PR-Tracking-Bug)
+Eigentliche Aufgabe: der im vorherigen Konsolidierungs-Sprint
+  zurückgestellte Fund 4 ("PR-Erkennung evtl. 3 statt 2 Kopien") sollte
+  genauer geprüft werden, auf Nutzer-Anfrage.
+  Zeile-für-Zeile-Vergleich der 3 Kandidaten in state.js
+  (SET_TOGGLE_DONE, CONFIRM_SET, AUTO_EVAL_SET): CONFIRM_SET und
+  AUTO_EVAL_SET sind bit-identisch (nur kosmetische Whitespace-
+  Unterschiede) — reine, überflüssige Duplikation. SET_TOGGLE_DONE
+  (der manuelle ✓-Button, laut Projekt-Historie die häufigste
+  Eingabeart) fehlte dagegen das komplette ex.oneRM-Update-Fragment,
+  das die anderen beiden haben — ein echter Bug, nicht nur
+  Duplikations-Risiko.
+  Impact-Analyse: ui.js:1606 (Trainings-Tab-1RM-Hinweis) hat einen
+  Live-Fallback (rechnet bei fehlendem ex.oneRM direkt aus den
+  aktuellen Sätzen neu), der das im laufenden Betrieb kaschiert — aber
+  ex.oneRM ist als wochenübergreifendes historisches Maximum gedacht
+  (state.js: _resetClonedDays() rührt es beim Wochenwechsel bewusst
+  nicht an, Migration v19→v20-Kommentar bestätigt die Absicht). Nutzer,
+  die nur über den ✓-Button bestätigen, hätten den Hinweis beim Wechsel
+  in eine neue, leere Woche verschwinden sehen, statt weiterhin den
+  Vorwochen-Bestwert zu zeigen.
+  Fix: neue gemeinsame _applyPrTracking(state, ex, weight, reps) in
+  state.js (vor der reduce()-Funktion). Alle 3 Reducer delegieren jetzt
+  dorthin, keine 3 Kopien mehr.
+  Verifiziert auf zwei Ebenen: (1) volle Playwright-Suite 18/18 grün.
+  (2) gezieltes Node-Skript mit ECHTEM dispatch(A.SET_TOGGLE_DONE, ...)
+  (nicht nur die extrahierte Funktion isoliert aufgerufen) — localStorage
+  minimal gemockt, State direkt mutiert, Reducer real durchlaufen:
+  ex.oneRM war vorher null, ist danach korrekt 116.7 (Epley: 100kg ×
+  (1+5/30)). Damit ist Fund 4 aus dem Konsolidierungs-Audit
+  abgeschlossen — alle 4 Funde (B44-B47) bearbeitet.
+  CACHE_VERSION → train-v171 (kein CSS-Bump, kein SCHEMA-Bump).
+
 ## 2026-07-14 train-v170 (Konsolidierungs-Sprint)
 Eigentliche Aufgabe: direkte Fortsetzung der Geräte-Verifikation — Nutzer
   bat um einen systematischen Audit des ganzen Codes auf Berechnungen,

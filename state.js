@@ -1282,6 +1282,60 @@ function _applyPlannedProgression(days) {
   });
 }
 
+/**
+ * Aktualisiert PR-Tracking (state.prs, ex.oneRM, ex.prWeight/
+ * prRepsAtMaxWeight, ex.prRepsHistory) nachdem ein Satz gerade neu als
+ * 'success' bewertet wurde. Aufrufer prüfen VORHER bereits: Satz wurde
+ * gerade success, Woche ist nicht Deload, reps > 0 — diese Funktion selbst
+ * prüft nur noch weight > 0 (state.prs/oneRM sind ohne Gewicht bedeutungs-
+ * los) und aktualisiert prWeight/prRepsAtMaxWeight/prRepsHistory
+ * bedingungslos (auch bei weight===0, für Körpergewichts-Übungen —
+ * Original-Verhalten aller 3 vorherigen Kopien beibehalten).
+ *
+ * Konsolidierung 2026-07-14 (B47): ersetzt 3 unabhängige Kopien in
+ * SET_TOGGLE_DONE/CONFIRM_SET/AUTO_EVAL_SET. SET_TOGGLE_DONE hatte dabei
+ * das ex.oneRM-Update VERGESSEN — ein echter Bug, nicht nur Duplikations-
+ * Risiko: der 1RM-Bestwert wurde nie geschrieben, wenn ein Satz nur über
+ * den manuellen ✓-Button bestätigt wurde (die häufigste Eingabeart). Der
+ * Trainings-Tab-1RM-Hinweis (ui.js:1606) hat zwar einen Live-Fallback, der
+ * das kaschierte — aber der Fallback rechnet nur aus den Sätzen der
+ * AKTUELLEN Woche, während ex.oneRM als wochenübergreifendes historisches
+ * Maximum gedacht ist (bleibt beim Wochenwechsel erhalten, siehe
+ * _resetClonedDays() — rührt ex.oneRM bewusst nicht an). Betroffene Nutzer
+ * sahen den Hinweis in der neuen, noch leeren Woche schlicht verschwinden.
+ */
+function _applyPrTracking(state, ex, weight, reps) {
+  if (weight > 0) {
+    const volume  = weight * reps;
+    const est1RM  = reps <= 10 ? weight * (1 + reps / 30) : 0;
+    const name    = ex.name;
+    if (!state.prs) state.prs = {};
+    const prev    = state.prs[name] ?? { maxWeight: 0, maxVolume: 0, maxEstimated1RM: 0, maxRepsAtMaxWeight: 0, date: null };
+    const newMaxW   = Math.max(prev.maxWeight,       weight);
+    const newMaxV   = Math.max(prev.maxVolume,       volume);
+    const newMaxE   = Math.max(prev.maxEstimated1RM, est1RM);
+    const newMaxRMW = weight > prev.maxWeight
+      ? reps
+      : (weight === prev.maxWeight ? Math.max(prev.maxRepsAtMaxWeight ?? 0, reps) : prev.maxRepsAtMaxWeight ?? 0);
+    if (newMaxW > prev.maxWeight || newMaxV > prev.maxVolume || newMaxE > prev.maxEstimated1RM) {
+      state.prs[name] = { maxWeight: newMaxW, maxVolume: newMaxV, maxEstimated1RM: newMaxE, maxRepsAtMaxWeight: newMaxRMW, date: new Date().toISOString().split('T')[0] };
+    }
+    if (est1RM > 0 && (ex.oneRM == null || est1RM > ex.oneRM)) {
+      ex.oneRM = Math.round(est1RM * 10) / 10;
+    }
+  }
+  if (ex.prWeight === null || weight > ex.prWeight) {
+    ex.prWeight = weight; ex.prRepsAtMaxWeight = reps;
+  } else if (weight >= ex.prWeight && reps > (ex.prRepsAtMaxWeight ?? 0)) {
+    ex.prRepsAtMaxWeight = reps;
+  }
+  if (!ex.prRepsHistory) ex.prRepsHistory = {};
+  if (weight < ex.prWeight) {
+    const w = String(weight);
+    if (reps > (ex.prRepsHistory[w] ?? 0)) ex.prRepsHistory[w] = reps;
+  }
+}
+
 function reduce(state, action) {
   const { type, payload: p } = action;
 
@@ -1841,33 +1895,7 @@ function reduce(state, action) {
         const weight = parseFloat(s.weight) || 0;
         const reps   = parseFloat(s.reps)   || 0;
         if (ex && reps > 0) {
-          if (weight > 0) {
-            const volume   = weight * reps;
-            const est1RM   = reps <= 10 ? weight * (1 + reps / 30) : 0;
-            const name     = ex.name;
-            if (!state.prs) state.prs = {};
-            const prev     = state.prs[name] ?? { maxWeight: 0, maxVolume: 0, maxEstimated1RM: 0, maxRepsAtMaxWeight: 0, date: null };
-            const newMaxW  = Math.max(prev.maxWeight,      weight);
-            const newMaxV  = Math.max(prev.maxVolume,      volume);
-            const newMaxE  = Math.max(prev.maxEstimated1RM, est1RM);
-            const newMaxRMW = weight > prev.maxWeight ? reps : (weight === prev.maxWeight ? Math.max(prev.maxRepsAtMaxWeight ?? 0, reps) : prev.maxRepsAtMaxWeight ?? 0);
-            if (newMaxW > prev.maxWeight || newMaxV > prev.maxVolume || newMaxE > prev.maxEstimated1RM) {
-              state.prs[name] = { maxWeight: newMaxW, maxVolume: newMaxV, maxEstimated1RM: newMaxE, maxRepsAtMaxWeight: newMaxRMW, date: new Date().toISOString().split('T')[0] };
-            }
-          }
-          if (ex.prWeight === null || weight > ex.prWeight) {
-            ex.prWeight = weight; ex.prRepsAtMaxWeight = reps;
-          } else if (weight >= ex.prWeight && reps > (ex.prRepsAtMaxWeight ?? 0)) {
-            ex.prRepsAtMaxWeight = reps;
-          }
-          // Wdh-PR an einem submaximalen Gewicht (jenseits des Maximalgewichts
-          // bereits über prRepsAtMaxWeight abgedeckt) — pro Gewicht die beste
-          // je erreichte Wdh-Zahl, würdigt Steigerungen unabhängig vom PR-Gewicht.
-          if (!ex.prRepsHistory) ex.prRepsHistory = {};
-          if (weight < ex.prWeight) {
-            const w = String(weight);
-            if (reps > (ex.prRepsHistory[w] ?? 0)) ex.prRepsHistory[w] = reps;
-          }
+          _applyPrTracking(state, ex, weight, reps);
         }
       }
       break;
@@ -1923,35 +1951,7 @@ function reduce(state, action) {
         const weight = parseFloat(s.weight) || 0;
         const reps   = parseFloat(s.reps)   || 0;
         if (reps > 0) {
-          if (weight > 0) {
-            const volume   = weight * reps;
-            const est1RM   = reps <= 10 ? weight * (1 + reps / 30) : 0;
-            const name     = ex.name;
-            if (!state.prs) state.prs = {};
-            const prev     = state.prs[name] ?? { maxWeight: 0, maxVolume: 0, maxEstimated1RM: 0, maxRepsAtMaxWeight: 0, date: null };
-            const newMaxW  = Math.max(prev.maxWeight,       weight);
-            const newMaxV  = Math.max(prev.maxVolume,       volume);
-            const newMaxE  = Math.max(prev.maxEstimated1RM, est1RM);
-            const newMaxRMW = weight > prev.maxWeight ? reps : (weight === prev.maxWeight ? Math.max(prev.maxRepsAtMaxWeight ?? 0, reps) : prev.maxRepsAtMaxWeight ?? 0);
-            if (newMaxW > prev.maxWeight || newMaxV > prev.maxVolume || newMaxE > prev.maxEstimated1RM) {
-              state.prs[name] = { maxWeight: newMaxW, maxVolume: newMaxV, maxEstimated1RM: newMaxE, maxRepsAtMaxWeight: newMaxRMW, date: new Date().toISOString().split('T')[0] };
-            }
-            if (est1RM > 0 && (ex.oneRM == null || est1RM > ex.oneRM)) {
-              ex.oneRM = Math.round(est1RM * 10) / 10;
-            }
-          }
-          if (ex.prWeight === null || weight > ex.prWeight) {
-            ex.prWeight = weight; ex.prRepsAtMaxWeight = reps;
-          } else if (weight >= ex.prWeight && reps > (ex.prRepsAtMaxWeight ?? 0)) {
-            ex.prRepsAtMaxWeight = reps;
-          }
-          // Wdh-PR an einem submaximalen Gewicht — identisch zu SET_TOGGLE_DONE,
-          // beide Bestätigungswege müssen konsistent bleiben.
-          if (!ex.prRepsHistory) ex.prRepsHistory = {};
-          if (weight < ex.prWeight) {
-            const w = String(weight);
-            if (reps > (ex.prRepsHistory[w] ?? 0)) ex.prRepsHistory[w] = reps;
-          }
+          _applyPrTracking(state, ex, weight, reps);
         }
       }
       break;
@@ -1972,35 +1972,7 @@ function reduce(state, action) {
         const weight = parseFloat(s.weight) || 0;
         const reps   = parseFloat(s.reps)   || 0;
         if (reps > 0) {
-          if (weight > 0) {
-            const volume  = weight * reps;
-            const est1RM  = reps <= 10 ? weight * (1 + reps / 30) : 0;
-            const name    = ex.name;
-            if (!state.prs) state.prs = {};
-            const prev    = state.prs[name] ?? { maxWeight: 0, maxVolume: 0, maxEstimated1RM: 0, maxRepsAtMaxWeight: 0, date: null };
-            const newMaxW   = Math.max(prev.maxWeight,       weight);
-            const newMaxV   = Math.max(prev.maxVolume,       volume);
-            const newMaxE   = Math.max(prev.maxEstimated1RM, est1RM);
-            const newMaxRMW = weight > prev.maxWeight
-              ? reps
-              : (weight === prev.maxWeight ? Math.max(prev.maxRepsAtMaxWeight ?? 0, reps) : prev.maxRepsAtMaxWeight ?? 0);
-            if (newMaxW > prev.maxWeight || newMaxV > prev.maxVolume || newMaxE > prev.maxEstimated1RM) {
-              state.prs[name] = { maxWeight: newMaxW, maxVolume: newMaxV, maxEstimated1RM: newMaxE, maxRepsAtMaxWeight: newMaxRMW, date: new Date().toISOString().split('T')[0] };
-            }
-            if (est1RM > 0 && (ex.oneRM == null || est1RM > ex.oneRM)) {
-              ex.oneRM = Math.round(est1RM * 10) / 10;
-            }
-          }
-          if (ex.prWeight === null || weight > ex.prWeight) {
-            ex.prWeight = weight; ex.prRepsAtMaxWeight = reps;
-          } else if (weight >= ex.prWeight && reps > (ex.prRepsAtMaxWeight ?? 0)) {
-            ex.prRepsAtMaxWeight = reps;
-          }
-          if (!ex.prRepsHistory) ex.prRepsHistory = {};
-          if (weight < ex.prWeight) {
-            const w = String(weight);
-            if (reps > (ex.prRepsHistory[w] ?? 0)) ex.prRepsHistory[w] = reps;
-          }
+          _applyPrTracking(state, ex, weight, reps);
         }
       }
       break;
