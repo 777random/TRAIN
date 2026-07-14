@@ -1,7 +1,12 @@
 /**
- * weekReview.js – Pure function, kein DOM, kein State-Zugriff.
+ * weekReview.js – Pure function, kein DOM, kein State-Zugriff (gemeint ist:
+ * kein getState()/dispatch() — der Import von isTrainingDay() aus state.js
+ * ist eine reine, zustandslose Prädikat-Funktion, keine State-Kopplung).
  * Berechnet strukturierten Wochenrückblick aus einer Woche + allen Wochen.
  */
+
+import { weekSuccessCounts } from './setUtils.js';
+import { isTrainingDay } from './state.js';
 
 function _kw(sd) {
   const d   = new Date(sd + 'T12:00:00');
@@ -31,9 +36,15 @@ function _dayISODate(week, dayIdx) {
 // damit als "verpasst", sobald er nicht schon zu Tagesbeginn markedDone
 // war (bestätigt per Diagnose-Reproduktion: bei todayISO === Tag-Datum
 // kippte der noch laufende Tag ohne "<"-Fix in "verpasst").
+//
+// isTrainingDay()-Filter ergänzt (Konsolidierung 2026-07-14, B44): reine
+// Ruhe-Urlaubstage (isVacation && vacationPlan==='rest') zählten hier
+// bisher trotzdem als "geplant", während consistencyUtils.js/state.js sie
+// schon immer korrekt ausschließen — dieselbe Regel, dieselbe Quelle wie
+// dort, keine eigene Kopie der Ausschluss-Logik.
 function _reachableDays(week) {
   const todayISO = new Date().toISOString().slice(0, 10);
-  return week.days.filter((d, i) => d.markedDone || _dayISODate(week, i) < todayISO);
+  return week.days.filter((d, i) => isTrainingDay(d) && (d.markedDone || _dayISODate(week, i) < todayISO));
 }
 
 function _sumVolume(week) {
@@ -102,16 +113,12 @@ function _findBestGain(week, prevWeek) {
   return { type: 'gain', label: 'Stärkste Steigerung', text: `${best.name} +${best.delta} kg ggü. Vorwoche`, exName: best.name };
 }
 
+// Delegiert an setUtils.js (Konsolidierung 2026-07-14 — war vorher hier
+// UND in ui.js unabhängig dupliziert, mit unterschiedlicher Archiviert-
+// Behandlung, siehe setUtils.js-Kommentar).
 function _calcSuccessScore(week) {
-  let success = 0, fail = 0;
-  for (const d of week.days)
-    for (const ex of d.exercises)
-      for (const s of ex.sets) {
-        if (s.status === 'success') success++;
-        else if (s.status === 'fail') fail++;
-      }
-  const total = success + fail;
-  return total > 0 ? Math.round(success / total * 100) : null;
+  const { total, pct } = weekSuccessCounts(week);
+  return total > 0 ? pct : null;
 }
 
 function _calcStreak(sortedWeeks, week) {

@@ -33,8 +33,9 @@ import { showWeekReviewModal, renderWeekReviewHtml } from './weekReviewModal.js'
 import { computeWeeklyFocus, computeStructuralSignals, isInRecoveryWindow, buildDecisionalBalance } from './weeklyFocus.js';
 import { findExactDuplicates, findSimilarCandidates } from './exerciseNameCleanup.js';
 import { computeErkenntnisLines, getProgressCorridorCalibration } from './progressInsights.js';
-import { MOVEMENT_MAP } from './movementMap.js';
+import { buildCategoryMap, resolveCategory } from './movementMap.js';
 import { computeQualityTrend, computeConsistencyTrend, computeVolumeTrend, computeBreadthProgress } from './overallPerformance.js';
+import { weekSuccessCounts } from './setUtils.js';
 
 // ─── Module-level UI state (transient, never persisted) ──────────────────────
 
@@ -2281,18 +2282,10 @@ function _trueVol(week) {
 }
 
 // ─── Weekly Success Score: success / (success + fail), pending excluded ───────
+// Delegiert an setUtils.js (Konsolidierung 2026-07-14 — war vorher hier UND
+// in weekReview.js unabhängig dupliziert, siehe setUtils.js-Kommentar).
 function _weekSuccessScore(week) {
-  let succ = 0, fail = 0;
-  for (const d of week.days)
-    for (const ex of d.exercises) {
-      if (ex.archived) continue;
-      for (const s of ex.sets) {
-        if (s.status === 'success') succ++;
-        else if (s.status === 'fail') fail++;
-      }
-    }
-  const total = succ + fail;
-  return { succ, fail, total, pct: total > 0 ? Math.round(succ / total * 100) : 0 };
+  return weekSuccessCounts(week);
 }
 
 
@@ -2327,10 +2320,7 @@ function _relDate(startDate) {
 
 function _renderMovementPattern(state) {
   const RADAR_CATS = ['Push', 'Pull', 'Squat', 'Hinge', 'Carry', 'Core'];
-  const customCatMap = {};
-  for (const ce of state.customExercises ?? []) {
-    if (ce.category) customCatMap[ce.name] = ce.category;
-  }
+  const customCatMap = buildCategoryMap(state.customExercises);
 
   // ── Balken: letzte 4 Wochen (ohne Deload) ────────────────────────────────
   const last4 = [...state.weeks]
@@ -2345,7 +2335,7 @@ function _renderMovementPattern(state) {
       for (const ex of day.exercises) {
         if (ex.archived) continue;
         const baseName = ex.substituteFor ?? ex.name;
-        const cat = customCatMap[baseName] ?? MOVEMENT_MAP[baseName] ?? 'Sonstige';
+        const cat = resolveCategory(baseName, customCatMap);
         // B22: success+fail zählen (pending ausgeschlossen) statt nur success —
         // fail-Sätze sollen in der Kategorie-Verteilung sichtbar bleiben statt
         // komplett zu verschwinden.
@@ -2382,7 +2372,7 @@ function _renderMovementPattern(state) {
       for (const ex of day.exercises) {
         if (ex.archived) continue;
         const baseName = ex.substituteFor ?? ex.name;
-        const cat = customCatMap[baseName] ?? MOVEMENT_MAP[baseName] ?? 'Sonstige';
+        const cat = resolveCategory(baseName, customCatMap);
         const n = ex.sets.filter(s => s.status === 'success' || s.status === 'fail').length;
         if (cat === 'Push') pushSets += n;
         else if (cat === 'Pull') pullSets += n;

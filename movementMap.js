@@ -68,3 +68,28 @@ export const MOVEMENT_MAP = {
   'Sit-Up': 'Core', 'Sit-Ups': 'Core', 'Sit Ups': 'Core', 'Crunches': 'Core',
   'Leg Raise': 'Core', 'Leg Raises': 'Core', 'Hanging Leg Raise': 'Core',
 };
+
+/**
+ * Baut eine Name→Kategorie-Map aus state.customExercises (nur Einträge mit
+ * gesetztem category-Feld — reine Kategorie-Overrides UND vollwertige
+ * eigene Übungen mit Kategorie, siehe EX_SET_CATEGORY_OVERRIDE in
+ * state.js). Einmal pro Render bauen, dann per resolveCategory() O(1)
+ * nachschlagen — nicht pro Übung neu aufbauen.
+ *
+ * Konsolidierung 2026-07-14: war vorher als identischer 3-Zeilen-Block
+ * unabhängig in ui.js UND weeklyFocus.js dupliziert, UND fehlte komplett
+ * in overallPerformance.js's computeBreadthProgress() (Kategorie-
+ * Overrides wurden dort schlicht ignoriert) — siehe BUGS.md.
+ */
+export function buildCategoryMap(customExercises) {
+  const map = {};
+  for (const ce of customExercises ?? []) {
+    if (ce.category) map[ce.name] = ce.category;
+  }
+  return map;
+}
+
+/** Löst die Bewegungskategorie einer Übung auf: Override zuerst, dann MOVEMENT_MAP, sonst 'Sonstige'. */
+export function resolveCategory(name, categoryMap) {
+  return categoryMap[name] ?? MOVEMENT_MAP[name] ?? 'Sonstige';
+}

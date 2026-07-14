@@ -15,8 +15,11 @@
  *     ein Rückimport hätte einen zirkulären Import erzeugt)
  *   - _exerciseRateWindow() aus progressInsights.js
  *   - getSortedWeeks()/exWeightHistory() aus insightEngine.js (bereits exportiert)
- *   - MOVEMENT_MAP aus movementMap.js (aus ui.js extrahiert, um einen
- *     zirkulären Import ui.js<->overallPerformance.js zu vermeiden)
+ *   - buildCategoryMap()/resolveCategory() aus movementMap.js (aus ui.js
+ *     extrahiert, um einen zirkulären Import ui.js<->overallPerformance.js
+ *     zu vermeiden) — seit der Konsolidierung 2026-07-14 respektiert
+ *     computeBreadthProgress() damit auch Kategorie-Overrides, vorher
+ *     wurde nur die rohe MOVEMENT_MAP genutzt
  *   - _weekSuccessScore() aus ui.js wird NICHT importiert (ui.js importiert
  *     bereits diese Datei — ein Re-Import in die Gegenrichtung wäre
  *     zirkulär) — die Qualitäts-Funktion unten nimmt daher bereits
@@ -27,7 +30,7 @@
 import { getSortedWeeks } from './insightEngine.js';
 import { _weekConsistencyRatio, _consistencyEligibleWeeks } from './consistencyUtils.js';
 import { _exerciseRateWindow } from './progressInsights.js';
-import { MOVEMENT_MAP } from './movementMap.js';
+import { buildCategoryMap, resolveCategory } from './movementMap.js';
 
 const RADAR_CATS = ['Push', 'Pull', 'Squat', 'Hinge', 'Carry', 'Core'];
 
@@ -137,10 +140,15 @@ export function computeBreadthProgress(state, N = 8) {
   const sorted = allSorted.slice(-N);
   const exNames = [...new Set(sorted.flatMap(w => w.days.flatMap(d => d.exercises.map(e => e.substituteFor ?? e.name))))];
 
+  // Kategorie-Overrides (EX_SET_CATEGORY_OVERRIDE) respektieren — vorher
+  // ignoriert, nur die rohe MOVEMENT_MAP genutzt (Konsolidierung
+  // 2026-07-14, siehe BUGS.md: ui.js/weeklyFocus.js respektierten
+  // Overrides bereits, hier fehlte es).
+  const customCatMap = buildCategoryMap(state.customExercises);
   const byCat = {};
   for (const name of exNames) {
-    const cat = MOVEMENT_MAP[name];
-    if (!cat || !RADAR_CATS.includes(cat)) continue;
+    const cat = resolveCategory(name, customCatMap);
+    if (!RADAR_CATS.includes(cat)) continue;
     (byCat[cat] ??= []).push(name);
   }
 

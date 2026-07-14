@@ -1,7 +1,7 @@
 # TRAIN — Parallel Agent Regeln
 # Wird nach jedem Multi-Agent Sprint
 # automatisch aktualisiert.
-# Letzte Aktualisierung: 2026-07-13 / train-v167
+# Letzte Aktualisierung: 2026-07-14 / train-v170
 
 ---
 
@@ -30,12 +30,12 @@ sondern der Einstiegspunkt, der `state.js`, `backup.js`, `ui.js`,
 
 | Datei | Importiert | Wird importiert von |
 |-------|-----------|---------------------|
-| state.js | — | backup.js, consistencyUtils.js, timer.js, triggerEngine.js, ui.js, weeklyFocus.js, index.html |
+| state.js | — | backup.js, consistencyUtils.js, timer.js, triggerEngine.js, ui.js, weeklyFocus.js, weekReview.js (seit train-v170, siehe unten), index.html |
 | icons.js | — | ui.js |
-| setUtils.js | — | plateauDetector.js, weeklyFocus.js, weightRecommendation.js |
+| setUtils.js | — | plateauDetector.js, weeklyFocus.js, weightRecommendation.js, weekReview.js (seit train-v170, siehe unten) |
 | movementMap.js | — | overallPerformance.js, ui.js, weeklyFocus.js |
 | progressChart.js | — | ui.js |
-| weekReview.js | — | ui.js |
+| weekReview.js | setUtils.js, state.js (seit train-v170 — B44/B45-Konsolidierung: `isTrainingDay()` für `_reachableDays()`, `weekSuccessCounts()` für `_calcSuccessScore()`; beide reine, zustandslose Funktionen, kein `getState()`/`dispatch()` — Datei ist weiterhin "State-frei" im ursprünglich gemeinten Sinn) | ui.js |
 | weekReviewModal.js | — | ui.js |
 | exerciseNameCleanup.js | — | ui.js |
 | registerSW.js | — | index.html |
@@ -57,9 +57,11 @@ sondern der Einstiegspunkt, der `state.js`, `backup.js`, `ui.js`,
 Kettenglieder bis zum Blatt):**
 ```
 Tiefe 0: state.js, icons.js, setUtils.js, movementMap.js, progressChart.js,
-         weekReview.js, weekReviewModal.js, exerciseNameCleanup.js,
+         weekReviewModal.js, exerciseNameCleanup.js,
          registerSW.js, dragdrop.js*
-Tiefe 1: backup.js, timer.js, plateauDetector.js, weightRecommendation.js
+Tiefe 1: backup.js, timer.js, plateauDetector.js, weightRecommendation.js,
+         weekReview.js (seit train-v170 — importiert jetzt setUtils.js/
+         state.js, war vorher Tiefe 0)
 Tiefe 2: insightEngine.js
 Tiefe 3: triggerEngine.js, consistencyUtils.js, progressInsights.js
 Tiefe 4: overallPerformance.js

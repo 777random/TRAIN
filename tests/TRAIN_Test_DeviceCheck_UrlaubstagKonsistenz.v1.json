@@ -1,0 +1,197 @@
+{
+  "meta": { "schemaVersion": 30, "savedAt": "2026-07-14T12:00:00.000Z", "createdAt": "2026-07-14T12:00:00.000Z" },
+  "curIdx": 3,
+  "weeks": [
+    {
+      "id": 1751330001, "startDate": "2026-06-01", "note": "", "mode": "standard",
+      "days": [
+        {
+          "id": 1751330002, "title": "Tag A", "subtitle": "", "warmup": "", "cooldown": "",
+          "locked": true, "markedDone": true, "isVacation": false, "vacationPlan": null,
+          "sleepHours": 7, "energyLevel": 4, "sessionRating": 3,
+          "exercises": [
+            {
+              "name": "Kniebeuge", "note": "", "pauseSec": 90, "metric": "reps",
+              "sets": [
+                { "weight": 80, "reps": 8, "rpe": 7, "status": "success", "done": true, "note": "" },
+                { "weight": 80, "reps": 8, "rpe": 7, "status": "success", "done": true, "note": "" }
+              ],
+              "weightStep": 2.5, "nextWeekPlan": 0, "nextWeekPlanConfirmed": false,
+              "targetSets": 2, "targetReps": 8, "progressionType": "weight",
+              "progressionMode": "weight_first", "targetRepsMax": null, "prRepsHistory": {},
+              "prWeight": null, "prRepsAtMaxWeight": null, "setType": "straight",
+              "tags": [], "showPlates": false, "substituteFor": null, "archived": false
+            }
+          ]
+        },
+        {
+          "id": 1751330003, "title": "Tag B — Urlaub (leicht, NICHT absolviert)", "subtitle": "", "warmup": "", "cooldown": "",
+          "locked": false, "markedDone": false, "isVacation": true, "vacationPlan": "normal",
+          "sleepHours": null, "energyLevel": null, "sessionRating": null,
+          "exercises": [
+            {
+              "name": "Liegestütz", "note": "", "pauseSec": 60, "metric": "reps",
+              "sets": [
+                { "weight": 0, "reps": 0, "rpe": null, "status": "pending", "done": false, "note": "" },
+                { "weight": 0, "reps": 0, "rpe": null, "status": "pending", "done": false, "note": "" }
+              ],
+              "weightStep": 2.5, "nextWeekPlan": 0, "nextWeekPlanConfirmed": false,
+              "targetSets": 2, "targetReps": 10, "progressionType": "weight",
+              "progressionMode": "weight_first", "targetRepsMax": null, "prRepsHistory": {},
+              "prWeight": null, "prRepsAtMaxWeight": null, "setType": "straight",
+              "tags": [], "showPlates": false, "substituteFor": null, "archived": false
+            }
+          ]
+        }
+      ],
+      "sessionLog": [], "bodyData": {}, "restDays": [], "isSeedWeek": false
+    },
+    {
+      "id": 1751330004, "startDate": "2026-06-08", "note": "", "mode": "standard",
+      "days": [
+        {
+          "id": 1751330005, "title": "Tag A", "subtitle": "", "warmup": "", "cooldown": "",
+          "locked": true, "markedDone": true, "isVacation": false, "vacationPlan": null,
+          "sleepHours": 7, "energyLevel": 4, "sessionRating": 3,
+          "exercises": [
+            {
+              "name": "Kniebeuge", "note": "", "pauseSec": 90, "metric": "reps",
+              "sets": [
+                { "weight": 80, "reps": 8, "rpe": 7, "status": "success", "done": true, "note": "" },
+                { "weight": 80, "reps": 8, "rpe": 7, "status": "success", "done": true, "note": "" }
+              ],
+              "weightStep": 2.5, "nextWeekPlan": 0, "nextWeekPlanConfirmed": false,
+              "targetSets": 2, "targetReps": 8, "progressionType": "weight",
+              "progressionMode": "weight_first", "targetRepsMax": null, "prRepsHistory": {},
+              "prWeight": null, "prRepsAtMaxWeight": null, "setType": "straight",
+              "tags": [], "showPlates": false, "substituteFor": null, "archived": false
+            }
+          ]
+        },
+        {
+          "id": 1751330006, "title": "Tag B — Urlaub (leicht, NICHT absolviert)", "subtitle": "", "warmup": "", "cooldown": "",
+          "locked": false, "markedDone": false, "isVacation": true, "vacationPlan": "normal",
+          "sleepHours": null, "energyLevel": null, "sessionRating": null,
+          "exercises": [
+            {
+              "name": "Liegestütz", "note": "", "pauseSec": 60, "metric": "reps",
+              "sets": [
+                { "weight": 0, "reps": 0, "rpe": null, "status": "pending", "done": false, "note": "" },
+                { "weight": 0, "reps": 0, "rpe": null, "status": "pending", "done": false, "note": "" }
+              ],
+              "weightStep": 2.5, "nextWeekPlan": 0, "nextWeekPlanConfirmed": false,
+              "targetSets": 2, "targetReps": 10, "progressionType": "weight",
+              "progressionMode": "weight_first", "targetRepsMax": null, "prRepsHistory": {},
+              "prWeight": null, "prRepsAtMaxWeight": null, "setType": "straight",
+              "tags": [], "showPlates": false, "substituteFor": null, "archived": false
+            }
+          ]
+        }
+      ],
+      "sessionLog": [], "bodyData": {}, "restDays": [], "isSeedWeek": false
+    },
+    {
+      "id": 1751330007, "startDate": "2026-06-15", "note": "", "mode": "standard",
+      "days": [
+        {
+          "id": 1751330008, "title": "Tag A", "subtitle": "", "warmup": "", "cooldown": "",
+          "locked": true, "markedDone": true, "isVacation": false, "vacationPlan": null,
+          "sleepHours": 7, "energyLevel": 4, "sessionRating": 3,
+          "exercises": [
+            {
+              "name": "Kniebeuge", "note": "", "pauseSec": 90, "metric": "reps",
+              "sets": [
+                { "weight": 80, "reps": 8, "rpe": 7, "status": "success", "done": true, "note": "" },
+                { "weight": 80, "reps": 8, "rpe": 7, "status": "success", "done": true, "note": "" }
+              ],
+              "weightStep": 2.5, "nextWeekPlan": 0, "nextWeekPlanConfirmed": false,
+              "targetSets": 2, "targetReps": 8, "progressionType": "weight",
+              "progressionMode": "weight_first", "targetRepsMax": null, "prRepsHistory": {},
+              "prWeight": null, "prRepsAtMaxWeight": null, "setType": "straight",
+              "tags": [], "showPlates": false, "substituteFor": null, "archived": false
+            }
+          ]
+        },
+        {
+          "id": 1751330009, "title": "Tag B — Urlaub (leicht, NICHT absolviert)", "subtitle": "", "warmup": "", "cooldown": "",
+          "locked": false, "markedDone": false, "isVacation": true, "vacationPlan": "normal",
+          "sleepHours": null, "energyLevel": null, "sessionRating": null,
+          "exercises": [
+            {
+              "name": "Liegestütz", "note": "", "pauseSec": 60, "metric": "reps",
+              "sets": [
+                { "weight": 0, "reps": 0, "rpe": null, "status": "pending", "done": false, "note": "" },
+                { "weight": 0, "reps": 0, "rpe": null, "status": "pending", "done": false, "note": "" }
+              ],
+              "weightStep": 2.5, "nextWeekPlan": 0, "nextWeekPlanConfirmed": false,
+              "targetSets": 2, "targetReps": 10, "progressionType": "weight",
+              "progressionMode": "weight_first", "targetRepsMax": null, "prRepsHistory": {},
+              "prWeight": null, "prRepsAtMaxWeight": null, "setType": "straight",
+              "tags": [], "showPlates": false, "substituteFor": null, "archived": false
+            }
+          ]
+        }
+      ],
+      "sessionLog": [], "bodyData": {}, "restDays": [], "isSeedWeek": false
+    },
+    {
+      "id": 1751330010, "startDate": "2026-06-22", "note": "", "mode": "standard",
+      "days": [
+        {
+          "id": 1751330011, "title": "Tag A", "subtitle": "", "warmup": "", "cooldown": "",
+          "locked": true, "markedDone": true, "isVacation": false, "vacationPlan": null,
+          "sleepHours": 7, "energyLevel": 4, "sessionRating": 3,
+          "exercises": [
+            {
+              "name": "Kniebeuge", "note": "", "pauseSec": 90, "metric": "reps",
+              "sets": [
+                { "weight": 80, "reps": 8, "rpe": 7, "status": "success", "done": true, "note": "" },
+                { "weight": 80, "reps": 8, "rpe": 7, "status": "success", "done": true, "note": "" }
+              ],
+              "weightStep": 2.5, "nextWeekPlan": 0, "nextWeekPlanConfirmed": false,
+              "targetSets": 2, "targetReps": 8, "progressionType": "weight",
+              "progressionMode": "weight_first", "targetRepsMax": null, "prRepsHistory": {},
+              "prWeight": null, "prRepsAtMaxWeight": null, "setType": "straight",
+              "tags": [], "showPlates": false, "substituteFor": null, "archived": false
+            }
+          ]
+        },
+        {
+          "id": 1751330012, "title": "Tag B — Urlaub (leicht, NICHT absolviert)", "subtitle": "", "warmup": "", "cooldown": "",
+          "locked": false, "markedDone": false, "isVacation": true, "vacationPlan": "normal",
+          "sleepHours": null, "energyLevel": null, "sessionRating": null,
+          "exercises": [
+            {
+              "name": "Liegestütz", "note": "", "pauseSec": 60, "metric": "reps",
+              "sets": [
+                { "weight": 0, "reps": 0, "rpe": null, "status": "pending", "done": false, "note": "" },
+                { "weight": 0, "reps": 0, "rpe": null, "status": "pending", "done": false, "note": "" }
+              ],
+              "weightStep": 2.5, "nextWeekPlan": 0, "nextWeekPlanConfirmed": false,
+              "targetSets": 2, "targetReps": 10, "progressionType": "weight",
+              "progressionMode": "weight_first", "targetRepsMax": null, "prRepsHistory": {},
+              "prWeight": null, "prRepsAtMaxWeight": null, "setType": "straight",
+              "tags": [], "showPlates": false, "substituteFor": null, "archived": false
+            }
+          ]
+        }
+      ],
+      "sessionLog": [], "bodyData": {}, "restDays": [], "isSeedWeek": false
+    }
+  ],
+  "customTemplate": [], "templates": [], "prs": {}, "insights": [], "favoriteExercises": [],
+  "customExercises": [], "badges": [], "onboardingDone": true, "seenTips": [],
+  "plateauActions": {}, "decisionLog": [],
+  "coachQuestion": { "weekStart": null, "questionId": null, "answer": null, "outcome": null, "measuredWeekStart": null },
+  "coachQuestionHistory": [], "coachPerformance": { "suggestions": [] },
+  "lastReentryHandled": null, "longestStreakEver": 0,
+  "settings": {
+    "swipe": true, "drag": true, "heightCm": null, "targetWeight": null, "showBmi": false,
+    "deloadFactor": 0.75, "deloadFactorCustom": null, "barbellWeight": 20, "plateStep": 2.5,
+    "lastBackupDate": null, "activeTags": [], "vibrationEnabled": true, "rpeEnabled": true,
+    "weeksSinceLastBackupReminder": 0, "maxSessionMs": 10800000, "autoStartPauseTimer": true,
+    "dismissedNamePairs": [], "autoEval": false,
+    "autoWeek": { "enabled": false, "suggestProgress": true, "showReview": true },
+    "erkenntnisseHorizont": 8
+  }
+}

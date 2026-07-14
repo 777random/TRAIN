@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: Juli 2026 nach train-v169*
-*Nächste Version: train-v170*
+*Letzte Aktualisierung: Juli 2026 nach train-v170*
+*Nächste Version: train-v171*
 
 ---
 
@@ -11,7 +11,7 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v169 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v170 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
 - CSS: ?v=188 (unverändert diesen Sprint — nur JS angefasst,
@@ -19,6 +19,57 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 - SCHEMA: 30 (unverändert diesen Sprint)
 - Letzter Commit: siehe `git log` (dieser Sprint noch nicht committet
   zum Zeitpunkt dieses Eintrags — folgt direkt im Anschluss)
+- **Konsolidierungs-Sprint (train-v170):** Nutzer bat nach der Geräte-
+  Verifikation um eine systematische Prüfung des ganzen Codes auf
+  Berechnungen, die an mehreren Stellen unabhängig implementiert sind und
+  dadurch auseinanderlaufen können (dasselbe Muster wie B36). Ein
+  gezielter Read-Only-Audit fand 4 konkrete Cluster; 3 wurden konsolidiert
+  (auf Nutzer-Wunsch), der 4. (PR-Erkennung, evtl. 3. statt der
+  dokumentierten 2 Kopien) wird separat noch genauer geprüft, bevor
+  entschieden wird.
+  - **B44 behoben:** `_reachableDays()` (weekReview.js) filterte nicht
+    über `isTrainingDay()` — importiert jetzt dieselbe Funktion aus
+    state.js wie consistencyUtils.js/state.js selbst.
+  - **B45 behoben:** `_calcSuccessScore()` (weekReview.js) und
+    `_weekSuccessScore()` (ui.js) waren zwei unabhängige Kopien derselben
+    Formel, mit unterschiedlicher Archiviert-Behandlung — genau die
+    Funktion hinter der verwirrenden "100% Ziel"-Zahl aus der Geräte-
+    Verifikation. Neue gemeinsame `weekSuccessCounts()` in setUtils.js,
+    beide Call-Sites delegieren jetzt dorthin.
+  - **B46 behoben:** Kategorie-Lookup (`customCatMap ?? MOVEMENT_MAP`)
+    war 2x identisch dupliziert (ui.js, weeklyFocus.js) UND fehlte
+    komplett in `computeBreadthProgress()` (overallPerformance.js) —
+    Kategorie-Overrides wurden dort schlicht ignoriert. Neue
+    `buildCategoryMap()`/`resolveCategory()` in movementMap.js, an allen
+    3 Stellen genutzt.
+  - Jeder Fix einzeln mit Playwright + gezielten Node-Skripten verifiziert
+    (tatsächliches Vor/Nach-Verhalten, nicht nur Regressionstest-grün).
+  - Bewusst NICHT angefasst (Nutzer-Entscheidung aus vorherigem Turn):
+    das "1/2 Tage"/"100% Ziel"-Label in der Wochenrückblick-Karte bleibt
+    wie es ist — beide Zahlen sind jetzt korrekt, nur die Beschriftung
+    könnte klarer sein.
+  - AGENTS.md-Dateiabhängigkeits-Matrix aktualisiert: weekReview.js
+    importiert jetzt setUtils.js + state.js (war vorher Tiefe 0, jetzt
+    Tiefe 1).
+- **Echte Geräte-Verifikation des Deep-Check-Audits (2026-07-14,
+  kein neuer Code-Sprint):** Nutzer hat B36-B39 auf echtem Gerät via
+  4 eigens gebauten Test-JSONs (`tests/TRAIN_Test_DeviceCheck_*.v1.json`,
+  jeweils vorab über den ECHTEN "JSON importieren"-Weg via Playwright
+  verifiziert, nicht nur per localStorage-Shortcut) nachgetestet:
+  Push/Pull-Konsistenz (B36) ✓, archivierte Übung (B37) ✓, Undo nach
+  Löschung (B39) ✓ — alle wie erwartet. Urlaubstag-Konsistenz (B38)
+  auf den ersten Blick "nicht wie erwartet" gemeldet ("1/2 Tage" neben
+  "100% Ziel" in der Wochenrückblick-Karte) — bei der Diagnose stellte
+  sich heraus: kein Bug, sondern zwei unabhängige, je korrekte
+  Kennzahlen (Tage-Anwesenheit vs. Erfolgsquote der bewerteten Sätze),
+  siehe BUGS.md "BEWUSST KEIN BUG". Dabei einen echten technischen Fund
+  gemacht: eine DRITTE unabhängige "welche Tage zählen als geplant"-
+  Implementierung in weekReview.js (`_reachableDays()`), die anders als
+  die beiden anderen (consistencyUtils.js/state.js) keine
+  `isTrainingDay()`-Filterung hat — als B44 getrackt. Nutzer bat
+  daraufhin um eine systematische Konsolidierungs-Prüfung des gesamten
+  Codes auf dieses Duplikations-Muster (identisch zu B36) statt nur
+  diesen einen Fall zu fixen — siehe eigener Abschnitt unten.
 - **Deep-Check-Audit vor Produktions-Release (train-v169):** auf
   Nutzer-Wunsch ("sauberes Produkt shippen, keine Bugs/Logikfehler")
   4 parallele, rein lesende Diagnose-Agents (Muster 1 aus AGENTS.md)
@@ -142,6 +193,25 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 
 ## FILES (zuletzt angefasst)
 ```
+setUtils.js               — B45: neue weekSuccessCounts(week) — einzige
+                          Quelle für Erfolgsquote, archiviert-bewusst.
+ui.js                     — B45: _weekSuccessScore() delegiert jetzt an
+                          setUtils.js. B46: customCatMap-Aufbau + Lookup
+                          nutzen buildCategoryMap()/resolveCategory()
+                          aus movementMap.js statt Inline-Logik.
+weekReview.js             — B44: _reachableDays() filtert jetzt über
+                          isTrainingDay() (neuer Import aus state.js).
+                          B45: _calcSuccessScore() delegiert an
+                          setUtils.js.weekSuccessCounts().
+weeklyFocus.js            — B46: _checkPushPullBalance()s customCatMap-
+                          Aufbau nutzt jetzt buildCategoryMap()/
+                          resolveCategory() aus movementMap.js.
+overallPerformance.js     — B46: computeBreadthProgress() respektiert
+                          jetzt Kategorie-Overrides (vorher komplett
+                          ignoriert, nur rohe MOVEMENT_MAP genutzt).
+movementMap.js            — B46: neue buildCategoryMap()/resolveCategory()
+                          — einzige Quelle für den Override-Lookup.
+index.html / sw.js        — CACHE_VERSION train-v170 (kein CSS-Bump)
 weeklyFocus.js            — B36-Fix: _checkPushPullBalance() zählt jetzt
                           success+fail statt nur success (wie ui.js seit
                           B32). B37-Fix: archivierte Übungen (ex.archived)
@@ -340,6 +410,7 @@ state.js                — Wochenerstellung isSeedWeek-Skip, Auto-Eval Guard (f
 | B32+B33: Push/Pull-Ratio + Lighthouse Accessibility | e51ce3e | Zweiter echter Multi-Agent-Sprint (2 parallele Agents: ui.js allein / index.html+styles.css allein, disjunkt lt. AGENTS.md). B32: letzter Erfolgsquote-Nebenfund aus B22 behoben. B33: Lighthouse Accessibility 91→95 via `--c-text-3`-Kontrast-Fix, 2 weitere ARIA-Findings als B34/B35 dokumentiert (JS-Fix nötig, außerhalb des Scopes). CACHE_VERSION → train-v167, CSS → ?v=188 |
 | B34+B35: verbleibende ARIA-Fixes | fe71d80 | Nutzer bat direkt im Anschluss, die in B33 zurückgestellten ARIA-Findings jetzt in ui.js zu fixen. `<main>` → `<section>` für #page-workout, `role="region"` auf #days-container. Lighthouse Accessibility 95→100. CACHE_VERSION → train-v168 (kein CSS-Bump) |
 | Deep-Check-Audit vor Release: B36-B40 | — | Nutzer wollte vor dem Shippen sichergehen, "keine Bugs oder Logikfehler". 4 parallele read-only Diagnose-Agents (Coach-Kaskade / Fortschritt-Berechnungen / Training-Bedienung / Persistenz), 10 Funde, 5 eindeutige Fixes umgesetzt (Push/Pull-Konsistenz weeklyFocus.js↔ui.js, archivierte Übungen ausgeschlossen, Urlaubstag-Konsistenz-Widerspruch, Undo-Stack-Lücke, RPE-Schwellen-Inversion+Lücke bei Gewichtsempfehlung), 1 Fund bewusst nur dokumentiert (tote Plateau-Strategie "Variation"), 3 Kleinkram-Funde notiert. Jeder Fix einzeln mit Playwright + gezielten Node-Skripten verifiziert (tatsächliches Vor/Nach-Verhalten, nicht nur Regressionstest-grün). CACHE_VERSION → train-v169 (kein CSS-Bump) |
+| Geräte-Verifikation + Konsolidierungs-Sprint: B44-B46 | — | Nutzer testete B36/B37/B39 auf echtem Gerät (alle bestätigt), B38 zunächst als unerwartet gemeldet — Diagnose ergab kein Bug, aber einen 3. duplizierten "welche Tage geplant"-Berechnungsort (B44). Nutzer bat um systematischen Konsolidierungs-Audit statt Einzelfix — Read-Only-Fork fand 4 Cluster, 3 konsolidiert (B44 isTrainingDay-Filter, B45 weekSuccessCounts() in setUtils.js ersetzt 2 unabhängige Erfolgsquote-Formeln, B46 buildCategoryMap()/resolveCategory() in movementMap.js ersetzt 2 Duplikate + schließt eine fehlende Kategorie-Override-Stelle in overallPerformance.js), 1 Fund (PR-Erkennung, evtl. 3. Kopie) zur genaueren Prüfung zurückgestellt. CACHE_VERSION → train-v170 (kein CSS-Bump) |
 
 ---
 
@@ -362,6 +433,15 @@ state.js                — Wochenerstellung isSeedWeek-Skip, Auto-Eval Guard (f
 ---
 
 ## NEXT (konkret nächster Schritt)
+**Konsolidierungs-Sprint B44-B46 abgeschlossen (train-v170).** Nächster
+konkreter Schritt: Fund 4 aus dem Konsolidierungs-Audit noch genauer
+prüfen — PR-Erkennungs-Logik (prWeight/prRepsAtMaxWeight/prRepsHistory)
+existiert möglicherweise an 3 statt der bisher dokumentierten 2 Stellen
+(SET_TOGGLE_DONE, CONFIRM_SET, und scheinbar auch AUTO_EVAL_SET in
+state.js) — Zeile-für-Zeile-Vergleich noch nicht gemacht, daher noch
+keine Konsolidierungs-Empfehlung. Danach: zurück zur strategischen
+Priorität 1 (20 echte Nutzer).
+
 **Ab sofort: LOOPS.md beim Session-Start automatisch ausführen**
 (Regressionstest → HANDOFF.md-Sync → Edge-Case-Audit, siehe LOOPS.md.
 Push nach Loop-Fixes braucht einmal pro Session eine Bestätigung —

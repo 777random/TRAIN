@@ -1,7 +1,7 @@
 # TRAIN — CLAUDE.md
 # Vollständiger Projektkontext für Claude Code
-# Stand: train-v169 / SCHEMA 30 / Juli 2026
-# Letztes Update: nach train-v169 Sprint (Deep-Check-Audit: B36-B40 Logikfehler behoben)
+# Stand: train-v170 / SCHEMA 30 / Juli 2026
+# Letztes Update: nach train-v170 Sprint (Konsolidierung dupliziert-drift-anfälliger Berechnungen: B44-B46)
 
 ---
 
@@ -40,7 +40,7 @@ TRAIN ist eine deutschsprachige PWA für Krafttraining. Pure Vanilla ES Modules 
 
 - Repo: https://github.com/777random/TRAIN
 - Deployed: https://777random.github.io/TRAIN/
-- Aktueller Stand: SCHEMA_VERSION 30 · CACHE_VERSION train-v169 · CSS ?v=188
+- Aktueller Stand: SCHEMA_VERSION 30 · CACHE_VERSION train-v170 · CSS ?v=188
 
 ---
 
@@ -159,12 +159,12 @@ Bei unklarem Root Cause immer erst Diagnose → Ergebnis abwarten → dann Fix. 
 | `weeklyFocus.js` | Coach-Logik. `computeWeeklyFocus()` + `computeStructuralSignals()`. |
 | `plateauDetector.js` | Plateau-Erkennung. Verwendet `isFullSuccess()`. |
 | `weightRecommendation.js` | Gewichtsempfehlung. `isReadyForAutoSelect()`. |
-| `setUtils.js` | `isFullSuccess(s, ex)` — zentraler Helper. |
+| `setUtils.js` | `isFullSuccess(s, ex)` — zentraler Helper. Seit train-v170 auch `weekSuccessCounts(week)` (success/(success+fail), archiviert-bewusst) — einzige Quelle, von ui.js UND weekReview.js genutzt. |
 | `consistencyUtils.js` | `_weekConsistencyRatio()` — Shared Module (verhindert Circular Import overallPerformance ↔ weeklyFocus). |
 | `overallPerformance.js` | `computeVolumeTrend/QualityTrend/ConsistencyTrend`. |
 | `progressInsights.js` | Erkenntnisse-Sektion. |
 | `insightEngine.js` | Toast-Regeln, Insights. |
-| `movementMap.js` | Übungsname → Kategorie (Push/Pull/Squat/Hinge/Core/Carry). 50+ Übungen inkl. 32 englische Synonyme. |
+| `movementMap.js` | Übungsname → Kategorie (Push/Pull/Squat/Hinge/Core/Carry). 50+ Übungen inkl. 32 englische Synonyme. Seit train-v170 auch `buildCategoryMap()`/`resolveCategory()` — einzige Quelle für den Kategorie-Override-Lookup (`state.customExercises`-Override vor `MOVEMENT_MAP`-Fallback), genutzt von ui.js, weeklyFocus.js UND overallPerformance.js. |
 | `progressChart.js` | Übungsfortschritt-Chart. |
 | `weekReview.js` | Wochenrückblick. |
 | `timer.js` | Session-Uhr + Pause-Timer. Vollständig entkoppelt von `ui.js` via custom `window` Events. |

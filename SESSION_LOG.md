@@ -2,6 +2,78 @@
 # Automatisch von Claude Code
 # befüllt beim Session-Start
 
+## 2026-07-14 train-v170 (Konsolidierungs-Sprint)
+Eigentliche Aufgabe: direkte Fortsetzung der Geräte-Verifikation — Nutzer
+  bat um einen systematischen Audit des ganzen Codes auf Berechnungen,
+  die an mehreren Stellen unabhängig implementiert sind und dadurch
+  auseinanderlaufen können (Muster aus B36/B44).
+  Ein read-only Fork-Agent durchsuchte alle Root-JS-Dateien gezielt nach
+  8 Kandidaten-Kategorien (Erfolgsquote, Tage-Eligibility, Kategorie-
+  Lookup, Datums-Formel, PR-Erkennung, Volumen, Archiviert-Filter,
+  Streak/Badge-Schwellen). 4 Cluster gefunden, mit Nutzer besprochen:
+  - Fund 1 (Erfolgsquote): _weekSuccessScore() (ui.js) vs.
+    _calcSuccessScore() (weekReview.js) — dieselbe Formel, aber
+    _calcSuccessScore() schloss archivierte Übungen NICHT aus (Ursache
+    der "100% Ziel"-Verwirrung aus der Geräte-Verifikation).
+  - Fund 2 (Tage-Eligibility, = B44 von eben): _reachableDays()
+    (weekReview.js) ohne isTrainingDay()-Filter.
+  - Fund 3 (Kategorie-Lookup): 2x identisch dupliziert (ui.js,
+    weeklyFocus.js), UND komplett fehlend in computeBreadthProgress()
+    (overallPerformance.js) — Kategorie-Overrides dort ignoriert.
+  - Fund 4 (PR-Erkennung): möglicherweise 3 statt der dokumentierten 2
+    Kopien (state.js) — Fork konnte Byte-Gleichheit nicht abschließend
+    bestätigen.
+  Nutzer-Entscheidung: Fund 1-3 sofort konsolidieren, Fund 4 erst genauer
+  prüfen bevor entschieden wird (noch offen für nächste Session).
+  Umsetzung (jeweils einzeln implementiert, mit Regressionstest +
+  gezieltem Node-Skript verifiziert, dann committet):
+  - B44: weekReview.js importiert isTrainingDay() aus state.js,
+    _reachableDays() filtert jetzt damit (Datei-Kopfkommentar "kein
+    State-Zugriff" präzisiert: gemeint ist kein getState()/dispatch(),
+    nicht "keine Imports aus state.js").
+  - B45: neue weekSuccessCounts(week) in setUtils.js — einzige Quelle
+    der Erfolgsquote-Formel. _weekSuccessScore() (ui.js) und
+    _calcSuccessScore() (weekReview.js) delegieren beide dorthin.
+  - B46: neue buildCategoryMap()/resolveCategory() in movementMap.js.
+    ui.js und weeklyFocus.js nutzen sie jetzt statt eigener Inline-
+    customCatMap-Logik; computeBreadthProgress() (overallPerformance.js)
+    nutzt sie neu (vorher gar keine Override-Berücksichtigung).
+  AGENTS.md-Dependency-Matrix aktualisiert (weekReview.js neu Tiefe 1
+  statt Tiefe 0, importiert jetzt setUtils.js + state.js). CLAUDE.md
+  Modul-Tabelle (setUtils.js, movementMap.js) entsprechend ergänzt.
+  CACHE_VERSION → train-v170 (kein CSS-Bump, styles.css nicht
+  angefasst, kein SCHEMA-Bump). Finaler Kombi-Regressionslauf:
+  Playwright 18/18 grün.
+
+## 2026-07-14 (Geräte-Verifikation, kein neuer Code-Sprint, weiterhin train-v169)
+Eigentliche Aufgabe: Nutzer wollte den Deep-Check-Audit (B36-B40) auf
+  echtem Gerät nachtesten. 4 Test-JSONs gebaut
+  (tests/TRAIN_Test_DeviceCheck_*.v1.json: PushPullKonsistenz,
+  ArchivierteUebung, UrlaubstagKonsistenz, UndoNachLoeschung) — jedes
+  gezielt so konstruiert, dass der jeweilige Fix sichtbar wird. Vor der
+  Übergabe an den Nutzer alle 4 selbst über den ECHTEN "JSON
+  importieren"-Weg (Playwright: echter Datei-Upload über das
+  Settings-Input, nicht der localStorage-Shortcut der regulären
+  Fixtures) verifiziert — dabei zwei Fehler im eigenen Test-Setup
+  gefunden und korrigiert (Onboarding-Screen blockierte Klicks ohne
+  vorherigen Seed-Zustand; innerText() erfasst keine Input-Werte, Test
+  prüfte Übungsnamen fälschlich per innerText statt .inputValue()).
+  Wegwerf-Testdatei danach gelöscht (Konvention).
+  Nutzer-Ergebnis auf echtem Gerät: 3/4 wie erwartet (B36 Push/Pull,
+  B37 archiviert, B39 Undo). B38 (Urlaubstag) zunächst als "nicht wie
+  erwartet" gemeldet — Diagnose ergab keinen Bug: "1/2 Tage" und
+  "100% Ziel" in der Wochenrückblick-Karte sind zwei unabhängige,
+  beide korrekte Kennzahlen (Tage-Anwesenheit vs. Erfolgsquote der
+  bewerteten Sätze), siehe BUGS.md "BEWUSST KEIN BUG". Dabei einen
+  dritten unabhängigen "welche Tage zählen als geplant"-Berechnungsort
+  gefunden (weekReview.js `_reachableDays()`, filtert anders als
+  consistencyUtils.js/state.js) — als B44 (OFFEN) getrackt, dasselbe
+  Duplikations-Muster wie B36.
+  Nutzer bat um systematische Konsolidierungs-Prüfung statt Einzelfix
+  — nächster Schritt: Audit über den ganzen Code auf weitere Fälle
+  dieses Musters, dann Konsolidierungsplan vorlegen.
+  Kein Code geändert, kein Versions-Bump (weiterhin train-v169).
+
 ## 2026-07-14 train-v169
 Eigentliche Aufgabe: Nutzer wollte vor dem Shippen sichergehen — "keine
   Bugs oder Logikfehler oder anderes". Nutzer wählte explizit den

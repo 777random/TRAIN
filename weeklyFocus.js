@@ -50,7 +50,7 @@ import { getWeightRecommendation, isReadyForAutoSelect, roundToPlate } from './w
 import { isFullSuccess } from './setUtils.js';
 import { _consistencyEligibleWeeks } from './consistencyUtils.js';
 import { computeVolumeTrend, computeConsistencyTrend, computeQualityTrend } from './overallPerformance.js';
-import { MOVEMENT_MAP } from './movementMap.js';
+import { buildCategoryMap, resolveCategory } from './movementMap.js';
 
 const DAY_MS = 86_400_000;
 
@@ -670,10 +670,7 @@ function _checkProgression(state) {
 // akuten Kaskade (dort praktisch nie sichtbar, da Progression fast immer
 // vorher zutrifft), sondern in computeStructuralSignals() unten.
 function _checkPushPullBalance(state) {
-  const customCatMap = {};
-  for (const ce of state.customExercises ?? []) {
-    if (ce.category) customCatMap[ce.name] = ce.category;
-  }
+  const customCatMap = buildCategoryMap(state.customExercises);
 
   const horizont = state.settings?.erkenntnisseHorizont ?? 8;
   const lastN = _sortedWeeks(state)
@@ -687,7 +684,7 @@ function _checkPushPullBalance(state) {
       for (const ex of day.exercises) {
         if (ex.archived) continue;
         const baseName = ex.substituteFor ?? ex.name;
-        const cat = customCatMap[baseName] ?? MOVEMENT_MAP[baseName];
+        const cat = resolveCategory(baseName, customCatMap);
         // B22/B32-Konvention: success+fail zählen (pending ausgeschlossen),
         // identisch zur ui.js-Zwillingsfunktion _renderMovementPattern().
         const n = ex.sets.filter(s => s.status === 'success' || s.status === 'fail').length;

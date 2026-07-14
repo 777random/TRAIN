@@ -1,0 +1,197 @@
+{
+  "meta": { "schemaVersion": 30, "savedAt": "2026-07-14T12:00:00.000Z", "createdAt": "2026-07-14T12:00:00.000Z" },
+  "curIdx": 3,
+  "weeks": [
+    {
+      "id": 1751328001, "startDate": "2026-06-01", "note": "", "mode": "standard",
+      "days": [
+        {
+          "id": 1751328002, "title": "Tag A", "subtitle": "", "warmup": "", "cooldown": "",
+          "locked": true, "markedDone": true, "isVacation": false, "vacationPlan": null,
+          "sleepHours": 7, "energyLevel": 4, "sessionRating": 3,
+          "exercises": [
+            {
+              "name": "Bankdrücken", "note": "", "pauseSec": 90, "metric": "reps",
+              "sets": [
+                { "weight": 60, "reps": 8, "rpe": 7, "status": "success", "done": true, "note": "" },
+                { "weight": 60, "reps": 8, "rpe": 7, "status": "success", "done": true, "note": "" },
+                { "weight": 60, "reps": 8, "rpe": 7, "status": "success", "done": true, "note": "" },
+                { "weight": 60, "reps": 8, "rpe": 7, "status": "success", "done": true, "note": "" },
+                { "weight": 60, "reps": 4, "rpe": 9, "status": "fail", "done": false, "note": "" },
+                { "weight": 60, "reps": 4, "rpe": 9, "status": "fail", "done": false, "note": "" },
+                { "weight": 60, "reps": 4, "rpe": 9, "status": "fail", "done": false, "note": "" },
+                { "weight": 60, "reps": 4, "rpe": 9, "status": "fail", "done": false, "note": "" }
+              ],
+              "weightStep": 2.5, "nextWeekPlan": 0, "nextWeekPlanConfirmed": false,
+              "targetSets": 8, "targetReps": 8, "progressionType": "weight",
+              "progressionMode": "weight_first", "targetRepsMax": null, "prRepsHistory": {},
+              "prWeight": null, "prRepsAtMaxWeight": null, "setType": "straight",
+              "tags": [], "showPlates": false, "substituteFor": null, "archived": false
+            },
+            {
+              "name": "Rudern", "note": "", "pauseSec": 90, "metric": "reps",
+              "sets": [
+                { "weight": 40, "reps": 8, "rpe": 6, "status": "success", "done": true, "note": "" },
+                { "weight": 40, "reps": 8, "rpe": 6, "status": "success", "done": true, "note": "" },
+                { "weight": 40, "reps": 8, "rpe": 6, "status": "success", "done": true, "note": "" }
+              ],
+              "weightStep": 2.5, "nextWeekPlan": 0, "nextWeekPlanConfirmed": false,
+              "targetSets": 3, "targetReps": 8, "progressionType": "weight",
+              "progressionMode": "weight_first", "targetRepsMax": null, "prRepsHistory": {},
+              "prWeight": null, "prRepsAtMaxWeight": null, "setType": "straight",
+              "tags": [], "showPlates": false, "substituteFor": null, "archived": false
+            }
+          ]
+        }
+      ],
+      "sessionLog": [], "bodyData": {}, "restDays": [], "isSeedWeek": false
+    },
+    {
+      "id": 1751328003, "startDate": "2026-06-08", "note": "", "mode": "standard",
+      "days": [
+        {
+          "id": 1751328004, "title": "Tag A", "subtitle": "", "warmup": "", "cooldown": "",
+          "locked": true, "markedDone": true, "isVacation": false, "vacationPlan": null,
+          "sleepHours": 7, "energyLevel": 4, "sessionRating": 3,
+          "exercises": [
+            {
+              "name": "Bankdrücken", "note": "", "pauseSec": 90, "metric": "reps",
+              "sets": [
+                { "weight": 60, "reps": 8, "rpe": 7, "status": "success", "done": true, "note": "" },
+                { "weight": 60, "reps": 8, "rpe": 7, "status": "success", "done": true, "note": "" },
+                { "weight": 60, "reps": 8, "rpe": 7, "status": "success", "done": true, "note": "" },
+                { "weight": 60, "reps": 8, "rpe": 7, "status": "success", "done": true, "note": "" },
+                { "weight": 60, "reps": 4, "rpe": 9, "status": "fail", "done": false, "note": "" },
+                { "weight": 60, "reps": 4, "rpe": 9, "status": "fail", "done": false, "note": "" },
+                { "weight": 60, "reps": 4, "rpe": 9, "status": "fail", "done": false, "note": "" },
+                { "weight": 60, "reps": 4, "rpe": 9, "status": "fail", "done": false, "note": "" }
+              ],
+              "weightStep": 2.5, "nextWeekPlan": 0, "nextWeekPlanConfirmed": false,
+              "targetSets": 8, "targetReps": 8, "progressionType": "weight",
+              "progressionMode": "weight_first", "targetRepsMax": null, "prRepsHistory": {},
+              "prWeight": null, "prRepsAtMaxWeight": null, "setType": "straight",
+              "tags": [], "showPlates": false, "substituteFor": null, "archived": false
+            },
+            {
+              "name": "Rudern", "note": "", "pauseSec": 90, "metric": "reps",
+              "sets": [
+                { "weight": 40, "reps": 8, "rpe": 6, "status": "success", "done": true, "note": "" },
+                { "weight": 40, "reps": 8, "rpe": 6, "status": "success", "done": true, "note": "" },
+                { "weight": 40, "reps": 8, "rpe": 6, "status": "success", "done": true, "note": "" }
+              ],
+              "weightStep": 2.5, "nextWeekPlan": 0, "nextWeekPlanConfirmed": false,
+              "targetSets": 3, "targetReps": 8, "progressionType": "weight",
+              "progressionMode": "weight_first", "targetRepsMax": null, "prRepsHistory": {},
+              "prWeight": null, "prRepsAtMaxWeight": null, "setType": "straight",
+              "tags": [], "showPlates": false, "substituteFor": null, "archived": false
+            }
+          ]
+        }
+      ],
+      "sessionLog": [], "bodyData": {}, "restDays": [], "isSeedWeek": false
+    },
+    {
+      "id": 1751328005, "startDate": "2026-06-15", "note": "", "mode": "standard",
+      "days": [
+        {
+          "id": 1751328006, "title": "Tag A", "subtitle": "", "warmup": "", "cooldown": "",
+          "locked": true, "markedDone": true, "isVacation": false, "vacationPlan": null,
+          "sleepHours": 7, "energyLevel": 4, "sessionRating": 3,
+          "exercises": [
+            {
+              "name": "Bankdrücken", "note": "", "pauseSec": 90, "metric": "reps",
+              "sets": [
+                { "weight": 60, "reps": 8, "rpe": 7, "status": "success", "done": true, "note": "" },
+                { "weight": 60, "reps": 8, "rpe": 7, "status": "success", "done": true, "note": "" },
+                { "weight": 60, "reps": 8, "rpe": 7, "status": "success", "done": true, "note": "" },
+                { "weight": 60, "reps": 8, "rpe": 7, "status": "success", "done": true, "note": "" },
+                { "weight": 60, "reps": 4, "rpe": 9, "status": "fail", "done": false, "note": "" },
+                { "weight": 60, "reps": 4, "rpe": 9, "status": "fail", "done": false, "note": "" },
+                { "weight": 60, "reps": 4, "rpe": 9, "status": "fail", "done": false, "note": "" },
+                { "weight": 60, "reps": 4, "rpe": 9, "status": "fail", "done": false, "note": "" }
+              ],
+              "weightStep": 2.5, "nextWeekPlan": 0, "nextWeekPlanConfirmed": false,
+              "targetSets": 8, "targetReps": 8, "progressionType": "weight",
+              "progressionMode": "weight_first", "targetRepsMax": null, "prRepsHistory": {},
+              "prWeight": null, "prRepsAtMaxWeight": null, "setType": "straight",
+              "tags": [], "showPlates": false, "substituteFor": null, "archived": false
+            },
+            {
+              "name": "Rudern", "note": "", "pauseSec": 90, "metric": "reps",
+              "sets": [
+                { "weight": 40, "reps": 8, "rpe": 6, "status": "success", "done": true, "note": "" },
+                { "weight": 40, "reps": 8, "rpe": 6, "status": "success", "done": true, "note": "" },
+                { "weight": 40, "reps": 8, "rpe": 6, "status": "success", "done": true, "note": "" }
+              ],
+              "weightStep": 2.5, "nextWeekPlan": 0, "nextWeekPlanConfirmed": false,
+              "targetSets": 3, "targetReps": 8, "progressionType": "weight",
+              "progressionMode": "weight_first", "targetRepsMax": null, "prRepsHistory": {},
+              "prWeight": null, "prRepsAtMaxWeight": null, "setType": "straight",
+              "tags": [], "showPlates": false, "substituteFor": null, "archived": false
+            }
+          ]
+        }
+      ],
+      "sessionLog": [], "bodyData": {}, "restDays": [], "isSeedWeek": false
+    },
+    {
+      "id": 1751328007, "startDate": "2026-06-22", "note": "", "mode": "standard",
+      "days": [
+        {
+          "id": 1751328008, "title": "Tag A", "subtitle": "", "warmup": "", "cooldown": "",
+          "locked": true, "markedDone": true, "isVacation": false, "vacationPlan": null,
+          "sleepHours": 7, "energyLevel": 4, "sessionRating": 3,
+          "exercises": [
+            {
+              "name": "Bankdrücken", "note": "", "pauseSec": 90, "metric": "reps",
+              "sets": [
+                { "weight": 60, "reps": 8, "rpe": 7, "status": "success", "done": true, "note": "" },
+                { "weight": 60, "reps": 8, "rpe": 7, "status": "success", "done": true, "note": "" },
+                { "weight": 60, "reps": 8, "rpe": 7, "status": "success", "done": true, "note": "" },
+                { "weight": 60, "reps": 8, "rpe": 7, "status": "success", "done": true, "note": "" },
+                { "weight": 60, "reps": 4, "rpe": 9, "status": "fail", "done": false, "note": "" },
+                { "weight": 60, "reps": 4, "rpe": 9, "status": "fail", "done": false, "note": "" },
+                { "weight": 60, "reps": 4, "rpe": 9, "status": "fail", "done": false, "note": "" },
+                { "weight": 60, "reps": 4, "rpe": 9, "status": "fail", "done": false, "note": "" }
+              ],
+              "weightStep": 2.5, "nextWeekPlan": 0, "nextWeekPlanConfirmed": false,
+              "targetSets": 8, "targetReps": 8, "progressionType": "weight",
+              "progressionMode": "weight_first", "targetRepsMax": null, "prRepsHistory": {},
+              "prWeight": null, "prRepsAtMaxWeight": null, "setType": "straight",
+              "tags": [], "showPlates": false, "substituteFor": null, "archived": false
+            },
+            {
+              "name": "Rudern", "note": "", "pauseSec": 90, "metric": "reps",
+              "sets": [
+                { "weight": 40, "reps": 8, "rpe": 6, "status": "success", "done": true, "note": "" },
+                { "weight": 40, "reps": 8, "rpe": 6, "status": "success", "done": true, "note": "" },
+                { "weight": 40, "reps": 8, "rpe": 6, "status": "success", "done": true, "note": "" }
+              ],
+              "weightStep": 2.5, "nextWeekPlan": 0, "nextWeekPlanConfirmed": false,
+              "targetSets": 3, "targetReps": 8, "progressionType": "weight",
+              "progressionMode": "weight_first", "targetRepsMax": null, "prRepsHistory": {},
+              "prWeight": null, "prRepsAtMaxWeight": null, "setType": "straight",
+              "tags": [], "showPlates": false, "substituteFor": null, "archived": false
+            }
+          ]
+        }
+      ],
+      "sessionLog": [], "bodyData": {}, "restDays": [], "isSeedWeek": false
+    }
+  ],
+  "customTemplate": [], "templates": [], "prs": {}, "insights": [], "favoriteExercises": [],
+  "customExercises": [], "badges": [], "onboardingDone": true, "seenTips": [],
+  "plateauActions": {}, "decisionLog": [],
+  "coachQuestion": { "weekStart": null, "questionId": null, "answer": null, "outcome": null, "measuredWeekStart": null },
+  "coachQuestionHistory": [], "coachPerformance": { "suggestions": [] },
+  "lastReentryHandled": null, "longestStreakEver": 4,
+  "settings": {
+    "swipe": true, "drag": true, "heightCm": null, "targetWeight": null, "showBmi": false,
+    "deloadFactor": 0.75, "deloadFactorCustom": null, "barbellWeight": 20, "plateStep": 2.5,
+    "lastBackupDate": null, "activeTags": [], "vibrationEnabled": true, "rpeEnabled": true,
+    "weeksSinceLastBackupReminder": 0, "maxSessionMs": 10800000, "autoStartPauseTimer": true,
+    "dismissedNamePairs": [], "autoEval": false,
+    "autoWeek": { "enabled": false, "suggestProgress": true, "showReview": true },
+    "erkenntnisseHorizont": 8
+  }
+}
