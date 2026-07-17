@@ -786,3 +786,34 @@ Eigentliche Aufgabe: Nutzer fragte "womit geht es jetzt weiter" —
   als überlagernde Störfaktoren, testet nicht isoliert. Details in
   tests/fixtures/README.md. Keine Code-Änderung, nur Doku (README.md,
   BUGS.md B17, HANDOFF.md) — kein Versions-Bump nötig.
+
+## 2026-07-14 train-v175 (DSGVO/Rechts-Review, kein Code-Sprint)
+Loop 1: 18/18 grün (Playwright, regression_core + alle 17 Fixtures) ✓ —
+  Kontroll-Lauf, kein Code geändert, daher erwartungsgemäß unverändert.
+Loop 2: aktuell ✓ — CACHE_VERSION (sw.js train-v175) und CSS (?v=191)
+  stimmen mit HANDOFF.md/CLAUDE.md überein, kein Sync nötig.
+Loop 3: übersprungen — Stop-Bedingung bereits erfüllt (17 Fixtures ≥ 15),
+  keine UX-Hoch-Bugs offen.
+Eigentliche Aufgabe: Nutzer bat um Prüfung der App auf DSGVO-Verstöße und
+  sonstige rechtliche Risiken vor weiterer Nutzerwerbung. Code-Review
+  (index.html, ui.js, manifest.json, sw.js, fonts/) statt Vermutung:
+  - **B55 (Blocker):** Impressum in den Einstellungen ist nur ein TODO-
+    Platzhalter (`ui.js:4113-4118`), während die App bereits live ist und
+    Nutzerwerbung + Bezahlfunktion geplant sind — akutes Abmahnrisiko nach
+    § 5 TMG/DDG. War als TODO bereits bekannt, jetzt mit Rechts-Einordnung
+    priorisiert vor jeder weiteren Nutzerwerbung.
+  - **B56 (Mittel):** Datenschutz-Akkordeon (`ui.js:4097-4106`) ist keine
+    vollständige Art.-13-Erklärung — v.a. fehlt ein Hinweis auf GitHub
+    Pages als Hoster (IP-Verarbeitung durch Microsoft, unabhängig von
+    GoatCounter), Betroffenenrechte, Verantwortlicher.
+  - **B57/B58 (Low):** keine "Alle Daten löschen"-Funktion; OFL.txt für
+    die selbst gehosteten Fonts (B51) fehlt im Repo.
+  Positiv bestätigt: rein lokale Datenspeicherung (kein Server/Konto),
+  selbst gehostete Fonts statt Google-Fonts-CDN, GoatCounter cookielos
+  ohne weitere externe Netzwerk-Aufrufe (manifest.json/sw.js geprüft,
+  sauber) — strukturell bereits datensparsam aufgebaut.
+  Details siehe BUGS.md B55-B58, HANDOFF.md NEXT-Sektion. Keine Code-
+  Änderung (reine Analyse/Doku), kein Versions-Bump. Lokal committet,
+  Push braucht Bestätigung (Push-Policy, LOOPS.md).
+Loop 5: übersprungen — kein Code seit letzter Regenerierung (cd9c4a5,
+  Stand v175) geändert, for-advisor.txt wäre inhaltlich identisch.

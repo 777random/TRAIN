@@ -1,5 +1,5 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: Juli 2026 nach train-v175*
+*Letzte Aktualisierung: 2026-07-14, DSGVO/Rechts-Review (kein Code-Sprint, train-v175 unverändert)*
 *Nächste Version: train-v176*
 
 ---
@@ -652,6 +652,30 @@ state.js                — Wochenerstellung isSeedWeek-Skip, Auto-Eval Guard (f
 ---
 
 ## NEXT (konkret nächster Schritt)
+**DSGVO/Rechts-Review (2026-07-14, reine Doku-Session, kein Code geändert):**
+Nutzer bat um Prüfung auf DSGVO-Verstöße/rechtliche Risiken vor weiterer
+Nutzerwerbung. Ergebnis, jetzt als B55-B58 in BUGS.md getrackt:
+- **B55 (Blocker):** Impressum-Platzhalter (`ui.js:4113-4118`) ist kein
+  bloßes TODO mehr, sondern ein akutes Abmahnrisiko — App ist bereits live,
+  Nutzerwerbung + Bezahlfunktion sind geplant, das reicht für
+  Impressumspflicht nach § 5 TMG/DDG. Deckt sich mit TODO 2 unten, jetzt aber
+  explizit priorisiert vor jeder weiteren Nutzerwerbung (auch vor dem
+  20-Nutzer-Rekrutierungs-Schritt, strategische Priorität 1).
+- **B56 (Mittel):** Datenschutz-Akkordeon ist keine vollständige
+  Art.-13-Erklärung — fehlt v.a. ein GitHub-Pages-Hosting-Hinweis (IP-
+  Verarbeitung durch Microsoft beim Ausliefern der Seite, unabhängig von
+  GoatCounter) und Betroffenenrechte. Text-Fix, sobald B55 die
+  Verantwortlicher-Angaben liefert.
+- **B57/B58 (Low):** fehlende "Alle Daten löschen"-Funktion, fehlende
+  OFL.txt für die selbst gehosteten Fonts — beides kein Blocker, leicht
+  nachrüstbar.
+Regressionstest 10/10 + Playwright 18/18 vor Session-Ende zur Kontrolle
+gelaufen (kein Code geändert, daher wie erwartet unverändert grün).
+**Nächster Schritt: B55 zuerst — braucht echten Namen + Kontaktanschrift
+vom Nutzer, kann nicht durch Code allein gelöst werden. Danach B56
+(Datenschutztext), dann zurück zu TODO 1/3/4 unten und strategischer
+Priorität 1.**
+
 **B54 umgesetzt (train-v175) — Install-Button im Onboarding:** vollständige
 Umsetzung siehe STAND-Sektion oben. Direkter Anschluss an B51-B53. Damit ist
 die Pre-Launch-Checkliste inhaltlich (code-seitig) vollständig abgeschlossen.
