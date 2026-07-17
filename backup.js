@@ -69,9 +69,53 @@ export function exportJSONAuto(startDate) {
   triggerDownload(blob, filename);
 }
 
+// ─── Import-Härtung ───────────────────────────────────────────────────────────
+//
+// Importierte Backup-/Template-Dateien können von anderen Nutzern stammen
+// (geteilte Trainingspläne). meta/settings/weeks-Shape wird oben geprüft,
+// aber einzelne Textfelder (name/note/title/subtitle) wurden bisher roh
+// übernommen und landen unverändert in state.customTemplate / state.weeks,
+// von wo sie über dieselben Render-Pfade wie normal getippte Werte in
+// ui.js angezeigt werden. Type-Coercion + Längen-Deckel hier ist Defense-
+// in-Depth zusätzlich zum h()-Escaping in ui.js, nicht dessen Ersatz.
+
+const _IMPORT_MAX_BYTES = 5 * 1024 * 1024; // reguläre Backups liegen weit darunter
+const _IMPORT_MAX_TEXT  = 200;
+
+function _sanitizeImportText(val, maxLen = _IMPORT_MAX_TEXT) {
+  if (typeof val !== 'string') return '';
+  return val.length > maxLen ? val.slice(0, maxLen) : val;
+}
+
+function _sanitizeImportExercise(ex) {
+  if (!ex || typeof ex !== 'object') return;
+  if ('name' in ex) ex.name = _sanitizeImportText(ex.name, 80);
+  if ('note' in ex) ex.note = _sanitizeImportText(ex.note, 200);
+}
+
+function _sanitizeImportDay(day) {
+  if (!day || typeof day !== 'object') return;
+  if ('title' in day) day.title = _sanitizeImportText(day.title, 80);
+  if ('subtitle' in day) day.subtitle = _sanitizeImportText(day.subtitle, 80);
+  if ('note' in day) day.note = _sanitizeImportText(day.note, 200);
+  for (const ex of day.exercises ?? []) _sanitizeImportExercise(ex);
+}
+
+function _sanitizeImportedState(parsed) {
+  for (const wk of parsed.weeks ?? []) {
+    if ('note' in wk) wk.note = _sanitizeImportText(wk.note, 200);
+    for (const day of wk.days ?? []) _sanitizeImportDay(day);
+  }
+  for (const day of parsed.customTemplate ?? []) _sanitizeImportDay(day);
+  return parsed;
+}
+
 export function importJSON(file) {
   return new Promise((resolve, reject) => {
     if (!file) { reject(new Error('No file provided.')); return; }
+    if (file.size > _IMPORT_MAX_BYTES) {
+      reject(new Error('Datei zu groß (max. 5 MB). Import abgebrochen.')); return;
+    }
     const reader = new FileReader();
     reader.onload = event => {
       let parsed;
@@ -90,7 +134,7 @@ export function importJSON(file) {
       if (importedVersion > SCHEMA_VERSION) {
         console.warn(`[TRAIN] Importing from newer schema (${importedVersion} > ${SCHEMA_VERSION}).`);
       }
-      dispatch(A.STATE_IMPORT, { imported: parsed });
+      dispatch(A.STATE_IMPORT, { imported: _sanitizeImportedState(parsed) });
       resolve();
     };
     reader.onerror = () => reject(new Error('Datei konnte nicht gelesen werden.'));

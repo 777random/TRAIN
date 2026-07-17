@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-14, DSGVO/Rechts-Review (kein Code-Sprint, train-v175 unverändert)*
-*Nächste Version: train-v176*
+*Letzte Aktualisierung: 2026-07-18, B59 XSS-Fix Template-Editor + Import-Härtung + CSP (train-v176)*
+*Nächster Schritt: B55/B56 (Impressum/Datenschutz-Blocker) — braucht echte Angaben vom Nutzer, kein Code allein lösbar*
 
 ---
 
@@ -11,13 +11,58 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v175 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v176 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
-- CSS: ?v=191 (neue `.ob-ios-help`-Klassen für die iOS-Install-Anleitung, B54)
+- CSS: ?v=191 (unverändert diesen Sprint — reiner JS/HTML-Sprint)
 - SCHEMA: 30 (unverändert diesen Sprint)
-- Letzter Commit: `cd9c4a5` (Loop 5 — for-advisor.txt Regenerierung).
-  B54 selbst: `8bcaffd`. Beide gepusht.
+- Letzter Commit: siehe `git log` (dieser Sprint noch nicht gepusht,
+  siehe Sprint-Ende-Workflow).
+- **B59 umgesetzt (train-v176) — Security-Bestandsaufnahme vor Public-Launch:**
+  Nutzer-Anfrage nach Instagram-Beispielen gehackter "vibecoded" Apps
+  (typische Themen: API-Keys, Rate Limiting, DDoS, Auth, Access Control).
+  Vor der Umsetzung erst der Realitätscheck: TRAIN hat kein Backend/keine
+  API-Keys/keine Accounts (verifiziert — kein `fetch()` außer Service-
+  Worker, keine Secrets im Repo), daher läuft der Großteil der üblichen
+  Checkliste (Rate Limiting, JWT, SQL-Injection, SSRF, IDOR) ins Leere.
+  Gezielter Code-Audit fand die eine real zutreffende Lücke:
+  - **XSS im Template-Editor:** `ui.js:4134` schrieb `ex.name` ohne das im
+    Rest der Codebase etablierte `h()`-Escaping (ui.js:306) direkt in ein
+    `value`-Attribut — sowohl beim Tippen als auch über einen präparierten
+    JSON-Import (`backup.js`, geteilte Trainingspläne) ausnutzbar. Fix:
+    `h(ex.name)` ergänzt.
+  - **Import-Härtung:** `backup.js` prüfte beim Import bisher nur Shape
+    (`weeks`-Array/`meta.schemaVersion`/`settings`-Objekt), keine Typ-/
+    Längenprüfung einzelner Textfelder. Neue `_sanitizeImportedState()` als
+    Defense-in-Depth (ergänzt das Escaping in ui.js, ersetzt es nicht) —
+    normalisiert `name`/`note`/`title`/`subtitle` in weeks/days/exercises/
+    customTemplate auf String-Typ mit Längen-Deckel, plus 5-MB-Obergrenze
+    für importierte Dateien.
+  - **CSP-`<meta>`-Tag** in index.html ergänzt (`default-src 'self'`,
+    Skripte nur `'self'`+GoatCounter, `object-src 'none'`,
+    `frame-ancestors 'none'`) als zusätzliche Absicherung — nur per
+    `<meta>` möglich (GitHub Pages erlaubt keine echten HTTP-Header).
+    `'unsafe-inline'` bei `script-src` bewusst beibehalten (bestehender
+    Bootstrap-`<script>` + 4 inline-`onclick`-Handler ohne Build-Step nicht
+    per Nonce/Hash absicherbar — als bekannte Grenze dokumentiert).
+  - Alle anderen unescaped `${...}`-Stellen in ui.js geprüft (Badge-Titel,
+    Onboarding-Templates) — feste Konstanten, kein Nutzertext, kein
+    weiterer Fund.
+  - **Neues Dokument `SECURITY.md`:** Teil 1 = heutiger Stand (siehe oben),
+    Teil 2 = dokumentierte, noch NICHT gebaute Blaupause für Auth/Rate-
+    Limiting/Access-Control-Matrix/API-Key-Handling, aktiviert erst sobald
+    die geplante Paywall/Coaching-Funktion einen echten Server bekommt.
+  - Verifiziert: neuer Regressionstest `tests/security_xss.spec.js`
+    (Payload per echtem JSON-Import-UI-Flow eingeschleust, Template-Editor
+    geöffnet, bestätigt `window.__xssFired` bleibt `false` und kein
+    `<img src="x">` im DOM) — manuell gegen unreparierten Code laufen
+    lassen zur Bestätigung, dass der Test die Lücke wirklich fängt (schlug
+    erwartungsgemäß fehl, danach Fix wiederhergestellt). Volle Suite
+    `npx playwright test`: 19/19 grün (10/10 regression_core, 17 fixtures,
+    neuer Security-Test) — bestätigt auch, dass die neue CSP GoatCounter/
+    Coach-Toasts/Tab-Navigation nicht bricht.
+  - B55/B56 (Impressum/Datenschutz) bewusst NICHT Teil dieses Sprints —
+    bereits als eigener Blocker getrackt, braucht echte Nutzerangaben.
 - **B54 umgesetzt (train-v175) — Install-Button im Onboarding:** direkter
   Anschluss an die Pre-Launch-Checkliste — Nutzer fragte, ob sich "Zum
   Home-Bildschirm hinzufügen" im Onboarding automatisieren lässt. Technische

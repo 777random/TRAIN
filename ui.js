@@ -4131,7 +4131,7 @@ function renderTemplateEditor(state) {
     ${day.exercises.map((ex, ei) => `
     <div class="tpl-exercise">
       <div class="tpl-ex-top">
-        <input class="tpl-name-input" type="text" value="${ex.name}"
+        <input class="tpl-name-input" type="text" value="${h(ex.name)}"
           data-tpl-di="${di}" data-tpl-ei="${ei}" data-tpl-field="name"
           aria-label="Übungsname" maxlength="80"
         />

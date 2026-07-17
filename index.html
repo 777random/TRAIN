@@ -9,6 +9,20 @@
   <meta name="apple-mobile-web-app-title" content="TRAIN">
   <meta name="description" content="Funktionaler Workout-Tracker mit wöchentlichem Progressions-Tracking, Pausentimer und CSV-Export.">
 
+  <!-- CSP nur als <meta>, da GitHub Pages keine echten HTTP-Header erlaubt
+       (kein Server-Zugriff) — deckt daher nicht alle Header ab (z.B.
+       X-Frame-Options funktioniert nur als echter HTTP-Header). Erlaubt
+       Skript-Quellen nur von 'self' + GoatCounter, Bild-Fetch für Badge-
+       Assets, keine Plugins/Objects, keine fremde base-Umleitung, keine
+       Einbettung in fremde <iframe>s. 'unsafe-inline' bei script-src ist
+       nötig, da die App ohne Build-Step direkt im Browser läuft und daher
+       (a) den Bootstrap-<script> hier unten sowie (b) einige bestehende
+       inline onclick-Handler in ui.js (Notiz-Toggle) nicht per Nonce/Hash
+       absichern kann — kein CSP-Ersatz für h()-Escaping in ui.js (siehe
+       dort), sondern zusätzliche Absicherung gegen externe Script-Injektion
+       (z.B. <script src="https://evil.tld">-Payloads bleiben blockiert). -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://gc.zgo.at; img-src 'self' https://*.goatcounter.com data:; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.goatcounter.com; object-src 'none'; base-uri 'self'; frame-ancestors 'none'">
+
   <title>TRAIN</title>
 
   <link rel="manifest" href="./manifest.json">
