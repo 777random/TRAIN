@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-18, B59 XSS-Fix Template-Editor + Import-Härtung + CSP (train-v176)*
-*Nächster Schritt: B55/B56 (Impressum/Datenschutz-Blocker) — braucht echte Angaben vom Nutzer, kein Code allein lösbar*
+*Letzte Aktualisierung: 2026-07-18, Impressum/Datenschutz strukturell vervollständigt (train-v177)*
+*Nächster Schritt: B55 bleibt Blocker — braucht echte Name+Anschrift-Angaben vom Nutzer, Code-Seite ist jetzt vorbereitet*
 
 ---
 
@@ -11,13 +11,30 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v176 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v177 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
 - CSS: ?v=191 (unverändert diesen Sprint — reiner JS/HTML-Sprint)
 - SCHEMA: 30 (unverändert diesen Sprint)
 - Letzter Commit: siehe `git log` (dieser Sprint noch nicht gepusht,
   siehe Sprint-Ende-Workflow).
+- **B55/B56 strukturell vorbereitet (train-v177) — Impressum/Datenschutz:**
+  direkter Anschluss an den B59-Security-Sprint, Nutzer bat darum, die
+  Platzhalter mit korrektem rechtlichem Rahmentext vorzubereiten statt
+  nur "TODO" stehen zu lassen. `ui.js` Settings-Tab: Impressum-Block hat
+  jetzt § 5 TMG/DDG-Rahmentext mit klar markierten Platzhalter-Zeilen
+  (Name/Anschrift/E-Mail in `[ECKIGEN KLAMMERN]`, `⚠️`+`--c-danger`-Farbe).
+  Datenschutz-Block erweitert um Verantwortlicher-Zeile (verweist auf
+  Impressum statt Daten zu duplizieren), Rechtsgrundlage (Art. 6 Abs. 1
+  lit. f DSGVO), GitHub-Pages-Hosting-Hinweis (Microsoft verarbeitet
+  Besucher-IPs beim Ausliefern, unabhängig von GoatCounter) mit Link zum
+  GitHub Privacy Statement, Betroffenenrechte-Absatz, präzisierte
+  GoatCounter-Formulierung. **Bleibt Blocker (B55):** braucht weiterhin
+  echte Name+Anschrift-Angaben vom Nutzer — Code-Seite ist jetzt fertig
+  vorbereitet, kann direkt eingesetzt werden sobald die Angaben da sind.
+  Verifiziert: Playwright bestätigt fehlerfreies Rendern beider
+  aufgeklappter Akkordeons, volle Suite 19/19 grün. CACHE_VERSION →
+  train-v177 (kein SCHEMA-/CSS-Bump, reiner Text-Change).
 - **B59 umgesetzt (train-v176) — Security-Bestandsaufnahme vor Public-Launch:**
   Nutzer-Anfrage nach Instagram-Beispielen gehackter "vibecoded" Apps
   (typische Themen: API-Keys, Rate Limiting, DDoS, Auth, Access Control).

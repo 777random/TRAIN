@@ -4096,13 +4096,32 @@ function renderSettingsTab(state) {
       </button>
       <div class="session-note-body">
         <div class="settings-row__desc" style="padding:var(--sp-2) 0">
+          <strong>Verantwortlicher:</strong> siehe Impressum unten.<br><br>
           Deine Trainingsdaten bleiben ausschließlich lokal auf diesem Gerät
           gespeichert (Browser-Storage) — kein Konto, kein Server, keine
-          Übertragung deiner Workout-Daten an Dritte. Für anonyme Nutzungs-
-          Zählung (wie viele Personen die App öffnen) wird GoatCounter
-          eingesetzt — cookielos, ohne personenbezogene Daten, ohne
-          Werbe-Tracking. Schriftarten werden selbst gehostet, es findet kein
-          Aufruf bei Google statt.
+          Übertragung deiner Workout-Daten an Dritte.<br><br>
+          Für anonyme Nutzungs-Zählung (wie viele Personen die App öffnen)
+          wird GoatCounter eingesetzt — cookielos, ohne Werbe-Tracking, ohne
+          Weitergabe an Dritte. Dabei wird deine IP-Adresse kurz technisch
+          verarbeitet, aber nicht dauerhaft gespeichert. Rechtsgrundlage
+          hierfür ist unser berechtigtes Interesse an der Weiterentwicklung
+          der App (Art. 6 Abs. 1 lit. f DSGVO). Schriftarten werden selbst
+          gehostet, es findet kein Aufruf bei Google statt.<br><br>
+          <strong>Hosting:</strong> Diese Seite wird über GitHub Pages
+          (GitHub Inc./Microsoft Corporation) ausgeliefert. Beim Aufruf der
+          Seite verarbeitet GitHub dabei automatisch deine IP-Adresse in
+          Server-Logs — unabhängig von der GoatCounter-Zählung oben. Mehr
+          dazu im
+          <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" target="_blank" rel="noopener" style="color:var(--c-accent)">GitHub Privacy Statement</a>.<br><br>
+          <strong>Deine Rechte:</strong> Du hast das Recht auf Auskunft,
+          Berichtigung, Löschung und Widerspruch bezüglich der wenigen bei
+          GoatCounter/GitHub anfallenden Daten, sowie das Recht auf
+          Beschwerde bei einer Datenschutz-Aufsichtsbehörde. Deine
+          Trainingsdaten verlassen nie dein Gerät — du kannst sie jederzeit
+          selbst über die Browser-Einstellungen löschen.<br><br>
+          <span style="color:var(--c-danger)">⚠️ Verantwortlicher-Angabe
+          oben wird automatisch korrekt, sobald das Impressum unten mit
+          echten Angaben ausgefüllt ist.</span>
         </div>
       </div>
     </div>
@@ -4112,8 +4131,16 @@ function renderSettingsTab(state) {
       </button>
       <div class="session-note-body">
         <div class="settings-row__desc" style="padding:var(--sp-2) 0">
-          TODO: vor Veröffentlichung ausfüllen — Name und Kontaktmöglichkeit
-          (z.B. E-Mail oder Anschrift) des Betreibers.
+          Angaben gemäß § 5 TMG/DDG:<br><br>
+          [DEIN VOLLER NAME]<br>
+          [DEINE STRASSE UND HAUSNUMMER]<br>
+          [DEINE PLZ UND STADT]<br><br>
+          Kontakt: [DEINE E-MAIL-ADRESSE]<br><br>
+          <span style="color:var(--c-danger)">⚠️ Platzhalter — vor
+          Veröffentlichung mit echten Angaben ausfüllen. Name und
+          ladungsfähige Anschrift sind für ein geschäftsmäßiges
+          Online-Angebot gesetzlich vorgeschrieben (§ 5 TMG/DDG bzw. § 18
+          MStV), siehe BUGS.md B55.</span>
         </div>
       </div>
     </div>

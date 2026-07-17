@@ -163,6 +163,20 @@ Priorität innerhalb der Strukturkarte: Mehr-Übungen-Aggregation > Präventiver
 
 ---
 
+## SICHERHEIT
+
+### 2026-07 — Security-Checkliste erst Phase 2 (sobald Server existiert)
+**Entscheidung:** Die volle Standard-Security-Checkliste (Rate Limiting, Auth/JWT/bcrypt, Access-Control-Matrix, API-Key-Handling, WAF/DDoS-Schutz, IP-Bans, SSRF, SQL-Injection) wird NICHT vorab spekulativ gebaut. Sie ist dokumentiert als Blaupause in SECURITY.md (Teil 2), wird aber erst umgesetzt, sobald die geplante Paywall/Coaching-Funktion tatsächlich einen Server/Accounts bekommt.
+**Begründung:** TRAIN hat heute kein Backend, keine API-Keys, keine Accounts (verifiziert per Code-Audit, B59) — diese Angriffsklassen haben schlicht keine Angriffsfläche, gegen die sie greifen könnten. Vorab bauen wäre spekulative Komplexität ohne Nutzen, siehe "Lokal-first, kein Backend" oben. Was heute real ist (XSS beim Rendern von Nutzertext, Import-Validierung) wurde behoben, siehe unten.
+**Gilt:** Bis der Server für die Paywall/Coaching-Funktion tatsächlich gebaut wird — dann SECURITY.md Teil 2 aktivieren, nicht neu recherchieren.
+
+### 2026-07 — CSP `'unsafe-inline'` bei script-src bewusst akzeptiert (B59)
+**Entscheidung:** Der neue CSP-`<meta>`-Tag (index.html) behält `'unsafe-inline'` in `script-src`, statt es zu entfernen.
+**Begründung:** TRAIN hat keinen Build-Step (siehe "Vanilla JS, kein Build-Step" oben) und kann daher keine Nonces/Hashes pro Auslieferung generieren. Der bestehende Bootstrap-`<script>` (index.html, Drag-Polyfill-Init) sowie 4 bestehende inline-`onclick`-Handler (Notiz-Toggle, ui.js) würden ohne `'unsafe-inline'` brechen. Die CSP bleibt trotzdem wertvoll: `script-src` ist weiterhin auf `'self'` + GoatCounter begrenzt, externe Script-Injection (`<script src="https://evil.tld">`) bleibt blockiert — nur die (bereits durch h()-Escaping abgedeckte) Inline-Payload-Klasse ist nicht zusätzlich per CSP gehärtet.
+**Gilt:** Bis eine Build-Pipeline existiert — dann die 4 onclick-Handler auf das bestehende `data-action`-Event-Delegation-Muster umstellen und `'unsafe-inline'` aus `script-src` entfernen.
+
+---
+
 ## TECHNISCH
 
 ### 2026-07 — consistencyUtils.js als Shared Module

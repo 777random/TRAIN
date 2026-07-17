@@ -817,3 +817,73 @@ Eigentliche Aufgabe: Nutzer bat um Prüfung der App auf DSGVO-Verstöße und
   Push braucht Bestätigung (Push-Policy, LOOPS.md).
 Loop 5: übersprungen — kein Code seit letzter Regenerierung (cd9c4a5,
   Stand v175) geändert, for-advisor.txt wäre inhaltlich identisch.
+
+## 2026-07-18 train-v176 (B59 — Security-Bestandsaufnahme vor Public-Launch)
+Loop 1: 19/19 grün (Playwright: regression_core + 17 Fixtures + neuer
+  Security-Test) ✓
+Loop 2: aktualisiert — CACHE_VERSION/CSS in HANDOFF.md/CLAUDE.md auf
+  train-v176 synchronisiert (Push: erledigt, Commit 98a5842)
+Loop 3: übersprungen — Stop-Bedingung bereits erfüllt (17 Fixtures ≥ 15)
+Eigentliche Aufgabe: Nutzer bat um eine Security-Bestandsaufnahme, nachdem
+  er auf Instagram Beispiele gehackter "vibecoded" Apps gesehen hatte
+  (Stichworte: API-Keys, Rate Limiting, DDoS, Auth, Access Control) —
+  Ziel: alles schließen vor dem Public-Launch, in Alltagssprache erklärt.
+  Per /plan zunächst ein Realitätscheck: TRAIN hat kein Backend/keine
+  API-Keys/keine Accounts (verifiziert per Code-Audit), daher trifft der
+  Großteil der üblichen Checkliste (Rate Limiting, JWT, SQL-Injection,
+  SSRF, IDOR) auf die heutige Architektur schlicht nicht zu — dokumentiert
+  als konsolidierte Tabelle im Plan. Ein Explore-Agent fand die einzige
+  real zutreffende Lücke: `ui.js:4134` (Template-Editor) schrieb
+  `ex.name` ohne das etablierte `h()`-Escaping direkt in ein
+  `value`-Attribut — sowohl beim Tippen als auch über einen präparierten
+  JSON-Import ausnutzbar. Fix: `h()` ergänzt. Zusätzlich `backup.js`s
+  Import-Validierung gehärtet (`_sanitizeImportedState()`, Typ-/Längen-
+  Coercion + 5-MB-Dateigrößen-Cap, Defense-in-Depth) und einen
+  CSP-`<meta>`-Tag in index.html ergänzt (GitHub Pages erlaubt keine
+  echten HTTP-Header; `'unsafe-inline'` bei script-src bewusst
+  beibehalten, siehe DECISIONS.md "SICHERHEIT"). Neuer Regressionstest
+  `tests/security_xss.spec.js` — manuell gegen den unreparierten Code
+  laufen lassen zur Bestätigung, dass er die Lücke wirklich fängt (schlug
+  dort korrekt fehl, danach Fix wiederhergestellt). Neues Dokument
+  `SECURITY.md`: Teil 1 = heutiger Ist-Zustand, Teil 2 = dokumentierte,
+  noch NICHT gebaute Blaupause für Auth/Rate-Limiting/Access-Control-
+  Matrix/API-Key-Handling, aktiviert erst sobald die geplante Paywall/
+  Coaching-Funktion einen echten Server bekommt. Committed, gepusht,
+  Milestone-Backup erstellt (`backups/TRAIN_2026-07-18_security-xss-fix-csp-b59/`).
+
+## 2026-07-18 train-v177 (B55/B56 — Impressum/Datenschutz strukturell vervollständigt)
+Loop 1: 19/19 grün ✓ (nach Textänderung erneut bestätigt, inkl. Ad-hoc-
+  Check dass beide Akkordeons fehlerfrei aufklappen)
+Loop 2: aktualisiert — CACHE_VERSION/CSS in HANDOFF.md/CLAUDE.md auf
+  train-v177 synchronisiert
+Loop 3: übersprungen — unverändert seit v176
+Eigentliche Aufgabe: direkter Anschluss an den B59-Sprint — Nutzer bat
+  darum, die B55/B56-Platzhalter (Impressum/Datenschutz, aus der DSGVO/
+  Rechts-Review vom 2026-07-14) mit korrektem rechtlichem Rahmentext
+  vorzubereiten statt nur "TODO" stehen zu lassen. `ui.js` Settings-Tab:
+  Impressum-Block hat jetzt § 5 TMG/DDG-Rahmentext mit klar markierten
+  Platzhalter-Zeilen (Name/Anschrift/E-Mail in eckigen Klammern, ⚠️ +
+  Warnfarbe). Datenschutz-Block erweitert um Verantwortlicher-Zeile
+  (verweist auf Impressum statt Daten zu duplizieren), Rechtsgrundlage
+  (Art. 6 Abs. 1 lit. f DSGVO), GitHub-Pages-Hosting-Hinweis mit Link
+  zum GitHub Privacy Statement, Betroffenenrechte-Absatz, präzisierte
+  GoatCounter-Formulierung. B55 bleibt Blocker (braucht echte
+  Name+Anschrift-Angaben vom Nutzer), B56 ist jetzt code-vollständig.
+  Zusätzlich zwei Nebenbefunde aus der Loop-5-Regenerierung (siehe
+  unten) direkt behoben: `.github/workflows/test.yml` rief
+  `security_xss.spec.js` bisher NICHT mit (nur die beiden älteren Specs
+  namentlich aufgerufen) — dritter Schritt ergänzt, läuft jetzt bei
+  jedem Push mit. `CLAUDE.md:189` hatte noch "State Shape (SCHEMA 29)"
+  im Zwischenüberschrift-Label, obwohl SCHEMA_VERSION seit B18/v165
+  bereits 30 ist — korrigiert. `project_train.md`-Memory aktualisiert
+  (Verweis auf SECURITY.md als Referenz für künftige Server-Anforderungen,
+  statt Inhalte zu duplizieren). DECISIONS.md um neue Sektion
+  "SICHERHEIT" ergänzt (2 Einträge: Security-Checkliste erst Phase 2,
+  CSP `'unsafe-inline'`-Kompromiss). Committed, gepusht, Milestone-Backup
+  erstellt.
+Loop 5: for-advisor.txt aktualisiert (11. Fassung, Stand train-v177) —
+  per Fork direkt aus dem Code erzeugt (nicht aus Doku zusammengefasst),
+  fand dabei die beiden oben genannten Nebenbefunde (CI-Wiring-Lücke,
+  CLAUDE.md-Label-Drift), die noch im selben Sprint behoben und im
+  Export nachgetragen wurden. context-exports/ ist gitignored, nie
+  mitgepusht.
