@@ -1,7 +1,7 @@
 # TRAIN — CLAUDE.md
 # Vollständiger Projektkontext für Claude Code
-# Stand: train-v180 / SCHEMA 30 / Juli 2026
-# Letztes Update: nach train-v180 (Cross-AI-Review Runde 2: Prototype-Pollution-Fix, § 25 TDDDG)
+# Stand: train-v181 / SCHEMA 30 / Juli 2026
+# Letztes Update: nach train-v181 (Cross-AI-Review Runde 3 vorbereitet, Versions-Anzeige-Drift gefixt)
 
 ---
 
@@ -40,7 +40,7 @@ TRAIN ist eine deutschsprachige PWA für Krafttraining. Pure Vanilla ES Modules 
 
 - Repo: https://github.com/777random/TRAIN
 - Deployed: https://777random.github.io/TRAIN/
-- Aktueller Stand: SCHEMA_VERSION 30 · CACHE_VERSION train-v180 · CSS ?v=191
+- Aktueller Stand: SCHEMA_VERSION 30 · CACHE_VERSION train-v181 · CSS ?v=191
 
 ---
 
@@ -414,3 +414,10 @@ Plateau:   "Plateau überwinden" + konkrete Strategie
 2. Feature-Status-Tabelle
 3. HANDOFF.md überschreiben
 4. BUGS.md aktualisieren (behoben/offen)
+5. Versions-Anzeige in den Einstellungen (`ui.js`, Settings-Tab "Info"-Sektion,
+   `<div class="settings-row__desc">TRAIN train-vXXX</div>`) — hartkodierter
+   String, kein gemeinsamer Konstanten-Import mit sw.js möglich (sw.js läuft
+   als Classic Script, kein ES-Modul, siehe registerSW.js). War bis train-v180
+   seit train-v175 nicht mehr mitgezogen worden (Fund aus Cross-AI-Review
+   Runde 3) — deshalb jetzt explizit im Checklist, nicht mehr nur implizit
+   über CACHE_VERSION mitgemeint.

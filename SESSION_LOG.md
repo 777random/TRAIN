@@ -1037,3 +1037,48 @@ Loop 5: übersprungen — for-advisor.txt (Loop 5) wäre nach diesem Sprint
   wieder einen Schritt hinter dem echten Stand, aber kein neuer
   Cross-AI-Advisor-Export in diesem Sprint angefordert — nachholen bei
   Bedarf im nächsten Sprint.
+
+
+## 2026-07-18 train-v181 (Cross-AI-Review Runde 3 vorbereitet, B61 Versions-Anzeige-Fix)
+Loop 1: 20/20 grün (Playwright) ✓
+Loop 2: aktualisiert — CACHE_VERSION/CSS in HANDOFF.md/CLAUDE.md auf train-v181 synchronisiert
+Loop 3: übersprungen — unverändert seit v180
+Eigentliche Aufgabe: Nutzer bat um Aktualisierung aller .md-Dateien UND
+  der 4 Cross-AI-Advisor-Exportdokumente für eine dritte externe
+  Beratungsrunde, per paralleler Subagents. Konsistenz-Check über alle
+  .md-Dateien lief zuerst (grep auf veraltete Versionsnummern) — keine
+  echten Doku-Drifts gefunden, alle bereits korrekt auf v180 synchron
+  (historische Sprint-Log-Einträge mit alten Versionsnummern sind
+  korrekt, keine Fixes nötig). Anschließend 4 parallele Forks, je ein
+  `context-exports/advisor-*.txt`-Dokument komplett neu erzeugt:
+  - **Legal:** § 25 TDDDG + § 312k BGB ergänzt, explizite Warnung vor der
+    BGH-Fehlinterpretation aus Runde 2 als Kalibrierungs-Hinweis für
+    Runde 3 ("selbst spezifisch klingende Zitate prüfen, auch in diesem
+    Dokument").
+  - **Security:** Prototype-Pollution-Fix + alle 4 abgelehnten
+    Gemini-Vorschläge aus Runde 2 (SRI, zirkuläre-JSON-DoS,
+    Verschlüsselung, Silent-Backup) mit technischer Begründung als
+    Kalibrierungs-Kontext dokumentiert.
+  - **Produkt/UX:** leichteres Update (Runde 2 bestätigte die meisten
+    Punkte als echte Ermessensfragen ohne harte Fakten) — Kreuzverweis
+    auf die Preisfrage im Business-Dokument statt Duplizierung.
+  - **Business/Ethik:** größtes Update — echte Strong/Hevy-Preise
+    eingearbeitet MIT der kritischen Neurahmung (Vergleich mit reinen
+    Logging-Apps ist die falsche Frage, da TRAINs Gratis-Tier das schon
+    abdeckt), Kündigungsbutton-Prinzip + B60 als Erweiterung der
+    bestehenden Dark-Pattern-Historie ergänzt, Preisfrage exakt als
+    "gibt es eine Referenzklasse für Coaching-Preise, sonst
+    Zahlungsbereitschaft der 20 Testnutzer messen" neu gestellt statt
+    beantwortet.
+  Nebenbefund eines Subagents beim Re-Lesen von ui.js (nicht gesucht):
+  B61 — Versions-Anzeige in den Einstellungen zeigte seit train-v175
+  unverändert "train-v175", weil dieser Wert bei keinem Sprint seither
+  im Update-Ablauf enthalten war (kein gemeinsamer Konstanten-Import
+  mit sw.js möglich — sw.js läuft als Classic Script, kein ES-Modul).
+  Korrigiert auf train-v181, als expliziter Punkt 5 in CLAUDE.md "NACH
+  JEDEM SPRINT AKTUALISIEREN" ergänzt. CACHE_VERSION train-v180→v181.
+  Volle Suite 20/20 grün.
+Loop 5: nicht erneut ausgeführt — die 4 Advisor-Exportdokumente wurden
+  in diesem Sprint bereits gezielt (nicht über den generischen Loop-5-
+  Ablauf) aktualisiert; for-advisor.txt selbst (der technische Loop-5-
+  Code-Export) bleibt auf Stand v176, nachholen bei Bedarf.

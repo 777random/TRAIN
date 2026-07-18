@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-18, Cross-AI-Review Runde 2 ausgewertet (train-v180)*
-*Nächster Schritt: B55 bleibt Blocker — braucht echte Name+Anschrift-Angaben vom Nutzer (c/o-Adress-Workaround, siehe LEGAL.md). Preis-Frage (8-12€/Monat vs. Strong/Hevy-Realpreise) noch offen, braucht Nutzer-Entscheidung. Kündigungsbutton-Prinzip (§312k BGB) bereits als DECISIONS.md-Eintrag festgehalten für den Payment-Sprint.*
+*Letzte Aktualisierung: 2026-07-18, Cross-AI-Review Runde 3 vorbereitet + B61 Versions-Anzeige-Fix (train-v181)*
+*Nächster Schritt: B55 bleibt Blocker — braucht echte Name+Anschrift-Angaben vom Nutzer (c/o-Adress-Workaround, siehe LEGAL.md). Preis-Referenzklassen-Frage (Coaching-Apps statt Strong/Hevy, siehe advisor-business-ethics-Export) noch offen, braucht Nutzer-Entscheidung oder echte Zahlungsbereitschafts-Daten aus dem Testlauf. Kündigungsbutton-Prinzip (§312k BGB) bereits als DECISIONS.md-Eintrag festgehalten für den Payment-Sprint. 4 aktualisierte Cross-AI-Advisor-Exportdokumente bereit für eine dritte externe Beratungsrunde.*
 
 ---
 
@@ -11,14 +11,36 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v180 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v181 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
 - CSS: ?v=191 (unverändert diesen Sprint — reiner JS/HTML-Sprint)
 - SCHEMA: 30 (unverändert diesen Sprint)
 - Letzter Commit: siehe `git log` (dieser Sprint noch nicht gepusht,
   siehe Sprint-Ende-Workflow).
-- **Cross-AI-Review Runde 2 ausgewertet (train-v180):** Nutzer ließ die
+- **Cross-AI-Review Runde 3 vorbereitet + B61 (train-v181):** Nutzer bat
+  darum, alle .md-Dateien UND die 4 Cross-AI-Advisor-Exportdokumente für
+  eine weitere (dritte) externe Beratungsrunde zu aktualisieren, per
+  paralleler Subagents. Alle 4 `context-exports/advisor-*.txt`-Dateien
+  neu erzeugt (in sich verständlich, Round-2-Ergebnisse eingearbeitet,
+  je neue Runde-3-spezifische offene Fragen — nicht nur Runde-1-Fragen
+  wiederholt). Kern-Update im Business/Ethik-Dokument: die Preisfrage
+  wurde neu gerahmt — nicht "ist 8-12€ zu teuer verglichen mit Strong/
+  Hevy" (falsche Vergleichsgruppe, da TRAINs Gratis-Tier bereits das
+  liefert, wofür Strong/Hevy bezahlt verlangen), sondern "gibt es eine
+  echte Referenzklasse für Coaching/Decision-Support-Preise, und falls
+  nein: ist die Zahlungsbereitschaft der ersten 20 Testnutzer der
+  einzig verlässliche Weg, den Preis zu bestimmen?" — bewusst nicht
+  selbst entschieden, offene Frage für Runde 3 bzw. den echten Testlauf.
+  **B61 (Nebenfund, nicht gesucht):** ein Subagent meldete beim
+  Re-Lesen von `ui.js` für die Legal-Export-Aktualisierung, dass die
+  Versions-Anzeige in den Einstellungen seit train-v175 unverändert
+  "train-v175" zeigte — war schlicht bei keinem Sprint seither im
+  Update-Ablauf enthalten (kein gemeinsamer Konstanten-Import mit
+  sw.js möglich, da sw.js als Classic Script ohne ES-Modul-Unterstützung
+  läuft). Korrigiert auf train-v181, UND als expliziter Punkt 5 in
+  CLAUDE.md "NACH JEDEM SPRINT AKTUALISIEREN" ergänzt, damit das nicht
+  wieder passiert. CACHE_VERSION train-v180→v181. Volle Suite 20/20 grün. Nutzer ließ die
   4 fertigen Advisor-Exportdokumente von zwei weiteren KIs (Claude
   Cowork, Gemini) querlesen und bat erneut um eigenständige, kritische
   Prüfung statt Übernahme. Ergebnis, jeder Punkt einzeln nachrecherchiert
