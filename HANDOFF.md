@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-18, B57 "Alle Daten löschen"-Button (train-v179)*
-*Nächster Schritt: B55 bleibt Blocker — braucht echte Name+Anschrift-Angaben vom Nutzer (c/o-Adress-Workaround, siehe LEGAL.md), Code-Seite ist fertig vorbereitet. 4 Cross-AI-Review-Exportdokumente (Legal/Security/Produkt/Business-Ethik) fertig in context-exports/, bereit zum Einspielen bei Gemini/ChatGPT.*
+*Letzte Aktualisierung: 2026-07-18, Cross-AI-Review Runde 2 ausgewertet (train-v180)*
+*Nächster Schritt: B55 bleibt Blocker — braucht echte Name+Anschrift-Angaben vom Nutzer (c/o-Adress-Workaround, siehe LEGAL.md). Preis-Frage (8-12€/Monat vs. Strong/Hevy-Realpreise) noch offen, braucht Nutzer-Entscheidung. Kündigungsbutton-Prinzip (§312k BGB) bereits als DECISIONS.md-Eintrag festgehalten für den Payment-Sprint.*
 
 ---
 
@@ -11,13 +11,59 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v179 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v180 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
 - CSS: ?v=191 (unverändert diesen Sprint — reiner JS/HTML-Sprint)
 - SCHEMA: 30 (unverändert diesen Sprint)
 - Letzter Commit: siehe `git log` (dieser Sprint noch nicht gepusht,
   siehe Sprint-Ende-Workflow).
+- **Cross-AI-Review Runde 2 ausgewertet (train-v180):** Nutzer ließ die
+  4 fertigen Advisor-Exportdokumente von zwei weiteren KIs (Claude
+  Cowork, Gemini) querlesen und bat erneut um eigenständige, kritische
+  Prüfung statt Übernahme. Ergebnis, jeder Punkt einzeln nachrecherchiert
+  bzw. am echten Code verifiziert:
+  - **Übernommen + umgesetzt:** § 25 TDDDG (vormals TTDSG) als eigene
+    Rechtsgrundlage für localStorage/Service-Worker-Speicherung neben
+    Art. 6 Abs. 1 lit. f DSGVO ergänzt (`ui.js`-Datenschutz-Akkordeon +
+    `datenschutz.html`) — echter Fund, den keine der 3 vorherigen
+    KI-Runden hatte. Prototype-Pollution-Guard in `backup.js`
+    (`_stripPrototypePollutionKeys()`) — code-verifiziert am echten
+    `Object.assign(state, imported)`-Merge-Muster in state.js (nicht nur
+    behauptet: per direktem Test bestätigt, dass ohne Guard `state`s
+    Prototype-Chain über einen `"__proto__"`-Key in der importierten
+    JSON tatsächlich kapert werden kann, mit Guard nicht).
+  - **Korrigiert:** BGH V ZR 210/22 zur c/o-Adresse — eine KI hatte das
+    Urteil als Lockerung dargestellt, tatsächlich bestätigt es die
+    bereits vorsichtige LEGAL.md-Linie (reine Weiterleitungsvollmacht
+    reicht nicht) und wurde NICHT gelockert. §312k-BGB-Kündigungsbutton
+    (echter neuer Fund, seit 01.07.2022 in Kraft, in keinem der 4
+    Runde-1-Dokumente enthalten) als DECISIONS.md-Prinzip-Entscheidung
+    festgehalten (Umsetzung über Zahlungsanbieter-Self-Service, sobald
+    Payment-Sprint kommt). BFSG-Einschätzung leicht nach oben korrigiert
+    (wahrscheinlich unproblematisch, nicht mehr "unklar").
+  - **Abgelehnt mit technischer Begründung:** SRI-Hash für GoatCounter
+    (unversionierte Script-URL würde bei Anbieter-Updates lautlos
+    brechen), "zirkuläre JSON als DoS" (faktisch unmöglich, JSON kennt
+    keine Referenzen), client-seitige Verschlüsselung + "silent auto
+    backup" (beide von Gemini als Top-Empfehlung vorgeschlagen —
+    Verschlüsselung schützt nicht gegen das genannte XSS-Szenario, da
+    der Schlüssel im selben Origin liegt; Silent-Backup ist auf iOS
+    Safari technisch nicht umsetzbar). Details mit Begründung in
+    SECURITY.md/LEGAL.md, jeweils neuer "Kritische Prüfung Runde 2"-
+    Abschnitt.
+  - **Geprüft, echter Preis-Fund (noch offen):** Strong PRO $4,99/Monat,
+    Hevy Pro $23,99/Jahr — TRAINs geplante 8-12€/Monat liegen deutlich
+    darüber. Nicht direkt vergleichbar (TRAINs kostenloser Tier deckt
+    bereits das ab, was Strong/Hevy bezahlt anbieten; die 8-12€ sind für
+    Coaching, ein bei beiden Wettbewerbern nicht vorhandenes Feature),
+    aber psychologisch real (Preisanker der Nutzer). **Bleibt offene
+    Entscheidung — nicht code-seitig gelöst, braucht Nutzer-Input**
+    (Preis senken, Jahres-Tier ergänzen, oder Coach-Wert stärker
+    kommunizieren).
+  - BUGS.md B60 (Streak-Anzeige optional ausblendbar) als neuer,
+    niedrigpriorer Kandidat ergänzt — nicht umgesetzt.
+  - CACHE_VERSION train-v179→v180. Volle Suite 20/20 grün.
 - **B57 umgesetzt (train-v179) — "Alle Daten löschen"-Button:** Nutzer
   bat darum, B57 (aus dem 2026-07-14-DSGVO-Review, bis dahin offen) noch
   in denselben Sprint wie B55/B56 aufzunehmen. Neue Settings-Row

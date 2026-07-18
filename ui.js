@@ -4118,6 +4118,18 @@ function renderSettingsTab(state) {
           JSON-Sicherung (Einstellungen → Backup) — die Export-Datei
           landet auf deinem Gerät/deiner Cloud, ebenfalls nie auf einem
           Server von uns.<br><br>
+          <strong>Rechtsgrundlage für die Speicherung auf deinem Gerät
+          (§ 25 TDDDG, vormals TTDSG):</strong> Das Ablegen deiner
+          Trainingsdaten in localStorage sowie das Zwischenspeichern von
+          App-Dateien im Browser-Cache (siehe Offline-Funktion unten)
+          sind technisch unbedingt erforderlich, um die von dir
+          gewünschte App-Funktion (Nutzung + Offline-Fähigkeit)
+          überhaupt bereitzustellen — dafür ist nach § 25 Abs. 2 Nr. 2
+          TDDDG keine gesonderte Einwilligung nötig. Für die anonyme
+          Nutzungs-Zählung (GoatCounter, siehe unten) gilt das nicht in
+          gleicher Weise — die speichert aber ihrerseits nichts auf
+          deinem Gerät (cookielos), weshalb § 25 TDDDG dafür gar nicht
+          erst greift.<br><br>
           <strong>Offline-Funktion (Service Worker):</strong> TRAIN
           speichert App-Dateien technisch im Browser-Cache, damit die
           App auch offline funktioniert. Das ist eine rein technische

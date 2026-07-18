@@ -1,6 +1,6 @@
 # TRAIN — Bug-Tracking
 *Wird nach jedem Sprint aktualisiert*
-*Stand: Juli 2026 / train-v179*
+*Stand: Juli 2026 / train-v180*
 
 ---
 
@@ -74,6 +74,7 @@
 | B55 | Impressum-Platzhalter ist ein akutes Abmahnrisiko | **Blocker vor weiterer Nutzerwerbung — strukturell vorbereitet (train-v177/v178), wartet auf echte Name+Adresse-Angaben** | Details, Quellen und die vollständige Rechts-Recherche (inkl. c/o-Adress-Workaround) siehe LEGAL.md. |
 | B56 | Datenschutz-Akkordeon ist keine vollständige Art.-13-DSGVO-Erklärung | **Behoben (train-v178)** | Details siehe LEGAL.md. Verantwortlicher-Zeile verweist auf Impressum, wird automatisch korrekt sobald B55 echte Angaben bekommt. |
 | B58 | OFL.txt (Font-Lizenztext) fehlt im `fonts/`-Ordner | Low | Gleiches Review. Bebas Neue + DM Sans (B51, selbst gehostet) stehen unter SIL Open Font License — rechtlich unproblematisch, aber OFL verlangt bei Weiterverteilung eigentlich Mitlieferung des Lizenztexts. Kleinigkeit, schnell ergänzt. |
+| B60 | Streak-Anzeige nicht optional ausblendbar | Low | Aus der Cross-AI-Review-Runde 2 (2026-07-18, Business/Ethik-Dokument). Streak-Tracking bleibt trotz neutraler Sprache ("X Wochen konsistentes Training" statt Flamme) ein Loss-Aversion-Mechanismus — konsequente Fortsetzung der bereits gelebten Anti-Dark-Pattern-Linie (Streak-Freeze/Badge-Granting/Flammen-Icon entfernt, siehe DECISIONS.md GAMIFICATION) wäre ein Einstellungs-Toggle, der die Streak-Anzeige komplett ausblendet statt sie nur neutral zu formulieren. Nicht umgesetzt, nur als Kandidat dokumentiert — echte Ermessensfrage, kein Blocker. |
 
 ---
 

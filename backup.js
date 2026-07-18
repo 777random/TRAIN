@@ -82,6 +82,27 @@ export function exportJSONAuto(startDate) {
 const _IMPORT_MAX_BYTES = 5 * 1024 * 1024; // reguläre Backups liegen weit darunter
 const _IMPORT_MAX_TEXT  = 200;
 
+// Prototype-Pollution-Guard: state.js' STATE_IMPORT-Reducer merged importierte
+// Daten per `Object.assign(state, imported)` — ein Top-Level-Feld namens
+// "__proto__" in der importierten JSON würde darüber tatsächlich state's
+// Prototype-Chain überschreiben (Object.assign nutzt intern [[Set]], das den
+// geerbten __proto__-Setter auslöst; JSON.parse selbst ist davon NICHT
+// betroffen, aber Object.assign schon). Läuft als allererstes über die
+// geparste Datei, vor jeder anderen Prüfung — verworfene Werte, keine Fehler,
+// da ein legitimes Backup diese Schlüsselnamen nie enthält.
+function _stripPrototypePollutionKeys(obj) {
+  if (!obj || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) {
+    for (const item of obj) _stripPrototypePollutionKeys(item);
+    return obj;
+  }
+  for (const key of ['__proto__', 'constructor', 'prototype']) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) delete obj[key];
+  }
+  for (const key of Object.keys(obj)) _stripPrototypePollutionKeys(obj[key]);
+  return obj;
+}
+
 function _sanitizeImportText(val, maxLen = _IMPORT_MAX_TEXT) {
   if (typeof val !== 'string') return '';
   return val.length > maxLen ? val.slice(0, maxLen) : val;
@@ -121,6 +142,7 @@ export function importJSON(file) {
       let parsed;
       try { parsed = JSON.parse(event.target.result); }
       catch { reject(new Error('Die Datei enthält kein gültiges JSON.')); return; }
+      _stripPrototypePollutionKeys(parsed);
       if (!parsed || !Array.isArray(parsed.weeks)) {
         reject(new Error('Keine Trainingsdaten gefunden (weeks-Array fehlt).')); return;
       }

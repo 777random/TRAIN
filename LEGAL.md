@@ -1,6 +1,6 @@
 # TRAIN — LEGAL.md
 *Rechts-Recherche und -Entscheidungen. Getrennt von BUGS.md gehalten (das bleibt reiner Bug-Tracker) — hier steht das Warum, dort nur ein Pointer.*
-*Stand: train-v178 (Juli 2026)*
+*Stand: train-v180 (Juli 2026)*
 
 ---
 
@@ -19,12 +19,15 @@
    - Optionen: kommerzielle Anbieter (~5-15€/Monat, z.B. Postflex — eigene Prüfung der Seriosität empfohlen), Coworking-Space mit Post-Service, c/o bei einem Steuerberater o.ä. mit dessen ausdrücklicher Zustimmung.
    - GmbH/UG-Gründung würde eine Firmenadresse ermöglichen, ist aber für den aktuellen Stand (Paywall laut DECISIONS.md "bis Marktvalidierung" zurückgestellt) unverhältnismäßig — nicht empfohlen.
    - **Vor dem Platzhalter-Swap:** beim gewählten Adress-Anbieter explizit bestätigen lassen, dass der Name im Format "Vorname Nachname, c/o [Anbieter]" geführt werden darf.
+   - **Gegengeprüft (Runde 2, BGH-Urteil V ZR 210/22 vom 07.07.2023):** bestätigt die vorsichtige Linie oben, lockert sie NICHT. Das Urteil stellt klar, dass eine Vollmacht, die nur auf reine Postweiterleitung beschränkt ist, für eine ladungsfähige Anschrift NICHT ausreicht — es muss echte, ausdrückliche Empfangsvollmacht mit tatsächlicher Erreichbarkeit vorliegen. Ein extern kolportierter "OLG-Frankfurt-Briefkasten"-Fall, der angeblich eine reine Briefkastenadresse durchgewunken hätte, ließ sich in der eigenen Recherche nicht verifizieren — nicht übernommen. Beim Adress-Anbieter also explizit auf eine echte Empfangs-/Weiterleitungsvollmacht bestehen, nicht nur auf eine Postfach-Zusage.
 
 **3. OS-Streitschlichtung — NICHT hinzufügen.** Die EU-Plattform wurde zum **20.07.2025 abgeschaltet**. Ein Hinweis darauf (wie in vielen älteren Vorlagen) wäre jetzt selbst irreführend/abmahnfähig. TRAINs Text enthält keinen — bewusst so lassen, nicht "vervollständigen". ([ihk.de](https://www.ihk.de/lahn-dill/branchen/einstellung-os-plattform-6504948), [wbs.legal](https://www.wbs.legal/it-und-internet-recht/eu-streitbeilegungsplattform-os-plattform-eingestellt-jetzt-impressum-aktualisieren-83428/))
 
 **4. §5 DDG greift schon jetzt.** "Geschäftsmäßig" ist weit gefasst — gilt auch vor dem ersten Euro Umsatz, wenn ein Angebot der Anbahnung eines späteren Geschäfts dient (TRAINs geplante Paywall reicht). Bußgeldrahmen bei Verstoß: bis 50.000€. ([gesetze-im-internet.de](https://www.gesetze-im-internet.de/ddg/__5.html), [rehkatsch.com](https://rehkatsch.com/media-law/impressum-law-germany/))
 
 **5. Zweiter Kontaktweg — Entscheidung: nur E-Mail, Risiko akzeptiert.** §5 DDG verlangt "unmittelbare Kommunikation". Ein ECJ-Urteil (2008) stellt klar: eine Telefonnummer ist NICHT zwingend, wenn eine gleichwertig schnelle Alternative existiert — reine E-Mail ist rechtlich eine Grauzone, aber praktisch ein geringes Risiko bei einem kostenlosen ~20-Nutzer-Angebot ohne Umsatz. ([e-recht24.de](https://www.e-recht24.de/impressum/1023-impressum-telefonnummer.html)) Kein Kontaktformular gewählt — würde einen Drittanbieter-Formularservice erfordern (kein eigener Server), also einen neuen externen Aufruf + neuen Auftragsverarbeiter-Eintrag bedeuten, mehr Rechts-/Angriffsfläche statt weniger. **Neu bewerten, sobald die Paywall live geht** (Risiko-Kalkül ändert sich mit echtem Umsatz).
+
+**6. § 25 TDDDG (vormals TTDSG) — eigene Rechtsgrundlage neben Art. 6 Abs. 1 lit. f DSGVO nötig (Runde-2-Fund, umgesetzt train-v180).** Gilt nachweislich nicht nur für Cookies, sondern ausdrücklich auch für localStorage und vergleichbare Speichermechanismen — Speicherung/Zugriff auf dem Endgerät braucht grundsätzlich Einwilligung, AUSSER die Ausnahme "unbedingt erforderlich für den vom Nutzer gewünschten Dienst" (§ 25 Abs. 2 Nr. 2 TDDDG) greift. Für TRAINs Trainingsdaten-Speicherung + Service-Worker-Offline-Cache greift diese Ausnahme (der Nutzer will genau diese Funktion). Jetzt explizit im Datenschutztext benannt, nicht mehr nur implizit über die DSGVO-Rechtsgrundlage mitgemeint. GoatCounter bleibt unberührt — speichert selbst nichts auf dem Gerät (cookielos), § 25 TDDDG greift dafür also gar nicht erst. ([gesetze-im-internet.de](https://www.gesetze-im-internet.de/ttdsg/__25.html), [dejure.org](https://dejure.org/gesetze/TDDDG/25.html))
 
 ---
 
@@ -44,12 +47,25 @@ Nutzer bat um eine zweite Meinung von Gemini und ChatGPT zum ursprünglichen Pla
 
 ---
 
+## Kritische Prüfung von Runde 2 (Claude Cowork + Gemini, 2026-07-18, train-v180)
+
+Nutzer ließ die fertigen Cross-AI-Review-Exportdokumente von zwei weiteren KIs querlesen und bat erneut um eigenständige Prüfung statt Übernahme. Ergebnis:
+
+**Übernommen:** § 25 TDDDG (siehe Fakt 6 oben, echter Fund — keine der 3 vorherigen KI-Runden hatte das). § 312k BGB Kündigungsbutton (siehe "später"-Blaupause oben, echter Fund, in keinem der 4 Runde-1-Exportdokumente enthalten obwohl direkt die dort schon aufgeworfene Paywall-UX-Frage betreffend). BFSG-Einordnung leicht nach oben korrigiert (siehe oben) — aber NICHT so kategorisch "gelöst" übernommen wie behauptet, eigene Quelle bleibt vorsichtiger.
+
+**Korrigiert:** BGH V ZR 210/22 — Claude Cowork charakterisierte das Urteil als Lockerung ("eher zu vorsichtig als zu offensiv, kein Korrekturbedarf") plus einen nicht verifizierbaren "OLG-Frankfurt-Briefkasten"-Fall. Die tatsächliche Quellenlage zeigt das Gegenteil: das Urteil bestätigt die strenge Linie (reine Weiterleitungsvollmacht reicht nicht). Die ursprüngliche LEGAL.md-Fassung war bereits korrekt vorsichtig, nicht "zu" vorsichtig — nicht gelockert.
+
+**Nicht übernommen:** siehe SECURITY.md für die Security-spezifischen Ablehnungen dieser Runde (client-seitige Verschlüsselung, "silent auto backup", "zirkuläre JSON-DoS" — alle mit technischer Begründung verworfen, nicht rechtlicher).
+
+---
+
 ## Bewusst noch NICHT umgesetzt (Blaupause, aktivieren bei Bedarf)
 
 - **AGB (Nutzungsbedingungen):** erst nötig, sobald die Paywall/Coaching-Abo tatsächlich verkauft wird (DECISIONS.md: "bis Marktvalidierung").
-- **Widerrufsbelehrung:** EU-Verbraucherrecht verlangt bei digitalen Abo-Inhalten ein 14-tägiges Widerrufsrecht bzw. einen expliziten Verzichts-Checkbox-Flow beim Checkout — erst relevant sobald bezahlt wird.
+- **Widerrufsbelehrung:** EU-Verbraucherrecht verlangt bei digitalen Abo-Inhalten ein 14-tägiges Widerrufsrecht bzw. einen expliziten Verzichts-Checkbox-Flow beim Checkout (§ 356 Abs. 5 BGB) — erst relevant sobald bezahlt wird. Sollte technisch als Teil des Payment-Sprints mitgeplant werden (eigener UI-Baustein mit Vorlauf), nicht erst als reiner Rechtstext im letzten Moment.
+- **§ 312k BGB Kündigungsbutton (Runde-2-Fund, neu):** seit 01.07.2022 in Kraft — jeder B2C-Online-Vertrag mit wiederkehrender Zahlungspflicht (TRAINs geplantes Coaching-Abo) braucht einen gut sichtbaren, unmittelbar wirkenden Kündigungs-Button ("Jetzt kündigen" o.ä.), der zu einer Bestätigungsseite führt — Kündigung muss genauso leicht erreichbar sein wie der Abschluss. Fehlt der Button, kann der Nutzer jederzeit fristlos kündigen. Naheliegende Umsetzung: über den Self-Service-Kündigungsflow des künftigen Zahlungsanbieters (z.B. Stripe Customer Portal) statt selbst gebaut — muss die Zahlung tatsächlich beenden, nicht nur eine Nachricht anzeigen. ([gesetze-im-internet.de](https://www.gesetze-im-internet.de/bgb/__312k.html), [twobirds.com](https://www.twobirds.com/de/insights/2025/germany/k%C3%BCndigungsbutton-nach-%C2%A7-312k-bgb-%E2%80%93-eine-rechtsprechungs%C3%BCbersicht)) Siehe auch DECISIONS.md — Prinzip-Entscheidung dazu wurde bereits jetzt getroffen, obwohl die UI noch nicht gebaut wird.
 - **Datenschutz-Ergänzung für Zahlungsanbieter** (z.B. Stripe/PayPal), sobald einer für die Paywall integriert wird — neuer Auftragsverarbeiter-Eintrag nötig.
-- **BFSG (Barrierefreiheitsstärkungsgesetz),** seit 28.06.2025 in Kraft: digitale Dienstleistungen im elektronischen Geschäftsverkehr mit Verbrauchern sind grundsätzlich betroffen. Kleinstunternehmen-Ausnahme (< 10 Beschäftigte, ≤ 2 Mio. € Umsatz/Bilanzsumme) greift für **Dienstleistungen**, aber nicht zwingend für als "Produkt" eingestufte Software — die Einordnung einer Abo-App ist nicht auf den ersten Blick eindeutig und sollte zum Zeitpunkt des Paywall-Starts geprüft werden. TRAIN steht hier schon gut da (Lighthouse Accessibility 100, siehe CLAUDE.md). ([activemind.legal](https://www.activemind.legal/de/guides/bfsg/), [haendlerbund.de](https://ohn.haendlerbund.de/recht/rechtsfragen/kleinstunternehmen-bfsg-ausnahme))
+- **BFSG (Barrierefreiheitsstärkungsgesetz),** seit 28.06.2025 in Kraft: digitale Dienstleistungen im elektronischen Geschäftsverkehr mit Verbrauchern sind grundsätzlich betroffen. Kleinstunternehmen-Ausnahme (< 10 Beschäftigte, ≤ 2 Mio. € Umsatz/Bilanzsumme) greift für **Dienstleistungen**, nicht automatisch für als "Produkt" eingestufte Software. **Runde-2-Update:** ein Abo-Modell mit Vertragsschluss fällt nach gegengeprüfter Quellenlage typischerweise unter "Dienstleistungen im elektronischen Geschäftsverkehr mit Verbrauchern" (die Produkt-Kategorie ist im Kern für Hardware/Betriebssysteme reserviert) — die Kleinstunternehmen-Ausnahme greift damit voraussichtlich. Kein hundertprozentiger Freifahrtschein (hängt an den exakt im Gesetz aufgezählten Dienstleistungs-Kategorien), aber Einschätzung von "unklar" auf "wahrscheinlich unproblematisch" angehoben. Trotzdem beim Paywall-Start kurz gegenchecken statt blind darauf verlassen. TRAIN steht ohnehin schon gut da (Lighthouse Accessibility 100, siehe CLAUDE.md). ([activemind.legal](https://www.activemind.legal/de/guides/bfsg/), [haendlerbund.de](https://ohn.haendlerbund.de/recht/rechtsfragen/kleinstunternehmen-bfsg-ausnahme))
 - **Google Play "Data Safety"-Formular / Apple Privacy-Nutrition-Label:** auch ein "wir erheben nichts"-Angebot muss das Formular ausfüllen (keine automatische Befreiung) — erst relevant beim geplanten App-Store-Schritt (CLAUDE.md: "App Store nach ersten Nutzer-Signalen"). `datenschutz.html` (train-v178) deckt die "eigenständig aufrufbare URL"-Anforderung dafür bereits ab.
 
 ## Geprüft und für unbedenklich befunden (kein Handlungsbedarf)

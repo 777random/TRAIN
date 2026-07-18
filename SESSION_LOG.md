@@ -971,3 +971,69 @@ Eigentliche Aufgabe: Nutzer bestätigte auf Rückfrage, B57 (seit dem
   erwartetes Verhalten, kein Datenleck). CACHE_VERSION train-v178→v179.
   Volle Suite 20/20 grün, CI grün. Committed, gepusht, Milestone-Backup
   erstellt.
+
+
+## 2026-07-18 train-v180 (Cross-AI-Review Runde 2 — kritisch ausgewertet)
+Loop 1: 20/20 grün (Playwright) ✓
+Loop 2: aktualisiert — CACHE_VERSION/CSS in HANDOFF.md/CLAUDE.md auf train-v180 synchronisiert
+Loop 3: übersprungen — unverändert seit v179
+Eigentliche Aufgabe: Nutzer ließ die 4 Cross-AI-Review-Exportdokumente von
+  zwei weiteren KIs (Claude Cowork, Gemini) gegenlesen und bat ausdrücklich
+  um eigenständige, kritische Prüfung statt Übernahme — inkl. der
+  expliziten Frage nach weiteren blinden Flecken. Jeder Punkt einzeln
+  nachrecherchiert bzw. am echten Code verifiziert (nicht nur behauptet):
+  - **§ 25 TDDDG (vormals TTDSG):** echter, bisher übersehener Fund — gilt
+    auch für localStorage, nicht nur Cookies. Jetzt explizit als eigene
+    Rechtsgrundlage neben Art. 6 Abs. 1 lit. f DSGVO in der
+    Datenschutzerklärung benannt (ui.js-Akkordeon + datenschutz.html).
+  - **Prototype Pollution beim JSON-Import:** code-verifiziert am echten
+    `Object.assign(state, imported)`-Merge in state.js — per direktem
+    Test bestätigt, dass ein `"__proto__"`-Key in der importierten JSON
+    ohne Guard tatsächlich state's Prototype-Chain kapert (kein
+    Mythos-Abnicken, empirisch nachvollzogen: Test schlägt ohne Guard
+    fehl, mit Guard nicht, legitime Importe bleiben unverändert). Fix:
+    neue `_stripPrototypePollutionKeys()` in backup.js, läuft als
+    allererstes über jede importierte Datei.
+  - **BGH V ZR 210/22 korrigiert:** eine KI hatte das Urteil als Lockerung
+    der c/o-Adress-Regel dargestellt — die echte Quellenlage bestätigt
+    stattdessen die bereits vorsichtige LEGAL.md-Linie (reine
+    Weiterleitungsvollmacht reicht nicht). Nicht gelockert.
+  - **§ 312k BGB Kündigungsbutton:** echter neuer Fund (in Kraft seit
+    01.07.2022), fehlte in allen 4 Runde-1-Dokumenten trotz direktem
+    Bezug zur dort schon aufgeworfenen Paywall-UX-Frage. Als
+    DECISIONS.md-Prinzip-Entscheidung festgehalten (Umsetzung über
+    Zahlungsanbieter-Self-Service beim Payment-Sprint), analog zu den
+    bereits früh getroffenen Gamification-Entscheidungen.
+  - **BFSG-Einschätzung** leicht nach oben korrigiert (wahrscheinlich
+    unproblematisch statt "unklar"), aber nicht so kategorisch "gelöst"
+    übernommen wie vorgeschlagen — eigene Quelle bleibt vorsichtiger.
+  - **Abgelehnt, mit technischer Begründung statt Meinung:** SRI-Hash für
+    GoatCounter (unversionierte Script-URL, würde bei Anbieter-Updates
+    lautlos brechen — Wartungs-Trade-off, kein Nulltarif-Fix wie
+    behauptet), "zirkuläre JSON-Struktur als Client-DoS" (faktisch
+    unmöglich, JSON-Syntax kennt keine Referenzen), client-seitige
+    localStorage-Verschlüsselung + "silent automated native backup"
+    (beide von Gemini als Top-Priorität vorgeschlagen — Verschlüsselung
+    ist Security-Theater gegen das selbst genannte XSS-Szenario, da der
+    Schlüssel im selben Origin/Web-Crypto-Keystore läge; Silent-Backup
+    ist auf iOS Safari, TRAINs Hauptzielplattform, technisch nicht
+    umsetzbar ohne Nutzer-Geste).
+  - **Preis-Fund (recherchiert, noch offene Entscheidung):** Strong PRO
+    $4,99/Monat, Hevy Pro $23,99/Jahr — TRAINs geplante 8-12€/Monat
+    liegen deutlich darüber. Nicht direkt vergleichbar (TRAINs
+    kostenloser Tier deckt bereits ab, was Strong/Hevy bezahlt anbieten;
+    8-12€ sind für ein bei beiden Wettbewerbern fehlendes Coaching-
+    Feature), aber psychologisch real. Bleibt offen, braucht
+    Nutzer-Entscheidung (Preis senken, Jahres-Tier ergänzen, oder
+    Coach-Wert stärker kommunizieren) — nicht code-seitig gelöst.
+  - Neuer BUGS.md-Kandidat B60 (Streak-Anzeige optional ausblendbar,
+    Low-Priorität, nicht umgesetzt) aus dem Business/Ethik-Dokument.
+  Umsetzung: `ui.js`/`datenschutz.html` (TDDDG-Absatz), `backup.js`
+  (Prototype-Pollution-Guard), `LEGAL.md`/`SECURITY.md` (je neuer
+  "Kritische Prüfung Runde 2"-Abschnitt mit Quellen), `DECISIONS.md`
+  (Kündigungsbutton-Prinzip), `BUGS.md` (B60). CACHE_VERSION
+  train-v179→v180. Volle Suite 20/20 grün.
+Loop 5: übersprungen — for-advisor.txt (Loop 5) wäre nach diesem Sprint
+  wieder einen Schritt hinter dem echten Stand, aber kein neuer
+  Cross-AI-Advisor-Export in diesem Sprint angefordert — nachholen bei
+  Bedarf im nächsten Sprint.
