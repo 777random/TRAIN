@@ -1,7 +1,7 @@
 # TRAIN — CLAUDE.md
 # Vollständiger Projektkontext für Claude Code
-# Stand: train-v177 / SCHEMA 30 / Juli 2026
-# Letztes Update: nach train-v177 (Impressum/Datenschutz-Platzhalter strukturell vervollständigt, B55/B56)
+# Stand: train-v178 / SCHEMA 30 / Juli 2026
+# Letztes Update: nach train-v178 (Datenschutz/Impressum erweitert, LEGAL.md angelegt, datenschutz.html)
 
 ---
 
@@ -40,7 +40,7 @@ TRAIN ist eine deutschsprachige PWA für Krafttraining. Pure Vanilla ES Modules 
 
 - Repo: https://github.com/777random/TRAIN
 - Deployed: https://777random.github.io/TRAIN/
-- Aktueller Stand: SCHEMA_VERSION 30 · CACHE_VERSION train-v177 · CSS ?v=191
+- Aktueller Stand: SCHEMA_VERSION 30 · CACHE_VERSION train-v178 · CSS ?v=191
 
 ---
 
@@ -64,6 +64,7 @@ Bei CSS-Änderungen: Cache-Buster in `index.html` erhöhen:
 | `DECISIONS.md` | Unveränderliche Produkt-/Architektur-Entscheidungen — nicht ohne neue explizite Entscheidung revidieren |
 | `AGENTS.md` | Parallelisierungs-Regeln für Multi-Agent Sprints |
 | `SECURITY.md` | Security-Status heutiger Architektur (kein Backend) + dokumentierte Blaupause für Auth/Rate-Limiting/Access-Control, sobald ein Server (Paywall/Coaching) kommt |
+| `LEGAL.md` | Rechts-Recherche zu Impressum/Datenschutz (Name-/Adress-Pflicht, c/o-Workaround, DDG/DSGVO-Fakten) + Blaupause für AGB/Widerrufsrecht/BFSG, sobald Paywall/App-Store kommen |
 | `LOOPS.md` | Automatische Session-Loops (beim Start jeder Session ausführen) |
 | `SESSION_LOG.md` | Protokoll aller Sessions und Loop-Ergebnisse |
 | `prompts/` | Wiederverwendbare Prompt-Vorlagen für Claude Code und externe Beratung |

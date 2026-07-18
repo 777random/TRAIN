@@ -16,7 +16,7 @@
  *   asset conflicts.
  */
 
-const CACHE_VERSION  = 'train-v177';
+const CACHE_VERSION  = 'train-v178';
 
 /**
  * App shell – every file the app needs to render its first frame offline.
@@ -25,6 +25,7 @@ const CACHE_VERSION  = 'train-v177';
 const PRECACHE_URLS = [
   './',
   './index.html',
+  './datenschutz.html',
   './state.js',
   './backup.js',
   './ui.js',

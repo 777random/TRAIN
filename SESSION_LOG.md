@@ -887,3 +887,52 @@ Loop 5: for-advisor.txt aktualisiert (11. Fassung, Stand train-v177) —
   CLAUDE.md-Label-Drift), die noch im selben Sprint behoben und im
   Export nachgetragen wurden. context-exports/ ist gitignored, nie
   mitgepusht.
+
+## 2026-07-18 train-v178 (B55/B56 — Datenschutz/Impressum erweitert, LEGAL.md, Cross-AI-Review)
+Loop 1: 19/19 grün (Playwright) ✓
+Loop 2: aktualisiert — CACHE_VERSION/CSS in HANDOFF.md/CLAUDE.md auf train-v178 synchronisiert
+Loop 3: übersprungen — unverändert seit v177
+Eigentliche Aufgabe: direkter Anschluss an den v177-Sprint — Nutzer ließ
+  den vorherigen Plan zusätzlich von Gemini und ChatGPT gegenchecken und
+  bat um zwei Dinge: (1) einen Workaround, um die private Adresse im
+  Impressum nicht offenlegen zu müssen, (2) eine EXPLIZIT KRITISCHE
+  Prüfung des externen KI-Feedbacks statt blinder Übernahme — inkl. der
+  Nachfrage, welche weiteren AI-Review-Perspektiven neben Legal/Security/
+  Produkt sinnvoll wären. Per /plan durchgeführt (2 Iterationen, da der
+  erste Plan-Entwurf das KI-Feedback zu unkritisch übernommen hatte —
+  Nutzer wies das explizit zurück und forderte eigenständige Nachrecherche).
+  Ergebnis der Nachrecherche (jeder Punkt einzeln mit eigenen Quellen
+  verifiziert, nicht nur der KI-Aussage geglaubt):
+  - c/o-Geschäftsadresse für die Anschrift bestätigt als legaler
+    Workaround (echte Postannahme/-weiterleitung nötig, reines Postfach
+    reicht nicht) — Klarname selbst bleibt ohne Workaround Pflicht.
+  - Zweiter Kontaktweg (§5 DDG "unmittelbare Kommunikation"): nach
+    Rückfrage (Kontaktformular würde neuen Drittanbieter-Service +
+    neue externe Verbindung + neuen Auftragsverarbeiter-Eintrag
+    bedeuten) Option "nur E-Mail, Risiko akzeptieren" gewählt statt
+    Telefonnummer oder Formular.
+  - SW/Cache-Rechtsgrundlage korrigiert (Art. 6 Abs. 1 lit. f statt der
+    von Gemini vorgeschlagenen lit. b DSGVO — einfachere, gängigere
+    Basis, identisch zur bereits genutzten GoatCounter-Grundlage).
+  - **Link-Haftungsausschluss (ursprünglich geplant, von ChatGPT als
+    "Textballast" kritisiert) nach eigener Recherche komplett
+    gestrichen statt nur gekürzt** — Rechtsprechung (LG Hamburg 1998)
+    zeigt, dass solche Disclaimer wirkungslos bis kontraproduktiv sind.
+    Medizinischer Disclaimer (anderes Rechtsgebiet) bleibt.
+  - Neu gefunden, von keiner KI erwähnt: BFSG (Barrierefreiheits-
+    stärkungsgesetz, seit 2025-06-28 in Kraft) als künftiger Prüfpunkt
+    beim Paywall-Start; dragdrop.js-MIT-Lizenz geprüft und für bereits
+    compliant befunden (Hinweis im Dateikopf vorhanden).
+  Umsetzung: `ui.js` Datenschutz-Akkordeon erweitert (Local-First-
+  Dilemma/Cache-Datenverlust-Warnung, Backup-Hinweis, SW-Cache-Hinweis,
+  Transparenz-Checkliste), Impressum-Akkordeon um medizinischen +
+  Minderjährigen-Satz ergänzt (kein Link-Disclaimer). Neue eigenständig
+  aufrufbare `datenschutz.html` (statisch, kein JS) für künftige
+  App-Store-Einreichungen, in sw.js precached. Neues `LEGAL.md` (Fakten,
+  kritische KI-Feedback-Prüfung, "später"-Blaupause) — BUGS.md B55/B56
+  auf kurze Pointer gekürzt (bleibt reiner Bug-Tracker). CACHE_VERSION
+  train-v177→v178. Verifiziert: volle Suite 19/19 grün, Ad-hoc-Checks
+  für beide Akkordeons + datenschutz.html bestanden.
+Loop 5: 4 Cross-AI-Review-Exportdokumente (Legal/Security/Produkt-UX/
+  Business-Ethik) werden im Anschluss per parallelen Subagents erzeugt
+  — siehe separater Eintrag nach Fertigstellung.

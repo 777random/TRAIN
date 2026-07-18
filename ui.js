@@ -4096,10 +4096,27 @@ function renderSettingsTab(state) {
       </button>
       <div class="session-note-body">
         <div class="settings-row__desc" style="padding:var(--sp-2) 0">
+          <strong>Kurz gesagt:</strong> Deine Trainingsdaten bleiben
+          ausschließlich auf deinem Gerät — TRAIN hat kein Konto, keinen
+          Server und überträgt deine Workout-Daten nie an irgendwen.<br><br>
           <strong>Verantwortlicher:</strong> siehe Impressum unten.<br><br>
-          Deine Trainingsdaten bleiben ausschließlich lokal auf diesem Gerät
-          gespeichert (Browser-Storage) — kein Konto, kein Server, keine
-          Übertragung deiner Workout-Daten an Dritte.<br><br>
+          <strong>Wo deine Daten liegen:</strong> Alle Trainingsdaten
+          (Sätze, Gewichte, Körpergewicht, Schlaf, Energielevel) werden
+          ausschließlich im lokalen Speicher deines Browsers
+          (localStorage) auf diesem Gerät abgelegt. Wichtig: Löschst du
+          den Browser-Cache/die Website-Daten für diese Seite oder
+          setzt du dein Gerät zurück, werden diese Daten unwiderruflich
+          gelöscht — TRAIN hat keine Kopie und kann sie nicht
+          wiederherstellen. Nutze dafür regelmäßig die
+          JSON-Sicherung (Einstellungen → Backup) — die Export-Datei
+          landet auf deinem Gerät/deiner Cloud, ebenfalls nie auf einem
+          Server von uns.<br><br>
+          <strong>Offline-Funktion (Service Worker):</strong> TRAIN
+          speichert App-Dateien technisch im Browser-Cache, damit die
+          App auch offline funktioniert. Das ist eine rein technische
+          Verarbeitung auf Basis unseres berechtigten Interesses an
+          einer zuverlässig nutzbaren App (Art. 6 Abs. 1 lit. f DSGVO)
+          — dieselbe Rechtsgrundlage wie unten bei der Nutzungs-Zählung.<br><br>
           Für anonyme Nutzungs-Zählung (wie viele Personen die App öffnen)
           wird GoatCounter eingesetzt — cookielos, ohne Werbe-Tracking, ohne
           Weitergabe an Dritte. Dabei wird deine IP-Adresse kurz technisch
@@ -4113,12 +4130,20 @@ function renderSettingsTab(state) {
           Server-Logs — unabhängig von der GoatCounter-Zählung oben. Mehr
           dazu im
           <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" target="_blank" rel="noopener" style="color:var(--c-accent)">GitHub Privacy Statement</a>.<br><br>
+          <strong>Was TRAIN verarbeitet — und was nicht:</strong><br>
+          ✔ Trainingsdaten, Körpergewicht, Schlaf, Energielevel (nur lokal auf deinem Gerät)<br>
+          ✔ Anonyme, aggregierte Nutzungs-Zählung (GoatCounter)<br>
+          ✘ Kein Standort, keine Kontakte, keine Kamera/Mikrofon<br>
+          ✘ Keine Werbung, kein Werbe-Tracking, kein Verkauf von Daten<br>
+          ✘ Keine Übertragung deiner Trainingsdaten an einen Server<br><br>
           <strong>Deine Rechte:</strong> Du hast das Recht auf Auskunft,
           Berichtigung, Löschung und Widerspruch bezüglich der wenigen bei
           GoatCounter/GitHub anfallenden Daten, sowie das Recht auf
           Beschwerde bei einer Datenschutz-Aufsichtsbehörde. Deine
           Trainingsdaten verlassen nie dein Gerät — du kannst sie jederzeit
           selbst über die Browser-Einstellungen löschen.<br><br>
+          Vollständige, eigenständig aufrufbare Fassung:
+          <a href="./datenschutz.html" target="_blank" rel="noopener" style="color:var(--c-accent)">datenschutz.html</a><br><br>
           <span style="color:var(--c-danger)">⚠️ Verantwortlicher-Angabe
           oben wird automatisch korrekt, sobald das Impressum unten mit
           echten Angaben ausgefüllt ist.</span>
@@ -4136,11 +4161,18 @@ function renderSettingsTab(state) {
           [DEINE STRASSE UND HAUSNUMMER]<br>
           [DEINE PLZ UND STADT]<br><br>
           Kontakt: [DEINE E-MAIL-ADRESSE]<br><br>
+          <strong>Hinweis zu Trainingsempfehlungen:</strong> TRAIN bietet
+          keine medizinische Beratung — alle Empfehlungen (Gewicht,
+          Wiederholungen, Deload) ersetzen keine ärztliche oder
+          physiotherapeutische Einschätzung.<br><br>
+          TRAIN richtet sich an erwachsene Kraftsportler und ist nicht für
+          die Nutzung durch Kinder und Jugendliche unter 16 Jahren ohne
+          Aufsicht durch Erziehungsberechtigte vorgesehen.<br><br>
           <span style="color:var(--c-danger)">⚠️ Platzhalter — vor
           Veröffentlichung mit echten Angaben ausfüllen. Name und
           ladungsfähige Anschrift sind für ein geschäftsmäßiges
           Online-Angebot gesetzlich vorgeschrieben (§ 5 TMG/DDG bzw. § 18
-          MStV), siehe BUGS.md B55.</span>
+          MStV), siehe LEGAL.md.</span>
         </div>
       </div>
     </div>

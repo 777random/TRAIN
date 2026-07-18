@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-18, Impressum/Datenschutz strukturell vervollständigt (train-v177)*
-*Nächster Schritt: B55 bleibt Blocker — braucht echte Name+Anschrift-Angaben vom Nutzer, Code-Seite ist jetzt vorbereitet*
+*Letzte Aktualisierung: 2026-07-18, Datenschutz/Impressum inhaltlich erweitert + LEGAL.md angelegt (train-v178)*
+*Nächster Schritt: B55 bleibt Blocker — braucht echte Name+Anschrift-Angaben vom Nutzer (c/o-Adress-Workaround, siehe LEGAL.md), Code-Seite ist fertig vorbereitet. Danach: 4 Cross-AI-Review-Exportdokumente (Legal/Security/Produkt/Business-Ethik) für weitere externe Beratung.*
 
 ---
 
@@ -11,13 +11,46 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v177 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v178 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
 - CSS: ?v=191 (unverändert diesen Sprint — reiner JS/HTML-Sprint)
 - SCHEMA: 30 (unverändert diesen Sprint)
 - Letzter Commit: siehe `git log` (dieser Sprint noch nicht gepusht,
   siehe Sprint-Ende-Workflow).
+- **B55/B56 inhaltlich erweitert + LEGAL.md angelegt (train-v178):**
+  direkter Anschluss an den vorherigen Sprint — Nutzer ließ den Plan
+  zusätzlich von Gemini und ChatGPT gegenchecken, bat explizit um eine
+  kritische Prüfung dieses Feedbacks (nicht blind übernehmen) und einen
+  c/o-Adress-Workaround für die private Anschrift. Ergebnis der
+  eigenständigen Nachrecherche: mehrere Punkte bestätigt, einer korrigiert
+  (SW/Cache-Rechtsgrundlage: Art. 6 Abs. 1 lit. f statt lit. b DSGVO),
+  einer komplett umgedreht (Link-Haftungsausschluss ist laut Rechtsprechung
+  wirkungslos/kontraproduktiv — gestrichen statt nur gekürzt), einer neu
+  gefunden ohne KI-Hinweis (BFSG/Barrierefreiheitsstärkungsgesetz, seit
+  2025-06-28 in Kraft, als "später"-Punkt dokumentiert). Volle
+  Begründung inkl. Quellen in `LEGAL.md`, nicht mehr in BUGS.md (das
+  bleibt reiner Bug-Tracker, B55/B56 haben jetzt nur noch kurze
+  Pointer-Zeilen dorthin).
+  - `ui.js` Datenschutz-Akkordeon erweitert: Local-First-Dilemma
+    (Cache-Löschung = unwiderruflicher Datenverlust), Backup-Hinweis
+    (JSON-Export), Service-Worker/Cache als technische Verarbeitung
+    (gleiche Rechtsgrundlage wie GoatCounter), "Was wird verarbeitet /
+    nicht verarbeitet"-Transparenz-Checkliste, menschlichere Einleitung.
+  - `ui.js` Impressum-Akkordeon: EIN Satz medizinischer Disclaimer
+    ("keine medizinische Beratung") + EIN Satz Minderjährigen-Hinweis —
+    bewusst KEIN Link-Haftungsausschluss (siehe oben).
+  - Neue eigenständig aufrufbare Seite `datenschutz.html` (statisches
+    HTML, kein JS nötig) — für künftige App-Store-Einreichungen (Apple/
+    Google verlangen eine von außen aufrufbare Privacy-Policy-URL,
+    nicht in einem Settings-Tab vergraben), in `sw.js` precached.
+  - CACHE_VERSION train-v177 → v178 (bewusst beibehalten trotz
+    Gegenargument aus dem KI-Feedback — Begründung in LEGAL.md).
+  - Verifiziert: volle Playwright-Suite 19/19 grün, Ad-hoc-Checks für
+    beide Akkordeons + die neue Standalone-Seite bestanden.
+  - Nächster Schritt danach: 4 Cross-AI-Review-Exportdokumente
+    (Legal/Security/Produkt-UX/Business-Ethik) für eine weitere externe
+    Beratungsrunde, per Subagents erzeugt, in `context-exports/`.
 - **B55/B56 strukturell vorbereitet (train-v177) — Impressum/Datenschutz:**
   direkter Anschluss an den B59-Security-Sprint, Nutzer bat darum, die
   Platzhalter mit korrektem rechtlichem Rahmentext vorzubereiten statt
