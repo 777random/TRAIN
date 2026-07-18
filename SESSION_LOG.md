@@ -946,3 +946,28 @@ Loop 5: 4 Cross-AI-Review-Exportdokumente per 4 parallelen Subagents
   Trainingsleistung trotz reiner Lokalspeicherung in irgendeiner Form
   greift — bisher nirgends im Projekt geprüft, echter neuer offener
   Punkt). Alle 4 gitignored, nicht committet.
+
+
+## 2026-07-18 train-v179 (B57 — "Alle Daten löschen"-Button)
+Loop 1: 20/20 grün (Playwright, inkl. neuem Test) ✓
+Loop 2: aktualisiert — CACHE_VERSION/CSS in HANDOFF.md/CLAUDE.md auf train-v179 synchronisiert
+Loop 3: übersprungen — unverändert seit v178
+Eigentliche Aufgabe: Nutzer bestätigte auf Rückfrage, B57 (seit dem
+  2026-07-14-DSGVO-Review offen, Low-Priorität) in denselben Sprint wie
+  B55/B56 aufzunehmen, da thematisch identisch (Vertrauen/Datenkontrolle).
+  Neue Settings-Row "🗑️ Alle Daten löschen" (ui.js, Abschnitt "Deine
+  Daten", neben Backup/Restore) — `confirm()`-Dialog mit unmissverständ-
+  licher Unwiderruflich-Warnung, identisches Bestätigungsmuster zu
+  bereits bestehenden destruktiven Aktionen (`reset-factory`). Löscht
+  bei Bestätigung `localStorage[STORAGE_KEY]` + `STORAGE_KEY_SHADOW`
+  (aus state.js importierte Konstanten statt hartcodierter String-Keys)
+  und lädt die Seite neu. Neuer Regressionstest
+  `tests/delete_all_data.spec.js`, in CI verdrahtet — belädt die App
+  zuerst mit synthetischen Alt-Daten (eindeutiger Marker-String),
+  bestätigt danach dass der Marker nach Löschung+Reload nachweislich
+  weg ist UND die App korrekt frisch im Onboarding-Zustand startet
+  (kein kaputter Zwischenzustand — `loadState()` erzeugt beim nächsten
+  Boot automatisch wieder einen validen Default-State, das ist
+  erwartetes Verhalten, kein Datenleck). CACHE_VERSION train-v178→v179.
+  Volle Suite 20/20 grün, CI grün. Committed, gepusht, Milestone-Backup
+  erstellt.

@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-18, Datenschutz/Impressum inhaltlich erweitert + LEGAL.md angelegt (train-v178)*
-*Nächster Schritt: B55 bleibt Blocker — braucht echte Name+Anschrift-Angaben vom Nutzer (c/o-Adress-Workaround, siehe LEGAL.md), Code-Seite ist fertig vorbereitet. Danach: 4 Cross-AI-Review-Exportdokumente (Legal/Security/Produkt/Business-Ethik) für weitere externe Beratung.*
+*Letzte Aktualisierung: 2026-07-18, B57 "Alle Daten löschen"-Button (train-v179)*
+*Nächster Schritt: B55 bleibt Blocker — braucht echte Name+Anschrift-Angaben vom Nutzer (c/o-Adress-Workaround, siehe LEGAL.md), Code-Seite ist fertig vorbereitet. 4 Cross-AI-Review-Exportdokumente (Legal/Security/Produkt/Business-Ethik) fertig in context-exports/, bereit zum Einspielen bei Gemini/ChatGPT.*
 
 ---
 
@@ -11,13 +11,28 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v178 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v179 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
 - CSS: ?v=191 (unverändert diesen Sprint — reiner JS/HTML-Sprint)
 - SCHEMA: 30 (unverändert diesen Sprint)
 - Letzter Commit: siehe `git log` (dieser Sprint noch nicht gepusht,
   siehe Sprint-Ende-Workflow).
+- **B57 umgesetzt (train-v179) — "Alle Daten löschen"-Button:** Nutzer
+  bat darum, B57 (aus dem 2026-07-14-DSGVO-Review, bis dahin offen) noch
+  in denselben Sprint wie B55/B56 aufzunehmen. Neue Settings-Row
+  "🗑️ Alle Daten löschen" im "Deine Daten"-Abschnitt (ui.js, neben
+  Backup/Restore) — `confirm()` mit klarer Unwiderruflich-Warnung
+  (gleiches Muster wie `reset-factory`), löscht bei Bestätigung
+  `localStorage[STORAGE_KEY]` + `STORAGE_KEY_SHADOW` (aus state.js
+  importierte Konstanten, keine hartcodierten Strings) und reloadet.
+  Neuer Regressionstest `tests/delete_all_data.spec.js` (in CI
+  verdrahtet) — bestätigt: alte synthetische Testdaten sind nach
+  Bestätigung+Reload nachweislich weg, App startet korrekt frisch im
+  Onboarding-Zustand (kein kaputter Zwischenzustand — `loadState()`
+  erzeugt beim nächsten Boot automatisch wieder einen validen
+  Default-State, erwartetes Verhalten). CACHE_VERSION → train-v179.
+  Volle Suite 20/20 grün.
 - **B55/B56 inhaltlich erweitert + LEGAL.md angelegt (train-v178):**
   direkter Anschluss an den vorherigen Sprint — Nutzer ließ den Plan
   zusätzlich von Gemini und ChatGPT gegenchecken, bat explizit um eine

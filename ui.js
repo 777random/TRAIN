@@ -19,7 +19,7 @@
 import {
   getState, dispatch, subscribe, A, canUndo, BADGE_THRESHOLDS, VACATION_PLANS,
   calcCurrentStreak, calcLongestStreakEver, weekTrainingStatus, getLatestWeek,
-  clearAutoWeekPending,
+  clearAutoWeekPending, STORAGE_KEY, STORAGE_KEY_SHADOW,
 } from './state.js';
 import {
   exportJSON, exportJSONAuto, importJSON, exportCSV,
@@ -3978,6 +3978,13 @@ function renderSettingsTab(state) {
       <div class="settings-row__action">${ic.chevronRight()}</div>
       <input type="file" accept=".json" class="sr-only" data-action="import-json" aria-label="JSON-Backup-Datei wählen"/>
     </label>
+    <div class="settings-row settings-row--clickable" data-action="delete-all-data">
+      <div>
+        <div class="settings-row__label" style="color:var(--c-danger)">🗑️ Alle Daten löschen</div>
+        <div class="settings-row__desc">Unwiderruflich — löscht alle Trainingsdaten auf diesem Gerät</div>
+      </div>
+      <div class="settings-row__action">${ic.chevronRight()}</div>
+    </div>
   </div>
 
   <!-- Trainingstage -->
@@ -5571,6 +5578,18 @@ function _handleClick(e) {
       if (confirm('Custom-Template auf Werkseinstellung zurücksetzen?')) {
         dispatch(A.TPL_RESET_TO_FACTORY, {});
         showToast('Original-Template wiederhergestellt ✓', 'ok');
+      }
+      break;
+
+    case 'delete-all-data':
+      if (confirm(
+        'Alle Trainingsdaten auf diesem Gerät werden unwiderruflich gelöscht.\n' +
+        'Erstelle vorher ein Backup, falls du die Daten behalten willst.\n\n' +
+        'Wirklich alles löschen?'
+      )) {
+        localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(STORAGE_KEY_SHADOW);
+        location.reload();
       }
       break;
 
