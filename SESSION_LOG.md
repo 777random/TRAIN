@@ -933,6 +933,16 @@ Eigentliche Aufgabe: direkter Anschluss an den v177-Sprint — Nutzer ließ
   auf kurze Pointer gekürzt (bleibt reiner Bug-Tracker). CACHE_VERSION
   train-v177→v178. Verifiziert: volle Suite 19/19 grün, Ad-hoc-Checks
   für beide Akkordeons + datenschutz.html bestanden.
-Loop 5: 4 Cross-AI-Review-Exportdokumente (Legal/Security/Produkt-UX/
-  Business-Ethik) werden im Anschluss per parallelen Subagents erzeugt
-  — siehe separater Eintrag nach Fertigstellung.
+Loop 5: 4 Cross-AI-Review-Exportdokumente per 4 parallelen Subagents
+  erzeugt — `context-exports/advisor-legal-2026-07-18.txt` (1438 Wörter),
+  `advisor-security-2026-07-18.txt` (~1050 Wörter),
+  `advisor-product-userjourney-2026-07-18.txt` (~1250 Wörter, bewusst
+  von der bestehenden `for-advisor.txt` abgegrenzt — Produkt-/UX-
+  Perspektive statt Code-Fakten), `advisor-business-ethics-2026-07-18.txt`
+  (~1180 Wörter). Jedes Dokument in sich verständlich ohne Repo-Zugriff,
+  endet mit gezielten, projektspezifischen Blind-Spot-Fragen (u.a. eine
+  bemerkenswerte eigenständige Frage im Legal-Dokument: ob Art. 9 DSGVO
+  "besondere Kategorien" (Gesundheitsdaten) für Körpergewicht/Schlaf/
+  Trainingsleistung trotz reiner Lokalspeicherung in irgendeiner Form
+  greift — bisher nirgends im Projekt geprüft, echter neuer offener
+  Punkt). Alle 4 gitignored, nicht committet.
