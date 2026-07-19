@@ -1,6 +1,6 @@
 # TRAIN — SECURITY.md
 
-Stand: train-v180 (2026-07-18). Zwei Teile: (1) was für TRAINs heutige
+Stand: train-v182 (2026-07-19). Zwei Teile: (1) was für TRAINs heutige
 Architektur bereits gilt, (2) eine Blaupause für den Moment, in dem TRAIN
 einen Server bekommt (Paywall/Coaching-Feature, siehe CLAUDE.md).
 
@@ -121,15 +121,21 @@ code-verifiziert am echten `Object.assign(state, imported)`-Muster, siehe
 Punkt 5 oben. Echte, präzise lokalisierte Lücke, gefixt.
 
 **Abgelehnt mit technischer Begründung (nicht nur Meinung):**
-- **SRI-Hash für das GoatCounter-Script** (Claude Cowork, "kostet nichts,
-  Minuten erledigt") — **Einspruch.** GoatCounter liefert `count.js` von
-  einer unversionierten URL (`gc.zgo.at/count.js`), der Skriptinhalt kann
-  sich beim Anbieter jederzeit ändern. Ein SRI-Hash gegen eine
-  unversionierte URL bricht die Analytics beim nächsten Anbieter-Update
-  lautlos (Browser verweigert Ausführung bei Hash-Mismatch) — das ist ein
-  Wartungs-Trade-off, kein Nulltarif-Fix. Nicht umgesetzt; nur sinnvoll,
-  falls GoatCounter eine gepinnte/versionierte Embed-URL anbietet (nicht
-  recherchiert).
+- **SRI-Hash für das GoatCounter-Script** (Claude Cowork Runde 2, "kostet
+  nichts, Minuten erledigt") — ursprünglich abgelehnt mit der Begründung,
+  GoatCounter liefere nur eine unversionierte URL. **Runde-3-Korrektur:
+  diese Prämisse war falsch.** GoatCounter bietet tatsächlich versionierte
+  Embed-URLs (`count.v5.js`, veröffentlicht 09.06.2025) mit offiziell
+  publiziertem SRI-Hash — direkt von
+  [goatcounter.com/help/countjs-versions](https://www.goatcounter.com/help/countjs-versions)
+  bezogen (Primärquelle, nicht nur Blog-Paraphrase) und per Playwright
+  gegen die echte, laufende App verifiziert (keine `integrity`-Fehler in
+  der Konsole beim Laden). Seit train-v182 umgesetzt (`index.html`):
+  `count.v5.js` + `crossorigin="anonymous"` + `integrity="sha384-..."`.
+  Der Wartungs-Trade-off bleibt real (kein automatisches Update mehr bei
+  künftigen GoatCounter-Releases, neue Version + neuer Hash müssen
+  gemeinsam übernommen werden) — aber die Prämisse "gibt es nicht" war
+  schlicht falsch, nicht nur eine Abwägungsfrage.
 - **"Zirkuläre JSON-Struktur als Client-DoS"** (Gemini) — **faktisch
   falsch.** JSON-Syntax kennt keine Referenzen; `JSON.parse` kann
   grundsätzlich keine zirkuläre Objektstruktur erzeugen, unabhängig vom
@@ -155,9 +161,12 @@ Punkt 5 oben. Echte, präzise lokalisierte Lücke, gefixt.
   gezielt (Drive-by-Download-Schutz); die File System Access API, die das
   am ehesten könnte, existiert auf Safari/iOS gar nicht. Der reale, bereits
   vorhandene Baustein dagegen: ein Backup-Erinnerungs-Zähler existiert
-  laut Sprint-Historie bereits (4-Wochen-Reminder) — was tatsächlich noch
-  fehlt, ist ein Hinweis schon im Onboarding selbst statt nur in den
-  Einstellungen (siehe CLAUDE.md-Feature-Backlog).
+  laut Sprint-Historie bereits (4-Wochen-Reminder). **Umgesetzt in
+  train-v182:** der Onboarding-Install-Screen (`ui.js`, letzter
+  Onboarding-Schritt) zeigt jetzt zusätzlich einen kurzen Hinweis
+  ("100% lokal — Cache-Löschung löscht Daten unwiderruflich, Backup in
+  Einstellungen") statt diese Information nur in den Einstellungen zu
+  vergraben.
 
 **Ergänzt (kein Widerspruch, aber Präzisierung):** die Feststellung "kein
 Server = IDOR nicht anwendbar" (aus Teil 1 oben) bleibt korrekt für IDOR
@@ -171,3 +180,49 @@ zu dokumentieren (Punkt 3 oben, Top-Level-Navigation als Rest-Lücke).
 Hardware-Key statt SMS/TOTP für 2FA, sicher verwahrte Recovery-Codes.
 Reine Account-Einstellung, kein Code — Nutzer-Aktionspunkt, nicht von
 Claude Code umsetzbar.
+
+---
+
+## Kritische Prüfung von Runde 3 (Claude Cowork + Gemini, 2026-07-19, train-v182)
+
+**Korrigiert, umgesetzt:** GoatCounter-SRI — die Runde-2-Ablehnung beruhte
+auf einer falschen Prämisse (siehe oben), Claude Cowork fand die
+tatsächlich existierende versionierte URL + Hash und wurde direkt an der
+Primärquelle nachverifiziert, nicht nur übernommen. Jetzt umgesetzt.
+
+**Bestätigt, nicht neu:** CSP kann Top-Level-Navigation-Exfiltration
+(`location.href = ...`) strukturell nicht schließen — beide KIs bestätigen
+unabhängig, dass es dafür keine verabschiedete CSP-Direktive gibt
+(`navigate-to` wurde nie standardisiert). Escaping bleibt die eigentliche
+Verteidigungslinie, nicht CSP.
+
+**Geprüft auf Nachfrage von Claude Cowork (10-Minuten-Grep, wie
+vorgeschlagen):** gibt es einen zweiten JSON-Import-Pfad neben
+`backup.js`s `importJSON()`, an dem der Prototype-Pollution-Guard fehlen
+könnte (z.B. Clipboard-Paste, URL-Parameter)? Grep über alle
+`JSON.parse`-Aufrufe im Repo bestätigt: nein. Die einzigen anderen
+`JSON.parse`-Stellen (state.js, ui.js) parsen entweder den eigenen,
+bereits vertrauenswürdigen `localStorage`-Inhalt der App selbst
+(`loadState()`) oder sind reine Deep-Clone-Idiome (`JSON.parse(JSON.stringify(x))`)
+auf bereits im Speicher befindlichen, nicht-externen Daten — keine dieser
+Stellen mergt per `Object.assign` auf ein Objekt mit echter Prototype-Chain
+wie der verwundbare `STATE_IMPORT`-Reducer. Der Guard sitzt am einzigen
+tatsächlich verwundbaren Punkt.
+
+**Nützliche Heuristik übernommen (Claude Cowork):** einer Security-Empfehlung
+mehr trauen, wenn sie einen Angriffspfad Ende-zu-Ende mit exaktem
+Mechanismus benennt (Payload → Effekt → Fix → Payload schlägt danach fehl
+— wie bei der Prototype-Pollution-Lücke), weniger, wenn sie nur ein
+bekanntes Fachwort auf eine Situation überträgt, ohne den exakten
+Mechanismus im konkreten Code zu benennen (wie bei "Verschlüsselung",
+"zirkuläres JSON" in Runde 2). Als Faustregel für künftige Runden notiert,
+nicht nur einmalig angewendet.
+
+**Nicht umgesetzt, dokumentiert als Kandidat:** eine strikte Allowlist
+bekannter Feldnamen (statt der aktuellen `__proto__`/`constructor`/
+`prototype`-Blockliste) beim JSON-Import wäre robuster gegen künftige,
+heute nicht vorhersehbare Angriffsklassen (Blocklists veralten,
+Allowlists nicht) — Claude Cowork bestätigt aber explizit, dass die
+aktuelle Blockliste den bekannten Angriffspfad bereits vollständig
+abdeckt (JSON-Schlüssel sind immer Strings, keine Symbol-Tricks möglich).
+Niedrige Priorität, kein akutes Risiko.

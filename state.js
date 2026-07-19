@@ -197,6 +197,7 @@ function buildDefaultState() {
       weeksSinceLastBackupReminder:   0,
       maxSessionMs:                   10800000, // 3h default
       autoStartPauseTimer:            true,
+      hideStreakBadge:                false, // B60: Streak-Badge im Trainings-Tab optional ausblendbar
       dismissedNamePairs:             [], // [nameA, nameB][] – sortiert, getrimmt, lowercase
       autoWeek: {
         enabled:          false, // Hauptschalter automatische Wochenerstellung
@@ -873,6 +874,7 @@ function migrate(raw) {
   if (raw.settings.weeksSinceLastBackupReminder   === undefined) raw.settings.weeksSinceLastBackupReminder   = 0;
   if (raw.settings.maxSessionMs                   === undefined) raw.settings.maxSessionMs                   = 10800000;
   if (raw.settings.autoStartPauseTimer            === undefined) raw.settings.autoStartPauseTimer            = true;
+  if (raw.settings.hideStreakBadge                === undefined) raw.settings.hideStreakBadge                = false;
   if (!Array.isArray(raw.settings.dismissedNamePairs)) raw.settings.dismissedNamePairs = [];
   if (!raw.coachQuestion || typeof raw.coachQuestion !== 'object') {
     raw.coachQuestion = { weekStart: null, questionId: null, answer: null, outcome: null, measuredWeekStart: null };

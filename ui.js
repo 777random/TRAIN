@@ -996,6 +996,7 @@ function _renderRitualAnchor(state, wk, di) {
  * neutrale Formulierung statt "Streak".
  */
 function _renderStreakBadge(state) {
+  if (state.settings?.hideStreakBadge) return '';
   const streakWeeks = (_calcStreak(state)?.cur ?? 0);
   const streakLabel = streakWeeks === 1 ? '1 Woche' : `${streakWeeks} Wochen`;
   return `<span class="streak-badge" aria-label="${streakLabel} konsistentes Training"><span class="streak-badge__num">${streakWeeks}</span> ${streakWeeks === 1 ? 'Woche' : 'Wochen'}</span>`;
@@ -3846,6 +3847,7 @@ function renderSettingsTab(state) {
     ${tog('autoStartPauseTimer', 'Pausentimer automatisch', 'Timer startet automatisch nach jedem bestätigten Satz (außer dem letzten)')}
     ${tog('rpeEnabled', 'RPE anzeigen', 'Rate of Perceived Exertion — Anstrengungsgrad pro Satz')}
     ${tog('autoEval', 'Automatische Satz-Bewertung', 'Satz wird bewertet sobald du die Wdh-Zahl einträgst und das Feld verlässt.')}
+    ${tog('hideStreakBadge', 'Streak-Anzeige ausblenden', '"X Wochen konsistentes Training" im Trainings-Tab verstecken')}
     <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:var(--sp-2)">
       <div>
         <div class="settings-row__label">Kleinstmögliche Steigerung</div>
@@ -4083,7 +4085,7 @@ function renderSettingsTab(state) {
   <div class="settings-section">
     <div class="settings-section__title">Info</div>
     <div class="settings-row">
-      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v181</div></div>
+      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v182</div></div>
     </div>
     <div class="settings-row">
       <div>
@@ -7254,6 +7256,9 @@ function _showOnboarding() {
           <div class="ob-logo">TRAIN</div>
           <h2 class="ob-title ob-title--sm">Bereit loszulegen</h2>
           <p class="ob-sub">Speichere TRAIN auf deinem Home-Bildschirm — startet dann wie eine echte App, ohne Browser-Leiste.</p>
+          <p class="ob-sub" style="font-size:13px">TRAIN ist 100% lokal — deine Trainingsdaten verlassen nie dieses Gerät.
+          <span style="color:var(--c-danger)">Löschst du Browser-Daten/Cache, sind sie unwiderruflich weg</span> —
+          sichere sie regelmäßig über Einstellungen → Backup.</p>
           <button class="btn btn--accent ob-btn" data-ob="${isIOS ? 'install-ios-help' : 'install-native'}">📲 Zum Home-Bildschirm hinzufügen</button>
           ${isIOS && _iosHelpOpen ? `
           <div class="ob-ios-help">

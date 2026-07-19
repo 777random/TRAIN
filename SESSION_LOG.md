@@ -1082,3 +1082,60 @@ Loop 5: nicht erneut ausgeführt — die 4 Advisor-Exportdokumente wurden
   in diesem Sprint bereits gezielt (nicht über den generischen Loop-5-
   Ablauf) aktualisiert; for-advisor.txt selbst (der technische Loop-5-
   Code-Export) bleibt auf Stand v176, nachholen bei Bedarf.
+
+
+## 2026-07-19 train-v182 (Cross-AI-Review Runde 3 ausgewertet)
+Loop 1: 21/21 grün (Playwright, inkl. neuem Streak-Toggle-Test) ✓
+Loop 2: aktualisiert — CACHE_VERSION/CSS in HANDOFF.md/CLAUDE.md auf train-v182 synchronisiert
+Loop 3: übersprungen — unverändert seit v181
+Eigentliche Aufgabe: Nutzer teilte Runde-3-Feedback von Gemini und Claude
+  Cowork zu den 4 aktualisierten Advisor-Exportdokumenten, bat um weitere
+  kritische Prüfung. Direkte Widersprüche zwischen den beiden KIs traten
+  diesmal mehrfach auf — gezielt einzeln aufgelöst statt gemittelt:
+  - **GoatCounter-SRI: eigene Fehleinschätzung aus Runde 2 korrigiert.**
+    Claude Cowork widersprach der Runde-2-Ablehnung direkt und fand eine
+    tatsächlich existierende versionierte GoatCounter-URL (`count.v5.js`)
+    mit offiziellem SRI-Hash — per WebFetch an der GoatCounter-
+    Primärquelle selbst nachgeprüft (nicht nur der KI geglaubt), Hash
+    vollständig übernommen, in `index.html` umgesetzt und per Playwright
+    gegen die echte App verifiziert (keine Integrity-Fehler).
+  - **§ 309 Nr. 9 BGB:** neuer, an Primärquelle verifizierter Rechts-Fund
+    (Claude Cowork) zu AGB-Verlängerungsklauseln — in LEGAL.md als
+    "später"-Blaupause ergänzt.
+  - **Fitbod-Preis:** Gemini nannte $12,99/Monat als Referenzklasse für
+    TRAINs Coaching-Preis, Claude Cowork verweigerte explizit eigene
+    Zahlen ("mein Such-Limit war erreicht, ich erfinde nichts aus altem
+    Trainingswissen — das war genau der Fehler beim c/o-Punkt in Runde
+    2"). Eigenständig nachrecherchiert: aktuell $15,99/Monat bzw. $95,99/
+    Jahr (≈$8/Monat effektiv) — Gemini lag ungefähr richtig, aber am
+    unteren/veralteten Ende; die aktuelle Zahl macht TRAINs 8-12€ sogar
+    noch kompetitiver als von Gemini dargestellt.
+  - **BFSG und § 25 TDDDG (Service-Worker):** beide Male widersprachen
+    sich die KIs direkt (eine erklärte die Frage für sicher gelöst, die
+    andere hielt sie explizit für offen). Jeweils die vorsichtigere
+    Einschätzung übernommen — Muster aus Runde 2 bestätigt sich: die KI,
+    die transparent macht was sie nicht geprüft hat, lag bisher
+    zuverlässiger richtig als die, die volle Sicherheit behauptet.
+    Für § 25 TDDDG zusätzlich einen konstruktiven, nicht umgesetzten
+    Lösungsvorschlag dokumentiert (Offline-Modus als Opt-in statt
+    immer-an, B62 in BUGS.md).
+  - **Prototype-Pollution-Guard-Abdeckung geprüft** (Claude Cowork bat um
+    einen 10-Minuten-Grep-Check): bestätigt, der Guard sitzt am einzigen
+    tatsächlich verwundbaren Punkt, kein zweiter ungeschützter
+    JSON-Import-Pfad im Code gefunden.
+  Umsetzung (nicht nur Dokumentation): B60 (Streak-Anzeige-Toggle,
+  Settings) — dabei einen echten, unabhängigen Bug in `SETTING_TOGGLE`
+  gefunden und gefixt (togglete nur bereits existierende Settings-Keys;
+  `hideStreakBadge` hatte keinen Default, der Button hätte beim ersten
+  Klick still nichts bewirkt). Onboarding-Datenverlust-Hinweis ergänzt
+  (Install-Screen). GoatCounter-SRI (`index.html`). LEGAL.md/SECURITY.md/
+  BUGS.md um Runde-3-Funde ergänzt. Neue Regressionstests
+  `tests/streak_toggle.spec.js`, in CI verdrahtet. CACHE_VERSION
+  train-v181→v182. Volle Suite 21/21 grün.
+  **Bewusst NICHT getan:** eine vierte Runde von Advisor-Dokumenten
+  erzeugen — beide KIs empfehlen unabhängig, stattdessen jetzt die
+  Rekrutierung der 20 echten Testnutzer zu starten (Reddit
+  r/weightroom, r/powerlifting), da Legal/Security nach 3 Runden gut
+  durchgekaut sind und der eigentliche Engpass fehlendes echtes
+  Nutzer-Feedback ist, nicht weitere Recherche.
+Loop 5: nicht ausgeführt — kein neuer Code-Fakten-Export angefordert.

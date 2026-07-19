@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-18, Cross-AI-Review Runde 3 vorbereitet + B61 Versions-Anzeige-Fix (train-v181)*
-*Nächster Schritt: B55 bleibt Blocker — braucht echte Name+Anschrift-Angaben vom Nutzer (c/o-Adress-Workaround, siehe LEGAL.md). Preis-Referenzklassen-Frage (Coaching-Apps statt Strong/Hevy, siehe advisor-business-ethics-Export) noch offen, braucht Nutzer-Entscheidung oder echte Zahlungsbereitschafts-Daten aus dem Testlauf. Kündigungsbutton-Prinzip (§312k BGB) bereits als DECISIONS.md-Eintrag festgehalten für den Payment-Sprint. 4 aktualisierte Cross-AI-Advisor-Exportdokumente bereit für eine dritte externe Beratungsrunde.*
+*Letzte Aktualisierung: 2026-07-19, Cross-AI-Review Runde 3 ausgewertet (train-v182)*
+*Nächster Schritt: beide externe KIs empfehlen unabhängig, JETZT die Rekrutierung der 20 echten Testnutzer zu starten (Reddit r/weightroom, r/powerlifting) statt eine 4. Konsultationsrunde zu drehen — Legal/Security sind nach 3 Runden gut durchgekaut, der eigentliche Engpass ist fehlendes echtes Nutzer-Feedback. B55 bleibt Blocker (c/o-Adresse, siehe LEGAL.md). Preisfrage weiterhin offen, am besten über echte Zahlungsbereitschaft der Testnutzer beantworten statt weiterer Schreibtisch-Recherche.*
 
 ---
 
@@ -11,14 +11,66 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v181 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v182 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
 - CSS: ?v=191 (unverändert diesen Sprint — reiner JS/HTML-Sprint)
 - SCHEMA: 30 (unverändert diesen Sprint)
 - Letzter Commit: siehe `git log` (dieser Sprint noch nicht gepusht,
   siehe Sprint-Ende-Workflow).
-- **Cross-AI-Review Runde 3 vorbereitet + B61 (train-v181):** Nutzer bat
+- **Cross-AI-Review Runde 3 ausgewertet (train-v182):** Nutzer ließ die
+  4 aktualisierten Advisor-Exportdokumente von Gemini und Claude Cowork
+  ein drittes Mal gegenlesen. Jeder Punkt eigenständig nachverifiziert
+  (Primärquellen, nicht nur Blog-Zusammenfassungen), Widersprüche
+  zwischen den beiden KIs gezielt aufgelöst statt beide unkritisch
+  gemischt:
+  - **GoatCounter-SRI umgesetzt (Korrektur einer eigenen Fehleinschätzung
+    aus Runde 2):** Runde 2 hatte SRI abgelehnt, weil angeblich keine
+    versionierte GoatCounter-URL existiert — Claude Cowork fand das
+    Gegenteil (`count.v5.js` + offiziell publizierter Hash), an der
+    GoatCounter-Primärquelle direkt nachverifiziert (nicht nur
+    übernommen) und per Playwright gegen die echte App bestätigt (keine
+    Integrity-Fehler). `index.html` nutzt jetzt die versionierte URL +
+    SRI-Hash.
+  - **B60 umgesetzt — Streak-Anzeige-Toggle:** neuer Settings-Schalter,
+    blendet den Trainings-Tab-Badge komplett aus. Beim Implementieren
+    einen echten, unabhängigen Bug gefunden: `SETTING_TOGGLE` (state.js)
+    toggled nur bereits existierende Settings-Keys — ohne Default-Wert
+    für `hideStreakBadge` in `STATE_INIT`+`migrate()` hätte der neue
+    Button beim ersten Klick still gar nichts bewirkt. Gefixt, per
+    neuem Regressionstest (`tests/streak_toggle.spec.js`, in CI)
+    bestätigt (beide Richtungen).
+  - **Onboarding-Datenverlust-Hinweis ergänzt:** letzter
+    Onboarding-Screen (Install-Schritt) zeigt jetzt zusätzlich zum
+    Settings-Hinweis einen kurzen "100% lokal, Cache-Löschung =
+    unwiderruflich, Backup nutzen"-Satz — von beiden KIs in Runde 2
+    UND 3 unabhängig vorgeschlagen.
+  - **§ 309 Nr. 9 BGB (neuer Rechts-Fund, an Primärquelle verifiziert):**
+    Grenzen für AGB-Vertragsverlängerungsklauseln (max. 2 Jahre
+    Erstlaufzeit, automatische Verlängerung nur auf unbestimmte Zeit mit
+    max. 1 Monat Kündigungsfrist) — betrifft TRAINs künftige AGB direkt,
+    in LEGAL.md als "später"-Blaupause dokumentiert.
+  - **BFSG-Einschätzung NICHT weiter hochgestuft:** die beiden KIs
+    widersprachen sich direkt (eine erklärte TRAIN für "glasklar
+    rechtlich befreit", die andere hielt die Einordnung explizit für
+    nicht bis auf Gesetzestext-Ebene geklärt) — die vorsichtigere Linie
+    wird beibehalten (Muster aus Runde 2 wiederholt sich: die KI, die
+    offen sagt was sie nicht geprüft hat, lag bisher öfter richtig).
+  - **§ 25 TDDDG für Service-Worker-Caching:** ebenfalls ein direkter
+    KI-Widerspruch (stabil vs. wahrscheinlich-aber-nicht-sauber-
+    entschieden). Konstruktive Lösung dokumentiert, aber nicht gebaut:
+    Offline-Modus als expliziten Opt-in-Schalter statt immer-an anbieten
+    würde die Rechtsfrage durch Konstruktion lösen — echte
+    Architektur-Änderung, als neuer Kandidat B62 in BUGS.md
+    dokumentiert, nicht in diesem Sprint umgesetzt.
+  - **Wichtigstes Gesamt-Signal beider KIs unabhängig:** Legal/Security
+    sind nach 3 Runden gut durchgekaut, der eigentliche Engpass ist
+    jetzt fehlendes echtes Nutzer-Feedback — beide empfehlen, die
+    Rekrutierung der 20 Testnutzer zu starten statt eine 4.
+    Konsultationsrunde zu drehen. Keine neue Advisor-Dokument-
+    Regenerierung in diesem Sprint, bewusst.
+  - CACHE_VERSION train-v181→v182. Volle Suite 21/21 grün.
+- **B61 (train-v181, vorheriger Sprint):** Nutzer bat
   darum, alle .md-Dateien UND die 4 Cross-AI-Advisor-Exportdokumente für
   eine weitere (dritte) externe Beratungsrunde zu aktualisieren, per
   paralleler Subagents. Alle 4 `context-exports/advisor-*.txt`-Dateien
