@@ -1306,7 +1306,7 @@ function _applyPlannedProgression(days) {
  * _resetClonedDays() — rührt ex.oneRM bewusst nicht an). Betroffene Nutzer
  * sahen den Hinweis in der neuen, noch leeren Woche schlicht verschwinden.
  */
-function _applyPrTracking(state, ex, weight, reps) {
+function _applyPrTracking(state, ex, s, weight, reps) {
   if (weight > 0) {
     const volume  = weight * reps;
     const est1RM  = reps <= 10 ? weight * (1 + reps / 30) : 0;
@@ -1326,15 +1326,26 @@ function _applyPrTracking(state, ex, weight, reps) {
       ex.oneRM = Math.round(est1RM * 10) / 10;
     }
   }
+  // s.prBadge markiert, ob DIESER Satz konkret einen Rekord ausgelöst hat —
+  // am Satz selbst gespeichert (nicht am Render-Zeitpunkt gegen den
+  // all-time ex.prWeight verglichen), damit ein späteres bloßes Wiederholen
+  // desselben Gewichts/derselben Wdh-Zahl in einer künftigen Woche nicht
+  // erneut als "neuer PR" erscheint — nur der Satz, der den Rekord beim
+  // Schreiben tatsächlich erhöht hat, behält das Badge dauerhaft.
   if (ex.prWeight === null || weight > ex.prWeight) {
+    s.prBadge = 'weight';
     ex.prWeight = weight; ex.prRepsAtMaxWeight = reps;
   } else if (weight >= ex.prWeight && reps > (ex.prRepsAtMaxWeight ?? 0)) {
+    s.prBadge = 'reps';
     ex.prRepsAtMaxWeight = reps;
   }
   if (!ex.prRepsHistory) ex.prRepsHistory = {};
   if (weight < ex.prWeight) {
     const w = String(weight);
-    if (reps > (ex.prRepsHistory[w] ?? 0)) ex.prRepsHistory[w] = reps;
+    if (reps > (ex.prRepsHistory[w] ?? 0)) {
+      s.prBadge = 'reps';
+      ex.prRepsHistory[w] = reps;
+    }
   }
 }
 
@@ -1897,7 +1908,7 @@ function reduce(state, action) {
         const weight = parseFloat(s.weight) || 0;
         const reps   = parseFloat(s.reps)   || 0;
         if (ex && reps > 0) {
-          _applyPrTracking(state, ex, weight, reps);
+          _applyPrTracking(state, ex, s, weight, reps);
         }
       }
       break;
@@ -1953,7 +1964,7 @@ function reduce(state, action) {
         const weight = parseFloat(s.weight) || 0;
         const reps   = parseFloat(s.reps)   || 0;
         if (reps > 0) {
-          _applyPrTracking(state, ex, weight, reps);
+          _applyPrTracking(state, ex, s, weight, reps);
         }
       }
       break;
@@ -1974,7 +1985,7 @@ function reduce(state, action) {
         const weight = parseFloat(s.weight) || 0;
         const reps   = parseFloat(s.reps)   || 0;
         if (reps > 0) {
-          _applyPrTracking(state, ex, weight, reps);
+          _applyPrTracking(state, ex, s, weight, reps);
         }
       }
       break;

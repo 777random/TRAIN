@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-19, echter GoatCounter-Site-Code aktiviert (train-v183)*
-*Nächster Schritt: B55 bleibt der letzte echte Blocker (Impressum-Platzhalter, c/o-Adresse, siehe LEGAL.md) — braucht Name+Adresse+E-Mail vom Nutzer. Feedback-E-Mail (ui.js:4099) hängt daran. Danach: Rekrutierung der 20 echten Testnutzer starten (beide externe KIs empfehlen das als nächsten Schritt, nicht weitere Konsultationsrunden).*
+*Letzte Aktualisierung: 2026-07-19, 5 Nutzer-Bugs diagnostiziert, 2 gefixt (B63/B64), 3 brauchen Klärung (B65/B66/B67) (train-v184)*
+*Nächster Schritt: B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md). Rückfragen an den Nutzer offen: B65 (weightStep für Squats bereits manuell konfiguriert?), B66 (Fehler-Toast — welches Gerät, wann genau?), B67 (Label-Fix für die Erfolgsquote bestätigen?).*
 
 ---
 
@@ -11,13 +11,53 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v183 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v184 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
 - CSS: ?v=191 (unverändert diesen Sprint — reiner JS/HTML-Sprint)
 - SCHEMA: 30 (unverändert diesen Sprint)
 - Letzter Commit: siehe `git log` (dieser Sprint noch nicht gepusht,
   siehe Sprint-Ende-Workflow).
+- **5 Nutzer-Bugs diagnostiziert, 2 gefixt (train-v184):** Nutzer meldete
+  5 Bugs aus dem echten Gebrauch. Diagnose vor Fix (CLAUDE.md-Regel) für
+  jeden einzeln:
+  - **B63 (gefixt) — PR-Pokal bei Altgewicht-Wiederholung:** Root Cause
+    gefunden (`ex.prWeight` ist All-Time-Wert, `s.weight >= ex.prWeight`
+    beim Render verglichen zeigte den Pokal erneut bei bloßer
+    Wiederholung eines alten Rekords). Ein erster Fix-Versuch
+    ("nur in der aktuellsten Woche zeigen") erwies sich beim Testen als
+    unzureichend — per Playwright verifiziert, nicht nur angenommen.
+    Eigentlicher Fix: `_applyPrTracking()` (state.js) markiert den
+    rekordauslösenden Satz jetzt direkt (`s.prBadge`), statt es bei
+    jedem Render neu zu berechnen. 2 neue Tests (`tests/pr_badge.spec.js`,
+    in CI) bestätigen beide Richtungen (Wiederholung zeigt keinen Pokal,
+    echte Steigerung weiterhin schon).
+  - **B64 (gefixt) — Volle statt Zahlen-Tastatur:** 6 `<input type="number">`-
+    Felder ohne `inputmode` gefunden (Körpergewicht, Zielgewicht,
+    Stangengewicht, Deload-Prozentsatz, 3 Template-Editor-Zahlenfelder) —
+    ergänzt, analog zum bereits etablierten B16-Muster.
+  - **B65 (offen, braucht Nutzer-Antwort) — Gewichtssteigerung "immer
+    noch 1,25kg bei Squats":** Empfehlungs-Logik selbst (B48) ist intakt,
+    liest `ex.weightStep` überall korrekt. Aber: jede Übungs-Erstellung
+    setzt `weightStep` unconditional auf 2.5 — keine automatische
+    Kategorie-Erkennung trotz vorhandener movementMap.js-Kategorisierung.
+    Frage an Nutzer: wurde die Schrittweite für Kniebeuge manuell auf 5
+    gesetzt (dann echter Bug, weiter untersuchen) oder nie konfiguriert
+    (dann Produkt-Frage: smarterer Default für Squat/Hinge)?
+  - **B66 (offen, nicht reproduziert) — Fehler-Toast beim Öffnen:**
+    2 realistische Szenarien per Playwright nachgestellt (Neustart ohne
+    Daten, 3-Wochen-Bestand), kein Fehler in beiden gefangen. Braucht
+    mehr Kontext (Gerät/Browser, Häufigkeit, Auslöser).
+  - **B67 (offen, Label-Vorschlag wartet auf Bestätigung) — zwei
+    Prozentzahlen beim Tages-Abschluss:** Beide Zahlen sind bewusst
+    unterschiedliche, je korrekte Kennzahlen (Erfolgsquote der bewerteten
+    Sätze vs. Zielerfüllung inkl. übersprungener Sätze) — direktes
+    Analogon zu einem bereits bestehenden "BEWUSST KEIN BUG"-Fall.
+    Vorschlag: der oberen (aktuell unbeschrifteten) Zahl ein Label
+    geben, Formeln unverändert lassen — noch nicht umgesetzt, Label-
+    Wortlaut braucht Nutzer-Entscheidung (Konvention in diesem Projekt:
+    Formulierungen nicht ohne Rückfrage ändern).
+  Volle Suite 23/23 grün.
 - **Echter GoatCounter-Site-Code aktiviert (train-v183):** Nutzer hat
   einen GoatCounter-Account angelegt (Site-Code "train"). `index.html`
   Platzhalter `<SITE-CODE>` durch `train.goatcounter.com` ersetzt — die

@@ -1,6 +1,6 @@
 # TRAIN — SECURITY.md
 
-Stand: train-v182 (2026-07-19). Zwei Teile: (1) was für TRAINs heutige
+Stand: train-v184 (2026-07-19). Zwei Teile: (1) was für TRAINs heutige
 Architektur bereits gilt, (2) eine Blaupause für den Moment, in dem TRAIN
 einen Server bekommt (Paywall/Coaching-Feature, siehe CLAUDE.md).
 

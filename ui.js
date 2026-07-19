@@ -1781,24 +1781,25 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
   const stLabel   = st === 'success' ? 'erfolgreich' : st === 'fail' ? 'nicht geschafft' : 'offen';
 
   // PR indicators: 🏆 weight PR (gold) | 🔄 reps PR (green)
-  const isWeightPR = st === 'success' && ex.prWeight !== null &&
-                     (s.weight ?? 0) > 0 && (s.weight ?? 0) >= ex.prWeight;
-  const isRepsPRAtMax = st === 'success' && ex.prRepsAtMaxWeight != null &&
-                     ex.prRepsAtMaxWeight > 0 &&
-                     (s.weight ?? 0) >= (ex.prWeight ?? 0) &&
-                     (s.reps ?? 0) >= ex.prRepsAtMaxWeight;
+  // Bis train-v184 wurde das live am Render-Zeitpunkt gegen ex.prWeight
+  // (All-Time-Wert, bleibt über Wochen hinweg bestehen) verglichen — dadurch
+  // zeigte JEDES erneute Erreichen eines schon früher aufgestellten Rekords
+  // wieder den Pokal, auch ohne echte Steigerung (vom Nutzer gemeldet,
+  // 2026-07). Seit train-v184 markiert `_applyPrTracking()` (state.js) den
+  // Satz, der einen Rekord TATSÄCHLICH auslöst, direkt am Satz selbst
+  // (`s.prBadge`) — historisch korrekt und unabhängig davon, welche Woche
+  // gerade betrachtet wird. Bereits bestehende (vor train-v184 gespeicherte)
+  // Sätze haben kein `s.prBadge` und zeigen daher ab sofort keinen Pokal
+  // mehr, bis der nächste echte Rekord live gesetzt wird — bewusster
+  // Kompromiss (rückwirkende Rekonstruktion aus der Historie wäre möglich,
+  // aber ein deutlich größerer Eingriff für einen rein kosmetischen Anzeige-
+  // fehler bei bereits abgeschlossenen Wochen).
+  const isWeightPR    = st === 'success' && s.prBadge === 'weight';
+  const isRepsPRAtMax = st === 'success' && s.prBadge === 'reps' && (s.weight ?? 0) >= (ex.prWeight ?? 0);
   // Wdh-Steigerung an einem submaximalen Gewicht (jenseits des persönlichen
   // Bestgewichts) würdigt denselben Badge — ex.prRepsHistory[gewicht] hält
   // pro Gewicht die beste je erreichte Wdh-Zahl.
-  // >= statt > (literal Spec-Text): zum Render-Zeitpunkt hat der Reducer
-  // ex.prRepsHistory[gewicht] bereits auf s.reps aktualisiert (gleiche
-  // Render-nach-Write-Reihenfolge wie isWeightPR/isRepsPRAtMax oben, die
-  // beide ebenfalls >= statt > nutzen) — mit > würde der Badge für genau
-  // den Satz, der den Rekord aufstellt, nie erscheinen.
-  const isRepsPRSubmax = st === 'success' && (s.weight ?? 0) > 0 &&
-                     ex.prWeight != null && (s.weight ?? 0) < ex.prWeight &&
-                     ex.prRepsHistory?.[String(s.weight)] !== undefined &&
-                     (s.reps ?? 0) >= ex.prRepsHistory[String(s.weight)];
+  const isRepsPRSubmax = st === 'success' && s.prBadge === 'reps' && (s.weight ?? 0) < (ex.prWeight ?? 0);
   const isRepsPR   = isRepsPRAtMax || isRepsPRSubmax;
   const isPR = isWeightPR || isRepsPR;
   const effortScore   = (st === 'success' && ex.targetReps && (ex.metric === 'reps' || !ex.metric)) ? Math.round((s.reps ?? 0) / ex.targetReps * 100) : null;
@@ -2128,7 +2129,7 @@ function renderBodyTab(state) {
     <div class="chart-card__title">Körpergewicht</div>
     <div class="body-today-row">
       <span class="body-today-row__label">Heute:</span>
-      <input id="body-weight-today" class="body-input" type="number" step="0.1"
+      <input id="body-weight-today" class="body-input" type="number" step="0.1" inputmode="decimal"
         value="${todayEntry ? todayEntry.weight : ''}"
         placeholder="${lastKnown ?? '82.5'}"
         aria-label="Körpergewicht heute in kg"
@@ -2160,7 +2161,7 @@ function renderBodyTab(state) {
     </div>`}
     <div class="body-field" style="margin-top:var(--sp-3)">
       <label for="body-target-weight">Zielgewicht (kg)</label>
-      <input id="body-target-weight" class="body-input" type="number" step="0.1"
+      <input id="body-target-weight" class="body-input" type="number" step="0.1" inputmode="decimal"
         value="${targetWeight ?? ''}" placeholder="80.0"
         data-action="set-target-weight"
         aria-label="Zielgewicht in kg"
@@ -3905,7 +3906,7 @@ function renderSettingsTab(state) {
     })()}
     <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:var(--sp-1)">
       <div class="settings-row__label">Stangengewicht (kg)</div>
-      <input class="body-input" type="number" step="0.5" min="5" max="50"
+      <input class="body-input" type="number" step="0.5" min="5" max="50" inputmode="decimal"
         value="${s.barbellWeight ?? 20}" placeholder="20"
         data-action="set-barbell-weight"
         style="margin-top:var(--sp-1);width:120px"
@@ -3935,7 +3936,7 @@ function renderSettingsTab(state) {
           </div>
           ${isCustomDl ? `
           <div style="margin-top:var(--sp-2);display:flex;align-items:center;gap:var(--sp-2)">
-            <input class="body-input" type="number" min="1" max="99" step="1"
+            <input class="body-input" type="number" min="1" max="99" step="1" inputmode="numeric"
               value="${dlCustom != null ? Math.round(dlCustom * 100) : Math.round(dlFactor * 100)}"
               data-action="set-deload-factor-value"
               style="width:80px"
@@ -4085,7 +4086,7 @@ function renderSettingsTab(state) {
   <div class="settings-section">
     <div class="settings-section__title">Info</div>
     <div class="settings-row">
-      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v183</div></div>
+      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v184</div></div>
     </div>
     <div class="settings-row">
       <div>
@@ -4227,17 +4228,17 @@ function renderTemplateEditor(state) {
       />
       <div class="tpl-sets-row">
         <span>Sätze:</span>
-        <input class="tpl-num" type="number" min="1" max="8" value="${ex.sets.length}"
+        <input class="tpl-num" type="number" min="1" max="8" inputmode="numeric" value="${ex.sets.length}"
           data-tpl-di="${di}" data-tpl-ei="${ei}" data-tpl-field="setsCount"
           aria-label="Anzahl Sätze"
         />
         <span>Wdh:</span>
-        <input class="tpl-num" type="number" min="1" value="${ex.sets[0]?.reps ?? 10}"
+        <input class="tpl-num" type="number" min="1" inputmode="numeric" value="${ex.sets[0]?.reps ?? 10}"
           data-tpl-di="${di}" data-tpl-ei="${ei}" data-tpl-field="reps"
           aria-label="Standard-Wiederholungen"
         />
         <span>kg:</span>
-        <input class="tpl-num" type="number" min="0" step="0.5" value="${ex.sets[0]?.weight ?? 0}"
+        <input class="tpl-num" type="number" min="0" step="0.5" inputmode="decimal" value="${ex.sets[0]?.weight ?? 0}"
           data-tpl-di="${di}" data-tpl-ei="${ei}" data-tpl-field="weight"
           aria-label="Standard-Gewicht"
         />

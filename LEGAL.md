@@ -1,6 +1,6 @@
 # TRAIN — LEGAL.md
 *Rechts-Recherche und -Entscheidungen. Getrennt von BUGS.md gehalten (das bleibt reiner Bug-Tracker) — hier steht das Warum, dort nur ein Pointer.*
-*Stand: train-v182 (Juli 2026)*
+*Stand: train-v184 (Juli 2026)*
 
 ---
 

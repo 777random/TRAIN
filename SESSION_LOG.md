@@ -1155,3 +1155,65 @@ Eigentliche Aufgabe: Nutzer hat einen GoatCounter-Account angelegt und
   erledigt (Impressum-Name/-Adresse und Feedback-E-Mail bleiben offen,
   hängen an B55). CACHE_VERSION train-v182→v183. Volle Suite 21/21 grün.
 Loop 5: nicht ausgeführt — kein neuer Code-Fakten-Export angefordert.
+
+
+## 2026-07-19 train-v184 (5 Nutzer-Bugs — B63/B64 gefixt, B65/B66/B67 offen)
+Loop 1: 23/23 grün (Playwright, inkl. 2 neuer PR-Badge-Tests) ✓
+Loop 2: aktualisiert — CACHE_VERSION/CSS in HANDOFF.md/CLAUDE.md auf train-v184 synchronisiert. Nebenbei Doku-Drift gefunden und behoben: BUGS.md/LEGAL.md/SECURITY.md hatten den train-v183-GoatCounter-Sprint nicht mitgezogen (Stand-Header blieben bei v182).
+Loop 3: übersprungen — unverändert seit v183
+Eigentliche Aufgabe: Nutzer meldete 5 Bugs aus dem echten Gebrauch. Jeden
+  einzeln diagnostiziert (Code lesen, nicht raten) vor jedem Fix:
+  - **B63 — PR-Pokal blieb bei Wiederholung eines alten Rekords sichtbar:**
+    `ex.prWeight` (All-Time-Wert, bleibt über Wochen bestehen) wurde beim
+    Render live mit `s.weight >= ex.prWeight` verglichen — zeigte den
+    Pokal erneut, sobald ein späterer Satz (auch in einer alten,
+    abgeschlossenen Woche) denselben oder höheren Wert traf, unabhängig
+    von echter Steigerung. Erster Fix-Versuch ("nur aktuellste Woche")
+    per Playwright getestet und als unzureichend verworfen — betraf auch
+    die aktuelle Woche bei reiner Wiederholung. Eigentlicher Fix: neues
+    `s.prBadge`-Feld, von `_applyPrTracking()` (state.js) direkt am Satz
+    gesetzt, der den Rekord beim Schreiben tatsächlich auslöst — 3
+    Reducer-Aufrufstellen (SET_TOGGLE_DONE/CONFIRM_SET/AUTO_EVAL_SET)
+    entsprechend angepasst (Set-Objekt statt nur Gewicht/Wdh übergeben).
+    Render-Bedingungen in `renderSetRow()` (ui.js) auf `s.prBadge`
+    umgestellt, live-Vergleiche entfernt. Bewusster Kompromiss: bereits
+    gespeicherte Sätze (vor train-v184) haben kein `prBadge`, zeigen also
+    rückwirkend keine historischen Pokale mehr — Rekonstruktion aus der
+    Historie wäre möglich, aber unverhältnismäßig für einen kosmetischen
+    Anzeigefehler bei abgeschlossenen Wochen. 2 neue Tests
+    (`tests/pr_badge.spec.js`) verifizieren beide Richtungen, inkl. eines
+    Fehlversuchs währenddessen (Test-Selektor `.pr-badge` traf anfangs
+    auch den unabhängigen "Ziel erreicht"-Badge, dieselbe CSS-Klasse —
+    korrigiert auf `.pr-badge:not(.pr-badge--goal):not(.pr-badge--reps)`).
+  - **B64 — volle statt Zahlen-Tastatur:** 6 `<input type="number">`
+    ohne `inputmode` gefunden und ergänzt (Körpergewicht heute/Ziel,
+    Stangengewicht → decimal; Deload-Prozentsatz, Template-Editor
+    Sätze/Wdh → numeric; Template-Editor Gewicht → decimal) — analog zum
+    bereits etablierten B16-Muster im Rest der App.
+  - **B65 — Gewichtssteigerung "immer noch 1,25kg bei Squats":**
+    Empfehlungs-Logik (B48) und alle 4 Aufrufstellen lesen `ex.weightStep`
+    bereits korrekt — keine Regression gefunden. Root Cause liegt
+    stattdessen darin, dass JEDE Übungs-Erstellungsstelle `weightStep`
+    unconditional auf 2.5 setzt, ohne die bereits vorhandene
+    movementMap.js-Kategorisierung (Kniebeuge = "Squat") zu nutzen. Nicht
+    gefixt — Rückfrage an Nutzer, ob das echter Bug (Schrittweite war
+    manuell gesetzt) oder Produkt-Frage (smarterer Default fehlt) ist.
+  - **B66 — Fehler-Toast beim App-Öffnen:** nicht reproduziert. 2
+    realistische Szenarien per Playwright durchgespielt (Neustart ohne
+    Daten, 3-Wochen-Bestand mit echter Kniebeuge-Historie), `pageerror`/
+    `unhandledrejection`-Listener fingen nichts. `window.goatcounter`-
+    Aufrufe bereits defensiv mit Optional Chaining abgesichert. Braucht
+    mehr Kontext vom Nutzer.
+  - **B67 — zwei Prozentzahlen beim Tages-Abschluss (100%/86%):**
+    diagnostiziert als bewusst unterschiedliche, je korrekte Kennzahlen
+    (`_showCompletionScreen()`, ui.js — `pct` = Erfolgsquote NUR bewerteter
+    Sätze, `effortPct` = Zielerfüllung inkl. übersprungener/pending Sätze,
+    aus einem früheren Sprint bewusst so entschieden). Erklärt den
+    gemeldeten Fall exakt (KB Windmill übersprungen zieht die
+    Zielerfüllung runter, obwohl alles Gemachte erfolgreich war). Direktes
+    Analogon zu einem bereits bestehenden "BEWUSST KEIN BUG"-Fall.
+    Label-Fix vorgeschlagen (obere Zahl aktuell unbeschriftet), aber
+    NICHT umgesetzt — Formulierungsänderungen brauchen laut Projekt-
+    Konvention Nutzer-Bestätigung, nicht einseitig entschieden.
+  CACHE_VERSION train-v183→v184. Volle Suite 23/23 grün.
+Loop 5: nicht ausgeführt — kein neuer Code-Fakten-Export angefordert.
