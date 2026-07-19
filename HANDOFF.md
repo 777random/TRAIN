@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-19, Cross-AI-Review Runde 3 ausgewertet (train-v182)*
-*Nächster Schritt: beide externe KIs empfehlen unabhängig, JETZT die Rekrutierung der 20 echten Testnutzer zu starten (Reddit r/weightroom, r/powerlifting) statt eine 4. Konsultationsrunde zu drehen — Legal/Security sind nach 3 Runden gut durchgekaut, der eigentliche Engpass ist fehlendes echtes Nutzer-Feedback. B55 bleibt Blocker (c/o-Adresse, siehe LEGAL.md). Preisfrage weiterhin offen, am besten über echte Zahlungsbereitschaft der Testnutzer beantworten statt weiterer Schreibtisch-Recherche.*
+*Letzte Aktualisierung: 2026-07-19, echter GoatCounter-Site-Code aktiviert (train-v183)*
+*Nächster Schritt: B55 bleibt der letzte echte Blocker (Impressum-Platzhalter, c/o-Adresse, siehe LEGAL.md) — braucht Name+Adresse+E-Mail vom Nutzer. Feedback-E-Mail (ui.js:4099) hängt daran. Danach: Rekrutierung der 20 echten Testnutzer starten (beide externe KIs empfehlen das als nächsten Schritt, nicht weitere Konsultationsrunden).*
 
 ---
 
@@ -11,13 +11,27 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v182 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v183 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
 - CSS: ?v=191 (unverändert diesen Sprint — reiner JS/HTML-Sprint)
 - SCHEMA: 30 (unverändert diesen Sprint)
 - Letzter Commit: siehe `git log` (dieser Sprint noch nicht gepusht,
   siehe Sprint-Ende-Workflow).
+- **Echter GoatCounter-Site-Code aktiviert (train-v183):** Nutzer hat
+  einen GoatCounter-Account angelegt (Site-Code "train"). `index.html`
+  Platzhalter `<SITE-CODE>` durch `train.goatcounter.com` ersetzt — die
+  seit train-v182 aktive versionierte SRI-URL (`count.v5.js` + Hash)
+  blieb dabei unverändert, nur der Site-Code wurde getauscht. Der
+  "TODO vor Launch"-Kommentar im HTML ist damit erledigt. CSP
+  (`connect-src`/`img-src` auf `https://*.goatcounter.com` als
+  Wildcard) deckt die konkrete Subdomain bereits ab, keine Anpassung
+  nötig. **Hinweis:** Playwright-Testläufe (lokal + CI) laden das
+  Script jetzt gegen den echten Account — GoatCounter filtert
+  Headless-Browser/Bot-Traffic laut eigener Dokumentation automatisch,
+  nicht extra geprüft, da unkritisch (reine Analytics, kein Sicherheits-
+  /Datenschutzthema). CACHE_VERSION train-v182→v183. Volle Suite 21/21
+  grün.
 - **Cross-AI-Review Runde 3 ausgewertet (train-v182):** Nutzer ließ die
   4 aktualisierten Advisor-Exportdokumente von Gemini und Claude Cowork
   ein drittes Mal gegenlesen. Jeder Punkt eigenständig nachverifiziert

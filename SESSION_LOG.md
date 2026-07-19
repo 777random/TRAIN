@@ -1139,3 +1139,19 @@ Eigentliche Aufgabe: Nutzer teilte Runde-3-Feedback von Gemini und Claude
   durchgekaut sind und der eigentliche Engpass fehlendes echtes
   Nutzer-Feedback ist, nicht weitere Recherche.
 Loop 5: nicht ausgeführt — kein neuer Code-Fakten-Export angefordert.
+
+
+## 2026-07-19 train-v183 (echter GoatCounter-Site-Code aktiviert)
+Loop 1: 21/21 grün (Playwright) ✓
+Loop 2: aktualisiert — CACHE_VERSION/CSS in HANDOFF.md/CLAUDE.md auf train-v183 synchronisiert
+Loop 3: übersprungen — unverändert seit v182
+Eigentliche Aufgabe: Nutzer hat einen GoatCounter-Account angelegt und
+  den echten Embed-Code geliefert (Site-Code "train"). `index.html`:
+  Platzhalter `<SITE-CODE>` durch `train.goatcounter.com` ersetzt — die
+  seit train-v182 aktive versionierte SRI-Absicherung (`count.v5.js` +
+  offizieller Hash) blieb unverändert, nur der Site-Code getauscht statt
+  auf die vom Nutzer eingefügte unversionierte `count.js`-Variante
+  zurückzufallen. Einer von drei verbliebenen Launch-Platzhaltern damit
+  erledigt (Impressum-Name/-Adresse und Feedback-E-Mail bleiben offen,
+  hängen an B55). CACHE_VERSION train-v182→v183. Volle Suite 21/21 grün.
+Loop 5: nicht ausgeführt — kein neuer Code-Fakten-Export angefordert.
