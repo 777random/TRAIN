@@ -30,7 +30,7 @@
   <link rel="apple-touch-icon" sizes="192x192" href="./icon-192.png">
   <link rel="apple-touch-icon" sizes="512x512" href="./icon-512.png">
 
-  <link rel="stylesheet" href="./styles.css?v=191">
+  <link rel="stylesheet" href="./styles.css?v=192">
 
   <!-- modulepreload-Hints: ohne Bundler (bewusste Architekturentscheidung,
        siehe CLAUDE.md) entdeckt der Browser den ES-Module-Graphen sonst nur
@@ -189,13 +189,28 @@
     // Fehlermeldung/Dateiname an die Konsole (Debugging) und feuert das
     // anonyme GoatCounter-Event 'js_error' (siehe ui.js train:js-error-
     // Listener) — keine Nutzdaten verlassen das Gerät.
+    // Seit train-v185 (B66): die Fehlermeldung selbst wird als GoatCounter-
+    // Event-Pfad mitgegeben (gekürzt, keine Nutzdaten — reine JS-Fehlertext,
+    // kein Trainingsdaten-Bezug) — vorher zeigte GoatCounter nur "es gab
+    // einen Fehler", nie WELCHEN. Nutzer meldete einen reproduzierbaren
+    // Fehler-Toast beim App-Öffnen auf allen Geräten, der sich trotz
+    // mehrerer realistischer Nachstell-Versuche nicht lokal reproduzieren
+    // ließ — das GoatCounter-Dashboard zeigt die konkrete Fehlermeldung
+    // beim nächsten Auftreten, ohne dass der Nutzer die Browser-Konsole
+    // öffnen muss.
+    function _reportJsError(message) {
+      const short = String(message ?? 'unknown').slice(0, 120);
+      window.dispatchEvent(new CustomEvent('train:js-error', { detail: { message: short } }));
+    }
     window.addEventListener('error', event => {
+      const msg = event.error?.message ?? event.message;
       console.error('[TRAIN] Uncaught error:', event.error ?? event.message);
-      window.dispatchEvent(new CustomEvent('train:js-error'));
+      _reportJsError(msg);
     });
     window.addEventListener('unhandledrejection', event => {
+      const msg = event.reason?.message ?? event.reason;
       console.error('[TRAIN] Unhandled promise rejection:', event.reason);
-      window.dispatchEvent(new CustomEvent('train:js-error'));
+      _reportJsError(msg);
     });
 
     onSwUpdateReady(event => {

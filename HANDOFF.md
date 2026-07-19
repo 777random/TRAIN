@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-19, 5 Nutzer-Bugs diagnostiziert, 2 gefixt (B63/B64), 3 brauchen Klärung (B65/B66/B67) (train-v184)*
-*Nächster Schritt: B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md). Rückfragen an den Nutzer offen: B65 (weightStep für Squats bereits manuell konfiguriert?), B66 (Fehler-Toast — welches Gerät, wann genau?), B67 (Label-Fix für die Erfolgsquote bestätigen?).*
+*Letzte Aktualisierung: 2026-07-19, B65/B67 gefixt nach Nutzer-Antworten, B66 Error-Observability verbessert (train-v185, SCHEMA 31)*
+*Nächster Schritt: B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md) — braucht Name+Adresse+E-Mail vom Nutzer. B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten — GoatCounter-Dashboard zeigt jetzt die konkrete Fehlermeldung. Zusätzlich angefordert: Share-Bild-Feature (PR-Moment + Wochenrückblick) — technische Spec wird im Anschluss geschrieben, Implementierung wartet auf Bestätigung.*
 
 ---
 
@@ -11,13 +11,45 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v184 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v185 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
-- CSS: ?v=191 (unverändert diesen Sprint — reiner JS/HTML-Sprint)
-- SCHEMA: 30 (unverändert diesen Sprint)
+- CSS: ?v=192 (neue `.day-completion-screen__pct-label`-Klasse, B67)
+- SCHEMA: 31 (B65-Migration: Squat/Hinge-Übungen mit unverändertem
+  Schrittweite-Standard werden auf 5kg angehoben)
 - Letzter Commit: siehe `git log` (dieser Sprint noch nicht gepusht,
   siehe Sprint-Ende-Workflow).
+- **B65/B66/B67 abgeschlossen nach Nutzer-Antworten (train-v185):**
+  Nutzer beantwortete alle 3 offenen Rückfragen aus dem vorherigen
+  Sprint in einer Nachricht:
+  - **B65 (gefixt):** Squats standen tatsächlich beim nie geänderten
+    2.5kg-Standard — Nutzer bat trotzdem um den smarten Default. Neue
+    `defaultWeightStepForExercise()` (state.js) nutzt die bereits
+    vorhandene movementMap.js-Kategorisierung (B46): Squat/Hinge-
+    Übungen bekommen künftig 5kg statt 2.5kg, angewendet an allen 3
+    Übungs-Erstellungsstellen (EX_ADD, ONBOARDING_SEED, ui.js
+    `_applyTpl`). Migration SCHEMA v30→v31 hebt bestehende Squat/Hinge-
+    Übungen mit unverändertem Standard rückwirkend an, respektiert
+    aber bewusst vom Nutzer gesetzte andere Werte. Neuer Test
+    `tests/smart_weightstep.spec.js` (in CI) verifiziert beides.
+  - **B66 (nicht reproduziert, Observability verbessert):** Nutzer
+    bestätigte: passiert auf allen Geräten, immer beim Öffnen. 2
+    weitere Reproduktionsversuche (echte Produktions-URL frisch
+    besucht, SW-Install-und-erneutes-Öffnen simuliert) — zusätzlich zu
+    den 2 aus dem vorherigen Sprint, macht 4 insgesamt — fanden nichts.
+    Statt zu raten: die tatsächliche Fehlermeldung wird jetzt (gekürzt,
+    keine Nutzdaten) als GoatCounter-Event-Pfad mitgegeben
+    (`js_error: <Meldung>`) — beim nächsten Auftreten zeigt das
+    Dashboard die konkrete Ursache. Bleibt offen.
+  - **B67 (gefixt):** Nutzer bestätigte den Label-Vorschlag und bat um
+    eine auf einen Blick erkennbare visuelle Unterscheidung. Neues
+    Label unter der großen Erfolgsquote-Zahl ("✅ Erfolgsquote — Anteil
+    erfolgreicher Sätze"), die Zielerfüllungs-Zeile bekam denselben
+    erklärenden Zusatz. Neue CSS-Klasse rückt das Label eng an die
+    Zahl heran; die bereits bestehende Pill-Badge-Optik der
+    Zielerfüllung sorgt für zusätzliche visuelle Trennung.
+  Volle Suite 24/24 grün. CACHE_VERSION train-v184→v185, CSS
+  ?v=191→192, SCHEMA 30→31.
 - **5 Nutzer-Bugs diagnostiziert, 2 gefixt (train-v184):** Nutzer meldete
   5 Bugs aus dem echten Gebrauch. Diagnose vor Fix (CLAUDE.md-Regel) für
   jeden einzeln:

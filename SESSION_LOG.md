@@ -1217,3 +1217,55 @@ Eigentliche Aufgabe: Nutzer meldete 5 Bugs aus dem echten Gebrauch. Jeden
     Konvention Nutzer-Bestätigung, nicht einseitig entschieden.
   CACHE_VERSION train-v183→v184. Volle Suite 23/23 grün.
 Loop 5: nicht ausgeführt — kein neuer Code-Fakten-Export angefordert.
+
+
+## 2026-07-19 train-v185 (B65/B67 gefixt, B66 Observability — SCHEMA 31)
+Loop 1: 24/24 grün (Playwright, inkl. neuem Migrations-Test) ✓
+Loop 2: aktualisiert — CACHE_VERSION/CSS/SCHEMA in HANDOFF.md/CLAUDE.md auf train-v185/?v=192/31 synchronisiert
+Loop 3: übersprungen — unverändert seit v184
+Eigentliche Aufgabe: Nutzer beantwortete die 3 offenen Rückfragen aus dem
+  vorherigen Sprint in einer Nachricht und bat um konkrete Umsetzung:
+  - **B65:** Squats standen tatsächlich beim nie geänderten 2.5kg-Standard
+    (Nutzer bestätigt) — trotzdem expliziter Wunsch nach dem smarten
+    Default. Import-Zyklus-Check zuerst (movementMap.js hat keine
+    Imports, sicher in state.js importierbar). Neue
+    `defaultWeightStepForExercise(name, customExercises)` (state.js)
+    nutzt die bereits vorhandene movementMap.js-Kategorisierung (B46) —
+    Squat/Hinge-Übungen bekommen 5kg statt 2.5kg. Angewendet an EX_ADD,
+    ONBOARDING_SEED (state.js) und `_applyTpl` (ui.js) — dieselbe
+    Funktion, keine Duplikate. SCHEMA-Migration v30→v31 hebt bestehende
+    Squat/Hinge-Übungen mit unverändertem Standard (`undefined` oder
+    exakt 2.5) rückwirkend an, respektiert aber explizite Nutzer-
+    Overrides (z.B. 1.25 für eine leichte Variante). Neuer Test
+    `tests/smart_weightstep.spec.js` verifiziert alle 3 Fälle.
+  - **B66:** Nutzer bestätigte: passiert auf allen Geräten (Android/iOS,
+    Handy/Tablet/Laptop), immer direkt beim Öffnen. 2 weitere
+    Reproduktionsversuche (echte Produktions-URL `777random.github.io/
+    TRAIN` frisch besucht per Playwright; Service-Worker-Install-und-
+    erneutes-Öffnen-Übergang mit zweitem Tab simuliert) — zusammen mit
+    den 2 aus dem vorherigen Sprint macht das 4 Versuche insgesamt,
+    keiner reproduzierte den Fehler. Statt weiter zu raten (CLAUDE.md-
+    Regel: keine Fixes ohne bekannten Root Cause): `index.html`/`ui.js`
+    geben die tatsächliche Fehlermeldung (gekürzt auf 120 Zeichen, keine
+    Nutzdaten) jetzt als GoatCounter-Event-Pfad mit (`js_error:
+    <Meldung>` statt nur `js_error`) — sobald der Fehler erneut auftritt,
+    zeigt das GoatCounter-Dashboard die konkrete Ursache, ohne dass der
+    Nutzer die Browser-Konsole öffnen muss. Bleibt offen.
+  - **B67:** Nutzer bestätigte den Label-Vorschlag, bat zusätzlich um
+    eine auf einen Blick erkennbare visuelle Unterscheidung. Neues Label
+    unter der großen Erfolgsquote-Zahl (`_showCompletionScreen()`,
+    ui.js) plus erklärender Zusatz bei der bereits bestehenden
+    Zielerfüllungs-Zeile. Neue CSS-Klasse `.day-completion-screen__pct-
+    label` (styles.css, negativer margin-top rückt Label eng an die
+    Zahl). Per Playwright mit dem exakten gemeldeten Szenario verifiziert
+    (eine Übung erfolgreich, eine übersprungen → 100% Erfolgsquote/33%
+    Zielerfüllung, beide klar beschriftet).
+  CACHE_VERSION train-v184→v185, CSS ?v=191→192, SCHEMA 30→31. Volle
+  Suite 24/24 grün.
+Loop 5: nicht ausgeführt — kein neuer Code-Fakten-Export angefordert.
+
+Zusätzlich in derselben Nutzer-Nachricht angefordert: eine neue
+Feature-Spec (Share-Bild PR-Moment + Wochenrückblick, Canvas API) nach
+explizitem Spec-erst-dann-Bestätigung-Workflow — wird im Anschluss an
+diesen Sprint separat bearbeitet (Doku lesen, aktive Loops, Spec
+schreiben, auf Bestätigung warten), noch nicht umgesetzt.

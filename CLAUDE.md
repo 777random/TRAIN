@@ -1,7 +1,7 @@
 # TRAIN — CLAUDE.md
 # Vollständiger Projektkontext für Claude Code
-# Stand: train-v184 / SCHEMA 30 / Juli 2026
-# Letztes Update: nach train-v184 (B63 PR-Pokal-Fix, B64 inputmode-Felder)
+# Stand: train-v185 / SCHEMA 31 / Juli 2026
+# Letztes Update: nach train-v185 (B65 Squat/Hinge-Schrittweite, B66 Error-Observability, B67 Label-Klarheit)
 
 ---
 
@@ -40,7 +40,7 @@ TRAIN ist eine deutschsprachige PWA für Krafttraining. Pure Vanilla ES Modules 
 
 - Repo: https://github.com/777random/TRAIN
 - Deployed: https://777random.github.io/TRAIN/
-- Aktueller Stand: SCHEMA_VERSION 30 · CACHE_VERSION train-v184 · CSS ?v=191
+- Aktueller Stand: SCHEMA_VERSION 31 · CACHE_VERSION train-v185 · CSS ?v=192
 
 ---
 
@@ -185,9 +185,9 @@ Flux-Pattern: `dispatch(A.ACTION_TYPE, payload)` → `reduce()` → `persistStat
 
 **Undo:** 20-Entry Stack mit Deep-Cloned Snapshots. Navigation Actions (`WEEK_NAVIGATE`, `SESSION_START` etc.) sind von Undo ausgeschlossen (`_NO_UNDO`).
 
-**Schema Migration:** `migrate()` läuft bei jedem `loadState()`. Neuen `case` Block hinzufügen wenn `SCHEMA_VERSION` erhöht wird. Aktuelle Version: **30**.
+**Schema Migration:** `migrate()` läuft bei jedem `loadState()`. Neuen `case` Block hinzufügen wenn `SCHEMA_VERSION` erhöht wird. Aktuelle Version: **31**.
 
-**State Shape (SCHEMA 30):**
+**State Shape (SCHEMA 31):**
 ```javascript
 {
   meta: { schemaVersion: 29, savedAt, createdAt },

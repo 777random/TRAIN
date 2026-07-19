@@ -2104,6 +2104,15 @@ details[open] > .deload-details__summary::before { content: '▾ '; }
   font-family: var(--font-display); font-size: 80px; line-height: 1;
   color: var(--c-accent); letter-spacing: .04em;
 }
+/* B67: Label direkt unter der großen Erfolgsquote-Zahl, damit sie nicht
+   mit der abweichenden Zielerfüllung (.day-completion-screen__effort,
+   inkl. übersprungener Sätze — bewusst zwei unterschiedliche Kennzahlen)
+   verwechselt wird. Negativer margin-top rückt das Label eng an die
+   Zahl heran, statt wie ein weiterer gleichrangiger Block zu wirken. */
+.day-completion-screen__pct-label {
+  font-size: 13px; color: var(--c-text-2); margin-top: -6px;
+  text-align: center; max-width: 240px;
+}
 .day-completion-screen__sets { font-size: 18px; color: var(--c-text-2); }
 .day-completion-screen__pr {
   font-size: 20px; font-weight: 700; color: var(--c-warn);

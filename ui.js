@@ -19,7 +19,7 @@
 import {
   getState, dispatch, subscribe, A, canUndo, BADGE_THRESHOLDS, VACATION_PLANS,
   calcCurrentStreak, calcLongestStreakEver, weekTrainingStatus, getLatestWeek,
-  clearAutoWeekPending, STORAGE_KEY, STORAGE_KEY_SHADOW,
+  clearAutoWeekPending, STORAGE_KEY, STORAGE_KEY_SHADOW, defaultWeightStepForExercise,
 } from './state.js';
 import {
   exportJSON, exportJSONAuto, importJSON, exportCSV,
@@ -4086,7 +4086,7 @@ function renderSettingsTab(state) {
   <div class="settings-section">
     <div class="settings-section__title">Info</div>
     <div class="settings-row">
-      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v184</div></div>
+      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v185</div></div>
     </div>
     <div class="settings-row">
       <div>
@@ -6790,9 +6790,14 @@ export function mountApp(root) {
   // Von index.html gefeuert bei window.onerror/unhandledrejection (Pre-Launch-
   // Checkliste) — Nutzer bekommt einen Hinweis statt einer stillen Fehler-
   // fläche, zusätzlich anonymes GoatCounter-Zähl-Event (keine Nutzdaten).
-  window.addEventListener('train:js-error', () => {
+  // Seit train-v185 (B66): die (gekürzte) Fehlermeldung selbst wandert in
+  // den GoatCounter-Event-Pfad, damit ein nicht lokal reproduzierbarer
+  // Fehler im Dashboard sichtbar wird, statt nur als anonymer Zähler ohne
+  // jede Diagnose-Information.
+  window.addEventListener('train:js-error', (event) => {
     showToast('Etwas ist schiefgelaufen — bitte kurz neu laden.', 'warn', 4000);
-    _gcEvent('js_error');
+    const detail = event.detail?.message ? `js_error: ${event.detail.message}` : 'js_error';
+    _gcEvent(detail);
   });
 
   // Von index.html gefeuert bei window 'appinstalled' (PWA tatsächlich zum
@@ -7110,10 +7115,13 @@ function _showCompletionScreen(stats) {
       <div class="day-completion-screen__icon">💪</div>
       ${isVacation
         ? `<div class="day-completion-screen__pct" style="font-size:20px">🏖 Stark! Auch im Urlaub trainiert.</div>`
-        : pct !== null ? `<div class="day-completion-screen__pct">${pct}%</div>` : ''}
+        : pct !== null ? `
+          <div class="day-completion-screen__pct">${pct}%</div>
+          <div class="day-completion-screen__pct-label">✅ Erfolgsquote — Anteil erfolgreicher Sätze</div>
+        ` : ''}
       ${successSets > 0 ? `<div class="day-completion-screen__sets">${successSets}/${totalSets} Sätze erfolgreich</div>` : ''}
       ${prCount > 0 ? `<div class="day-completion-screen__pr">🏆 ${prCount} neues PR${prCount > 1 ? 's' : ''}!</div>` : ''}
-      ${!isVacation && effortPct !== null ? `<div class="day-completion-screen__effort">🎯 ${effortPct}% Zielerfüllung</div>` : ''}
+      ${!isVacation && effortPct !== null ? `<div class="day-completion-screen__effort">🎯 ${effortPct}% Zielerfüllung — erzielte Wdh/Zeit/Distanz ggü. Plan</div>` : ''}
       <div class="day-completion-screen__quote">"${displayQuote}"</div>
     </div>`;
   document.body.appendChild(el);
@@ -7476,7 +7484,7 @@ function _showOnboarding() {
           sets: Array.from({ length: n }, () => ({
             weight: 0, reps: tr, rpe: null, status: 'pending', done: false, note: '',
           })),
-          weightStep: 2.5, nextWeekPlan: 0, nextWeekPlanConfirmed: false,
+          weightStep: defaultWeightStepForExercise(ex.name, getState().customExercises), nextWeekPlan: 0, nextWeekPlanConfirmed: false,
           metricStep: ex.m === 'm' ? 50 : ex.m === 'sec' ? 10 : undefined,
           targetSets: n, targetReps: tr,
           _showCfg: false, setType: 'standard',

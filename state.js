@@ -20,11 +20,26 @@
  * and console.warn for non-fatal errors.
  */
 
+import { buildCategoryMap, resolveCategory } from './movementMap.js';
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 export const STORAGE_KEY        = 'train_v6';
 export const STORAGE_KEY_SHADOW = 'train_v6_shadow';
-export const SCHEMA_VERSION     = 30;
+export const SCHEMA_VERSION     = 31;
+
+// B65: Squat/Hinge sind die schweren Grundübungs-Kategorien (Kniebeuge/
+// Kreuzheben-Varianten), bei denen 2.5kg-Schritte in der Praxis zu klein
+// sind — Nutzer bestätigte, dass die pauschale 2.5kg-Vorgabe (B48) genau
+// dort als "die automatische Steigerung ist kaputt" wahrgenommen wurde,
+// obwohl die Empfehlungs-Logik selbst korrekt war. Bewusst NUR diese zwei
+// Kategorien (nicht Push/Pull — die reichen von schweren Bankdrücken-
+// Varianten bis zu leichten Bizeps-Curls, keine sinnvolle Pauschale).
+export function defaultWeightStepForExercise(name, customExercises) {
+  const categoryMap = buildCategoryMap(customExercises ?? []);
+  const category = resolveCategory(name, categoryMap);
+  return (category === 'Squat' || category === 'Hinge') ? 5 : 2.5;
+}
 
 export const BADGE_THRESHOLDS = [
   { id: 'badge_4',   weeks: 4,   title: 'Erster Schritt' },
@@ -865,6 +880,31 @@ function migrate(raw) {
     );
     (raw.customTemplate ?? []).forEach(day => (day.exercises ?? []).forEach(_fixMetricProgression));
     raw.meta = { ...raw.meta, schemaVersion: 30 };
+  }
+
+  // v30 → v31 (B65): Squat/Hinge-Übungen (Kniebeuge/Kreuzheben-Varianten)
+  // bekommen automatisch eine größere Schrittweite (5kg statt 2.5kg) —
+  // Nutzer meldete, die automatische Gewichtssteigerung wirke bei Squats
+  // "immer noch 1,25kg", obwohl die Empfehlungs-Logik selbst (B48) bereits
+  // korrekt ex.weightStep respektiert. Root Cause war das Fehlen eines
+  // kategorie-bewussten Defaults bei der Übungs-Erstellung, nicht die
+  // Empfehlungs-Logik. NUR Übungen, deren Schrittweite noch auf dem nie
+  // angefassten Standard steht (undefined ODER exakt 2.5), werden
+  // angehoben — eine bereits bewusst vom Nutzer gewählte andere
+  // Schrittweite (z.B. 1.25 für eine leichte Squat-Variante) bleibt
+  // unangetastet.
+  if ((raw.meta?.schemaVersion ?? 0) < 31) {
+    const _catMap = buildCategoryMap(raw.customExercises ?? []);
+    const _bumpSquatHingeStep = ex => {
+      if (ex.weightStep !== undefined && ex.weightStep !== 2.5) return;
+      const cat = resolveCategory(ex.name, _catMap);
+      if (cat === 'Squat' || cat === 'Hinge') ex.weightStep = 5;
+    };
+    (raw.weeks ?? []).forEach(wk =>
+      (wk.days ?? []).forEach(day => (day.exercises ?? []).forEach(_bumpSquatHingeStep))
+    );
+    (raw.customTemplate ?? []).forEach(day => (day.exercises ?? []).forEach(_bumpSquatHingeStep));
+    raw.meta = { ...raw.meta, schemaVersion: 31 };
   }
 
   // Always-apply defaults for settings added in later versions
@@ -1724,6 +1764,7 @@ function reduce(state, action) {
       day.exercises.push({
         name: p.name, note: '', pauseSec: 90, metric: m,
         progressionType: m === 'reps' ? 'weight' : 'reps',
+        weightStep: defaultWeightStepForExercise(p.name, state.customExercises),
         metricStep: m === 'm' ? 50 : m === 'sec' ? 10 : undefined,
         progressionMode: 'weight_first', targetRepsMax: null, prRepsHistory: {},
         prWeight: null, prRepsAtMaxWeight: null,
@@ -2339,7 +2380,7 @@ function reduce(state, action) {
         id: Date.now() - 1000 + i,
         name: sw.name, note: '', pauseSec: 90, metric: 'reps',
         sets: [{ weight: sw.weight, reps: sw.reps ?? 5, rpe: sw.rpe ?? null, status: 'success', done: true }],
-        weightStep: 2.5, nextWeekPlan: 0, nextWeekPlanConfirmed: false,
+        weightStep: defaultWeightStepForExercise(sw.name, state.customExercises), nextWeekPlan: 0, nextWeekPlanConfirmed: false,
         targetSets: 1, targetReps: sw.reps ?? 5,
         _showCfg: false, setType: 'standard', tags: [], showPlates: false,
         progressionType: 'weight', substituteFor: null,
