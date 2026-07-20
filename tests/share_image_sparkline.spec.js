@@ -84,6 +84,7 @@ test('Wochenrückblick-Teilen: echte Gewichtshistorie über 4 Wochen fließt in 
       coachPerformance: { suggestions: [] }, coachQuestion: null, coachQuestionHistory: [],
       lastReentryHandled: null, plateauActions: {}, decisionLog: [], badges: [], onboardingDone: true,
     }));
+    localStorage.setItem('train_share_consent', 'true'); // B73: hier nicht Testgegenstand
   });
   await page.reload();
   await page.waitForSelector('#app.is-ready', { timeout: 10000 });

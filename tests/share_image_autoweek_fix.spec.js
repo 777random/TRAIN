@@ -109,6 +109,7 @@ test('Wochenrückblick-Dropdown (Fortschritt-Tab): Teilen-Button vorhanden und l
       coachPerformance: { suggestions: [] }, coachQuestion: null, coachQuestionHistory: [],
       lastReentryHandled: null, plateauActions: {}, decisionLog: [], badges: [], onboardingDone: true,
     }));
+    localStorage.setItem('train_share_consent', 'true'); // B73: hier nicht Testgegenstand
   });
   await page.reload();
   await page.waitForSelector('#app.is-ready', { timeout: 10000 });

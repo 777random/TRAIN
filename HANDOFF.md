@@ -1,5 +1,5 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-20, Auto-Wochenrückblick-Fix + Teilen im Dropdown (B72, train-v188, SCHEMA 31)*
+*Letzte Aktualisierung: 2026-07-20, Share-Bild v3 — Favoriten-Kaskade + PR-Moment-Toast + Datenschutz-Hinweis (B73, train-v189, SCHEMA 31)*
 *Nächster Schritt: B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md) — braucht Name+Adresse+E-Mail vom Nutzer. B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten. Keine weiteren offenen Rückfragen aus diesem Sprint.*
 
 ---
@@ -11,14 +11,45 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v188 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v189 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
-- CSS: ?v=193 (unverändert — B72 ändert kein CSS, reused bestehende
-  `.btn`/`.btn--ghost`-Klassen)
+- CSS: ?v=194 (neue `.pr-moment-toast`/`.pr-moment-toast__btn`-Klassen, B73)
 - SCHEMA: 31 (unverändert)
 - Letzter Commit: siehe `git log` (dieser Sprint noch nicht gepusht,
   siehe Sprint-Ende-Workflow).
+- **B73 — Share-Bild v3: Favoriten-Kaskade, Hook-Satz im Fallback,
+  Retina-Deckelung, PR-Moment-Toast, Datenschutz-Hinweis (train-v189):**
+  Nutzer bestätigte eine vorab vorgelegte technische Spec ("Bestätigung
+  für alle 6 Punkte... ja"). Vorlage enthielt erneut mehrere Diskrepanzen
+  zum echten Code (falsche Versionsstände train-v181/?v=195/"SCHEMA
+  unverändert (30)" — real train-v188/?v=193/SCHEMA 31; bereits vergebene
+  BUGS.md-IDs B61-B64; "PR-Moment-Bild fehlte" war sachlich falsch,
+  existiert seit B68; `_pickBestExercise`-Signatur und PR-Erkennungslogik
+  passten nicht zur echten Datenstruktur — `_findPR()` liefert nur EINEN
+  PR-Highlight/Woche, favoritenblind, kein `weightDiff`-Feld; `Object.
+  entries()` auf einer `Map` in der Vorlage war ein echter Bug), vor der
+  Umsetzung offengelegt und korrigiert.
+  **Umsetzung:** 1) Favoriten-Kaskade (`_pickBestExercise()`,
+  weekReviewModal.js, 6 Prioritäten) — PR-Erkennung über direkten
+  `s.prBadge`-Scan statt `highlights`. `favoriteExercises` an 3 Stellen
+  in ui.js an `reviewData` angehängt. 2) Hook-Satz aus B71 gilt jetzt ab
+  2 statt erst ab 3 Datenpunkten. 3) `_buildCanvas()`: DPR bei 3x
+  gedeckelt. 4) Fallback bei 0/1/2 Datenpunkten differenziert. 5) Neuer
+  PR-Moment-Toast direkt nach `toggle-done`/`confirm-set` bei echtem
+  `s.prBadge === 'weight'`, unabhängig vom Tagesabschluss-Screen.
+  `buildPrShareCanvas()` komplett neu aufgebaut (Trophäe, Name,
+  Gewicht×Wdh, optional "Vorheriger Rekord"+Differenz). **Nach
+  Screenshot-Prüfung erneut** (zweites Mal nach B71) einen eigenen
+  Leerraum-Fehler in der PR-Bild-Neufassung gefunden und korrigiert —
+  Zonen großzügiger verteilt, Footer jetzt dynamisch direkt nach dem
+  Inhalt statt an fixer Position. 6) Datenschutz-Hinweis zentral in
+  `shareCanvas()` (`localStorage['train_share_consent']`) — läuft für
+  alle 4 Share-Einstiegspunkte durch dieselbe Implementierung. 4
+  bestehende Tests mussten wegen des neuen Consent-Gates angepasst
+  werden (Flag vorab gesetzt, nicht deren Testgegenstand). 10 neue Tests
+  (`tests/share_image_v3.spec.js`, in CI). CACHE_VERSION
+  train-v188→v189, CSS ?v=193→194. Volle Suite 39/39 grün.
 - **B72 — Auto-Wochenrückblick zeigte 0/0 trotz echter Trainingshistorie,
   gefixt (train-v188):** Nutzer meldete, dass das Share-Bild teils falsche
   (leere) Daten zeigte. Erst per reiner Diagnose-Anfrage (keine Änderungen)

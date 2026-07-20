@@ -16,7 +16,9 @@ function _themeColor(name, fallback) {
 
 async function _buildCanvas(draw) {
   await document.fonts.ready;
-  const dpr    = window.devicePixelRatio || 1;
+  // Deckel bei 3x — höhere DPR-Werte (manche Android-Geräte melden 4x)
+  // bringen keinen sichtbaren Vorteil, kosten aber quadratisch mehr Speicher.
+  const dpr    = Math.min(window.devicePixelRatio || 1, 3);
   const canvas = document.createElement('canvas');
   canvas.width  = SIZE * dpr;
   canvas.height = SIZE * dpr;
@@ -26,52 +28,110 @@ async function _buildCanvas(draw) {
   return canvas;
 }
 
-function _footer(ctx, text2) {
-  ctx.fillStyle    = text2;
-  ctx.textAlign    = 'center';
-  ctx.font         = '700 24px "DM Sans", sans-serif';
-  ctx.letterSpacing = '2px';
-  ctx.fillText('TRAIN', SIZE / 2, SIZE - 64);
-  ctx.letterSpacing = '0px';
-}
-
 /**
- * @param {Array<{name:string, weight:number, reps:number, type:'weight'|'reps'}>} prs
- *   Mindestens 1 Eintrag — die per s.prBadge markierten Sätze eines Tages.
+ * @param {Array<{name:string, weight:number, reps:number, type:'weight'|'reps', prevWeight?:number}>} prs
+ *   Mindestens 1 Eintrag — die per s.prBadge markierten Sätze eines Tages
+ *   (Tagesabschluss-Trigger) ODER ein einzelner Satz (PR-Moment-Toast,
+ *   B73) — dort ist `prevWeight` bekannt (Gewicht vor diesem Satz) und
+ *   wird als "Vorheriger Rekord"/Differenz-Hook angezeigt. Beim
+ *   Tagesabschluss-Trigger bleibt `prevWeight` unbekannt (undefined) —
+ *   die entsprechenden Zeilen werden dann einfach ausgelassen.
+ * @param {string} [kw] Optional — Kalenderwoche für die Kopfzeile rechts.
  */
-export async function buildPrShareCanvas(prs) {
+export async function buildPrShareCanvas(prs, kw) {
   const bg     = _themeColor('--c-bg', '#0E0E10');
   const accent = _themeColor('--c-accent', '#C8FF00');
   const text   = _themeColor('--c-text', '#F0F0F0');
   const text2  = _themeColor('--c-text-2', '#B0B0B8');
   const top    = prs[0];
-  const valueText = top.type === 'weight' ? `${top.weight} kg` : `${top.reps} Wdh`;
+  const valueText = top.type === 'weight' ? `${top.weight} KG × ${top.reps}` : `${top.reps} WDH`;
+  const hasPrev = top.type === 'weight' && typeof top.prevWeight === 'number' && top.prevWeight > 0;
+  const diff    = hasPrev ? Math.round((top.weight - top.prevWeight) * 100) / 100 : null;
 
   return _buildCanvas(ctx => {
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, SIZE, SIZE);
 
-    ctx.textAlign = 'center';
+    // ── Header (TRAIN links, KW rechts falls bekannt) ─────────────────
     ctx.fillStyle = accent;
-    ctx.font = '400 54px "DM Sans", sans-serif';
-    ctx.fillText('🏆 Neuer Rekord', SIZE / 2, 400);
+    ctx.fillRect(0, 0, SIZE, 3);
+    ctx.textAlign = 'left';
+    ctx.fillStyle = accent;
+    ctx.font = '900 11px "DM Sans", sans-serif';
+    ctx.letterSpacing = '4px';
+    ctx.fillText('TRAIN', 32, 52);
+    ctx.letterSpacing = '0px';
+    if (kw) {
+      ctx.textAlign = 'right';
+      ctx.fillStyle = text2;
+      ctx.font = '400 11px "DM Sans", sans-serif';
+      ctx.fillText(`KW ${kw}`, SIZE - 32, 52);
+    }
 
+    // ── Trophäe ────────────────────────────────────────────────────────
+    // Zonen bewusst großzügiger verteilt als in der ersten Umsetzung — die
+    // ließ (wie schon beim Wochenbild-Redesign, B71) einen großen leeren
+    // Bereich zwischen Inhalt und Footer. Divider/Footer werden unten
+    // deshalb dynamisch direkt nach dem tatsächlichen Inhalt platziert,
+    // nicht mehr an einer fixen Nahe-Bildunterkante-Position.
+    ctx.textAlign = 'center';
+    ctx.font = '400 150px "DM Sans", sans-serif';
+    ctx.fillText('🏆', SIZE / 2, 320);
+
+    // ── Übungsname ─────────────────────────────────────────────────────
     ctx.fillStyle = text;
-    ctx.font = '400 190px "Bebas Neue", sans-serif';
-    ctx.fillText(valueText, SIZE / 2, 570);
+    ctx.font = '900 60px "DM Sans", sans-serif';
+    const name = top.name.toUpperCase();
+    if (ctx.measureText(name).width > SIZE - 64) {
+      _wrapText(ctx, name, SIZE / 2, 440, SIZE - 64, 62, 2);
+    } else {
+      ctx.fillText(name, SIZE / 2, 460);
+    }
 
-    ctx.fillStyle = text2;
-    ctx.font = '400 42px "DM Sans", sans-serif';
-    ctx.fillText(top.name, SIZE / 2, 640);
+    // ── Gewicht × Wdh ──────────────────────────────────────────────────
+    ctx.fillStyle = accent;
+    ctx.font = '400 110px "Bebas Neue", sans-serif';
+    ctx.fillText(valueText, SIZE / 2, 630);
+
+    // ── Vorheriger Rekord + Differenz-Hook (nur wenn bekannt) ─────────
+    let y = 700;
+    if (hasPrev) {
+      ctx.fillStyle = text2;
+      ctx.font = '400 20px "DM Sans", sans-serif';
+      ctx.fillText(`Vorheriger Rekord: ${top.prevWeight} kg`, SIZE / 2, y);
+      y += 70;
+      ctx.fillStyle = accent;
+      ctx.font = '900 44px "DM Sans", sans-serif';
+      ctx.fillText(`+${diff} kg Steigerung 🔥`, SIZE / 2, y);
+      y += 60;
+    }
 
     if (prs.length > 1) {
       ctx.fillStyle = accent;
-      ctx.font = '400 30px "DM Sans", sans-serif';
+      ctx.font = '400 26px "DM Sans", sans-serif';
       const n = prs.length - 1;
-      ctx.fillText(`+ ${n} weitere${n === 1 ? 's' : ''} PR${n === 1 ? '' : 's'} heute`, SIZE / 2, 700);
+      ctx.fillText(`+ ${n} weitere${n === 1 ? 's' : ''} PR${n === 1 ? '' : 's'} heute`, SIZE / 2, y);
+      y += 50;
     }
 
-    _footer(ctx, text2);
+    // ── Trennlinie + Footer (dynamisch direkt nach dem Inhalt) ─────────
+    const dividerY = y + 40;
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(200, dividerY);
+    ctx.lineTo(SIZE - 200, dividerY);
+    ctx.stroke();
+
+    ctx.fillStyle = text2;
+    ctx.textAlign = 'center';
+    ctx.font = '700 24px "DM Sans", sans-serif';
+    ctx.letterSpacing = '2px';
+    ctx.fillText('TRAIN', SIZE / 2, dividerY + 50);
+    ctx.letterSpacing = '0px';
+
+    ctx.fillStyle = _withAlpha(accent, 0.4);
+    ctx.fillRect(0, SIZE - 3, SIZE, 3);
   });
 }
 
@@ -181,20 +241,32 @@ export async function buildWeekShareCanvas({
     ctx.fillStyle = 'rgba(255,255,255,0.03)';
     ctx.fill();
 
-    const hasSpark = Array.isArray(weights) && weights.length >= 3;
+    const n = Array.isArray(weights) ? weights.length : 0;
     let hookY = chartBottomBox + 30;
 
-    if (!hasSpark) {
-      // Fallback: letztes Gewicht groß zentriert statt Kurve.
-      const lastW = weights?.length ? weights[weights.length - 1] : null;
-      ctx.fillStyle = accent;
-      ctx.font = '400 120px "Bebas Neue", sans-serif';
-      ctx.fillText(lastW != null ? `${lastW} kg` : '—', SIZE / 2, (chartY + chartBottomBox) / 2 + 20);
+    if (n === 0) {
+      // Kein einziger Datenpunkt (z.B. Übung heute zum ersten Mal, noch
+      // kein Satz bewertet) — kein Gewicht anzeigen, klarer Ausblick statt
+      // eines irreführenden "—".
       ctx.fillStyle = text2;
-      ctx.font = '400 24px "DM Sans", sans-serif';
-      ctx.fillText('Erst der Anfang 💪', SIZE / 2, (chartY + chartBottomBox) / 2 + 60);
+      ctx.font = '400 28px "DM Sans", sans-serif';
+      ctx.fillText('Trainiere weiter · Sparkline erscheint ab Woche 2', SIZE / 2, (chartY + chartBottomBox) / 2 + 10);
+    } else if (n === 1) {
+      // Ein Datenpunkt — Kurve wäre bedeutungslos (keine Tendenz erkennbar),
+      // stattdessen das Gewicht selbst groß zeigen.
+      ctx.fillStyle = accent;
+      ctx.font = '400 100px "Bebas Neue", sans-serif';
+      ctx.fillText(`${weights[0]} KG`, SIZE / 2, (chartY + chartBottomBox) / 2 + 10);
+      ctx.fillStyle = text2;
+      ctx.globalAlpha = 0.4;
+      ctx.font = '400 18px "DM Sans", sans-serif';
+      ctx.fillText('Erste Einheit · Mehr Wochen = Sparkline', SIZE / 2, (chartY + chartBottomBox) / 2 + 55);
+      ctx.globalAlpha = 1;
     } else {
-      const n = weights.length;
+      // n >= 2: Linie zeichnen (Bezier ab 3 Punkten, sonst eine gerade
+      // Linie zwischen den 2 Punkten — Kurven-Interpolation wäre bei nur
+      // 2 Stützstellen ohnehin identisch zur Geraden), danach dieselben
+      // Datenpunkte/Labels/Hook-Satz für beide Fälle.
       const inset = 40;
       const plotX0 = chartX + inset, plotW = chartW - 2 * inset;
       const plotBottom = chartBottomBox - inset;
@@ -202,15 +274,19 @@ export async function buildWeekShareCanvas({
       const yPad   = (chartH - 2 * inset) * 0.15;
       const minW = Math.min(...weights), maxW = Math.max(...weights);
       const range = maxW - minW || 1;
-      const xStep = n > 1 ? plotW / (n - 1) : 0;
+      const xStep = plotW / (n - 1);
       const xs = weights.map((_, i) => plotX0 + i * xStep);
       const ys = weights.map(w => plotBottom - yPad - ((w - minW) / range) * yRange);
 
       ctx.beginPath();
       ctx.moveTo(xs[0], ys[0]);
-      for (let i = 1; i < n; i++) {
-        const cpx = (xs[i - 1] + xs[i]) / 2;
-        ctx.bezierCurveTo(cpx, ys[i - 1], cpx, ys[i], xs[i], ys[i]);
+      if (n >= 3) {
+        for (let i = 1; i < n; i++) {
+          const cpx = (xs[i - 1] + xs[i]) / 2;
+          ctx.bezierCurveTo(cpx, ys[i - 1], cpx, ys[i], xs[i], ys[i]);
+        }
+      } else {
+        ctx.lineTo(xs[1], ys[1]);
       }
       ctx.strokeStyle = accent;
       ctx.lineWidth = 4;
@@ -219,9 +295,13 @@ export async function buildWeekShareCanvas({
       // Fill unter der Kurve (Gradient).
       const fillPath = new Path2D();
       fillPath.moveTo(xs[0], ys[0]);
-      for (let i = 1; i < n; i++) {
-        const cpx = (xs[i - 1] + xs[i]) / 2;
-        fillPath.bezierCurveTo(cpx, ys[i - 1], cpx, ys[i], xs[i], ys[i]);
+      if (n >= 3) {
+        for (let i = 1; i < n; i++) {
+          const cpx = (xs[i - 1] + xs[i]) / 2;
+          fillPath.bezierCurveTo(cpx, ys[i - 1], cpx, ys[i], xs[i], ys[i]);
+        }
+      } else {
+        fillPath.lineTo(xs[1], ys[1]);
       }
       fillPath.lineTo(xs[n - 1], plotBottom);
       fillPath.lineTo(xs[0], plotBottom);
@@ -360,8 +440,45 @@ function _withAlpha(color, alpha) {
   return color; // Fallback: unverändert (z.B. bereits rgba()/named color)
 }
 
+const SHARE_CONSENT_KEY = 'train_share_consent';
+
+/**
+ * Einmaliger Datenschutz-Hinweis vor dem allerersten Teilen (B73) — danach
+ * per localStorage-Flag gemerkt, kein erneutes Nachfragen. Zentral hier
+ * (nicht an jedem der 3 Aufrufer dupliziert), da shareCanvas() der einzige
+ * Punkt ist, durch den JEDER Share-Weg (PR-Moment-Toast, Tagesabschluss,
+ * Wochenrückblick-Modal + -Dropdown) tatsächlich läuft.
+ */
+function _ensureShareConsent() {
+  let consented = false;
+  try { consented = localStorage.getItem(SHARE_CONSENT_KEY) === 'true'; } catch (_) { /* localStorage blockiert -> jedes Mal fragen */ }
+  if (consented) return Promise.resolve(true);
+
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.className = 'vac-plan-modal-overlay';
+    overlay.innerHTML = `
+      <div class="vac-plan-modal" style="align-items:center;text-align:center">
+        <div class="vac-plan-modal__title" style="font-size:18px">📤 Bild teilen?</div>
+        <p class="vac-plan-modal__sub">Dieses Bild enthält deine Trainingsdaten (Übung, Gewicht, Streak). Nur du entscheidest, ob du es teilst.</p>
+        <button type="button" class="btn btn--accent" id="share-consent-ok" style="width:100%;min-height:var(--touch)">Verstanden, teilen</button>
+        <button type="button" class="btn btn--ghost" id="share-consent-cancel" style="width:100%;min-height:var(--touch)">Abbrechen</button>
+      </div>`;
+    document.body.appendChild(overlay);
+    const cleanup = (result) => { overlay.remove(); resolve(result); };
+    overlay.querySelector('#share-consent-ok')?.addEventListener('click', () => {
+      try { localStorage.setItem(SHARE_CONSENT_KEY, 'true'); } catch (_) { /* best effort */ }
+      cleanup(true);
+    });
+    overlay.querySelector('#share-consent-cancel')?.addEventListener('click', () => cleanup(false));
+  });
+}
+
 /** Teilt den Canvas-Inhalt als PNG — natives Share-Sheet, sonst Download-Fallback. */
 export async function shareCanvas(canvas, filename, title) {
+  const consented = await _ensureShareConsent();
+  if (!consented) return;
+
   const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
   if (!blob) return;
 

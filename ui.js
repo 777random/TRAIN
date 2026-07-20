@@ -3364,6 +3364,7 @@ function _updateInlineReview(state) {
   if (!wk) { wrap.innerHTML = ''; return; }
   const review = buildWeekReview(wk, state.weeks, state.favoriteExercises ?? []);
   review.allWeeks = state.weeks;
+  review.favoriteExercises = state.favoriteExercises ?? [];
   // B72: Share-Button auch hier, nicht nur im Wochenwechsel-Modal — jede
   // hier wählbare Woche hat per `reviewable`-Filter oben garantiert
   // mindestens einen markedDone-Tag, ist also nie die leere Falle, die
@@ -4094,7 +4095,7 @@ function renderSettingsTab(state) {
   <div class="settings-section">
     <div class="settings-section__title">Info</div>
     <div class="settings-row">
-      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v188</div></div>
+      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v189</div></div>
     </div>
     <div class="settings-row">
       <div>
@@ -4509,6 +4510,7 @@ function _handleClick(e) {
       if (_hasCompleted) {
         const _review = buildWeekReview(_lastWk, _st.weeks, _st.favoriteExercises ?? []);
         _review.allWeeks = _st.weeks;
+        _review.favoriteExercises = _st.favoriteExercises ?? [];
         showWeekReviewModal(_review, () => { _prepNewWeekModal(); openModal('modal-new-week'); });
       } else {
         _prepNewWeekModal();
@@ -5364,6 +5366,7 @@ function _handleClick(e) {
     }
     case 'toggle-done': {
       _pendingAutoEval = null;
+      const _prevPrWeight = getState().weeks[getState().curIdx]?.days[+di]?.exercises[+ei]?.prWeight ?? 0;
       const _s = getState().weeks[getState().curIdx]?.days[+di]?.exercises[+ei]?.sets[+si];
       if (_s && _s.status === 'pending') {
         const _wInp = document.querySelector(`[data-action="set-weight"][data-di="${di}"][data-ei="${ei}"][data-si="${si}"]`);
@@ -5390,6 +5393,7 @@ function _handleClick(e) {
           for (const ins of triggered) {
             if (ins.immediate) showToast(ins.message, ins.type === 'warning' ? 'warn' : 'ok', ins.id === 'P-05' ? 4000 : 3000);
           }
+          _maybeShowPrMomentToast(+di, +ei, +si, _prevPrWeight);
         }
       }
       break;
@@ -5401,6 +5405,7 @@ function _handleClick(e) {
       const _cwk = _cst.weeks[_cst.curIdx];
       const _cex = _cwk?.days[+di]?.exercises[+ei];
       if (!_cex) break;
+      const _prevPrWeightConfirm = _cex.prWeight ?? 0;
       const _csi = _cex.sets.findIndex(s => {
         const st = s.status;
         return st === 'pending' || (st !== 'success' && st !== 'fail' && !s.done);
@@ -5454,6 +5459,7 @@ function _handleClick(e) {
         for (const ins of triggered) {
           if (ins.immediate) showToast(ins.message, ins.type === 'warning' ? 'warn' : 'ok', ins.id === 'P-05' ? 4000 : 3000);
         }
+        _maybeShowPrMomentToast(+di, +ei, _csi, _prevPrWeightConfirm);
         // RPE nudge — only if rpeEnabled
         if (_aft.settings?.rpeEnabled !== false && _aftSet.rpe == null) {
           clearTimeout(_rpeNudgeTimer);
@@ -6380,6 +6386,7 @@ function _runAutoWeekFlow() {
   if (autoWeek.showReview && prevWeek) {
     const review = buildWeekReview(prevWeek, state.weeks, state.favoriteExercises ?? []);
     review.allWeeks = state.weeks;
+    review.favoriteExercises = state.favoriteExercises ?? [];
     showWeekReviewModal(review, step2);
   } else {
     step2();
@@ -7169,6 +7176,41 @@ function _showCompletionScreen(stats) {
       if (document.body.contains(el)) setTimeout(dismiss, 2500);
     });
   }
+}
+
+/**
+ * PR-Moment-Toast (B73): dezenter, selbst-verschwindender Banner direkt
+ * nach einem echten Gewichts-PR (toggle-done/confirm-set) — unabhängig vom
+ * Tagesabschluss-Screen, das kann noch Stunden entfernt sein. Prüft
+ * `s.prBadge === 'weight'` (dieselbe historisch-korrekte Quelle wie der
+ * Satz-Pokal seit B63/B70), nicht einen prevPr/newPr-Vergleich — der wäre
+ * bei mehreren PRs am selben Tag/derselben Übung fragiler.
+ */
+function _maybeShowPrMomentToast(di, ei, si, prevWeight) {
+  const st = getState();
+  const ex = st.weeks[st.curIdx]?.days[di]?.exercises[ei];
+  const s  = ex?.sets[si];
+  if (s?.status === 'success' && s?.prBadge === 'weight' && ex) {
+    _showPrMomentToast(ex.name, s.weight ?? 0, s.reps ?? 0, prevWeight);
+  }
+}
+
+function _showPrMomentToast(exName, weight, reps, prevWeight) {
+  document.getElementById('pr-moment-toast')?.remove();
+  const el = document.createElement('div');
+  el.id        = 'pr-moment-toast';
+  el.className = 'pr-moment-toast';
+  el.innerHTML = `<button type="button" class="pr-moment-toast__btn" id="pr-moment-toast-btn">🏆 Neuer PR! Jetzt teilen</button>`;
+  document.body.appendChild(el);
+  const dismiss = () => { clearTimeout(timer); el.remove(); };
+  const timer   = setTimeout(dismiss, 10000);
+  el.querySelector('#pr-moment-toast-btn')?.addEventListener('click', async () => {
+    dismiss();
+    try {
+      const canvas = await buildPrShareCanvas([{ name: exName, weight, reps, type: 'weight', prevWeight }]);
+      await shareCanvas(canvas, 'train-pr.png', 'Neuer Rekord — TRAIN');
+    } catch (_) { /* Canvas/Share fehlgeschlagen -> stiller Abbruch, kein Crash */ }
+  });
 }
 
 function _showBadgeOverlay(badge) {

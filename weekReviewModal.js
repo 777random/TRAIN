@@ -33,18 +33,72 @@ function _weekVolumeByExercise(week) {
   return vol;
 }
 
+/** Alle Übungen, die in dieser Woche einen echten Gewichts-PR erzielt haben. */
+function _weekPrExerciseNames(week) {
+  const names = new Set();
+  for (const d of week.days ?? [])
+    for (const ex of d.exercises ?? [])
+      for (const s of ex.sets ?? [])
+        if (s.prBadge === 'weight') names.add(ex.name);
+  return [...names];
+}
+
 /**
- * Übung fürs Share-Bild (B71): 1. echter PR diese Woche (aus dem bereits
- * von buildWeekReview() ermittelten highlights-Eintrag `type:'pr'`),
- * 2. sonst höchstes Trainingsvolumen dieser Woche.
+ * Übung fürs Share-Bild (B71, Favoriten-Kaskade seit B73). 6 Prioritäten,
+ * Favorit immer vor Nicht-Favorit:
+ *   1. Favorit + echter Gewichts-PR diese Woche
+ *   2. Favorit + Steigerung ggü. Vorwoche
+ *   3. Favorit mit den meisten Datenpunkten (≥2)
+ *   4. Nicht-Favorit + PR
+ *   5. Nicht-Favorit mit höchstem Wochenvolumen
+ *   6. Übung mit den meisten Datenpunkten insgesamt (garantiert eine
+ *      Sparkline, sofern irgendeine Übung ≥2 Punkte hat)
+ *
+ * PR-Erkennung bewusst über `s.prBadge` direkt an den Sätzen, NICHT über
+ * `reviewData.highlights` — `_findPR()` (weekReview.js) liefert maximal
+ * EINEN `type:'pr'`-Highlight pro Woche (den mit dem größten Delta über
+ * alle Übungen, favoritenblind) und kein `weightDiff`-Feld. Ein direkter
+ * Sätze-Scan liefert dagegen ALLE PRs der Woche, unabhängig davon, ob es
+ * der insgesamt größte war — nötig, um "Favorit hat auch (irgend)einen PR"
+ * zuverlässig zu erkennen.
+ *
+ * @param {Object} reviewData  Rückgabe von buildWeekReview() + allWeeks
+ * @param {Array}  sorted      state.weeks, chronologisch sortiert (getSortedWeeks())
+ * @param {Array}  favs        state.favoriteExercises
  */
-function _pickBestExercise(reviewData) {
-  const prHit = reviewData.highlights?.find(h => h.type === 'pr');
-  if (prHit?.exName) return { name: prHit.exName, isPr: true };
-  const vol = _weekVolumeByExercise(reviewData.week);
-  let best = null, bestVol = 0;
-  vol.forEach((v, name) => { if (v > bestVol) { bestVol = v; best = name; } });
-  return best ? { name: best, isPr: false } : null;
+function _pickBestExercise(reviewData, sorted, favs) {
+  const { week } = reviewData;
+  const prNames = _weekPrExerciseNames(week);
+
+  const favPr = favs.find(f => prNames.includes(f));
+  if (favPr) return { name: favPr, isPr: true };
+
+  const hasGainThisWeek = (name) => {
+    const h = exWeightHistory(sorted, name).filter(w => w > 0);
+    return h.length >= 2 && h[h.length - 1] > h[h.length - 2];
+  };
+  const favGain = favs.find(f => hasGainThisWeek(f));
+  if (favGain) return { name: favGain, isPr: false };
+
+  const favHistory = favs
+    .map(f => ({ name: f, pts: exWeightHistory(sorted, f).filter(w => w > 0).length }))
+    .filter(f => f.pts >= 2)
+    .sort((a, b) => b.pts - a.pts)[0];
+  if (favHistory) return { name: favHistory.name, isPr: false };
+
+  if (prNames.length) return { name: prNames[0], isPr: true };
+
+  const vol = _weekVolumeByExercise(week);
+  const topVol = [...vol.entries()].sort((a, b) => b[1] - a[1])[0];
+  if (topVol) return { name: topVol[0], isPr: false };
+
+  const allNames = [...new Set((week.days ?? []).flatMap(d => (d.exercises ?? []).map(e => e.name)))];
+  const mostHistory = allNames
+    .map(n => ({ name: n, pts: exWeightHistory(sorted, n).filter(w => w > 0).length }))
+    .sort((a, b) => b.pts - a.pts)[0];
+  if (mostHistory?.pts >= 2) return { name: mostHistory.name, isPr: false };
+
+  return null;
 }
 
 /**
@@ -62,12 +116,10 @@ export async function shareWeekReviewImage(reviewData) {
   const { summary, week } = reviewData;
   const kw = String(_kw(week.startDate)).padStart(2, '0');
   try {
-    const best = _pickBestExercise(reviewData);
-    let weights = [];
-    if (best && reviewData.allWeeks) {
-      const sorted = getSortedWeeks({ weeks: reviewData.allWeeks });
-      weights = exWeightHistory(sorted, best.name).slice(-8).filter(w => w > 0);
-    }
+    const sorted = reviewData.allWeeks ? getSortedWeeks({ weeks: reviewData.allWeeks }) : [week];
+    const favs   = reviewData.favoriteExercises ?? [];
+    const best   = _pickBestExercise(reviewData, sorted, favs);
+    const weights = best ? exWeightHistory(sorted, best.name).slice(-8).filter(w => w > 0) : [];
     const canvas = await buildWeekShareCanvas({
       kw, monthYear: _monthYear(week.startDate),
       streak: summary.streak ?? 0,

@@ -1503,3 +1503,116 @@ Eigentliche Aufgabe: Nutzer meldete, dass das Wochenrückblick-Share-Bild
   CACHE_VERSION train-v187→v188, CSS/SCHEMA unverändert. Volle Suite
   34/34 grün.
 Loop 5: for-advisor.txt aktualisiert (am Ende der Session).
+
+## 2026-07-20 train-v189 (B73 — Share-Bild v3: Favoriten, Retina, PR-Moment-Toast, Consent)
+Loop 1: 34/34 grün ✓
+Loop 2: aktuell ✓ — HANDOFF.md/CLAUDE.md waren nach dem vorherigen
+  Sprintabschluss bereits auf train-v188/?v=193 synchron
+Loop 3: übersprungen — Stop-Bedingung (≥15 Fixtures) mit 17 weiterhin
+  erfüllt
+Eigentliche Aufgabe: Nutzer forderte per detaillierter Sprint-Vorlage ein
+  großes Share-Bild-v3-Paket an (6 Fixes: Favoriten-Kaskade, Hook-Satz im
+  Fallback, Retina-Fix, differenzierter Fallback, PR-Moment-Bild,
+  Datenschutz-Hinweis), mit explizitem Spec-erst-Workflow. Vor dem
+  Spec-Schreiben die konkreten technischen Behauptungen gegen den echten
+  Code geprüft (wiederholt etabliertes Muster dieses Projekts bei
+  Nutzer-Vorlagen — mittlerweile die 5. Vorlage in dieser Session mit
+  echten Diskrepanzen):
+  - Versionsstände falsch: "train-v181"/"?v=195"/"SCHEMA unverändert
+    (30)" — echter Stand war train-v188/CSS ?v=193/SCHEMA 31 (v181 lag 7
+    Versionen hinter dem aktuellen Stand).
+  - BUGS.md-IDs B61-B64 waren bereits seit Wochen an andere, längst
+    erledigte Bugs vergeben (Versions-Anzeige-Fix, Offline-Modus,
+    PR-Pokal-Wiederholung, inputmode-Felder). Echte nächste ID: B73.
+  - "PR-Moment-Bild fehlte" (als BUGS.md-Eintrag formuliert) war
+    sachlich falsch — existiert bereits seit B68 (train-v186), aktiv
+    getestet und in CI. Tatsächlich gewünscht: ein zusätzlicher,
+    früherer Trigger direkt nach dem Satz statt erst beim
+    Tagesabschluss — eine echte neue Funktion, kein Bugfix.
+  - `_pickBestExercise(reviewData, sorted, state)`-Signatur passte
+    nicht zur echten Funktion (kein `state`-Feld auf `reviewData`, nur
+    `allWeeks` seit B72).
+  - Prio-1-Logik der Vorlage (`highlights.filter(h => h.type ===
+    'pr').sort((a,b) => b.weightDiff - a.weightDiff)`) kann strukturell
+    NIE mehrere PR-Kandidaten vergleichen — `_findPR()` (weekReview.js)
+    liefert maximal EINEN `type:'pr'`-Highlight pro Woche (den mit dem
+    größten Delta über alle Übungen, favoritenblind), `weightDiff`
+    existiert als Feld gar nicht.
+  - Prio-5-Code hatte einen echten, eigenständig gefundenen Bug:
+    `_weekVolumeByExercise()` gibt eine `Map` zurück, `Object.entries()`
+    auf einer Map liefert immer `[]` — Prio 5 hätte nie gegriffen.
+  Technische Spec mit allen Korrekturen geschrieben und vorgelegt,
+  Nutzer bestätigte alle 6 Punkte einzeln ("Bestätigung für alle 6
+  Punkte: ... ja") plus die korrekten Versions-/ID-Angaben.
+  **Umsetzung (alle 6 Punkte):**
+  1. **Favoriten-Kaskade** — `_pickBestExercise(reviewData, sorted,
+     favs)` (weekReviewModal.js), 6 Prioritäten, Favorit immer vor
+     Nicht-Favorit. Neue `_weekPrExerciseNames()` scannt `s.prBadge`
+     direkt an den Sätzen (dieselbe historisch korrekte Quelle wie
+     B63/B70), statt sich auf `highlights`/`_findPR()` zu verlassen —
+     liefert ALLE PRs der Woche, nicht nur den größten. Prio 5 korrekt
+     mit `[...vol.entries()]` statt `Object.entries()`. `ui.js` hängt
+     `favoriteExercises` jetzt an 3 Stellen an `reviewData` an (analog
+     zum `allWeeks`-Muster aus B72): `open-new-week`, `_runAutoWeekFlow`,
+     `_updateInlineReview`-Dropdown.
+  2. **Hook-Satz im Fallback** — die bestehende +Xkg/konstant/Rückbau-
+     Kaskade aus B71 gilt jetzt bereits ab 2 Datenpunkten (gerade Linie
+     statt Bezier-Kurve bei genau 2 Punkten — mathematisch ohnehin
+     identisch bei nur 2 Stützstellen), nicht mehr erst ab 3.
+  3. **Retina-Deckelung** — `_buildCanvas()`: `Math.min(devicePixelRatio
+     || 1, 3)`. `canvas.style.width/height` bewusst NICHT ergänzt (aus
+     der Vorlage übernommen geprüft und verworfen) — der Canvas wird nie
+     ins DOM eingefügt (nur `toBlob()`/Download), das CSS-Sizing wäre
+     wirkungsloser toter Code.
+  4. **Fallback-Sparkline differenziert** — 0 Punkte: Ausblickstext
+     ("Trainiere weiter · Sparkline erscheint ab Woche 2"), 1 Punkt:
+     großes Gewicht + Subtext ("Erste Einheit · Mehr Wochen ="), 2
+     Punkte: siehe Punkt 2 oben.
+  5. **PR-Moment-Toast** — neue `_maybeShowPrMomentToast()`/
+     `_showPrMomentToast()` (ui.js), aufgerufen direkt nach `toggle-done`/
+     `confirm-set` bei `s?.status === 'success' && s?.prBadge ===
+     'weight'` — bewusst NICHT der in der Vorlage vorgeschlagene prevPr/
+     newPr-Snapshot-Vergleich (fragiler bei mehreren PRs am selben Tag),
+     sondern dieselbe etablierte `s.prBadge`-Quelle wie B63/B70.
+     `prevWeight` (für "Vorheriger Rekord"/Differenz-Hook) wird vor dem
+     jeweiligen `dispatch()` aus `ex.prWeight` erfasst. Banner
+     verschwindet nach 10s oder Klick, bei Klick `buildPrShareCanvas()`
+     + `shareCanvas()`. `buildPrShareCanvas()` komplett neu aufgebaut:
+     Header (TRAIN+KW), große Trophäe, Übungsname, Gewicht×Wdh, optional
+     "Vorheriger Rekord: X kg" + "+Y kg Steigerung 🔥" (nur wenn
+     `prevWeight` bekannt — beim bestehenden Tagesabschluss-Trigger
+     weiterhin `undefined`, Funktion bleibt abwärtskompatibel).
+     **Nach Screenshot-Prüfung ein zweites Mal** (erstes Mal war B71)
+     einen eigenen Leerraum-Fehler gefunden: die erste Umsetzung von
+     `buildPrShareCanvas()` ließ wieder ca. 300px toten Raum zwischen
+     Inhalt und Footer. Zonen großzügiger verteilt (Trophäe/Name/
+     Gewicht größer und weiter auseinander), Trennlinie+Footer jetzt
+     dynamisch direkt nach dem tatsächlichen Inhalt platziert statt an
+     einer fixen Nahe-Bildunterkante-Position — dabei den nun
+     überflüssigen `_footer()`-Helper als toten Code entfernt (keine
+     Aufrufer mehr).
+  6. **Datenschutz-Hinweis** — neue `_ensureShareConsent()` zentral in
+     `shareImage.js`s `shareCanvas()` (nicht an den 4 Aufrufern
+     dupliziert) — zeigt einmalig einen Bestätigungsdialog (reused
+     `.vac-plan-modal-overlay`/`.vac-plan-modal`, keine neue CSS-Klasse
+     nötig), merkt sich die Zustimmung in `localStorage['train_share_
+     consent']`, fragt danach nie wieder.
+  **4 bestehende Tests mussten wegen des neuen Consent-Gates angepasst
+  werden** (`share_image.spec.js` ×2, `share_image_sparkline.spec.js`
+  ×1, `share_image_autoweek_fix.spec.js` ×1) — Consent-Flag im
+  jeweiligen `page.evaluate`-Setup vorab gesetzt, da Consent nicht deren
+  Testgegenstand ist, reiner Download-Flow bleibt unverändert geprüft.
+  10 neue Tests (`tests/share_image_v3.spec.js`, in CI): 0-Punkte-
+  Fallback, Retina-Deckelung (DPR 5→3 verifiziert), Favoriten-Kaskade
+  (Favorit mit kleinerem PR schlägt Nicht-Favorit mit größerem PR, per
+  `CanvasRenderingContext2D.fillText()`-Interception direkt verifiziert
+  — kein Umweg über Bildinhalt-Erkennung), PR-Moment-Toast-Flow
+  (kompletter UI-Weg: Satz bestätigen → Toast erscheint → Klick → PNG-
+  Download), Datenschutz-Hinweis (erscheint beim ersten Teilen mit dem
+  korrekten Text, verschwindet danach dauerhaft, zweiter Share läuft
+  direkt durch). Volle Suite 39/39 grün. CACHE_VERSION train-v188→v189,
+  CSS ?v=193→194 (neue `.pr-moment-toast`/`.pr-moment-toast__btn`-
+  Klassen). SCHEMA unverändert 31 (keine State-Shape-Änderung — der
+  Consent-Flag lebt bewusst in einem eigenen localStorage-Key, nicht im
+  `train_v6`-State-Blob).
+Loop 5: for-advisor.txt aktualisiert (am Ende der Session).

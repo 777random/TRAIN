@@ -42,6 +42,9 @@ test('PR-Teilen-Button: erscheint nach echtem PR am Tagesabschluss und löst PNG
       coachPerformance: { suggestions: [] }, coachQuestion: null, coachQuestionHistory: [],
       lastReentryHandled: null, plateauActions: {}, decisionLog: [], badges: [], onboardingDone: true,
     }));
+    // B73: Datenschutz-Hinweis vor dem ersten Teilen — hier nicht Testgegenstand,
+    // Consent per Flag vorab erteilen, damit der Klick sofort zum Download führt.
+    localStorage.setItem('train_share_consent', 'true');
   });
   await page.reload();
   await page.waitForSelector('#app.is-ready', { timeout: 10000 });
@@ -87,6 +90,9 @@ test('Wochenrückblick-Teilen-Button löst PNG-Download aus', async ({ page }) =
       coachPerformance: { suggestions: [] }, coachQuestion: null, coachQuestionHistory: [],
       lastReentryHandled: null, plateauActions: {}, decisionLog: [], badges: [], onboardingDone: true,
     }));
+    // B73: Datenschutz-Hinweis vor dem ersten Teilen — hier nicht Testgegenstand,
+    // Consent per Flag vorab erteilen, damit der Klick sofort zum Download führt.
+    localStorage.setItem('train_share_consent', 'true');
   });
   await page.reload();
   await page.waitForSelector('#app.is-ready', { timeout: 10000 });

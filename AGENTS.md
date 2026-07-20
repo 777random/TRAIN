@@ -1,7 +1,7 @@
 # TRAIN — Parallel Agent Regeln
 # Wird nach jedem Multi-Agent Sprint
 # automatisch aktualisiert.
-# Letzte Aktualisierung: 2026-07-20 / train-v188
+# Letzte Aktualisierung: 2026-07-20 / train-v189
 
 ---
 

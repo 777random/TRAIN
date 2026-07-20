@@ -1,7 +1,7 @@
 # TRAIN — CLAUDE.md
 # Vollständiger Projektkontext für Claude Code
-# Stand: train-v188 / SCHEMA 31 / Juli 2026
-# Letztes Update: nach train-v188 (B72 Auto-Wochenrückblick-Fix + Teilen im Dropdown)
+# Stand: train-v189 / SCHEMA 31 / Juli 2026
+# Letztes Update: nach train-v189 (B73 Share-Bild v3 — Favoriten-Kaskade, PR-Moment-Toast, Datenschutz-Hinweis)
 
 ---
 
@@ -40,7 +40,7 @@ TRAIN ist eine deutschsprachige PWA für Krafttraining. Pure Vanilla ES Modules 
 
 - Repo: https://github.com/777random/TRAIN
 - Deployed: https://777random.github.io/TRAIN/
-- Aktueller Stand: SCHEMA_VERSION 31 · CACHE_VERSION train-v188 · CSS ?v=193
+- Aktueller Stand: SCHEMA_VERSION 31 · CACHE_VERSION train-v189 · CSS ?v=194
 
 ---
 
@@ -174,7 +174,7 @@ Bei unklarem Root Cause immer erst Diagnose → Ergebnis abwarten → dann Fix. 
 | `registerSW.js` | Service Worker Registrierung, Storage-Error, SW-Update Event. |
 | `dragdrop.js` | Minifizierter Third-Party Drag-Drop Polyfill — NICHT bearbeiten. |
 | `icons.js` | SVG Icon Strings als named constants. |
-| `shareImage.js` | Seit train-v186 (B68), Wochenrückblick-Canvas seit v187 (B71) mit Bezier-Sparkline neu aufgebaut. Canvas-basierte Share-Bilder (PR-Moment + Wochenrückblick, 1080×1080 PNG). Importfrei/State-frei (Tiefe 0), Farben live via `getComputedStyle()`. Teilen via `navigator.share`/`canShare` mit Download-Fallback (identisches Muster wie `backup.js`), kein Server-Upload. |
+| `shareImage.js` | Seit train-v186 (B68), Wochenrückblick-Canvas seit v187 (B71) mit Bezier-Sparkline neu aufgebaut, seit v189 (B73) Favoriten-Kaskade/Retina-Deckelung/PR-Moment-Redesign/Datenschutz-Consent-Gate. Canvas-basierte Share-Bilder (PR-Moment + Wochenrückblick, 1080×1080 PNG, DPR max. 3x). Importfrei/State-frei (Tiefe 0), Farben live via `getComputedStyle()`. Teilen via `navigator.share`/`canShare` mit Download-Fallback (identisches Muster wie `backup.js`), kein Server-Upload. Einmaliger Datenschutz-Hinweis vor dem ersten Teilen (`localStorage['train_share_consent']`), zentral in `shareCanvas()` für alle Einstiegspunkte. |
 
 ### State Layer (`state.js`):
 
@@ -322,9 +322,9 @@ Unabhängig von Hauptkarte — erscheint auch neben Progression.
 ## FEATURE-STATUS
 
 ### Implementiert ✓:
-**Training-Tab:** Wochenstruktur, Pillen-Nav, Satz-Bewertung (auto+manuell), Gewichtsempfehlung (seit v165 auch Distanz/Zeit-Progression für metric 'm'/'sec' via getMetricRecommendation(), B18; seit v172 pro-Übung-Schrittweite statt fixem Delta, B48), Schrittweite-Vorschlag aus Historie (v173, B49, nur sichtbarer Hinweis), anpassbare Steigerungsmenge im Empfehlungs-Chip (v173, B50), Progressions-Präferenz, PR-Erkennung, "Heute anders", Übung archivieren, Stoppuhr, Auto-Wochenerstellung, Deload/Urlaubsmodus, Körpergewicht, Schlaf+Energie, Share-Bild bei echtem PR im Tagesabschluss-Screen (v186, B68).
+**Training-Tab:** Wochenstruktur, Pillen-Nav, Satz-Bewertung (auto+manuell), Gewichtsempfehlung (seit v165 auch Distanz/Zeit-Progression für metric 'm'/'sec' via getMetricRecommendation(), B18; seit v172 pro-Übung-Schrittweite statt fixem Delta, B48), Schrittweite-Vorschlag aus Historie (v173, B49, nur sichtbarer Hinweis), anpassbare Steigerungsmenge im Empfehlungs-Chip (v173, B50), Progressions-Präferenz, PR-Erkennung, "Heute anders", Übung archivieren, Stoppuhr, Auto-Wochenerstellung, Deload/Urlaubsmodus, Körpergewicht, Schlaf+Energie, Share-Bild bei echtem PR (v186, B68 — Tagesabschluss-Screen; v189, B73 — zusätzlich sofortiger Toast direkt nach dem PR-Satz).
 
-**Wochenrückblick-Modal:** Zusammenfassung/Highlights/Lowlights/Empfehlungen (weekReview.js/weekReviewModal.js), Share-Bild-Button (v186, B68; Sparkline-Redesign v187, B71).
+**Wochenrückblick-Modal:** Zusammenfassung/Highlights/Lowlights/Empfehlungen (weekReview.js/weekReviewModal.js), Share-Bild-Button (v186, B68; Sparkline-Redesign v187, B71; Favoriten-Kaskade v189, B73) — auch im manuellen Wochenrückblick-Dropdown im Fortschritt-Tab (v188, B72).
 
 **Coach-Tab:** Hauptkarte (8 akute Signale, seit v160 inkl. Konsistente Fehlschläge) + Strukturkarte (4 strukturelle Signale, seit v163 inkl. Mehr-Übungen-Aggregation), Adaptive Nachfrage-Karte, Coach-Bilanz Mini, Plateau-Konsequenz (EX_SET_NEXT_WEEK_PLAN).
 
