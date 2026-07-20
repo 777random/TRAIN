@@ -1439,3 +1439,67 @@ Eigentliche Aufgabe: Nutzer forderte per detaillierter Sprint-Vorlage ein
   importiert jetzt zusätzlich insightEngine.js, Tiefe 1→3). Volle Suite
   32/32 grün.
 Loop 5: for-advisor.txt aktualisiert (am Ende der Session).
+
+## 2026-07-20 train-v188 (B72 — Auto-Wochenrückblick-Fix + Teilen im Dropdown)
+Loop 1: 32/32 grün ✓
+Loop 2: aktuell ✓ — HANDOFF.md/CLAUDE.md waren nach dem vorherigen
+  Sprintabschluss bereits auf train-v187/?v=193 synchron
+Loop 3: übersprungen — Stop-Bedingung (≥15 Fixtures) mit 17 weiterhin
+  erfüllt
+Eigentliche Aufgabe: Nutzer meldete, dass das Wochenrückblick-Share-Bild
+  0/0, keinen Übungsnamen und den <3-Punkte-Fallback zeigte, obwohl
+  mehrere Wochen echte Trainingsdaten vorlagen. Zwei-Schritt-Vorgehen
+  exakt wie angefordert:
+  1. **Reiner Diagnose-Auftrag (keine Änderungen).** Erste Prämisse
+     korrigiert: die Fragen bezogen sich auf `weekData`/
+     `generateWeekImage()` — beide existieren nicht, wurden im B71-Sprint
+     bereits durch die echte Architektur ersetzt. Alle 5 Fragen gegen den
+     echten Code beantwortet (weekReviewModal.js/shareImage.js/
+     insightEngine.js, mit Datei:Zeile). **Mit realistischen
+     Testdaten reproduziert:** 4 echte Wochen, steigendes Gewicht → Code
+     lieferte korrekt "4 Wochen · 100% Ziel · PR Kniebeuge 87.5kg",
+     `exWeightHistory` lieferte `[75,80,82.5,87.5]` — der Bug trat mit
+     normalen Daten NICHT auf. Einzige plausible Erklärung ohne die
+     echten Nutzerdaten zu kennen: `_runAutoWeekFlow()`s
+     `sorted[length-2]`-Annahme, aber ausdrücklich als unbestätigte
+     Hypothese markiert (Diagnose-vor-Fix-Regel: nicht raten).
+  2. **Fix-Auftrag** auf Basis dieser Hypothese. **Vor der Umsetzung
+     tatsächlich reproduziert** (nicht nur die Hypothese übernommen):
+     Testfixture mit 2 echten Trainingswochen + 1 manuell vorausgeplanter,
+     leerer Woche mit ZUKÜNFTIGEM `startDate` (das Datumsfeld bei "Neue
+     Woche" erlaubt jedes Datum) — bestätigte exakt das gemeldete Symptom
+     ("KW 30 · 0 Wochen · 0/0 Tage") trotz vorhandener echter Historie.
+     Root Cause damit real bestätigt, nicht mehr spekulativ.
+  **Fix:** `_runAutoWeekFlow()` (ui.js) — `prevWeek` wird jetzt rückwärts
+  durch die sortierten Wochen gesucht (erste Woche mit ≥1 `markedDone`-
+  Tag), statt positional `sorted[length-2]` zu raten. Verifiziert: die
+  soeben erstellte Woche selbst kann dabei nie fälschlich treffen, da
+  `_resetClonedDays()` `markedDone` beim Anlegen immer auf `false` setzt.
+  Fallback auf die alte Positions-Logik bleibt für den Extremfall "noch
+  nie irgendeine Woche abgeschlossen" bestehen.
+  **Zusätzlich (Nutzer-Anfrage):** Teilen-Button jetzt auch im manuellen
+  Wochenrückblick-Dropdown (Fortschritt-Tab, `#week-review-inline`)
+  verfügbar — jede dort wählbare Woche hat durch den bereits bestehenden
+  `reviewable`-Filter (nur Wochen mit ≥1 `markedDone`-Tag) garantiert
+  echte Daten, kann die B72-Falle also strukturell nie treffen,
+  unabhängig vom Auto-Flow. Teilen-Logik dafür aus dem Modal-Klick-
+  Handler in eine gemeinsame, exportierte `shareWeekReviewImage()`
+  (weekReviewModal.js) extrahiert statt sie zu duplizieren — beide
+  Einstiegspunkte (Modal + Dropdown) nutzen jetzt dieselbe Implementierung.
+  **Sprint-Vorlage enthielt erneut falsche Versionsstände** (nannte
+  "train-v180"/"?v=194" — aktueller Stand war train-v187/?v=193, also
+  RÜCKWÄRTS) — reale nächste Version (train-v188) verwendet, CSS
+  unverändert gelassen (keine neue CSS-Klasse, reused `.btn`/`.btn--ghost`).
+  **Nebenbefund:** eigener Doku-Fehler aus dem B71-Sprint gefunden — die
+  DECISIONS.md-Einfügung hatte die "Gilt"-Zeile des scrollTop-Restore-
+  Eintrags versehentlich ans Dateiende verschoben (Einfügepunkt zu früh
+  gewählt). Korrigiert, plus neuer DECISIONS.md-Eintrag zum "Rückwärtssuche
+  statt Array-Position"-Muster für künftige "letzte reale Woche"-Logik.
+  Verifiziert per 2 neuen Tests (`tests/share_image_autoweek_fix.spec.js`,
+  in CI) plus Screenshot über den ECHTEN Klick-Handler (nicht neu
+  nachgebaut — `toBlob()` kurzzeitig gepatcht, um das tatsächlich erzeugte
+  Bild abzufangen): 3 reale Trainingswochen 72.5→75→82.5kg zeigen korrekt
+  "+10kg in 3 Wochen 🏆", vorausgeplante leere Woche korrekt ignoriert.
+  CACHE_VERSION train-v187→v188, CSS/SCHEMA unverändert. Volle Suite
+  34/34 grün.
+Loop 5: for-advisor.txt aktualisiert (am Ende der Session).

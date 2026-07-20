@@ -1,5 +1,5 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-20, Share-Bild v2 — Sparkline-Redesign (B71, train-v187, SCHEMA 31)*
+*Letzte Aktualisierung: 2026-07-20, Auto-Wochenrückblick-Fix + Teilen im Dropdown (B72, train-v188, SCHEMA 31)*
 *Nächster Schritt: B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md) — braucht Name+Adresse+E-Mail vom Nutzer. B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten. Keine weiteren offenen Rückfragen aus diesem Sprint.*
 
 ---
@@ -11,16 +11,43 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v187 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v188 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
-- CSS: ?v=193 (unverändert — B71 ist reines Canvas-Redesign, keine neuen
-  CSS-Klassen, daher bewusst kein Bump trotz anderslautender
-  Sprint-Vorlage — Projekt-Konvention: nur bei echter CSS-Änderung)
-- SCHEMA: 31 (unverändert — Share-Bild-Redesign ändert die State-Shape
-  nicht)
+- CSS: ?v=193 (unverändert — B72 ändert kein CSS, reused bestehende
+  `.btn`/`.btn--ghost`-Klassen)
+- SCHEMA: 31 (unverändert)
 - Letzter Commit: siehe `git log` (dieser Sprint noch nicht gepusht,
   siehe Sprint-Ende-Workflow).
+- **B72 — Auto-Wochenrückblick zeigte 0/0 trotz echter Trainingshistorie,
+  gefixt (train-v188):** Nutzer meldete, dass das Share-Bild teils falsche
+  (leere) Daten zeigte. Erst per reiner Diagnose-Anfrage (keine Änderungen)
+  untersucht: der Code arbeitet für den Normalfall korrekt (mit
+  realistischen Testdaten reproduziert: exakte, richtige Werte). Root
+  Cause dann gezielt gesucht und **per echter Reproduktion bestätigt**
+  (nicht nur vermutet): `_runAutoWeekFlow()` (ui.js) nahm
+  `sorted[sorted.length - 2]` blind als "die Vorwoche" an — bricht, wenn
+  eine manuell vorausgeplante Woche mit zukünftigem `startDate` bereits
+  existiert (das Datumsfeld bei "Neue Woche" erlaubt jedes Datum). Diese
+  leere Zukunftswoche rutscht zwischen die echte letzte Trainingswoche und
+  die soeben automatisch erstellte aktuelle Woche — die Positions-Annahme
+  trifft dann die leere Woche statt der echten. Playwright-Reproduktion
+  bestätigte exakt das gemeldete Symptom. **Fix:** `prevWeek` wird jetzt
+  rückwärts gesucht (letzte Woche mit ≥1 `markedDone`-Tag), nicht mehr
+  positional geraten. **Zusätzlich:** Teilen-Button jetzt auch im
+  manuellen Wochenrückblick-Dropdown (Fortschritt-Tab) verfügbar — jede
+  dort wählbare Woche hat durch den bestehenden Filter garantiert echte
+  Daten, umgeht die B72-Falle also strukturell. Teilen-Logik dafür aus dem
+  Modal-Handler in eine gemeinsame `shareWeekReviewImage()`
+  (weekReviewModal.js) extrahiert, von beiden Einstiegspunkten genutzt.
+  2 neue Tests (`tests/share_image_autoweek_fix.spec.js`, in CI) plus
+  Screenshot-Verifikation über den echten Klick-Handler (3 reale Wochen,
+  korrekt "+10kg in 3 Wochen 🏆", vorausgeplante leere Woche ignoriert).
+  Nebenbei einen eigenen Doku-Fehler aus dem B71-Sprint gefunden und
+  behoben: die DECISIONS.md-Einfügung hatte die "Gilt"-Zeile des
+  scrollTop-Restore-Eintrags ans Dateiende verschoben, korrigiert.
+  CACHE_VERSION train-v187→v188, CSS/SCHEMA unverändert. Volle Suite
+  34/34 grün.
 - **Share-Bild v2 — Sparkline-Redesign (B71, train-v187):** Nutzer
   bestätigte eine vorab vorgelegte technische Spec ("passt so, leg
   los"). Die Sprint-Vorlage enthielt mehrere Diskrepanzen zum echten

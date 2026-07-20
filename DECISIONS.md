@@ -202,6 +202,7 @@ Priorität innerhalb der Strukturkarte: Mehr-Übungen-Aggregation > Präventiver
 ### 2026-07 — scrollTop-Restore statt scrollIntoView-Guard
 **Entscheidung:** Stepper-Buttons merken scrollTop vor Dispatch und restoren nach Render-RAF.
 **Begründung:** Kein scrollIntoView() im Stepper-Pfad — Scroll-Artefakt war Layout-Reflow. scrollTop-Restore ist die sauberste Lösung.
+**Gilt:** Permanent.
 
 ### 2026-07 — Share-Bild lokal per Canvas, kein Server-Upload (B68)
 **Entscheidung:** Share-Bilder (PR-Moment, Wochenrückblick) werden clientseitig per Canvas als PNG erzeugt und über `navigator.share`/`canShare` (Datei) geteilt, mit Download als Fallback — identisches Muster wie der bestehende JSON-Backup-Export. Kein Server-Upload, kein Drittanbieter-Bildhost/-Renderer.
@@ -212,4 +213,8 @@ Priorität innerhalb der Strukturkarte: Mehr-Übungen-Aggregation > Präventiver
 **Entscheidung:** Das Wochenrückblick-Share-Bild zeigt als Herzstück eine Bezier-geglättete Sparkline der Gewichtshistorie (`exWeightHistory()`, letzte 8 Wochen, nur weight>0) der Übung mit echtem PR diese Woche, ersatzweise der mit dem höchsten Wochenvolumen. Hook-Satz fasst die Differenz zusammen ("+Xkg in Y Wochen" bei Steigerung, "Xkg · Y Wochen konstant" bei Plateau, "Kontrollierter Rückbau" bei Rückgang). Unter 3 Datenpunkten wird keine Kurve gezeichnet, sondern nur das aktuelle Gewicht groß angezeigt.
 **Begründung:** Nutzer-Feedback zu B68: reine Kennzahlen ohne visuellen Anker wirkten leer/ohne "Wow-Faktor". Eine Kurve mit <3 Punkten wäre visuell bedeutungslos/irreführend (keine erkennbare Tendenz), daher bewusster Fallback statt einer entwerteten Mini-Kurve.
 **Gilt:** Permanent für dieses Feature. Bei künftigen Sparkline-artigen Visualisierungen dieselbe Mindest-Datenpunkt-Schwelle (3) und denselben Fallback-Gedanken anwenden.
-**Gilt:** Permanent.
+
+### 2026-07 — "Letzte Woche mit echten Daten" per Rückwärtssuche, nicht per Array-Position (B72)
+**Entscheidung:** Wo Code "die Vorwoche" oder "die zuletzt trainierte Woche" braucht, wird rückwärts durch die sortierten Wochen gesucht (erste Woche mit ≥1 `markedDone`-Tag), nicht positional aus der Wochen-Array-Länge abgeleitet (z.B. `sorted[length-2]`).
+**Begründung:** `state.weeks` kann leere, in der Zukunft datierte Wochen enthalten (manuell über "Neue Woche" mit frei wählbarem Datum vorausgeplant) — eine positionale Annahme ("die vorletzte Woche ist die echte Vorwoche") bricht dann, weil die leere Zukunftswoche dazwischenrutscht (B72: `_runAutoWeekFlow()` zeigte dadurch 0/0 im Auto-Wochenrückblick trotz vorhandener Trainingshistorie).
+**Gilt:** Permanent. Bei jeder künftigen "letzte reale Woche"-Logik dieses Muster verwenden, nicht Array-Indizes.

@@ -47,6 +47,38 @@ function _pickBestExercise(reviewData) {
   return best ? { name: best, isPr: false } : null;
 }
 
+/**
+ * Erzeugt und teilt das Wochenrückblick-Share-Bild (B71/B72). Reused vom
+ * Wochenwechsel-Modal (`#wr-btn-share`) UND vom manuellen Wochenrückblick-
+ * Dropdown im Fortschritt-Tab (ui.js `_updateInlineReview()`) — eine
+ * Implementierung statt zwei, damit beide Einstiegspunkte identisch
+ * korrekt bleiben.
+ *
+ * @param {Object} reviewData  Rückgabe von buildWeekReview(), MUSS zusätzlich
+ *   `allWeeks` (das komplette state.weeks-Array) tragen — sonst bleibt die
+ *   Sparkline leer (kein Absturz, nur Fallback-Anzeige).
+ */
+export async function shareWeekReviewImage(reviewData) {
+  const { summary, week } = reviewData;
+  const kw = String(_kw(week.startDate)).padStart(2, '0');
+  try {
+    const best = _pickBestExercise(reviewData);
+    let weights = [];
+    if (best && reviewData.allWeeks) {
+      const sorted = getSortedWeeks({ weeks: reviewData.allWeeks });
+      weights = exWeightHistory(sorted, best.name).slice(-8).filter(w => w > 0);
+    }
+    const canvas = await buildWeekShareCanvas({
+      kw, monthYear: _monthYear(week.startDate),
+      streak: summary.streak ?? 0,
+      doneDays: summary.completedDays ?? 0, totalDays: summary.plannedDays ?? 0,
+      successPct: summary.goalFulfillment ?? null,
+      bestExercise: best?.name ?? null, weights, isPr: best?.isPr ?? false,
+    });
+    await shareCanvas(canvas, 'train-woche.png', `Wochenrückblick KW ${kw} — TRAIN`);
+  } catch (_) { /* Canvas/Share fehlgeschlagen -> stiller Abbruch, kein Crash */ }
+}
+
 function _fmtVol(v) {
   return v >= 1000 ? (v / 1000).toFixed(1) + 't' : v + ' kg';
 }
@@ -157,23 +189,5 @@ export function showWeekReviewModal(reviewData, onContinue) {
     }, { once: true });
 
   overlay.querySelector('#wr-btn-share')
-    ?.addEventListener('click', async () => {
-      const { summary } = reviewData;
-      try {
-        const best = _pickBestExercise(reviewData);
-        let weights = [];
-        if (best && reviewData.allWeeks) {
-          const sorted = getSortedWeeks({ weeks: reviewData.allWeeks });
-          weights = exWeightHistory(sorted, best.name).slice(-8).filter(w => w > 0);
-        }
-        const canvas = await buildWeekShareCanvas({
-          kw, monthYear: _monthYear(week.startDate),
-          streak: summary.streak ?? 0,
-          doneDays: summary.completedDays ?? 0, totalDays: summary.plannedDays ?? 0,
-          successPct: summary.goalFulfillment ?? null,
-          bestExercise: best?.name ?? null, weights, isPr: best?.isPr ?? false,
-        });
-        await shareCanvas(canvas, 'train-woche.png', `Wochenrückblick KW ${kw} — TRAIN`);
-      } catch (_) { /* Canvas/Share fehlgeschlagen -> stiller Abbruch, kein Crash */ }
-    });
+    ?.addEventListener('click', () => shareWeekReviewImage(reviewData));
 }

@@ -29,7 +29,7 @@ import { fireTrigger } from './triggerEngine.js';
 import { getWeightRecommendation, getMetricRecommendation, roundToPlate, isReadyForAutoSelect } from './weightRecommendation.js';
 import { renderProgressChart, renderBodyWeightChart, renderRelativeStrengthChart } from './progressChart.js';
 import { buildWeekReview }        from './weekReview.js';
-import { showWeekReviewModal, renderWeekReviewHtml } from './weekReviewModal.js';
+import { showWeekReviewModal, renderWeekReviewHtml, shareWeekReviewImage } from './weekReviewModal.js';
 import { computeWeeklyFocus, computeStructuralSignals, isInRecoveryWindow, buildDecisionalBalance } from './weeklyFocus.js';
 import { findExactDuplicates, findSimilarCandidates } from './exerciseNameCleanup.js';
 import { computeErkenntnisLines, getProgressCorridorCalibration } from './progressInsights.js';
@@ -3363,7 +3363,14 @@ function _updateInlineReview(state) {
   const wk = reviewable[+sel.value];
   if (!wk) { wrap.innerHTML = ''; return; }
   const review = buildWeekReview(wk, state.weeks, state.favoriteExercises ?? []);
-  wrap.innerHTML = renderWeekReviewHtml(review);
+  review.allWeeks = state.weeks;
+  // B72: Share-Button auch hier, nicht nur im Wochenwechsel-Modal — jede
+  // hier wählbare Woche hat per `reviewable`-Filter oben garantiert
+  // mindestens einen markedDone-Tag, ist also nie die leere Falle, die
+  // _runAutoWeekFlow() treffen konnte.
+  wrap.innerHTML = `${renderWeekReviewHtml(review)}
+    <button type="button" class="btn btn--ghost" id="week-review-inline-share" style="width:100%;margin-top:var(--sp-3);min-height:var(--touch)">📤 Teilen</button>`;
+  wrap.querySelector('#week-review-inline-share')?.addEventListener('click', () => shareWeekReviewImage(review));
 }
 
 function _calcStreak(state) {
@@ -4087,7 +4094,7 @@ function renderSettingsTab(state) {
   <div class="settings-section">
     <div class="settings-section__title">Info</div>
     <div class="settings-row">
-      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v187</div></div>
+      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v188</div></div>
     </div>
     <div class="settings-row">
       <div>
@@ -6349,7 +6356,18 @@ function _runAutoWeekFlow() {
   if (!state.autoWeekPending) return;
   const autoWeek = state.settings?.autoWeek ?? {};
   const sorted   = [...state.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
-  const prevWeek = sorted[sorted.length - 2] ?? null; // die soeben auto-erstellte Woche ist die letzte
+  // B72: `sorted[length-2]` nahm blind die chronologisch vorletzte Woche an —
+  // stimmt NICHT, wenn eine spätere Woche mit zukünftigem startDate bereits
+  // existiert (z.B. manuell vorausgeplant über "Neue Woche" mit frei
+  // wählbarem Datum) oder die vorletzte Woche schlicht komplett leer blieb
+  // (übersprungene Woche). Rückwärts nach der letzten Woche MIT echten Daten
+  // suchen (mind. 1 markedDone-Tag), statt positional zu raten — die soeben
+  // auto-erstellte Woche selbst kann hier nie treffen, da _resetClonedDays()
+  // markedDone immer auf false setzt. Fallback auf die alte Positions-Logik
+  // nur im Extremfall, dass ÜBERHAUPT keine Woche je einen Tag abgeschlossen
+  // hat (z.B. ganz neuer Account).
+  const prevWeek = [...sorted].reverse().find(w => w.days?.some(d => d.markedDone))
+    ?? sorted[sorted.length - 2] ?? null;
 
   const step2 = () => {
     if (autoWeek.suggestProgress) {
