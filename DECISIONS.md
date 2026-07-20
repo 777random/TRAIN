@@ -207,4 +207,9 @@ Priorität innerhalb der Strukturkarte: Mehr-Übungen-Aggregation > Präventiver
 **Entscheidung:** Share-Bilder (PR-Moment, Wochenrückblick) werden clientseitig per Canvas als PNG erzeugt und über `navigator.share`/`canShare` (Datei) geteilt, mit Download als Fallback — identisches Muster wie der bestehende JSON-Backup-Export. Kein Server-Upload, kein Drittanbieter-Bildhost/-Renderer.
 **Begründung:** Konsistent mit der "Lokal-first, kein Backend"-Grundentscheidung und der "GoatCounter = einziger externer Call"-Positionierung (LEGAL.md/SECURITY.md) — ein Bild-Hosting-Dienst wäre ein neuer externer Aufruf und ein neuer Auftragsverarbeiter-Eintrag gewesen.
 **Gilt:** Permanent für zukünftige Share-/Export-Features. Kein Server-Rendering/-Upload ohne explizite Neuentscheidung.
+
+### 2026-07 — Share-Bild Sparkline (B71): exWeightHistory letzte 8 Wochen, Bezier-Kurve, Hook-Satz "+Xkg in Y Wochen", Fallback bei <3 Punkten
+**Entscheidung:** Das Wochenrückblick-Share-Bild zeigt als Herzstück eine Bezier-geglättete Sparkline der Gewichtshistorie (`exWeightHistory()`, letzte 8 Wochen, nur weight>0) der Übung mit echtem PR diese Woche, ersatzweise der mit dem höchsten Wochenvolumen. Hook-Satz fasst die Differenz zusammen ("+Xkg in Y Wochen" bei Steigerung, "Xkg · Y Wochen konstant" bei Plateau, "Kontrollierter Rückbau" bei Rückgang). Unter 3 Datenpunkten wird keine Kurve gezeichnet, sondern nur das aktuelle Gewicht groß angezeigt.
+**Begründung:** Nutzer-Feedback zu B68: reine Kennzahlen ohne visuellen Anker wirkten leer/ohne "Wow-Faktor". Eine Kurve mit <3 Punkten wäre visuell bedeutungslos/irreführend (keine erkennbare Tendenz), daher bewusster Fallback statt einer entwerteten Mini-Kurve.
+**Gilt:** Permanent für dieses Feature. Bei künftigen Sparkline-artigen Visualisierungen dieselbe Mindest-Datenpunkt-Schwelle (3) und denselben Fallback-Gedanken anwenden.
 **Gilt:** Permanent.

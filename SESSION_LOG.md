@@ -1363,3 +1363,79 @@ Eigentliche Aufgabe: Nutzer bestätigte die im Vorsprint vorgelegte
   ändern die persistierte State-Shape). Alle 3 neuen Testdateien in
   .github/workflows/test.yml verdrahtet. Volle Suite 28/28 grün.
 Loop 5: nicht ausgeführt — läuft laut LOOPS.md erst am Sitzungsende.
+
+## 2026-07-20 train-v187 (B71 — Share-Bild v2 Sparkline-Redesign)
+Loop 1: 28/28 grün (kein Flake diesmal) ✓
+Loop 2: aktuell ✓ — HANDOFF.md/CLAUDE.md waren nach dem vorherigen
+  Sprintabschluss bereits auf train-v186/?v=193 synchron
+Loop 3: übersprungen — Stop-Bedingung (≥15 Fixtures) mit 17 weiterhin
+  erfüllt, keine neuen Edge-Cases angefordert
+Eigentliche Aufgabe: Nutzer forderte per detaillierter Sprint-Vorlage ein
+  Layout-Redesign des Wochenrückblick-Share-Bilds (B68) mit einer
+  Übungsfortschritt-Sparkline als Herzstück an, mit explizitem
+  Spec-erst-Workflow ("technische Spec schreiben, auf Bestätigung
+  warten"). Vor dem Spec-Schreiben die konkreten technischen Behauptungen
+  der Vorlage gegen den echten Code geprüft (nicht blind übernommen —
+  etablierte Regel dieses Projekts bei Nutzer-Vorlagen):
+  - Versionsstände falsch: Vorlage sprach von "Share-Bild (v178)" und
+    Ziel-"train-v179" — Share-Bild existiert tatsächlich erst seit B68/
+    train-v186 (letzter Sprint). Reale Zielversion train-v187 verwendet.
+  - `generateWeekImage(weekData, state)` mit einem
+    `{kwNumber, monthYear, ..., prExercise, prWeight}`-Objekt existiert
+    nirgends im Code — erfundene/erinnerte API, keine reale.
+  - `exWeightHistory()` per Grep verortet: liegt in `insightEngine.js`
+    (Zeile 49), nicht wie in der Vorlage behauptet in
+    `progressInsights.js`.
+  - Der reale Teilen-Button-Aufrufort ist `weekReviewModal.js` (hat seit
+    B68 direkten `reviewData`-Zugriff), nicht `ui.js` wie die
+    Vorlagen-Constraint "Nur shareImage.js + ui.js" annahm.
+  Technische Spec mit allen 4 Korrekturen geschrieben und vorgelegt,
+  Nutzer bestätigte ("passt so, leg los").
+  **Umsetzung:**
+  - `ui.js`: an beiden `buildWeekReview()`-Aufrufstellen (`open-new-week`,
+    `_runAutoWeekFlow`) wird `_review.allWeeks = state.weeks` angehängt,
+    bevor `showWeekReviewModal()` aufgerufen wird — einzige ui.js-
+    Änderung, gibt weekReviewModal.js erstmals Zugriff auf die volle
+    Wochen-Historie (vorher nur die eine aktuelle `week`).
+  - `weekReviewModal.js`: importiert neu `getSortedWeeks`/
+    `exWeightHistory` (insightEngine.js). Neue `_pickBestExercise()`:
+    1. echter PR-Highlight dieser Woche (`highlights.find(h => h.type
+    === 'pr')`, bereits von `buildWeekReview()`/`_findPR()` ermittelt),
+    2. sonst höchstes Trainingsvolumen der Woche (neu, lokal berechnet —
+    keine bestehende Funktion dafür gefunden, keine dupliziert). Neue
+    `_monthYear()` für den Header ("KW N · Monat Jahr").
+  - `shareImage.js`: `buildWeekShareCanvas()` komplett neu aufgebaut,
+    4-Zonen-Layout (Header/Sparkline-Hero/Stats-Kacheln/Footer),
+    Bezier-geglättete Kurve exakt nach Vorlagen-Formel, Gradient-Fill
+    unter der Linie, Glow-Effekt (shadowBlur 20) auf dem letzten/
+    aktuellen Punkt, Gewichts-Labels an erstem/letztem Datenpunkt,
+    dynamischer Hook-Satz (Steigerung/Plateau/Rückbau), Fallback bei <3
+    Datenpunkten (großes aktuelles Gewicht statt bedeutungsloser
+    Mini-Kurve), 2-Zeilen-Umbruch bei Übungsnamen >20 Zeichen.
+  - **Eigener Fehler gefunden und korrigiert (Screenshot-Prüfung vor
+    Commit, wie von der Vorlage selbst als Qualitätsschritt gefordert):**
+    Canvas als `data:`-URL gerendert und visuell geprüft (`Read`-Tool auf
+    die PNG-Datei) — die erste Umsetzung nach den wörtlichen
+    Vorlagen-Koordinaten (Zonen enden bei y:780 von 1080px) ließ ca.
+    300px komplett leeren Raum am unteren Bildrand, exakt das Problem,
+    das dieses Redesign laut Nutzer-Anfrage eigentlich beheben sollte
+    ("zu viel Leerraum, kein Wow-Faktor"). Vertikalen Rhythmus
+    neu verteilt (Sparkline-Box 260→330px Höhe, Stats-Kacheln 100→120px,
+    Footer 60→100px, alle nach unten verschoben) — Leerraum am Ende auf
+    ~117px reduziert, zweiter Screenshot bestätigt deutlich ausgewogeneres
+    Bild. Auch der Lange-Namen-Fallback visuell verifiziert (38 Zeichen
+    passten bei 38px Font noch einzeilig, kein unnötiger Umbruch).
+  - CSS-Version bewusst NICHT gebumpt (?v=193 unverändert) — B71 ist
+    reines Canvas-Redesign, keine neue CSS-Klasse — abweichend von der
+    Vorlagen-Angabe "?v=193" (die von einer CSS-Änderung ausging, die es
+    nie gab; Projekt-Konvention aus CLAUDE.md: nur bei echter
+    CSS-Änderung bumpen).
+  4 neue Tests (`tests/share_image_sparkline.spec.js`, in CI): Canvas-
+  Maße mit Sparkline-Pfad (≥3 Punkte), Fallback-Pfad (<3 Punkte), langer
+  Übungsname ohne Absturz, vollständiger UI-Flow über 4 echte Wochen mit
+  steigendem Gewicht (Sparkline-Daten fließen nachweislich korrekt ein,
+  PNG-Download ausgelöst). CACHE_VERSION train-v186→v187, CSS/SCHEMA
+  unverändert. AGENTS.md-Matrix aktualisiert (weekReviewModal.js
+  importiert jetzt zusätzlich insightEngine.js, Tiefe 1→3). Volle Suite
+  32/32 grün.
+Loop 5: for-advisor.txt aktualisiert (am Ende der Session).

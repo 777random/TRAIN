@@ -1,7 +1,7 @@
 # TRAIN — Parallel Agent Regeln
 # Wird nach jedem Multi-Agent Sprint
 # automatisch aktualisiert.
-# Letzte Aktualisierung: 2026-07-20 / train-v186
+# Letzte Aktualisierung: 2026-07-20 / train-v187
 
 ---
 
@@ -37,7 +37,7 @@ sondern der Einstiegspunkt, der `state.js`, `backup.js`, `ui.js`,
 | movementMap.js | — | overallPerformance.js, ui.js, weeklyFocus.js |
 | progressChart.js | — | ui.js |
 | weekReview.js | setUtils.js, state.js (seit train-v170 — B44/B45-Konsolidierung: `isTrainingDay()` für `_reachableDays()`, `weekSuccessCounts()` für `_calcSuccessScore()`; beide reine, zustandslose Funktionen, kein `getState()`/`dispatch()` — Datei ist weiterhin "State-frei" im ursprünglich gemeinten Sinn) | ui.js |
-| weekReviewModal.js | shareImage.js (seit train-v186 — B68: Teilen-Button im Wochenrückblick-Modal, ruft `buildWeekShareCanvas()`/`shareCanvas()` direkt auf) | ui.js |
+| weekReviewModal.js | shareImage.js (seit train-v186 — B68: Teilen-Button im Wochenrückblick-Modal, ruft `buildWeekShareCanvas()`/`shareCanvas()` direkt auf), insightEngine.js (seit train-v187 — B71: `getSortedWeeks`/`exWeightHistory` für die Sparkline-Datenquelle) | ui.js |
 | shareImage.js | — | ui.js, weekReviewModal.js (beide seit train-v186 — B68) |
 | exerciseNameCleanup.js | — | ui.js |
 | registerSW.js | — | index.html |
@@ -46,7 +46,7 @@ sondern der Einstiegspunkt, der `state.js`, `backup.js`, `ui.js`,
 | timer.js | state.js | index.html (kein JS-Modul importiert es, nur der Einstiegspunkt) |
 | plateauDetector.js | setUtils.js | insightEngine.js, weeklyFocus.js |
 | weightRecommendation.js | setUtils.js | insightEngine.js, ui.js, weeklyFocus.js |
-| insightEngine.js | weightRecommendation.js, plateauDetector.js | consistencyUtils.js, overallPerformance.js, progressInsights.js, triggerEngine.js, ui.js (seit train-v173 — B49: `getSortedWeeks`, `exWeightHistory`, `exMetricHistory`, `detectRecurringStep` für den Schrittweite-Vorschlag) |
+| insightEngine.js | weightRecommendation.js, plateauDetector.js | consistencyUtils.js, overallPerformance.js, progressInsights.js, triggerEngine.js, ui.js (seit train-v173 — B49: `getSortedWeeks`, `exWeightHistory`, `exMetricHistory`, `detectRecurringStep` für den Schrittweite-Vorschlag), weekReviewModal.js (seit train-v187 — B71) |
 | triggerEngine.js | insightEngine.js, state.js | ui.js |
 | consistencyUtils.js | state.js, insightEngine.js | overallPerformance.js, weeklyFocus.js |
 | progressInsights.js | insightEngine.js | overallPerformance.js, ui.js |
@@ -63,10 +63,11 @@ Tiefe 0: state.js, icons.js, setUtils.js, movementMap.js, progressChart.js,
          registerSW.js, dragdrop.js*
 Tiefe 1: backup.js, timer.js, plateauDetector.js, weightRecommendation.js,
          weekReview.js (seit train-v170 — importiert jetzt setUtils.js/
-         state.js, war vorher Tiefe 0), weekReviewModal.js (seit train-v186 —
-         importiert jetzt shareImage.js, war vorher Tiefe 0)
+         state.js, war vorher Tiefe 0)
 Tiefe 2: insightEngine.js
-Tiefe 3: triggerEngine.js, consistencyUtils.js, progressInsights.js
+Tiefe 3: triggerEngine.js, consistencyUtils.js, progressInsights.js,
+         weekReviewModal.js (seit train-v187 — B71: importiert jetzt
+         insightEngine.js für exWeightHistory(), war seit v186 Tiefe 1)
 Tiefe 4: overallPerformance.js
 Tiefe 5: weeklyFocus.js
 Tiefe 6: ui.js   ← importiert am meisten, höchstes Blast-Radius-Risiko
@@ -144,8 +145,9 @@ movementMap.js weeklyFocus.js UND ui.js gleichzeitig treffen könnte).
   setUtils.js / weightRecommendation.js / plateauDetector.js /
   movementMap.js** — alle sechs werden von weeklyFocus.js importiert;
   Signatur-Änderungen dort brechen weeklyFocus.js sofort.
-- **insightEngine.js + eine seiner 4 Importer** (consistencyUtils.js,
-  overallPerformance.js, progressInsights.js, triggerEngine.js) —
+- **insightEngine.js + eine seiner 5 Importer** (consistencyUtils.js,
+  overallPerformance.js, progressInsights.js, triggerEngine.js,
+  weekReviewModal.js seit train-v187/B71) —
   insightEngine.js hat selbst die zweitmeisten Importer nach state.js.
 - **setUtils.js + eine seiner 3 Importer** (plateauDetector.js,
   weeklyFocus.js, weightRecommendation.js) — isFullSuccess() ist die

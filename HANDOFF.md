@@ -1,5 +1,5 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-20, Share-Bild-Feature (B68) implementiert + 2 Nutzer-Bugmeldungen diagnostiziert (train-v186, SCHEMA 31)*
+*Letzte Aktualisierung: 2026-07-20, Share-Bild v2 — Sparkline-Redesign (B71, train-v187, SCHEMA 31)*
 *Nächster Schritt: B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md) — braucht Name+Adresse+E-Mail vom Nutzer. B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten. Keine weiteren offenen Rückfragen aus diesem Sprint.*
 
 ---
@@ -11,14 +11,47 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v186 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v187 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
-- CSS: ?v=193 (Share-Bild-Buttons, B68)
-- SCHEMA: 31 (unverändert — Share-Bild und der Streak-Fix ändern die
-  State-Shape nicht)
+- CSS: ?v=193 (unverändert — B71 ist reines Canvas-Redesign, keine neuen
+  CSS-Klassen, daher bewusst kein Bump trotz anderslautender
+  Sprint-Vorlage — Projekt-Konvention: nur bei echter CSS-Änderung)
+- SCHEMA: 31 (unverändert — Share-Bild-Redesign ändert die State-Shape
+  nicht)
 - Letzter Commit: siehe `git log` (dieser Sprint noch nicht gepusht,
   siehe Sprint-Ende-Workflow).
+- **Share-Bild v2 — Sparkline-Redesign (B71, train-v187):** Nutzer
+  bestätigte eine vorab vorgelegte technische Spec ("passt so, leg
+  los"). Die Sprint-Vorlage enthielt mehrere Diskrepanzen zum echten
+  Code, die vor der Umsetzung offengelegt statt stillschweigend
+  übernommen wurden: falsche Versionsstände (Vorlage ging von
+  "Share-Bild v178"/Ziel-"v179" aus — das Feature wurde tatsächlich erst
+  als B68 in v186 gebaut), eine nirgends existierende
+  `generateWeekImage(weekData, state)`-API mit erfundenem
+  `weekData`-Objekt, `exWeightHistory()` fälschlich in
+  `progressInsights.js` statt tatsächlich `insightEngine.js` verortet,
+  und ein falscher Aufrufort (`ui.js` statt tatsächlich
+  `weekReviewModal.js`, wo der Teilen-Button seit B68 lebt). Umsetzung
+  entsprechend korrigiert: `ui.js` hängt an beiden
+  `buildWeekReview()`-Aufrufstellen `allWeeks` an reviewData an (einzige
+  ui.js-Änderung); `weekReviewModal.js` importiert neu
+  `getSortedWeeks`/`exWeightHistory` (insightEngine.js) und ermittelt
+  die Bild-Übung selbst (PR-Highlight dieser Woche > höchstes
+  Wochenvolumen); `shareImage.js`s `buildWeekShareCanvas()` komplett neu
+  aufgebaut (4-Zonen-Layout, Bezier-Sparkline, Gradient-Fill, Glow auf
+  letztem Punkt, dynamischer Hook-Satz, Fallback bei <3 Datenpunkten).
+  **Nach Screenshot-Prüfung (Canvas als data-URL geöffnet, wie von der
+  Vorlage selbst gefordert)** einen eigenen Layout-Fehler gefunden und
+  korrigiert: die erste Umsetzung nach den Vorlagen-Koordinaten ließ
+  ca. 300px ungenutzten Leerraum am unteren Bildrand — genau das
+  Problem, das dieses Redesign eigentlich beheben sollte. Vertikaler
+  Rhythmus neu verteilt (Sparkline-Box 260→330px, Kacheln/Footer nach
+  unten verschoben), Leerraum auf ~117px reduziert. CSS-Version bewusst
+  NICHT gebumpt (kein CSS geändert, abweichend von der Vorlagen-Angabe
+  "?v=193" bei fälschlicher Annahme einer CSS-Änderung). 4 neue Tests
+  (`tests/share_image_sparkline.spec.js`, in CI). Volle Suite 32/32
+  grün. CACHE_VERSION train-v186→v187, CSS/SCHEMA unverändert.
 - **Share-Bild-Feature + 2 weitere Nutzer-Bugmeldungen (train-v186):**
   Nutzer bestätigte die Share-Bild-Spec aus dem vorherigen Sprint
   ("passt so, leg los") und meldete gleichzeitig 3 weitere mögliche

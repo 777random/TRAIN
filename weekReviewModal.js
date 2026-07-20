@@ -4,6 +4,7 @@
  */
 
 import { buildWeekShareCanvas, shareCanvas } from './shareImage.js';
+import { getSortedWeeks, exWeightHistory } from './insightEngine.js';
 
 const _h = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
@@ -11,6 +12,39 @@ function _kw(sd) {
   const d   = new Date(sd + 'T12:00:00');
   const jan = new Date(d.getFullYear(), 0, 1);
   return Math.ceil(((d - jan) / 86_400_000 + jan.getDay() + 1) / 7);
+}
+
+const _MONTHS = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+function _monthYear(sd) {
+  const d = new Date(sd + 'T12:00:00');
+  return `${_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+/** Trainingsvolumen (Σ weight×reps über success-Sätze) je Übung in dieser Woche. */
+function _weekVolumeByExercise(week) {
+  const vol = new Map();
+  for (const d of week.days ?? [])
+    for (const ex of d.exercises ?? [])
+      for (const s of ex.sets ?? [])
+        if (s.status === 'success') {
+          const v = (s.weight ?? 0) * (s.reps ?? 0);
+          vol.set(ex.name, (vol.get(ex.name) ?? 0) + v);
+        }
+  return vol;
+}
+
+/**
+ * Übung fürs Share-Bild (B71): 1. echter PR diese Woche (aus dem bereits
+ * von buildWeekReview() ermittelten highlights-Eintrag `type:'pr'`),
+ * 2. sonst höchstes Trainingsvolumen dieser Woche.
+ */
+function _pickBestExercise(reviewData) {
+  const prHit = reviewData.highlights?.find(h => h.type === 'pr');
+  if (prHit?.exName) return { name: prHit.exName, isPr: true };
+  const vol = _weekVolumeByExercise(reviewData.week);
+  let best = null, bestVol = 0;
+  vol.forEach((v, name) => { if (v > bestVol) { bestVol = v; best = name; } });
+  return best ? { name: best, isPr: false } : null;
 }
 
 function _fmtVol(v) {
@@ -124,12 +158,20 @@ export function showWeekReviewModal(reviewData, onContinue) {
 
   overlay.querySelector('#wr-btn-share')
     ?.addEventListener('click', async () => {
-      const { summary, highlights } = reviewData;
+      const { summary } = reviewData;
       try {
+        const best = _pickBestExercise(reviewData);
+        let weights = [];
+        if (best && reviewData.allWeeks) {
+          const sorted = getSortedWeeks({ weeks: reviewData.allWeeks });
+          weights = exWeightHistory(sorted, best.name).slice(-8).filter(w => w > 0);
+        }
         const canvas = await buildWeekShareCanvas({
-          kw, streak: summary.streak ?? 0, pct: null,
-          effortPct: summary.goalFulfillment ?? null,
-          highlightText: highlights[0]?.text ?? null,
+          kw, monthYear: _monthYear(week.startDate),
+          streak: summary.streak ?? 0,
+          doneDays: summary.completedDays ?? 0, totalDays: summary.plannedDays ?? 0,
+          successPct: summary.goalFulfillment ?? null,
+          bestExercise: best?.name ?? null, weights, isPr: best?.isPr ?? false,
         });
         await shareCanvas(canvas, 'train-woche.png', `Wochenrückblick KW ${kw} — TRAIN`);
       } catch (_) { /* Canvas/Share fehlgeschlagen -> stiller Abbruch, kein Crash */ }

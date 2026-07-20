@@ -1,7 +1,7 @@
 # TRAIN — CLAUDE.md
 # Vollständiger Projektkontext für Claude Code
-# Stand: train-v186 / SCHEMA 31 / Juli 2026
-# Letztes Update: nach train-v186 (B68 Share-Bild-Feature, B69 Streak-Fix, B70 PR-Count-Fix)
+# Stand: train-v187 / SCHEMA 31 / Juli 2026
+# Letztes Update: nach train-v187 (B71 Share-Bild v2 — Sparkline-Redesign)
 
 ---
 
@@ -40,7 +40,7 @@ TRAIN ist eine deutschsprachige PWA für Krafttraining. Pure Vanilla ES Modules 
 
 - Repo: https://github.com/777random/TRAIN
 - Deployed: https://777random.github.io/TRAIN/
-- Aktueller Stand: SCHEMA_VERSION 31 · CACHE_VERSION train-v186 · CSS ?v=193
+- Aktueller Stand: SCHEMA_VERSION 31 · CACHE_VERSION train-v187 · CSS ?v=193
 
 ---
 
@@ -174,7 +174,7 @@ Bei unklarem Root Cause immer erst Diagnose → Ergebnis abwarten → dann Fix. 
 | `registerSW.js` | Service Worker Registrierung, Storage-Error, SW-Update Event. |
 | `dragdrop.js` | Minifizierter Third-Party Drag-Drop Polyfill — NICHT bearbeiten. |
 | `icons.js` | SVG Icon Strings als named constants. |
-| `shareImage.js` | Seit train-v186 (B68). Canvas-basierte Share-Bilder (PR-Moment + Wochenrückblick, 1080×1080 PNG). Importfrei/State-frei (Tiefe 0), Farben live via `getComputedStyle()`. Teilen via `navigator.share`/`canShare` mit Download-Fallback (identisches Muster wie `backup.js`), kein Server-Upload. |
+| `shareImage.js` | Seit train-v186 (B68), Wochenrückblick-Canvas seit v187 (B71) mit Bezier-Sparkline neu aufgebaut. Canvas-basierte Share-Bilder (PR-Moment + Wochenrückblick, 1080×1080 PNG). Importfrei/State-frei (Tiefe 0), Farben live via `getComputedStyle()`. Teilen via `navigator.share`/`canShare` mit Download-Fallback (identisches Muster wie `backup.js`), kein Server-Upload. |
 
 ### State Layer (`state.js`):
 
@@ -324,7 +324,7 @@ Unabhängig von Hauptkarte — erscheint auch neben Progression.
 ### Implementiert ✓:
 **Training-Tab:** Wochenstruktur, Pillen-Nav, Satz-Bewertung (auto+manuell), Gewichtsempfehlung (seit v165 auch Distanz/Zeit-Progression für metric 'm'/'sec' via getMetricRecommendation(), B18; seit v172 pro-Übung-Schrittweite statt fixem Delta, B48), Schrittweite-Vorschlag aus Historie (v173, B49, nur sichtbarer Hinweis), anpassbare Steigerungsmenge im Empfehlungs-Chip (v173, B50), Progressions-Präferenz, PR-Erkennung, "Heute anders", Übung archivieren, Stoppuhr, Auto-Wochenerstellung, Deload/Urlaubsmodus, Körpergewicht, Schlaf+Energie, Share-Bild bei echtem PR im Tagesabschluss-Screen (v186, B68).
 
-**Wochenrückblick-Modal:** Zusammenfassung/Highlights/Lowlights/Empfehlungen (weekReview.js/weekReviewModal.js), Share-Bild-Button (v186, B68).
+**Wochenrückblick-Modal:** Zusammenfassung/Highlights/Lowlights/Empfehlungen (weekReview.js/weekReviewModal.js), Share-Bild-Button (v186, B68; Sparkline-Redesign v187, B71).
 
 **Coach-Tab:** Hauptkarte (8 akute Signale, seit v160 inkl. Konsistente Fehlschläge) + Strukturkarte (4 strukturelle Signale, seit v163 inkl. Mehr-Übungen-Aggregation), Adaptive Nachfrage-Karte, Coach-Bilanz Mini, Plateau-Konsequenz (EX_SET_NEXT_WEEK_PLAN).
 

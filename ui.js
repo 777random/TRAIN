@@ -4087,7 +4087,7 @@ function renderSettingsTab(state) {
   <div class="settings-section">
     <div class="settings-section__title">Info</div>
     <div class="settings-row">
-      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v186</div></div>
+      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v187</div></div>
     </div>
     <div class="settings-row">
       <div>
@@ -4501,6 +4501,7 @@ function _handleClick(e) {
       _recChipCustomOpenName = null;
       if (_hasCompleted) {
         const _review = buildWeekReview(_lastWk, _st.weeks, _st.favoriteExercises ?? []);
+        _review.allWeeks = _st.weeks;
         showWeekReviewModal(_review, () => { _prepNewWeekModal(); openModal('modal-new-week'); });
       } else {
         _prepNewWeekModal();
@@ -6360,6 +6361,7 @@ function _runAutoWeekFlow() {
 
   if (autoWeek.showReview && prevWeek) {
     const review = buildWeekReview(prevWeek, state.weeks, state.favoriteExercises ?? []);
+    review.allWeeks = state.weeks;
     showWeekReviewModal(review, step2);
   } else {
     step2();
