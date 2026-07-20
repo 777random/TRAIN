@@ -1,5 +1,5 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-20, Streak-Konsolidierung Wochenrückblick/Share-Bild (B74, train-v190, SCHEMA 31)*
+*Letzte Aktualisierung: 2026-07-20, Toast beim Auto-Backup (B75, train-v191, SCHEMA 31)*
 *Nächster Schritt: B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md) — braucht Name+Adresse+E-Mail vom Nutzer. B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten. Keine weiteren offenen Rückfragen aus diesem Sprint.*
 
 ---
@@ -11,13 +11,30 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v190 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v191 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
-- CSS: ?v=194 (unverändert — B74 änderte kein CSS, siehe unten)
+- CSS: ?v=194 (unverändert — B75 änderte kein CSS)
 - SCHEMA: 31 (unverändert)
 - Letzter Commit: siehe `git log` (dieser Sprint noch nicht gepusht,
   siehe Sprint-Ende-Workflow).
+- **B75 — Toast beim Auto-Backup, kein Trigger-Bug (train-v191):** Nutzer
+  meldete, ein Auto-Backup-Download erscheine beim Klick auf "Teilen" im
+  Fortschritt-Tab. Diagnose zuerst (keine Änderungen): 5 realistische
+  Reproduktionen (Auto-/manuelle Wochenerstellung × Dropdown-Teilen ×
+  Wochenwechsel-Modal-Teilen) zeigten in keinem Fall einen Download beim
+  Teilen-Klick — `exportJSONAuto()` hat genau eine Aufrufstelle
+  (`ui.js:6540`), reagiert ausschließlich auf `state.weeks.length`-Zuwachs,
+  kein gemeinsamer Codepfad mit dem Share-Button. Rückfrage beim Nutzer
+  (Android, immer derselbe Dropdown-Button, **nur** in Kombination mit
+  kurz zuvor erstellter Woche) bestätigte: der Trigger war die ganze Zeit
+  korrekt. Ursache: der Download passierte bisher unangekündigt (kein
+  Toast) — fiel auf Android erst beim nächsten Tap auf und wurde
+  fälschlich dem Teilen-Klick zugeschrieben. **Fix (nach Rücksprache, kein
+  Trigger geändert):** `showToast('💾 Automatisches Backup gespeichert')`
+  direkt an der bestehenden Auslösestelle ergänzt. 2 neue Tests
+  (`tests/autobackup_toast.spec.js`, in CI). CACHE_VERSION
+  train-v190→v191, CSS/SCHEMA unverändert. Volle Suite 43/43 grün.
 - **B74 — Streak-Konsolidierung (train-v190):** Nutzer meldete "Streak
   zeigt 0 bei neuer Woche", mit explizitem Diagnose-zuerst-Auftrag (keine
   Änderungen). Der wörtliche Fall reproduzierte NICHT — das ist der

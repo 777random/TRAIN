@@ -1700,3 +1700,62 @@ Eigentliche Aufgabe: Nutzer meldete "Streak zeigt 0 bei neuer Woche", mit
   CACHE_VERSION train-v189→v190, CSS ?v=194 unverändert (kein CSS
   geändert), SCHEMA unverändert 31. Volle Suite 41/41 grün.
 Loop 5: for-advisor.txt aktualisiert (am Ende der Session).
+
+## 2026-07-20 train-v191 (B75 — Toast beim Auto-Backup, kein Trigger-Bug)
+Loop 1: 43/43 grün ✓
+Loop 2: aktuell ✓ — HANDOFF.md/CLAUDE.md waren nach dem vorherigen
+  Sprintabschluss bereits auf train-v190/?v=194 synchron
+Loop 3: übersprungen — Stop-Bedingung (≥15 Fixtures) mit 17 weiterhin
+  erfüllt
+Eigentliche Aufgabe: Nutzer meldete, ein Auto-Backup-JSON-Download
+  erscheine beim Klick auf "Teilen" im Fortschritt-Tab-Dropdown, mit
+  explizitem Diagnose-zuerst-Auftrag (keine Änderungen bis das Ergebnis
+  dokumentiert ist).
+  **Diagnose:** Alle 4 gestellten Fragen beantwortet — `exportJSONAuto()`
+  (backup.js:65) hat genau eine Aufrufstelle im gesamten Repo
+  (`ui.js:6540`, innerhalb `scheduleRender()`), gategated ausschließlich
+  über einen reinen Zahlenvergleich (`ui.js:6536`:
+  `_knownWeekCount >= 0 && newWeekCount > _knownWeekCount &&
+  newWeekCount >= 2`, wobei `newWeekCount = state.weeks.length`). Der
+  Share-Button im Fortschritt-Tab (`#week-review-inline-share`,
+  ui.js:3373 → `shareWeekReviewImage()`, weekReviewModal.js) dispatcht
+  nichts und liest nur Zustand — kein gemeinsamer Codepfad gefunden.
+  **5 realistische Reproduktionen** (echte Playwright-Läufe, nicht nur
+  Code-Lesen): AUTO_WEEK_CREATE + Dropdown-Teilen; manuelle
+  Wochenerstellung mitten in der Sitzung + Dropdown-Teilen (mit/ohne
+  Wartezeit); Teilen direkt im manuell geöffneten Wochenwechsel-Modal
+  ohne vorheriges "Weiter"; Teilen im automatisch geöffneten Modal als
+  allererste Interaktion — **in keinem einzigen Fall löste der
+  Teilen-Klick einen `TRAIN_Backup_*.json`-Download aus.** Die
+  Wochenerstellung selbst löste den Backup korrekt und sofort aus.
+  Diagnose-Ergebnis dem Nutzer vorgelegt (wie gefordert), dabei zwei
+  gezielte Rückfragen gestellt statt zu raten: 1) welcher Teilen-Button
+  genau + Gerät + Häufigkeit — Antwort: Dropdown im Fortschritt-Tab,
+  Android, **jedesmal**, und eine neue Woche war jeweils kurz zuvor
+  erstellt worden; 2) die entscheidende Eingrenzungsfrage — tritt es
+  auch OHNE kurz zuvor erstellte Woche auf? Antwort: **nein, nur in
+  Kombination mit einer neuen Woche.** Das bestätigte abschließend: der
+  Trigger war die ganze Zeit korrekt, kein Bug im eigentlichen Sinn. Die
+  tatsächliche Ursache der Verwirrung: der Auto-Backup-Download passierte
+  bisher völlig unangekündigt (kein Toast, keine UI-Rückmeldung) — auf
+  Android ohne aufdringliche Download-Anzeige fiel er dem Nutzer erst
+  beim NÄCHSTEN Tap auf (meist der Teilen-Button, da das typischerweise
+  der nächste Schritt nach einem Wochenwechsel ist) und wurde diesem
+  fälschlich zugeschrieben. Kausalität lief umgekehrt.
+  Bevor blind der in der Aufgabe verlangte "Trigger-Fix" umgesetzt wurde
+  (der hätte das legitime Auto-Backup-Feature kaputt gemacht, ohne das
+  eigentliche Problem zu lösen), dem Nutzer 3 Optionen vorgelegt (mehr
+  Details / Observability statt Blindfix / trotzdem defensiv absichern)
+  — Nutzer wählte "mehr Details erfragen", dann nach Klärung "Ja, Toast
+  ergänzen".
+  **Fix (nach Rücksprache, kein Trigger geändert):**
+  `showToast('💾 Automatisches Backup gespeichert', 'info', 3000)` direkt
+  an der bestehenden Auslösestelle (`ui.js:6540`) ergänzt — macht
+  sichtbar wann und warum der Download passiert, ohne die (korrekte)
+  Trigger-Bedingung selbst anzufassen. Verifiziert per 2 neuen Tests
+  (`tests/autobackup_toast.spec.js`, in CI): Toast erscheint korrekt bei
+  echter Wochenerstellung (inkl. Download-Dateinamen-Check), Teilen-Klick
+  im Fortschritt-Tab löst weiterhin nachweislich keinen Backup-Download
+  aus. CACHE_VERSION train-v190→v191, CSS/SCHEMA unverändert. Volle
+  Suite 43/43 grün.
+Loop 5: for-advisor.txt aktualisiert (am Ende der Session).

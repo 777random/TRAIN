@@ -4095,7 +4095,7 @@ function renderSettingsTab(state) {
   <div class="settings-section">
     <div class="settings-section__title">Info</div>
     <div class="settings-row">
-      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v190</div></div>
+      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v191</div></div>
     </div>
     <div class="settings-row">
       <div>
@@ -6531,13 +6531,21 @@ function scheduleRender() {
     if (_onboardingActive) return;
     const state = getState();
 
-    // Auto-backup: silently download JSON when a new week is created
+    // Auto-backup: download JSON when a new week is created. Nutzer-Meldung
+    // (2026-07): der Download passierte bisher völlig unangekündigt — auf
+    // Android ohne sichtbare Rückmeldung (kein Toast, kein Hinweis), sodass
+    // er erst beim NÄCHSTEN Tap auffiel (z.B. dem Teilen-Button im
+    // Fortschritt-Tab) und fälschlich diesem zugeschrieben wurde. Diagnose
+    // bestätigte: der Trigger selbst ist korrekt (ausschließlich
+    // weeks.length-Zuwachs, kein Zusammenhang mit Share-Aktionen) — Fix ist
+    // ein Toast direkt am Auslösepunkt, kein geänderter Trigger.
     const newWeekCount = state.weeks?.length ?? 0;
     if (_knownWeekCount >= 0 && newWeekCount > _knownWeekCount && newWeekCount >= 2) {
       const sorted = [...state.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
       const completedWeek = sorted[sorted.length - 2];
       if (completedWeek?.startDate && !completedWeek.isSeedWeek) {
         exportJSONAuto(completedWeek.startDate);
+        showToast('💾 Automatisches Backup gespeichert', 'info', 3000);
       }
     }
     _knownWeekCount = newWeekCount;
