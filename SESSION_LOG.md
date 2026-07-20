@@ -1269,3 +1269,97 @@ Feature-Spec (Share-Bild PR-Moment + Wochenrückblick, Canvas API) nach
 explizitem Spec-erst-dann-Bestätigung-Workflow — wird im Anschluss an
 diesen Sprint separat bearbeitet (Doku lesen, aktive Loops, Spec
 schreiben, auf Bestätigung warten), noch nicht umgesetzt.
+
+## 2026-07-20 train-v186 (Share-Bild B68 umgesetzt, Streak-Fix B69, PR-Count-Fix B70 — SCHEMA 31 unverändert)
+Loop 1: 28/28 grün (1 bekannter `delete_all_data.spec.js`-Flake unter
+  Parallel-Last, im Retry grün — siehe LOOPS.md, kein neues Problem) ✓
+Loop 2: aktualisiert — CACHE_VERSION/CSS in HANDOFF.md/CLAUDE.md auf
+  train-v186/?v=193 synchronisiert, SCHEMA unverändert 31
+Loop 3: übersprungen — Stop-Bedingung (≥15 Fixtures) mit 17 in
+  tests/fixtures/ bereits erfüllt, keine neuen Edge-Cases in diesem Sprint
+Eigentliche Aufgabe: Nutzer bestätigte die im Vorsprint vorgelegte
+  Share-Bild-Spec ("passt so, leg los") und meldete in derselben
+  Nachricht 3 weitere mögliche Bugs aus dem echten Gebrauch. Diagnose vor
+  Fix (CLAUDE.md-Regel) für jeden einzeln, bevor irgendetwas geändert wurde:
+  - **Automatischer Wochenrückblick-Popup (kein Bug):** Nutzer vermutete
+    selbst schon korrekt "weil heute Montag ist und automatisch eine neue
+    Woche kreiert wurde". Per Code-Prüfung bestätigt: bereits bestehendes
+    `AUTO_WEEK_CREATE`/`_runAutoWeekFlow()`-Feature (Sprint C3,
+    train-v110), gesteuert über `settings.autoWeek.showReview` (Standard
+    an, in den Einstellungen abschaltbar). Kein neuer Code — in BUGS.md
+    unter "BEWUSST KEIN BUG" mit Erklärung + Abschalt-Hinweis dokumentiert.
+  - **B69 (echter Bug, gefixt) — Streak zeigt 0 trotz Wochen konsistenten
+    Trainings:** Root Cause in `_calcCurrentStreak()` (state.js): die
+    Funktion iteriert von der neuesten Woche rückwärts und bricht die
+    GESAMTE Zählung sofort ab, sobald eine Woche `_weekTrainingStatus()
+    === 'missed'` liefert. Eine soeben (montags automatisch) angelegte,
+    noch komplett leere aktuelle Woche hat 0 bewertete Sätze und erfüllt
+    diese Bedingung IMMER — unabhängig davon, wie viele Wochen zuvor
+    tatsächlich lückenlos abgeschlossen wurden, brach die Streak dadurch
+    strukturell bei jeder neuen Woche sofort auf 0. Fix: die neueste
+    Woche bricht die Kette nur noch, wenn ihr eigenes 7-Tage-Fenster
+    bereits abgelaufen ist (`_weekEndMs()`, bereits vorhandener
+    Lücken-Erkennungs-Helfer, hier erstmals für diesen Zweck
+    wiederverwendet) — läuft es noch, wird die Woche einfach
+    übersprungen (weder gezählt noch bricht sie die Kette), die
+    dahinterliegende echte Streak zählt korrekt weiter.
+    `_calcLongestStreakEver()` separat geprüft und NICHT betroffen
+    (andere Iterationsrichtung, `best` bleibt beim tatsächlichen
+    Bestwert). Neuer Test `tests/streak_inprogress_week.spec.js`: 3
+    lückenlos abgeschlossene Vorwochen + 1 frische leere aktuelle Woche
+    → Badge zeigt jetzt korrekt "3", vorher "0".
+  - **Schrittweite zeigt 5kg, angewendet werden nur +2,5kg (kein Bug):**
+    Frontkniebeuge-Beispiel des Nutzers geprüft. Per Code-Prüfung
+    bestätigt: bereits bestehende, mit dem Nutzer ausdrücklich
+    abgestimmte B48-Entscheidung (train-v172) —
+    `getWeightRecommendation()` empfiehlt bei "guter, aber nicht
+    herausragender" Form (RPE 7.5-8.5 bei ≥80% Erfolgsquote, oder 80-90%
+    Erfolgsquote ohne RPE) bewusst nur die HALBE Schrittweite. Die
+    gesehene "5kg" war vermutlich die Schrittweite-Einstellung selbst
+    (korrekt — bestätigt, dass der B65-Fix wirkt), nicht die für diese
+    konkrete Woche berechnete Empfehlung. Kein Bug, keine Code-Änderung —
+    in BUGS.md unter "BEWUSST KEIN BUG" dokumentiert, inkl. Hinweis auf
+    den bereits existierenden manuellen Override ("Anderer Wert", B50).
+  - **B68 (Feature) — Share-Bild:** Umsetzung exakt nach der im
+    Vorsprint vorgelegten und bestätigten Spec. Neues, importfreies
+    Modul `shareImage.js` (AGENTS.md-Matrix-Tiefe 0) — Canvas-basiertes
+    1080×1080-PNG, Farben live über `getComputedStyle(--c-bg/--c-accent/
+    --c-text/--c-text-2)` gelesen (bleibt bei künftigen Palette-
+    Änderungen automatisch konsistent), Bebas Neue/DM Sans (seit B51
+    selbst gehostet) nach `await document.fonts.ready` gezeichnet, damit
+    kein Fallback-Font-Rendering. Teilen über `navigator.share`/
+    `canShare` mit Datei — dasselbe, bereits verifizierte Muster wie der
+    bestehende JSON-Backup-Export (`backup.js:52-62`) —, sonst Download-
+    Fallback über einen lokalen `triggerDownload`-Klon (bewusst nicht aus
+    backup.js importiert, um shareImage.js als reinen Tiefe-0-Leaf-Modul
+    zu erhalten). Kein Server-Upload, kein Drittanbieter-Bildhost — neue
+    DECISIONS.md-Entscheidung dazu ergänzt. Zwei Einstiegspunkte: "📤 PR
+    teilen"-Button in `_showCompletionScreen()` (ui.js, nur wenn
+    `prCount > 0`), "📤 Teilen"-Button in `showWeekReviewModal()`
+    (weekReviewModal.js — importiert dafür neu shareImage.js, Tiefe 0→1,
+    AGENTS.md-Matrix entsprechend aktualisiert).
+    **B70 (Zusatzfund, gefixt):** beim Bau der PR-Bild-Datenquelle
+    aufgefallen — `_getDayCompletionStats()`s `prCount` verglich noch
+    live gegen `state.prs[ex.name]` (All-Time-Wert). Zum Zeitpunkt des
+    Tagesabschlusses ist `state.prs` für die heutigen Sätze aber bereits
+    aktualisiert, wodurch `s.weight > exPR.maxWeight` für den GENAU
+    rekordbrechenden Satz fast nie mehr zutraf (`exPR.maxWeight ==
+    s.weight`, nicht `>`) — derselbe Bug-Typ wie B63, nur mit
+    umgekehrtem Vorzeichen (Unter- statt Überzählung des Tagesabschluss-
+    "🏆 X neue PRs!"-Textes). Fix: nutzt jetzt `s.prBadge`, dieselbe
+    historisch-korrekte Quelle wie der Satz-Pokal seit B63 — liefert
+    nebenbei auch die für das Share-Bild benötigte PR-Detailliste
+    (Übungsname/Gewicht/Wdh/Typ) ohne zweite eigene Implementierung.
+    Verifiziert per 3 neuen Tests (`tests/share_image.spec.js`): Canvas-
+    Maße korrekt 1080×1080; PR-Teilen-Button erscheint nach einem live
+    per Dispatch ausgelösten echten Rekord (kompletter UI-Flow: Satz
+    bestätigen → Tag abschließen → Bewertung → Überspringen) und löst
+    einen `train-pr.png`-Download aus (Fallback-Pfad — `navigator.share`
+    ist in Headless-Chromium nicht verfügbar, das ist der tatsächlich
+    getestete Zweig); Wochenrückblick-Teilen-Button löst
+    `train-woche.png`-Download aus.
+  CACHE_VERSION train-v185→v186, CSS ?v=192→193, SCHEMA unverändert 31
+  (kein Migrations-Bedarf — weder Streak-Berechnung noch Share-Bild
+  ändern die persistierte State-Shape). Alle 3 neuen Testdateien in
+  .github/workflows/test.yml verdrahtet. Volle Suite 28/28 grün.
+Loop 5: nicht ausgeführt — läuft laut LOOPS.md erst am Sitzungsende.

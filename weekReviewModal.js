@@ -3,6 +3,8 @@
  * Exportiert showWeekReviewModal() und renderWeekReviewHtml().
  */
 
+import { buildWeekShareCanvas, shareCanvas } from './shareImage.js';
+
 const _h = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
 function _kw(sd) {
@@ -104,6 +106,7 @@ export function showWeekReviewModal(reviewData, onContinue) {
     </div>
     ${renderWeekReviewHtml(reviewData)}
     <div class="wr-continue">
+      <button class="btn btn--ghost wr-share__btn" id="wr-btn-share">📤 Teilen</button>
       <button class="btn btn--accent wr-continue__btn" id="wr-btn-continue">Weiter →</button>
     </div>
   </div>`;
@@ -118,4 +121,17 @@ export function showWeekReviewModal(reviewData, onContinue) {
       overlay.classList.remove('is-open');
       onContinue();
     }, { once: true });
+
+  overlay.querySelector('#wr-btn-share')
+    ?.addEventListener('click', async () => {
+      const { summary, highlights } = reviewData;
+      try {
+        const canvas = await buildWeekShareCanvas({
+          kw, streak: summary.streak ?? 0, pct: null,
+          effortPct: summary.goalFulfillment ?? null,
+          highlightText: highlights[0]?.text ?? null,
+        });
+        await shareCanvas(canvas, 'train-woche.png', `Wochenrückblick KW ${kw} — TRAIN`);
+      } catch (_) { /* Canvas/Share fehlgeschlagen -> stiller Abbruch, kein Crash */ }
+    });
 }

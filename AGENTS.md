@@ -1,7 +1,7 @@
 # TRAIN — Parallel Agent Regeln
 # Wird nach jedem Multi-Agent Sprint
 # automatisch aktualisiert.
-# Letzte Aktualisierung: 2026-07-14 / train-v170
+# Letzte Aktualisierung: 2026-07-20 / train-v186
 
 ---
 
@@ -20,8 +20,9 @@ Bei Zweifel: sequenziell ist sicherer.
 
 ## DATEI-ABHÄNGIGKEITS-MATRIX
 
-Erzeugt durch Parsen aller `import`-Statements in den 23 JS-Dateien im
-Repo-Root (Stand Commit 10c7686, train-v154). `sw.js` importiert nichts
+Erzeugt durch Parsen aller `import`-Statements in den 24 JS-Dateien im
+Repo-Root (Stand Commit 10c7686, train-v154; shareImage.js seit train-v186
+ergänzt). `sw.js` importiert nichts
 als ES-Modul — es ist der Service-Worker-Scope, wird über
 `registerSW.js:22` (`navigator.serviceWorker.register('./sw.js')`) als
 Ganzes registriert, nicht via `import`. `index.html` ist kein Modul,
@@ -36,7 +37,8 @@ sondern der Einstiegspunkt, der `state.js`, `backup.js`, `ui.js`,
 | movementMap.js | — | overallPerformance.js, ui.js, weeklyFocus.js |
 | progressChart.js | — | ui.js |
 | weekReview.js | setUtils.js, state.js (seit train-v170 — B44/B45-Konsolidierung: `isTrainingDay()` für `_reachableDays()`, `weekSuccessCounts()` für `_calcSuccessScore()`; beide reine, zustandslose Funktionen, kein `getState()`/`dispatch()` — Datei ist weiterhin "State-frei" im ursprünglich gemeinten Sinn) | ui.js |
-| weekReviewModal.js | — | ui.js |
+| weekReviewModal.js | shareImage.js (seit train-v186 — B68: Teilen-Button im Wochenrückblick-Modal, ruft `buildWeekShareCanvas()`/`shareCanvas()` direkt auf) | ui.js |
+| shareImage.js | — | ui.js, weekReviewModal.js (beide seit train-v186 — B68) |
 | exerciseNameCleanup.js | — | ui.js |
 | registerSW.js | — | index.html |
 | dragdrop.js | — | **kein ES-Import** — seit train-v156 aber per `<script src="./dragdrop.js">` klassisch in index.html geladen (vor dem Module-Script) und in sw.js precached. Kein JS-Modul importiert es, aber es ist jetzt aktiv ladungsrelevant, nicht mehr totes Legacy-Modul. |
@@ -50,18 +52,19 @@ sondern der Einstiegspunkt, der `state.js`, `backup.js`, `ui.js`,
 | progressInsights.js | insightEngine.js | overallPerformance.js, ui.js |
 | overallPerformance.js | insightEngine.js, consistencyUtils.js, progressInsights.js, movementMap.js | ui.js, weeklyFocus.js |
 | weeklyFocus.js | state.js, plateauDetector.js, weightRecommendation.js, setUtils.js, consistencyUtils.js, overallPerformance.js, movementMap.js | ui.js |
-| ui.js | state.js, backup.js, icons.js, triggerEngine.js, weightRecommendation.js, progressChart.js, weekReview.js, weekReviewModal.js, weeklyFocus.js, exerciseNameCleanup.js, progressInsights.js, movementMap.js, overallPerformance.js, insightEngine.js (seit train-v173), setUtils.js (seit train-v171) | — (Einstiegspunkt via index.html) |
+| ui.js | state.js, backup.js, icons.js, triggerEngine.js, weightRecommendation.js, progressChart.js, weekReview.js, weekReviewModal.js, weeklyFocus.js, exerciseNameCleanup.js, progressInsights.js, movementMap.js, overallPerformance.js, insightEngine.js (seit train-v173), setUtils.js (seit train-v171), shareImage.js (seit train-v186 — B68) | — (Einstiegspunkt via index.html) |
 | sw.js | — (kein ES-Import; referenziert Dateipfade als Precache-Liste) | — (via registerSW.js als Service Worker registriert, kein JS-Import) |
 
 **Abhängigkeitstiefe (0 = keine internen Imports, aufsteigend = mehr
 Kettenglieder bis zum Blatt):**
 ```
 Tiefe 0: state.js, icons.js, setUtils.js, movementMap.js, progressChart.js,
-         weekReviewModal.js, exerciseNameCleanup.js,
+         exerciseNameCleanup.js, shareImage.js (seit train-v186 — B68),
          registerSW.js, dragdrop.js*
 Tiefe 1: backup.js, timer.js, plateauDetector.js, weightRecommendation.js,
          weekReview.js (seit train-v170 — importiert jetzt setUtils.js/
-         state.js, war vorher Tiefe 0)
+         state.js, war vorher Tiefe 0), weekReviewModal.js (seit train-v186 —
+         importiert jetzt shareImage.js, war vorher Tiefe 0)
 Tiefe 2: insightEngine.js
 Tiefe 3: triggerEngine.js, consistencyUtils.js, progressInsights.js
 Tiefe 4: overallPerformance.js

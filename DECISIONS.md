@@ -202,4 +202,9 @@ Priorität innerhalb der Strukturkarte: Mehr-Übungen-Aggregation > Präventiver
 ### 2026-07 — scrollTop-Restore statt scrollIntoView-Guard
 **Entscheidung:** Stepper-Buttons merken scrollTop vor Dispatch und restoren nach Render-RAF.
 **Begründung:** Kein scrollIntoView() im Stepper-Pfad — Scroll-Artefakt war Layout-Reflow. scrollTop-Restore ist die sauberste Lösung.
+
+### 2026-07 — Share-Bild lokal per Canvas, kein Server-Upload (B68)
+**Entscheidung:** Share-Bilder (PR-Moment, Wochenrückblick) werden clientseitig per Canvas als PNG erzeugt und über `navigator.share`/`canShare` (Datei) geteilt, mit Download als Fallback — identisches Muster wie der bestehende JSON-Backup-Export. Kein Server-Upload, kein Drittanbieter-Bildhost/-Renderer.
+**Begründung:** Konsistent mit der "Lokal-first, kein Backend"-Grundentscheidung und der "GoatCounter = einziger externer Call"-Positionierung (LEGAL.md/SECURITY.md) — ein Bild-Hosting-Dienst wäre ein neuer externer Aufruf und ein neuer Auftragsverarbeiter-Eintrag gewesen.
+**Gilt:** Permanent für zukünftige Share-/Export-Features. Kein Server-Rendering/-Upload ohne explizite Neuentscheidung.
 **Gilt:** Permanent.

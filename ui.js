@@ -33,6 +33,7 @@ import { showWeekReviewModal, renderWeekReviewHtml } from './weekReviewModal.js'
 import { computeWeeklyFocus, computeStructuralSignals, isInRecoveryWindow, buildDecisionalBalance } from './weeklyFocus.js';
 import { findExactDuplicates, findSimilarCandidates } from './exerciseNameCleanup.js';
 import { computeErkenntnisLines, getProgressCorridorCalibration } from './progressInsights.js';
+import { buildPrShareCanvas, shareCanvas } from './shareImage.js';
 import { buildCategoryMap, resolveCategory } from './movementMap.js';
 import { computeQualityTrend, computeConsistencyTrend, computeVolumeTrend, computeBreadthProgress } from './overallPerformance.js';
 import { weekSuccessCounts } from './setUtils.js';
@@ -4086,7 +4087,7 @@ function renderSettingsTab(state) {
   <div class="settings-section">
     <div class="settings-section__title">Info</div>
     <div class="settings-row">
-      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v185</div></div>
+      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v186</div></div>
     </div>
     <div class="settings-row">
       <div>
@@ -6834,18 +6835,26 @@ export function mountApp(root) {
 function _getDayCompletionStats(di) {
   const state = getState();
   const day   = state.weeks[state.curIdx]?.days[di];
-  if (!day) return { successSets: 0, totalSets: 0, prCount: 0, pct: null, quote: '' };
+  if (!day) return { successSets: 0, totalSets: 0, prCount: 0, pct: null, quote: '', prDetails: [] };
   let successSets = 0, failSets = 0, totalSets = 0, prCount = 0;
+  const prDetails = [];
+  // B70 (Zusatzfund beim Bau des Share-Bild-Features, B68): prCount verglich
+  // bisher live gegen state.prs[ex.name] (All-Time-Wert) — zum Zeitpunkt des
+  // Tagesabschlusses ist state.prs für die heutigen Sätze aber bereits
+  // aktualisiert, wodurch `s.weight > exPR.maxWeight` für den GENAU
+  // rekordbrechenden Satz fast nie mehr zutraf (exPR.maxWeight == s.weight,
+  // nicht `>`) — derselbe Bug-Typ wie B63 (renderSetRow-Pokal), nur mit
+  // umgekehrtem Vorzeichen (Unter- statt Überzählung). Fix: s.prBadge nutzen,
+  // exakt dieselbe historisch-korrekte Quelle wie der Satz-Pokal seit B63.
   for (const ex of day.exercises ?? []) {
-    const exPR = state.prs?.[ex.name];
     for (const s of ex.sets ?? []) {
       totalSets++;
       if (s.status === 'success') {
         successSets++;
-        if (exPR && (s.weight ?? 0) > 0 && (
-          s.weight > exPR.maxWeight ||
-          (s.weight === exPR.maxWeight && (s.reps ?? 0) > (exPR.maxRepsAtMaxWeight ?? 0))
-        )) prCount++;
+        if (s.prBadge) {
+          prCount++;
+          prDetails.push({ name: ex.name, weight: s.weight ?? 0, reps: s.reps ?? 0, type: s.prBadge });
+        }
       } else if (s.status === 'fail') {
         failSets++;
       }
@@ -6889,7 +6898,7 @@ function _getDayCompletionStats(di) {
     'Erholung ist Teil des Plans.',
   ];
   const isVacation = !!(day.isVacation);
-  return { successSets, totalSets, prCount, pct, effortPct, isVacation, quote: quotes[Math.floor(Math.random() * quotes.length)] };
+  return { successSets, totalSets, prCount, pct, effortPct, isVacation, quote: quotes[Math.floor(Math.random() * quotes.length)], prDetails };
 }
 
 function _finishCompletion(di, rating, sleepHours, energyLevel) {
@@ -7096,7 +7105,7 @@ function _showDayCompletionModal(di) {
 }
 
 function _showCompletionScreen(stats) {
-  const { successSets, totalSets, prCount, pct, effortPct, isVacation, quote } = stats;
+  const { successSets, totalSets, prCount, pct, effortPct, isVacation, quote, prDetails } = stats;
   const vacQuotes = [
     'Kein Gym? Kein Problem.',
     'Urlaub vom Alltag, nicht vom Training.',
@@ -7122,12 +7131,24 @@ function _showCompletionScreen(stats) {
       ${successSets > 0 ? `<div class="day-completion-screen__sets">${successSets}/${totalSets} Sätze erfolgreich</div>` : ''}
       ${prCount > 0 ? `<div class="day-completion-screen__pr">🏆 ${prCount} neues PR${prCount > 1 ? 's' : ''}!</div>` : ''}
       ${!isVacation && effortPct !== null ? `<div class="day-completion-screen__effort">🎯 ${effortPct}% Zielerfüllung — erzielte Wdh/Zeit/Distanz ggü. Plan</div>` : ''}
+      ${prCount > 0 ? `<button type="button" class="btn btn--ghost day-completion-screen__share-btn" id="dcs-share-btn">📤 PR teilen</button>` : ''}
       <div class="day-completion-screen__quote">"${displayQuote}"</div>
     </div>`;
   document.body.appendChild(el);
   const dismiss = () => { clearTimeout(timer); el.remove(); };
   const timer   = setTimeout(dismiss, 4000);
   el.addEventListener('click', dismiss, { once: true });
+  if (prCount > 0 && prDetails?.length) {
+    el.querySelector('#dcs-share-btn')?.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      clearTimeout(timer);
+      try {
+        const canvas = await buildPrShareCanvas(prDetails);
+        await shareCanvas(canvas, 'train-pr.png', 'Neuer Rekord — TRAIN');
+      } catch (_) { /* Canvas/Share fehlgeschlagen -> stiller Abbruch, kein Crash */ }
+      if (document.body.contains(el)) setTimeout(dismiss, 2500);
+    });
+  }
 }
 
 function _showBadgeOverlay(badge) {

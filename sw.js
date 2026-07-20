@@ -16,7 +16,7 @@
  *   asset conflicts.
  */
 
-const CACHE_VERSION  = 'train-v185';
+const CACHE_VERSION  = 'train-v186';
 
 /**
  * App shell – every file the app needs to render its first frame offline.
@@ -43,6 +43,7 @@ const PRECACHE_URLS = [
   './progressChart.js',
   './weekReview.js',
   './weekReviewModal.js',
+  './shareImage.js',
   './plateauDetector.js',
   './setUtils.js',
   './exerciseNameCleanup.js',

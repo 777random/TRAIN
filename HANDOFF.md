@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-19, B65/B67 gefixt nach Nutzer-Antworten, B66 Error-Observability verbessert (train-v185, SCHEMA 31)*
-*Nächster Schritt: B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md) — braucht Name+Adresse+E-Mail vom Nutzer. B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten — GoatCounter-Dashboard zeigt jetzt die konkrete Fehlermeldung. Zusätzlich angefordert: Share-Bild-Feature (PR-Moment + Wochenrückblick) — technische Spec wird im Anschluss geschrieben, Implementierung wartet auf Bestätigung.*
+*Letzte Aktualisierung: 2026-07-20, Share-Bild-Feature (B68) implementiert + 2 Nutzer-Bugmeldungen diagnostiziert (train-v186, SCHEMA 31)*
+*Nächster Schritt: B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md) — braucht Name+Adresse+E-Mail vom Nutzer. B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten. Keine weiteren offenen Rückfragen aus diesem Sprint.*
 
 ---
 
@@ -11,14 +11,63 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v185 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v186 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
-- CSS: ?v=192 (neue `.day-completion-screen__pct-label`-Klasse, B67)
-- SCHEMA: 31 (B65-Migration: Squat/Hinge-Übungen mit unverändertem
-  Schrittweite-Standard werden auf 5kg angehoben)
+- CSS: ?v=193 (Share-Bild-Buttons, B68)
+- SCHEMA: 31 (unverändert — Share-Bild und der Streak-Fix ändern die
+  State-Shape nicht)
 - Letzter Commit: siehe `git log` (dieser Sprint noch nicht gepusht,
   siehe Sprint-Ende-Workflow).
+- **Share-Bild-Feature + 2 weitere Nutzer-Bugmeldungen (train-v186):**
+  Nutzer bestätigte die Share-Bild-Spec aus dem vorherigen Sprint
+  ("passt so, leg los") und meldete gleichzeitig 3 weitere mögliche
+  Bugs. Diagnose vor Fix (CLAUDE.md-Regel) für jeden einzeln:
+  - **Wochenrückblick öffnet sich automatisch (kein Bug):** bestätigt
+    als das bereits bestehende `AUTO_WEEK_CREATE`/`_runAutoWeekFlow()`-
+    Feature (Sprint C3, train-v110) — legt montags beim Öffnen
+    automatisch eine neue Woche an und zeigt optional den Rückblick der
+    Vorwoche (`settings.autoWeek.showReview`, per Settings abschaltbar).
+    Nutzer-Verdacht war selbst schon korrekt. In BUGS.md unter "BEWUSST
+    KEIN BUG" dokumentiert.
+  - **B69 (gefixt) — Streak zeigt 0 trotz konsistentem Training:**
+    echter Bug gefunden. `_calcCurrentStreak()` (state.js) brach die
+    Zählung sofort ab, sobald die NEUESTE Woche als 'missed' bewertet
+    wurde — eine frisch (montags automatisch) angelegte, noch leere
+    aktuelle Woche hat 0 bewertete Sätze und fiel darunter, obwohl der
+    Nutzer schlicht noch keine Chance hatte, darin zu trainieren. Fix:
+    die neueste Woche bricht die Streak nur noch, wenn ihr 7-Tage-
+    Fenster bereits abgelaufen ist (`_weekEndMs()`), sonst wird sie
+    übersprungen und die echte Streak dahinter zählt korrekt weiter.
+    Neuer Test `tests/streak_inprogress_week.spec.js` (in CI).
+  - **Schrittweite zeigt 5kg, angewendet werden nur 2,5kg (kein Bug):**
+    bestätigt als die bereits bestehende, mit dem Nutzer abgestimmte
+    B48-Entscheidung (train-v172) — bei "guter, aber nicht
+    herausragender" Form empfiehlt `getWeightRecommendation()` bewusst
+    nur den halben Schritt. Die "5kg" war vermutlich die Schrittweite-
+    EINSTELLUNG (korrekt, bestätigt B65 funktioniert), nicht die für
+    diese konkrete Woche berechnete Empfehlung. In BUGS.md unter
+    "BEWUSST KEIN BUG" dokumentiert.
+  - **B68 (Feature) — Share-Bild:** neues Modul `shareImage.js` (Tiefe
+    0, kein Import) erzeugt lokal ein 1080×1080-PNG per Canvas
+    (Theme-Farben live über `getComputedStyle()`, Bebas Neue/DM Sans
+    nach `document.fonts.ready`). Zwei Einstiegspunkte: "📤 PR teilen"
+    im Tagesabschluss-Screen (nur bei echtem PR) und "📤 Teilen" im
+    Wochenrückblick-Modal. Teilen über `navigator.share`/`canShare`
+    (identisches, bereits verifiziertes Muster wie der JSON-Backup-
+    Export in backup.js), sonst Download-Fallback — kein Server-Upload.
+    **Zusatzfund (B70):** beim Bau der PR-Bild-Datenquelle auffällig
+    gewordener, unabhängiger Bug in `_getDayCompletionStats()`s
+    `prCount` — verglich noch live gegen `state.prs` (All-Time-Wert),
+    der zum Zeitpunkt des Tagesabschlusses bereits aktualisiert ist,
+    wodurch echte Rekorde am Tagesabschluss fast nie mitgezählt wurden
+    (derselbe Bug-Typ wie B63, umgekehrtes Vorzeichen). Fix: nutzt
+    jetzt `s.prBadge`, dieselbe Quelle wie der Satz-Pokal seit B63.
+    3 neue Tests (`tests/share_image.spec.js`, in CI).
+  Volle Suite 28/28 grün (1 bekannter Flake bei `delete_all_data.spec.js`
+  unter Parallel-Last, im Retry grün — siehe LOOPS.md, kein neues
+  Problem). CACHE_VERSION train-v185→v186, CSS ?v=192→193, SCHEMA
+  unverändert 31.
 - **B65/B66/B67 abgeschlossen nach Nutzer-Antworten (train-v185):**
   Nutzer beantwortete alle 3 offenen Rückfragen aus dem vorherigen
   Sprint in einer Nachricht:

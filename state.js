@@ -423,10 +423,22 @@ function _calcCurrentStreak(weeks) {
   const sorted = [...weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
   let cur = 0;
   let lastWk = null;
+  const nowMs = Date.now();
   for (let i = sorted.length - 1; i >= 0; i--) {
     const wk     = sorted[i];
     const status = _weekTrainingStatus(wk);
-    if (status === 'missed') break;
+    if (status === 'missed') {
+      // Die neueste Woche läuft noch (ihr 7-Tage-Fenster ist noch nicht
+      // vorbei) und hat schlicht noch keine bewerteten Sätze — das ist
+      // "noch nicht dran gewesen", kein Versäumnis. Ohne diesen Sonderfall
+      // brach die Streak sofort auf 0 ab, sobald AUTO_WEEK_CREATE (z.B.
+      // montags beim Öffnen) eine neue, leere Woche anlegt — noch bevor der
+      // Nutzer überhaupt die Chance hatte, darin zu trainieren (B69).
+      // Eine bereits abgelaufene, leer gebliebene Woche bricht die Streak
+      // weiterhin wie zuvor.
+      if (i === sorted.length - 1 && nowMs <= _weekEndMs(wk)) continue;
+      break;
+    }
     if (lastWk && _streakGapBreaks(lastWk, wk)) break;
     if (status === 'completed') cur++;
     lastWk = wk;

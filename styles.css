@@ -1995,8 +1995,9 @@ details[open] > .deload-details__summary::before { content: '▾ '; }
 .wr-card__txt { font-size: 14px; color: var(--c-text); line-height: 1.45; }
 
 /* Continue button */
-.wr-continue { margin-top: var(--sp-5); }
-.wr-continue__btn { width: 100%; }
+.wr-continue { margin-top: var(--sp-5); display: flex; gap: var(--sp-3); }
+.wr-continue__btn { width: 100%; flex: 2; }
+.wr-share__btn { flex: 1; min-height: var(--touch); }
 
 /* ── RPE Nudge (Sprint 5) ─────────────────────────────────── */
 .confirm-set-wrap { position: relative; }
@@ -2123,6 +2124,10 @@ details[open] > .deload-details__summary::before { content: '▾ '; }
   font-size: 14px; color: var(--c-text-3); text-align: center;
   font-style: italic; max-width: 260px; line-height: 1.6;
   margin-top: var(--sp-2);
+}
+.day-completion-screen__share-btn {
+  min-height: var(--touch); padding: var(--sp-2) var(--sp-5);
+  font-size: 14px;
 }
 
 /* ── Effort-Score (Sprint 6) ──────────────────────────────── */
