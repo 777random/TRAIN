@@ -1616,3 +1616,87 @@ Eigentliche Aufgabe: Nutzer forderte per detaillierter Sprint-Vorlage ein
   Consent-Flag lebt bewusst in einem eigenen localStorage-Key, nicht im
   `train_v6`-State-Blob).
 Loop 5: for-advisor.txt aktualisiert (am Ende der Session).
+
+## 2026-07-20 train-v190 (B74 — Streak-Konsolidierung Wochenrückblick/Share-Bild)
+Loop 1: 41/41 grün (1 bekannter `delete_all_data.spec.js`-Flake unter
+  Parallel-Last, im Retry grün — siehe LOOPS.md, kein neues Problem) ✓
+Loop 2: aktuell ✓ — HANDOFF.md/CLAUDE.md waren nach dem vorherigen
+  Sprintabschluss bereits auf train-v189/?v=194 synchron
+Loop 3: übersprungen — Stop-Bedingung (≥15 Fixtures) mit 17 weiterhin
+  erfüllt
+Eigentliche Aufgabe: Nutzer meldete "Streak zeigt 0 bei neuer Woche", mit
+  explizitem Diagnose-zuerst-Auftrag (keine Änderungen bis das Ergebnis
+  dokumentiert ist — CLAUDE.md-Kernregel).
+  **Diagnose:** Zunächst versucht, den wörtlich gemeldeten Fall zu
+  reproduzieren — mit 3 real vollständig abgeschlossenen, lückenlosen
+  Wochen zeigte das Training-Tab-Badge korrekt weiterhin 3, auch direkt
+  nach Erstellung einer neuen leeren Woche (manuell UND simuliert via
+  AUTO_WEEK_CREATE). Das ist exakt der in B69 (train-v186) behobene Fall
+  — die Sonderbehandlung in `_calcCurrentStreak()` (state.js:422-448,
+  "die neueste Woche bricht nur, wenn ihr 7-Tage-Fenster bereits
+  abgelaufen ist") ist intakt, per frischer Reproduktion UND dem
+  bestehenden `tests/streak_inprogress_week.spec.js` (seit B69
+  durchgehend grün in CI) doppelt bestätigt.
+  Da der gemeldete Fall nicht reproduzierte, aber die Sprint-Vorlage
+  explizit nach drei potenziellen Streak-Quellen fragte (state.js,
+  weekReview.js, shareImage.js/weekReviewModal.js), alle drei systematisch
+  gegen den echten Code geprüft — dabei den TATSÄCHLICHEN Bug gefunden:
+  `weekReview.js`s `_calcStreak(sortedWeeks, week)` (Zeile 124, vor dem
+  Fix) ist eine zweite, komplett unabhängige Implementierung — zählt nur
+  `days.some(d => d.markedDone)`, ohne den 70%-'completed'-Schwellenwert
+  von `_weekTrainingStatus()` (state.js) und ohne jede
+  Kalenderlücken-Prüfung (`_streakGapBreaks()`-Äquivalent fehlt
+  komplett). Diese Funktion speist `summary.streak`, das sowohl das
+  Wochenrückblick-Modal (`_summaryRow()`) als auch — unverändert
+  durchgereicht via `shareWeekReviewImage()` (weekReviewModal.js) — das
+  Share-Bild (`buildWeekShareCanvas({streak})`) anzeigt.
+  Per 2 gezielten Reproduktionen konkret nachgewiesen (nicht nur
+  Code-Lesen, echte Playwright-Läufe mit synthetischen Daten):
+  - Teilabschluss (1 von 4 Tagen der letzten Woche erledigt): Training-
+    Tab-Badge zeigt korrekt 2, Wochenrückblick/Share-Bild fälschlich 3
+    (zählt jede angetippte Woche voll, ignoriert die 70%-Schwelle).
+  - Kalenderlücke (3 Wochen komplett ausgesetzt, real 2 Wochen davor + 2
+    danach trainiert): Training-Tab-Badge zeigt korrekt 2 (Lücke bricht
+    die Streak über `_streakGapBreaks()`), Wochenrückblick/Share-Bild
+    zeigt fälschlich 4 — zählt einfach durch die Lücke durch, da
+    `_calcStreak()` nur Array-Positionen kennt, nie Kalenderdaten
+    vergleicht. **Das Share-Bild hätte damit eine objektiv falsche,
+    potenziell öffentlich geteilte Streak-Zahl gezeigt** — der
+    schwerwiegendere der beiden Funde.
+  `state.longestStreakEver` als dritte, unabhängige Größe eingeordnet:
+  All-Time-Bestwert, monoton wachsend, speist nur die "Längste"-Anzeige
+  im Fortschritt-Tab, kein Bug, aber nicht mit dem aktuellen Streak zu
+  verwechseln.
+  Diagnose-Ergebnis vor dem Fix dokumentiert und dem Nutzer als
+  Zwischenantwort gemeldet (wie von der Sprint-Vorlage gefordert).
+  **Fix (nach Diagnose):** `weekReview.js`s `_calcStreak()` delegiert
+  jetzt vollständig an `calcCurrentStreak()` (state.js) — neuer Import
+  `calcCurrentStreak` aus state.js, analog zum bereits bestehenden
+  `isTrainingDay()`-Import (beides reine, zustandslose Funktionen, keine
+  `getState()`/`dispatch()`-Kopplung, Datei bleibt "State-frei" im
+  ursprünglich gemeinten Sinn). `calcCurrentStreak(sortedWeeks.slice(0,
+  idx + 1))` liefert exakt "Streak-Stand zum Zeitpunkt dieser Woche" —
+  identische Semantik wie die Training-Tab-Badge, inklusive der
+  B69-Sonderbehandlung für eine noch laufende, unvollständige neueste
+  Woche in der Slice. Konsolidiert zwei unabhängige Implementierungen auf
+  eine einzige Quelle, dasselbe etablierte Muster wie B44/B45/B47.
+  Beide zuvor divergenten Reproduktions-Szenarien zu permanenten Tests
+  ausgebaut (`tests/streak_weekreview_consistency.spec.js`, in CI) —
+  beide liefern jetzt identische Werte in Training-Tab UND
+  Wochenrückblick/Share-Bild.
+  **Aufgabe 2 (Share-Bild-Feinschliff, dieselbe Sprint-Vorlage) geprüft,
+  keine Änderung vorgenommen:** alle 3 angeforderten Korrekturen waren
+  bereits erfüllt, per Code-Lesen UND Screenshot verifiziert — Hook-Satz
+  ist bereits zentriert (`ctx.textAlign='center'` vor jedem
+  `fillText(..., SIZE/2, hookY)`, seit B71), Footer bereits dynamisch
+  positioniert ohne nennenswerten Leerraum (Bottom-Marge ~117px, kein
+  Vergleich zu den echten ~300px-Leerraum-Funden aus B71/B73), Stats-
+  Kacheln bereits 120px hoch — größer als die in der Vorlage angeforderten
+  100px (die Vorlage ging fälschlich von einer alten 88px-Basis aus).
+  Die Vorlagen-Pixelwerte blind zu übernehmen hätte teils eine
+  Verschlechterung bedeutet (Kacheln 120→100px trotz "größer machen"-
+  Ziel) — keine Änderung an shareImage.js vorgenommen, stattdessen
+  dokumentiert warum.
+  CACHE_VERSION train-v189→v190, CSS ?v=194 unverändert (kein CSS
+  geändert), SCHEMA unverändert 31. Volle Suite 41/41 grün.
+Loop 5: for-advisor.txt aktualisiert (am Ende der Session).

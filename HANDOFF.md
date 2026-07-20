@@ -1,5 +1,5 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-20, Share-Bild v3 — Favoriten-Kaskade + PR-Moment-Toast + Datenschutz-Hinweis (B73, train-v189, SCHEMA 31)*
+*Letzte Aktualisierung: 2026-07-20, Streak-Konsolidierung Wochenrückblick/Share-Bild (B74, train-v190, SCHEMA 31)*
 *Nächster Schritt: B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md) — braucht Name+Adresse+E-Mail vom Nutzer. B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten. Keine weiteren offenen Rückfragen aus diesem Sprint.*
 
 ---
@@ -11,13 +11,38 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v189 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v190 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
-- CSS: ?v=194 (neue `.pr-moment-toast`/`.pr-moment-toast__btn`-Klassen, B73)
+- CSS: ?v=194 (unverändert — B74 änderte kein CSS, siehe unten)
 - SCHEMA: 31 (unverändert)
 - Letzter Commit: siehe `git log` (dieser Sprint noch nicht gepusht,
   siehe Sprint-Ende-Workflow).
+- **B74 — Streak-Konsolidierung (train-v190):** Nutzer meldete "Streak
+  zeigt 0 bei neuer Woche", mit explizitem Diagnose-zuerst-Auftrag (keine
+  Änderungen). Der wörtliche Fall reproduzierte NICHT — das ist der
+  bereits in B69 (train-v186) behobene Bug, Fix intakt (per frischer
+  Reproduktion UND dem bestehenden `streak_inprogress_week.spec.js`
+  bestätigt). **Tatsächlich gefunden:** `weekReview.js`s eigenständige
+  `_calcStreak()` (nur `days.some(d => d.markedDone)`, kein Schwellenwert,
+  keine Kalenderlücken-Prüfung) wich vom korrekten Training-Tab-Badge
+  (`calcCurrentStreak()`, state.js) ab — speist sowohl das Wochenrückblick-
+  Modal als auch das Share-Bild. Konkret nachgewiesen: Teilabschluss (1/4
+  Tage) → Training-Tab 2, Wochenrückblick/Share-Bild fälschlich 3;
+  Kalenderlücke (3 Wochen ausgesetzt) → Training-Tab korrekt 2,
+  Wochenrückblick/Share-Bild fälschlich 4 (zählt durch die Lücke durch —
+  das Share-Bild hätte eine objektiv falsche Zahl öffentlich geteilt).
+  **Fix:** `_calcStreak()` delegiert jetzt an `calcCurrentStreak()` (state.js,
+  analog zum bestehenden `isTrainingDay()`-Import), konsolidiert zwei
+  Implementierungen auf eine (Muster wie B44/B45/B47). 2 neue Tests
+  (`tests/streak_weekreview_consistency.spec.js`, in CI).
+  **Zusätzlich geprüft (Share-Bild-Feinschliff aus derselben Sprint-
+  Vorlage):** alle 3 angeforderten Korrekturen (Hook-Satz zentrieren,
+  Leerraum unten reduzieren, Stats-Kacheln vergrößern) waren bereits
+  erfüllt — keine Änderung an shareImage.js nötig, teils hätten die
+  Vorlagen-Werte sogar eine Verschlechterung bedeutet (Kacheln sind
+  bereits 120px, größer als die angeforderten 100px). CACHE_VERSION
+  train-v189→v190, CSS/SCHEMA unverändert. Volle Suite 41/41 grün.
 - **B73 — Share-Bild v3: Favoriten-Kaskade, Hook-Satz im Fallback,
   Retina-Deckelung, PR-Moment-Toast, Datenschutz-Hinweis (train-v189):**
   Nutzer bestätigte eine vorab vorgelegte technische Spec ("Bestätigung

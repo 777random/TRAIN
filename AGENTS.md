@@ -1,7 +1,7 @@
 # TRAIN — Parallel Agent Regeln
 # Wird nach jedem Multi-Agent Sprint
 # automatisch aktualisiert.
-# Letzte Aktualisierung: 2026-07-20 / train-v189
+# Letzte Aktualisierung: 2026-07-20 / train-v190
 
 ---
 
@@ -36,7 +36,7 @@ sondern der Einstiegspunkt, der `state.js`, `backup.js`, `ui.js`,
 | setUtils.js | — | plateauDetector.js, weeklyFocus.js, weightRecommendation.js, weekReview.js (seit train-v170, siehe unten), ui.js (seit train-v171 — B45-Konsolidierung: `weekSuccessCounts()`) |
 | movementMap.js | — | overallPerformance.js, ui.js, weeklyFocus.js |
 | progressChart.js | — | ui.js |
-| weekReview.js | setUtils.js, state.js (seit train-v170 — B44/B45-Konsolidierung: `isTrainingDay()` für `_reachableDays()`, `weekSuccessCounts()` für `_calcSuccessScore()`; beide reine, zustandslose Funktionen, kein `getState()`/`dispatch()` — Datei ist weiterhin "State-frei" im ursprünglich gemeinten Sinn) | ui.js |
+| weekReview.js | setUtils.js, state.js (seit train-v170 — B44/B45-Konsolidierung: `isTrainingDay()` für `_reachableDays()`, `weekSuccessCounts()` für `_calcSuccessScore()`; seit train-v190/B74 zusätzlich `calcCurrentStreak()` für `_calcStreak()`; alle reine, zustandslose Funktionen, kein `getState()`/`dispatch()` — Datei ist weiterhin "State-frei" im ursprünglich gemeinten Sinn) | ui.js |
 | weekReviewModal.js | shareImage.js (seit train-v186 — B68: Teilen-Button im Wochenrückblick-Modal, ruft `buildWeekShareCanvas()`/`shareCanvas()` direkt auf), insightEngine.js (seit train-v187 — B71: `getSortedWeeks`/`exWeightHistory` für die Sparkline-Datenquelle) | ui.js |
 | shareImage.js | — | ui.js, weekReviewModal.js (beide seit train-v186 — B68) |
 | exerciseNameCleanup.js | — | ui.js |

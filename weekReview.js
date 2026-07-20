@@ -6,7 +6,7 @@
  */
 
 import { weekSuccessCounts } from './setUtils.js';
-import { isTrainingDay } from './state.js';
+import { isTrainingDay, calcCurrentStreak } from './state.js';
 
 function _kw(sd) {
   const d   = new Date(sd + 'T12:00:00');
@@ -121,15 +121,24 @@ function _calcSuccessScore(week) {
   return total > 0 ? pct : null;
 }
 
+/**
+ * B74: delegiert vollständig an calcCurrentStreak() (state.js) statt einer
+ * eigenen, einfacheren Logik — die frühere eigenständige Implementierung
+ * (nur `days.some(d => d.markedDone)`, kein Schwellenwert, keine
+ * Kalenderlücken-Prüfung) wich vom Training-Tab-Badge ab: zählte
+ * Teilabschlüsse unter der 70%-'completed'-Schwelle mit UND zählte durch
+ * mehrwöchige Trainingspausen einfach durch (kein `_streakGapBreaks()`-
+ * Äquivalent). Betraf sowohl den Wochenrückblick als auch das davon
+ * gespeiste Share-Bild — Letzteres hätte dadurch eine objektiv falsche
+ * Streak-Zahl öffentlich geteilt. `slice(0, idx+1)` liefert exakt "der
+ * Streak-Stand zum Zeitpunkt dieser Woche", identische Semantik wie die
+ * Training-Tab-Badge (inkl. B69: eine noch laufende, unvollständige
+ * neueste Woche in der Slice bricht die Streak nicht sofort).
+ */
 function _calcStreak(sortedWeeks, week) {
   const idx = sortedWeeks.findIndex(w => w === week || w.startDate === week.startDate);
   if (idx < 0) return 0;
-  let streak = 0;
-  for (let i = idx; i >= 0; i--) {
-    if (sortedWeeks[i].days.some(d => d.markedDone)) streak++;
-    else break;
-  }
-  return streak;
+  return calcCurrentStreak(sortedWeeks.slice(0, idx + 1));
 }
 
 function _findFailHighlight(week) {
