@@ -43,7 +43,11 @@ test('Migration v31: Squat/Hinge-Schrittweite angehoben, andere Übungen/Nutzer-
   expect(byName['Kreuzheben']).toBe(1.25);
   expect(byName['Bankdrücken']).toBe(2.5);
 
+  // >= statt === 31: prüft nur, dass die v30->v31-Migration selbst gelaufen
+  // ist (Kernanliegen dieses Tests) — nicht die exakte Endversion, die sich
+  // mit jeder neuen Migration (zuletzt B76, SCHEMA 32) sonst hier mit
+  // ändern müsste, ohne dass dieser Test inhaltlich etwas damit zu tun hat.
   const schemaVersion = await page.evaluate(() => JSON.parse(localStorage.getItem('train_v6')).meta.schemaVersion);
-  expect(schemaVersion).toBe(31);
+  expect(schemaVersion).toBeGreaterThanOrEqual(31);
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
 });

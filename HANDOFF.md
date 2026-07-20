@@ -1,5 +1,5 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-20, Toast beim Auto-Backup (B75, train-v191, SCHEMA 31)*
+*Letzte Aktualisierung: 2026-07-20, Pre-Session Check-in + Session Briefing (B76, train-v192, SCHEMA 32)*
 *Nächster Schritt: B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md) — braucht Name+Adresse+E-Mail vom Nutzer. B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten. Keine weiteren offenen Rückfragen aus diesem Sprint.*
 
 ---
@@ -11,13 +11,39 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v191 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v192 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
-- CSS: ?v=194 (unverändert — B75 änderte kein CSS)
-- SCHEMA: 31 (unverändert)
+- CSS: ?v=195 (neue `.session-checkin-card`/`.session-briefing-card`-Klassen)
+- SCHEMA: 32 (neue `day.sessionCheckIn`/`sessionModifier`-Felder, v31→v32)
 - Letzter Commit: siehe `git log` (dieser Sprint noch nicht gepusht,
   siehe Sprint-Ende-Workflow).
+- **B76 — Pre-Session Check-in + Session Briefing (train-v192):** Nutzer-
+  Anfrage, vorab per technischer Spec abgestimmt und bestätigt ("passt so,
+  leg los"). Vorlage enthielt mehrere Diskrepanzen zum echten Code, per
+  `AskUserQuestion` geklärt statt stillschweigend übernommen: (1)
+  `day.energyLevel` existiert bereits — kein neues `sessionEnergyPost`-Feld,
+  bestehendes Feld wiederverwendet. (2) `getWeightRecommendation()` betrifft
+  nur die Empfehlung für die NÄCHSTE Woche, nie die bereits gesetzten
+  Gewichte der laufenden Session — die -10%-Reduktion mutiert stattdessen
+  `ex.sets[].weight` direkt im Reducer. (3) Kein `'in_progress'`-Satzstatus
+  existiert. (4) SCHEMA stand bereits bei 31, nicht 30 — Migration daher
+  v31→v32. **Umsetzung:** Zwei-Tap-Check-in (Schlaf + Energie, Button-Grid,
+  `_checkInDraft` Map, automatischer Dispatch nach beiden Feldern, kein
+  Zwischenstand-Persistieren) erscheint nur am heutigen, noch offenen,
+  nicht-Urlaubstag, solange Settings-Toggle "Session Coach" (neu, Default
+  an) aktiv ist. Danach (oder direkt bei "Überspringen") ersetzt ein
+  auf-/zuklappbares Briefing (`_renderSessionBriefing()`) den Check-in:
+  Nachricht je nach Schlaf/Energie-Kombination, Fokus-Übung (erste Squat/
+  Hinge/Push-Übung des Tages via bestehendem movementMap.js), RPE-Ziel
+  relativ zum Vorwochen-Schnitt (±1 je nach Modifier). Bei `reduced`
+  (schlecht geschlafen ODER wenig Energie) reduziert der neue
+  `SESSION_CHECKIN_SET`-Reducer alle noch `pending` Gewichtssätze der
+  heutigen Übungen einmalig um 10%, gerundet auf die pro-Übung-
+  Schrittweite. Verifiziert per 6 neuen Tests (`tests/session_coach.spec.js`,
+  in CI) + 2 Screenshots (Check-in-UI, Briefing nach "gut geschlafen/hohe
+  Energie"). CACHE_VERSION train-v191→v192, CSS ?v=194→195, SCHEMA 31→32.
+  Volle Suite 49/49 grün.
 - **B75 — Toast beim Auto-Backup, kein Trigger-Bug (train-v191):** Nutzer
   meldete, ein Auto-Backup-Download erscheine beim Klick auf "Teilen" im
   Fortschritt-Tab. Diagnose zuerst (keine Änderungen): 5 realistische

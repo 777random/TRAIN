@@ -1758,4 +1758,87 @@ Eigentliche Aufgabe: Nutzer meldete, ein Auto-Backup-JSON-Download
   im Fortschritt-Tab löst weiterhin nachweislich keinen Backup-Download
   aus. CACHE_VERSION train-v190→v191, CSS/SCHEMA unverändert. Volle
   Suite 43/43 grün.
+
+## 2026-07-20 train-v192 (B76 — Pre-Session Check-in + Session Briefing — SCHEMA 32)
+Loop 1: 49/49 grün ✓ (43 bestehend + 6 neue `session_coach.spec.js`)
+Loop 2: aktuell ✓ — HANDOFF.md/CLAUDE.md waren nach dem vorherigen
+  Sprintabschluss bereits auf train-v191/?v=194 synchron
+Loop 3: übersprungen — Stop-Bedingung (≥15 Fixtures) mit 17 weiterhin
+  erfüllt
+Eigentliche Aufgabe: Nutzer-Anfrage ("SPRINT 1 — Pre-Session Check-in +
+  Session Briefing") mit ausführlicher Vorlage (Teile A-E, Constraints,
+  Akzeptanzkriterien) — Trainings-Empfehlungen sollten den tagesaktuellen
+  Zustand (Schlaf/Energie) einbeziehen statt nur auf Vorwochendaten zu
+  basieren.
+  **Vorlage vor der Umsetzung gegen den echten Code geprüft, 4
+  Diskrepanzen gefunden und offengelegt statt stillschweigend
+  übernommen:** (1) `day.energyLevel` existiert bereits (gesetzt im
+  bestehenden Tagesabschluss-Flow, `_finishCompletion()`) — die Vorlage
+  wollte ein neues, redundantes `sessionEnergyPost`-Feld samt eigener UI
+  einführen (Teil D der Vorlage). (2) `getWeightRecommendation()`
+  (weightRecommendation.js) berechnet ausschließlich die
+  Steigerungsempfehlung für die NÄCHSTE Woche (genutzt vom "Neue
+  Woche"-Chip + 3 Coach-Insight-Triggern) — nie die bereits gesetzten
+  Gewichte der laufenden Session; die Vorlage nahm fälschlich an, diese
+  Funktion ließe sich für die "-10% heute"-Reduktion nutzen. (3) Kein
+  `'in_progress'`-Satzstatus existiert (nur `'pending'|'success'|'fail'`).
+  (4) SCHEMA_VERSION stand bereits bei 31, nicht 30 wie die Vorlage
+  annahm — neue Migration daher v31→v32, nicht v30→v31.
+  Zwei genuine Produktentscheidungen per `AskUserQuestion` geklärt: (1)
+  bestehendes `energyLevel` wiederverwenden statt neuem Feld — bestätigt.
+  (2) Reducer mutiert `ex.sets[].weight` direkt statt
+  `getWeightRecommendation()` zweckzuentfremden — bestätigt ("empfohlen").
+  Korrigierte technische Spec vorgelegt, Nutzer bestätigte ("passt so,
+  leg los").
+  **Umsetzung:**
+  - state.js: Migration v31→v32 (`day.sessionCheckIn`/`sessionModifier`
+    als `null` für bestehende Tage), `DAY_ADD`/`DAY_ADD_CLONE`-Reducer
+    um beide Felder ergänzt, `_resetClonedDays()` setzt sie beim
+    Wochen-Klonen zurück (Vorwoche-Check-in darf nie mitklonen). Neuer
+    Settings-Default `sessionCoach: true` (Muster: `hideStreakBadge`) in
+    `STATE_INIT` UND `migrate()`. Neuer Reducer `SESSION_CHECKIN_SET`
+    wendet den von ui.js bereits bestimmten Modifier nur mechanisch an
+    (keine eigene Sleep/Energie→Modifier-Entscheidung im Reducer) — bei
+    `reduced` werden alle noch `pending`-Sätze der heutigen Übungen
+    einmalig um 10% reduziert, gerundet auf die pro-Übung-Schrittweite.
+  - ui.js: `_isTodayDay()` (wiederverwendet `_dayDate()`),
+    `_buildSessionBriefing()` (reine Sleep/Energie→Modifier/Text-Logik),
+    `_findFocusExercise()` (erste Squat/Hinge/Push-Übung in
+    Tages-Reihenfolge via bestehendem movementMap.js), `_lastWeekAvgRpe()`
+    für die RPE-Ziel-Verschiebung. Zwei-Tap-Check-in-UI
+    (`_renderSessionCheckIn()`, Button-Grid Schlaf+Energie, Draft pro Tag
+    in `_checkInDraft` Map, automatischer Dispatch sobald beide Felder
+    gesetzt sind, kein Persistieren des Zwischenstands). Briefing-UI
+    (`_renderSessionBriefing()`, auf-/zuklappbar, Standard-Zustand an
+    `sessionStartTs` gekoppelt). Check-in/Briefing nur am heutigen, noch
+    offenen, nicht-Urlaubstag UND wenn `settings.sessionCoach !== false`.
+    Neuer Settings-Toggle "Session Coach" (`tog()`-Helper, Muster
+    `hideStreakBadge`).
+  - styles.css: neue `.session-checkin-card`/`.session-briefing-card`-
+    Klassen (Button-Grid, Toggle-Karte, Fokus-Block).
+  - Test-Fund während der Umsetzung: `tests/smart_weightstep.spec.js`
+    prüfte `schemaVersion === 31` hart — durch die neue v32-Migration ein
+    erwarteter, nicht inhaltlicher Fehlschlag. Assertion auf
+    `toBeGreaterThanOrEqual(31)` verallgemeinert (prüft weiterhin den
+    eigentlichen Testgegenstand — dass die v30→v31-Migration gelaufen
+    ist — ohne bei jeder künftigen neuen Migration erneut brechen zu
+    müssen).
+  6 neue Tests (`tests/session_coach.spec.js`, in CI): Check-in-
+  Sichtbarkeit + Migration auf SCHEMA 32, Zwei-Tap-Auto-Submit +
+  Persistenz über Reload, "Überspringen"-Pfad, "schlecht geschlafen"→
+  `reduced`-Modifier inkl. korrekter -10%-Gewichtsrundung auf die
+  Übungs-Schrittweite und RPE-Ziel-Verschiebung (-1), Settings-Toggle
+  blendet beides aus, Settings-Toggle selbst schaltbar. 2 Screenshots
+  verifiziert (Check-in-UI, Briefing nach "gut geschlafen/hohe Energie" —
+  zeigt korrekt "Optimale Voraussetzungen — heute Steigerung versuchen"
+  + Fokus-Übung "Kniebeuge, 80 kg × 2×5"). CACHE_VERSION train-v191→v192,
+  CSS ?v=194→195, SCHEMA_VERSION 31→32. Volle Suite 49/49 grün.
+  Dokumentation aktualisiert: BUGS.md (neuer Eintrag B76), DECISIONS.md
+  (2 neue Einträge unter TECHNISCH für die beiden per `AskUserQuestion`
+  getroffenen Entscheidungen), HANDOFF.md (STAND-Sektion), CLAUDE.md
+  (Versionsstand-Header + Feature-Status-Tabelle + State-Shape-Beispiel),
+  AGENTS.md (Datums-/Versions-Header — Abhängigkeits-Matrix selbst
+  unverändert, keine neuen Cross-Datei-Imports), `.github/workflows/
+  test.yml` (neuer CI-Schritt für `session_coach.spec.js`).
+Loop 5: for-advisor.txt aktualisiert (17. Fassung, v192/SCHEMA 32)
 Loop 5: for-advisor.txt aktualisiert (am Ende der Session).

@@ -139,6 +139,17 @@ let _rpeNudgeKey = null;
 /** Auto-dismiss timer for the RPE nudge. */
 let _rpeNudgeTimer = null;
 
+// B76: Pre-Session Check-in — Entwurf pro Tag (di → {sleep, energyPre}),
+// rein UI-lokal bis beide Felder gesetzt sind (dann dispatch + verworfen).
+// Kein Persistieren des Zwischenstands — ein Reload verliert einen
+// halb ausgefüllten Check-in, das ist bewusst akzeptiert (kein Datenverlust
+// im eigentlichen Sinn, nur ein UI-Zwischenstand).
+let _checkInDraft = new Map();
+/** Tage (di), für die der Check-in in dieser Sitzung übersprungen wurde. */
+let _skippedCheckIn = new Set();
+/** Manuelles Auf-/Zuklappen des Briefings pro Tag (di → boolean), überschreibt den Default. */
+let _briefingExpandedOverride = new Map();
+
 /** Last rendered week index – used to detect week navigation. */
 let _lastRenderedCurIdx = null;
 
@@ -1051,6 +1062,120 @@ function _prevWeekBanner(state, wk, di) {
   </div>`;
 }
 
+/** Ist (wk, di) das heutige Kalenderdatum? Nutzt den bestehenden _dayDate()-Helfer. */
+function _isTodayDay(wk, di) {
+  return _dayDate(wk, di).toDateString() === new Date().toDateString();
+}
+
+/**
+ * B76: Kombinations-Matrix Schlaf × Energie → Trainingsempfehlung für heute.
+ * Reine Funktion. sleep/energyPre defaulten auf 'medium' (kein Check-in
+ * bzw. übersprungen) — ergibt dann immer modifier 'normal'. Der Reducer
+ * (state.js, SESSION_CHECKIN_SET) wendet den zurückgegebenen modifier nur
+ * noch mechanisch an, die Entscheidung selbst passiert ausschließlich hier.
+ */
+function _buildSessionBriefing(day) {
+  const sleep  = day.sessionCheckIn?.sleep ?? 'medium';
+  const energy = day.sessionCheckIn?.energyPre ?? 'medium';
+
+  if (sleep === 'poor' || energy === 'low') {
+    return { modifier: 'reduced', message: 'Heute reduzieren — Gewichte -10%, nur Hauptübungen, RPE-Ziel max 7' };
+  }
+  if ((sleep === 'good' || sleep === 'great') && energy === 'high') {
+    return { modifier: 'optimal', message: 'Optimale Voraussetzungen — heute Steigerung versuchen' };
+  }
+  if ((sleep === 'good' || sleep === 'great') && energy === 'medium') {
+    return { modifier: 'normal', message: 'Gute Basis — Training wie geplant' };
+  }
+  return { modifier: 'normal', message: 'Normales Training — Ziele wie geplant' };
+}
+
+/** Erste nicht-archivierte Compound-Übung des Tages (Squat/Hinge/Push) für das Briefing. */
+function _findFocusExercise(day, customExercises) {
+  const catMap = buildCategoryMap(customExercises ?? []);
+  for (const ex of day.exercises ?? []) {
+    if (ex.archived) continue;
+    const cat = resolveCategory(ex.name, catMap);
+    if (cat === 'Squat' || cat === 'Hinge' || cat === 'Push') return ex;
+  }
+  return null;
+}
+
+/** Ø RPE der success-Sätze derselben Übung in der chronologisch vorigen Woche, oder null. */
+function _lastWeekAvgRpe(exName, wk, state) {
+  const sorted = [...state.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
+  const idx = sorted.findIndex(w => w === wk || w.startDate === wk.startDate);
+  if (idx <= 0) return null;
+  const rpes = [];
+  for (const d of sorted[idx - 1].days ?? [])
+    for (const ex of d.exercises ?? [])
+      if (ex.name === exName)
+        for (const s of ex.sets ?? [])
+          if (s.status === 'success' && s.rpe != null) rpes.push(s.rpe);
+  return rpes.length ? rpes.reduce((a, b) => a + b, 0) / rpes.length : null;
+}
+
+function _renderSessionCheckIn(di) {
+  const draft = _checkInDraft.get(di) ?? { sleep: null, energyPre: null };
+  const sleepOpts  = [
+    { val: 'poor',   icon: '😴', label: '<6h' },
+    { val: 'medium', icon: '😐', label: '6-7h' },
+    { val: 'good',   icon: '🙂', label: '7-8h' },
+    { val: 'great',  icon: '💪', label: '>8h' },
+  ];
+  const energyOpts = [
+    { val: 'low',    icon: '🔋', label: 'Niedrig' },
+    { val: 'medium', icon: '⚡', label: 'Okay' },
+    { val: 'high',   icon: '🚀', label: 'Hoch' },
+  ];
+  const _btn = (o, field) => `
+    <button type="button" class="session-checkin-btn${draft[field] === o.val ? ' is-selected' : ''}"
+      data-action="session-checkin-select" data-di="${di}" data-field="${field}" data-val="${o.val}">
+      <span class="session-checkin-btn__icon" aria-hidden="true">${o.icon}</span><span class="session-checkin-btn__label">${o.label}</span>
+    </button>`;
+  return `
+  <div class="session-checkin-card" data-di="${di}">
+    <div class="session-checkin-card__headline">WIE STARTEST DU HEUTE?</div>
+    <div class="session-checkin-card__row" role="group" aria-label="Schlaf">
+      ${sleepOpts.map(o => _btn(o, 'sleep')).join('')}
+    </div>
+    <div class="session-checkin-card__label">Energie heute</div>
+    <div class="session-checkin-card__row" role="group" aria-label="Energie">
+      ${energyOpts.map(o => _btn(o, 'energyPre')).join('')}
+    </div>
+    <button type="button" class="session-checkin-skip" data-action="session-checkin-skip" data-di="${di}">Überspringen →</button>
+  </div>`;
+}
+
+function _renderSessionBriefing(di, day, wk, state) {
+  const { message, modifier } = _buildSessionBriefing(day);
+  const focusEx = _findFocusExercise(day, state.customExercises);
+  let focusHtml = '';
+  if (focusEx) {
+    const lastRpe = _lastWeekAvgRpe(focusEx.name, wk, state);
+    let rpeText = '';
+    if (lastRpe != null) {
+      let targetRpe = modifier === 'optimal' ? lastRpe + 0.5 : modifier === 'reduced' ? lastRpe - 1 : lastRpe;
+      targetRpe = Math.max(1, Math.min(10, Math.round(targetRpe * 2) / 2));
+      rpeText = ` @ RPE ${targetRpe}`;
+    }
+    const w = focusEx.sets?.[0]?.weight;
+    const weightText = w != null ? `${w} kg × ` : '';
+    const setsReps = `${focusEx.targetSets ?? focusEx.sets?.length ?? '–'}×${focusEx.targetReps ?? '–'}`;
+    focusHtml = `<div class="session-briefing-card__focus">Fokus heute: ${h(focusEx.name)}<br>Ziel: ${weightText}${setsReps}${rpeText}</div>`;
+  }
+  const defaultExpanded = !day.sessionStartTs;
+  const isExpanded = _briefingExpandedOverride.has(di) ? _briefingExpandedOverride.get(di) : defaultExpanded;
+  return `
+  <div class="session-briefing-card${isExpanded ? '' : ' is-collapsed'}" data-di="${di}">
+    <button type="button" class="session-briefing-card__toggle" data-action="toggle-session-briefing" data-di="${di}" aria-expanded="${isExpanded}">
+      <span class="session-briefing-card__icon" aria-hidden="true">📋</span>
+      <span class="session-briefing-card__msg">${h(message)}</span>
+    </button>
+    ${focusHtml}
+  </div>`;
+}
+
 function renderDayBody(wk, di, state) {
   const day      = wk.days[di];
   const locked   = !!day.locked;
@@ -1123,9 +1248,23 @@ function renderDayBody(wk, di, state) {
   </div>
 </div>`;
 
+  // B76: Pre-Session Check-in + Briefing — nur für den heutigen, noch
+  // offenen Tag, und nur wenn der Nutzer den Session Coach nicht
+  // deaktiviert hat. Check-in zeigt sich, solange weder eingegeben noch
+  // übersprungen wurde; danach (oder sofort bei Skip) das Briefing.
+  let sessionCoachHtml = '';
+  if (!isVacDay && !done && state.settings?.sessionCoach !== false && _isTodayDay(wk, di)) {
+    if (!day.sessionCheckIn && !_skippedCheckIn.has(di)) {
+      sessionCoachHtml = _renderSessionCheckIn(di);
+    } else {
+      sessionCoachHtml = _renderSessionBriefing(di, day, wk, state);
+    }
+  }
+
   return `
     ${_renderRitualAnchor(state, wk, di)}
     ${isVacDay ? '<div class="day-vacation-banner">🏖 Urlaubstag — unterbricht deinen Trainingsrhythmus nicht</div>' : ''}
+    ${sessionCoachHtml}
     ${noteBlock}
     ${warmupBlock}
     <div data-ex-list="${di}">${exHtml}</div>
@@ -3858,6 +3997,7 @@ function renderSettingsTab(state) {
     ${tog('rpeEnabled', 'RPE anzeigen', 'Rate of Perceived Exertion — Anstrengungsgrad pro Satz')}
     ${tog('autoEval', 'Automatische Satz-Bewertung', 'Satz wird bewertet sobald du die Wdh-Zahl einträgst und das Feld verlässt.')}
     ${tog('hideStreakBadge', 'Streak-Anzeige ausblenden', '"X Wochen konsistentes Training" im Trainings-Tab verstecken')}
+    ${tog('sessionCoach', 'Session Coach', 'Echtzeit-Feedback während des Trainings (Pre-Session Check-in + Briefing)')}
     <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:var(--sp-2)">
       <div>
         <div class="settings-row__label">Kleinstmögliche Steigerung</div>
@@ -4095,7 +4235,7 @@ function renderSettingsTab(state) {
   <div class="settings-section">
     <div class="settings-section__title">Info</div>
     <div class="settings-row">
-      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v191</div></div>
+      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v192</div></div>
     </div>
     <div class="settings-row">
       <div>
@@ -5730,6 +5870,44 @@ function _handleClick(e) {
 
     case 'adopt-prev-reps': {
       dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'reps', value: +el.dataset.value });
+      break;
+    }
+
+    // B76: Pre-Session Check-in
+    case 'session-checkin-select': {
+      const _ciDi    = +di;
+      const _ciField = el.dataset.field; // 'sleep' | 'energyPre'
+      const _ciVal   = el.dataset.val;
+      const _draft   = { ..._checkInDraft.get(_ciDi) ?? { sleep: null, energyPre: null }, [_ciField]: _ciVal };
+      _checkInDraft.set(_ciDi, _draft);
+      if (_draft.sleep && _draft.energyPre) {
+        // Zwei Taps (ein Feld pro Kategorie) reichen — Entscheidungslogik
+        // lebt allein in _buildSessionBriefing(), der Reducer wendet den
+        // gelieferten modifier nur noch mechanisch an.
+        const _ciWk  = getState().weeks[getState().curIdx];
+        const _ciDay = { ..._ciWk.days[_ciDi], sessionCheckIn: { sleep: _draft.sleep, energyPre: _draft.energyPre } };
+        const { modifier } = _buildSessionBriefing(_ciDay);
+        dispatch(A.SESSION_CHECKIN_SET, { di: _ciDi, sleep: _draft.sleep, energyPre: _draft.energyPre, modifier });
+        _checkInDraft.delete(_ciDi);
+      } else {
+        scheduleRender();
+      }
+      break;
+    }
+    case 'session-checkin-skip': {
+      _skippedCheckIn.add(+di);
+      _checkInDraft.delete(+di);
+      scheduleRender();
+      break;
+    }
+    case 'toggle-session-briefing': {
+      const _bDi = +di;
+      const _bWk = getState().weeks[getState().curIdx];
+      const _bDay = _bWk?.days[_bDi];
+      const _bDefault = !_bDay?.sessionStartTs;
+      const _bCurrent = _briefingExpandedOverride.has(_bDi) ? _briefingExpandedOverride.get(_bDi) : _bDefault;
+      _briefingExpandedOverride.set(_bDi, !_bCurrent);
+      scheduleRender();
       break;
     }
 

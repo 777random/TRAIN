@@ -26,7 +26,7 @@ import { buildCategoryMap, resolveCategory } from './movementMap.js';
 
 export const STORAGE_KEY        = 'train_v6';
 export const STORAGE_KEY_SHADOW = 'train_v6_shadow';
-export const SCHEMA_VERSION     = 31;
+export const SCHEMA_VERSION     = 32;
 
 // B65: Squat/Hinge sind die schweren Grundübungs-Kategorien (Kniebeuge/
 // Kreuzheben-Varianten), bei denen 2.5kg-Schritte in der Praxis zu klein
@@ -213,6 +213,7 @@ function buildDefaultState() {
       maxSessionMs:                   10800000, // 3h default
       autoStartPauseTimer:            true,
       hideStreakBadge:                false, // B60: Streak-Badge im Trainings-Tab optional ausblendbar
+      sessionCoach:                   true,  // B76: Pre-Session Check-in + Briefing
       dismissedNamePairs:             [], // [nameA, nameB][] – sortiert, getrimmt, lowercase
       autoWeek: {
         enabled:          false, // Hauptschalter automatische Wochenerstellung
@@ -919,6 +920,17 @@ function migrate(raw) {
     raw.meta = { ...raw.meta, schemaVersion: 31 };
   }
 
+  // v31 → v32 (B76): Pre-Session Check-in + Briefing — bestehende Tage
+  // bekommen sessionCheckIn/sessionModifier als null, kein Verhaltensunterschied
+  // bis der Nutzer das erste Mal einen aktuellen, noch offenen Tag öffnet.
+  if ((raw.meta?.schemaVersion ?? 0) < 32) {
+    (raw.weeks ?? []).forEach(wk => (wk.days ?? []).forEach(day => {
+      if (day.sessionCheckIn === undefined)  day.sessionCheckIn  = null;
+      if (day.sessionModifier === undefined) day.sessionModifier = null;
+    }));
+    raw.meta = { ...raw.meta, schemaVersion: 32 };
+  }
+
   // Always-apply defaults for settings added in later versions
   if (raw.settings.vibrationEnabled               === undefined) raw.settings.vibrationEnabled               = true;
   if (raw.settings.rpeEnabled                     === undefined) raw.settings.rpeEnabled                     = true;
@@ -927,6 +939,7 @@ function migrate(raw) {
   if (raw.settings.maxSessionMs                   === undefined) raw.settings.maxSessionMs                   = 10800000;
   if (raw.settings.autoStartPauseTimer            === undefined) raw.settings.autoStartPauseTimer            = true;
   if (raw.settings.hideStreakBadge                === undefined) raw.settings.hideStreakBadge                = false;
+  if (raw.settings.sessionCoach                   === undefined) raw.settings.sessionCoach                   = true;
   if (!Array.isArray(raw.settings.dismissedNamePairs)) raw.settings.dismissedNamePairs = [];
   if (!raw.coachQuestion || typeof raw.coachQuestion !== 'object') {
     raw.coachQuestion = { weekStart: null, questionId: null, answer: null, outcome: null, measuredWeekStart: null };
@@ -1199,6 +1212,7 @@ export const A = Object.freeze({
   DAY_LOAD_VACATION_PLAN:    'DAY_LOAD_VACATION_PLAN',    // { di, plan: 'bodyweight'|'light_kb'|'heavy_kb'|'hotel_gym'|'custom'|'rest' }
   WEEK_LOAD_VACATION_PLAN:   'WEEK_LOAD_VACATION_PLAN',   // { plan: 'bodyweight'|'light_kb'|'heavy_kb'|'hotel_gym'|'custom'|'rest' }
   DAY_SET_FIELD:             'DAY_SET_FIELD',             // { di, field, value }
+  SESSION_CHECKIN_SET:       'SESSION_CHECKIN_SET',       // { di, sleep, energyPre, modifier } — B76 Pre-Session Check-in
   // Exercise
   EX_ADD:              'EX_ADD',              // { di, name, metric? }
   CUSTOM_EX_ADD:        'CUSTOM_EX_ADD',        // { name, metric, category }
@@ -1295,6 +1309,8 @@ function _resetClonedDays(days) {
     day.sessionEndTs    = null;
     day.sleepHours      = null;
     day.energyLevel     = null;
+    day.sessionCheckIn  = null; // B76: Vorwoche-Check-in darf nicht mitgeklont werden
+    day.sessionModifier = null;
     (day.exercises ?? []).forEach(ex => {
       if (ex._showCfg) ex._showCfg = false;
       if (ex.substituteFor) ex.name = ex.substituteFor;
@@ -1568,6 +1584,8 @@ function reduce(state, action) {
         sessionEndTs:   null,
         sleepHours:     null,
         energyLevel:    null,
+        sessionCheckIn:  null,
+        sessionModifier: null,
         exercises:      [],
       });
       break;
@@ -1588,6 +1606,8 @@ function reduce(state, action) {
         isVacation:     false,
         sleepHours:     null,
         energyLevel:    null,
+        sessionCheckIn:  null,
+        sessionModifier: null,
         exercises:  srcDay ? srcDay.exercises.map(ex => ({
           ...JSON.parse(JSON.stringify(ex)),
           sets: ex.sets.map(s => ({ ...s, status: 'pending', done: false })),
@@ -1760,6 +1780,36 @@ function reduce(state, action) {
     case A.DAY_SET_FIELD: {
       const day = _currentWeek()?.days[p.di]; if (!day) break;
       day[p.field] = p.value;
+      break;
+    }
+
+    // B76: Pre-Session Check-in — der Reducer entscheidet NICHT selbst über
+    // den Modifier (Schlaf/Energie → 'reduced'/'normal'/'optimal'), das
+    // passiert bereits in ui.js' _buildSessionBriefing() und wird hier nur
+    // mechanisch angewendet. Bei 'reduced' werden die noch nicht bewerteten
+    // ('pending') Gewichtssätze der heutigen Übungen einmalig um 10%
+    // reduziert und auf die pro Übung eingestellte Schrittweite gerundet —
+    // bewusst NICHT über getWeightRecommendation() (die betrifft nur die
+    // Steigerungsempfehlung für die NÄCHSTE Woche, nicht die bereits
+    // gesetzten Gewichte der laufenden Session).
+    case A.SESSION_CHECKIN_SET: {
+      const day = _currentWeek()?.days[p.di]; if (!day) break;
+      day.sessionCheckIn = {
+        sleep: p.sleep ?? null,
+        energyPre: p.energyPre ?? null,
+        timestamp: Date.now(),
+      };
+      day.sessionModifier = p.modifier ?? 'normal';
+      if (p.modifier === 'reduced') {
+        for (const ex of day.exercises ?? []) {
+          const step = ex.weightStep || 2.5;
+          for (const s of ex.sets ?? []) {
+            if (s.status === 'pending' && (s.weight ?? 0) > 0) {
+              s.weight = Math.round((s.weight * 0.9) / step) * step;
+            }
+          }
+        }
+      }
       break;
     }
 
