@@ -2,7 +2,7 @@
 # Claude Code führt diese Loops am
 # Anfang JEDER Session aus.
 # Danach erst die eigentliche Aufgabe.
-# Letzte Aktualisierung: 2026-07-13 / train-v164
+# Letzte Aktualisierung: 2026-07-21 / train-v194
 
 ---
 
@@ -209,6 +209,52 @@ Datei wird nie mitgepusht, rein lokales Artefakt für externe Beratung.
 
 ---
 
+## LOOP 6 — GoatCounter count.js Versions-Check (AKTIV)
+Priorität: Nach Loop 1-3. Läuft NICHT bei jedem Sessionstart mit echtem
+  Netzwerkaufruf — nur das Datum unten wird bei jedem Start billig geprüft.
+
+Hintergrund: `index.html` bindet GoatCounter über eine versionierte URL +
+SRI-Hash ein (seit train-v182, siehe BUGS.md), bewusst OHNE Auto-Update.
+Ein gepinnter Hash ist kein Sicherheitsrisiko, wenn er veraltet — es fehlen
+höchstens neue Features. Eine feste Prüfroutine verhindert nur, dass eine
+neue Version dauerhaft unbemerkt bleibt.
+
+Ausführung:
+  1. "Letzte Prüfung"-Datum unten in diesem Abschnitt lesen.
+  2. Wenn < 90 Tage seit letzter Prüfung vergangen: Loop überspringen,
+     keine Netzwerkanfrage. In SESSION_LOG.md nur "übersprungen (zuletzt
+     geprüft: [Datum])" vermerken.
+  3. Wenn ≥ 90 Tage vergangen: https://www.goatcounter.com/help/countjs-versions
+     abrufen. Aktuellste dort gelistete Version + SRI-Hash mit dem
+     bestehenden `<script>`-Tag in index.html vergleichen (aktuell:
+     count.v5.js, siehe Kommentar direkt über dem Tag).
+  4. Bei neuerer Version: NICHT automatisch umstellen (Fremd-Script,
+     bewusster Pin) — Nutzer informieren (Version, Hash, Link, welche
+     Zeile in index.html betroffen wäre) und auf Bestätigung warten,
+     bevor geändert wird.
+  5. "Letzte Prüfung"-Datum unten in diesem Abschnitt aktualisieren —
+     unabhängig vom Ergebnis (auch wenn keine neue Version gefunden wurde).
+
+**90-Tage-Intervall statt der ursprünglich erwogenen 2-4 Wochen — Begründung:**
+Reale Release-Historie von count.js (Stand 2026-07-21, https://www.goatcounter.com/help/countjs-versions):
+v1 (Dez 2020) → v2 (Mär 2021, ~3 Monate) → v3 (Dez 2021, ~9 Monate) →
+v4 (Dez 2023, ~24 Monate) → v5 (Jun 2025, ~18 Monate). Kürzester je
+beobachteter Abstand: 3 Monate, Durchschnitt deutlich darüber. Eine
+monatliche/zweiwöchentliche Prüfung würde in praktisch jedem Lauf ergebnislos
+bleiben (reiner Overhead ohne Erkenntnisgewinn), und da der Hash ohnehin
+bewusst gepinnt ist (kein Zeitdruck durch ein Sicherheitsrisiko), gibt es
+keinen Grund für eine so hochfrequente Prüfung. 90 Tage balanciert
+"nicht monatelang verpassen" gegen "nicht bei jeder Session sinnlos
+nachfragen".
+
+Letzte Prüfung: 2026-07-21 (count.v5.js bestätigt aktuell, Hash in
+index.html stimmt exakt mit der offiziell publizierten SRI-Angabe überein
+— `sha384-atnOLvQb9t+jTSipvd75X2yginT4PjVbqDdlJAmxMm+wYElFmeR6EmLP5bYeoRVQ`)
+
+Stopp-Bedingung: keine (wiederkehrender Loop, läuft dauerhaft mit)
+
+---
+
 ## LOOP 4 — Diagnose offener Bugs (INAKTIV)
 # Aktivieren wenn: alle UX-Hoch Bugs
 # behoben und Edge-Case-Audit abgeschlossen
@@ -245,6 +291,7 @@ Eintrag in SESSION_LOG.md hinzufügen:
   Loop 2: aktuell ✓ / aktualisiert: [was] (Push: erledigt/ausstehend)
   Loop 3: [N] Edge Cases, neu: [dateiname] / übersprungen
   Loop 4: [Bug-ID] diagnostiziert / übersprungen
+  Loop 6: geprüft (neue Version: [ja/nein]) / übersprungen (zuletzt: [Datum])
   Eigentliche Aufgabe: [was gemacht wurde]
   Loop 5: for-advisor.txt aktualisiert (am Ende der Session)
 

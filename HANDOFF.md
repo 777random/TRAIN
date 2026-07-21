@@ -1,5 +1,5 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-21, Session Summary + Schlaf-Korrelation + Compound/Isolation-Balance + Deload-Plan (B79, train-v194, SCHEMA 32 unverändert)*
+*Letzte Aktualisierung: 2026-07-21, GoatCounter-SRI verifiziert (kein neuer Fund) + Loop 6 (periodischer Versions-Check) ergänzt (nur Doku, train-v194/SCHEMA 32 unverändert)*
 *Nächster Schritt: B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md) — braucht Name+Adresse+E-Mail vom Nutzer. B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten. B78 (autoStartPauseTimer respektiert nur den confirm-set-Pfad) bleibt offen, low priority. Keine weiteren offenen Rückfragen aus diesem Sprint.*
 
 ---
@@ -20,6 +20,30 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
   dem bestehenden Plateau-Mechanismus)
 - Letzter Commit: siehe `git log` (dieser Sprint noch nicht gepusht,
   siehe Sprint-Ende-Workflow).
+- **GoatCounter-SRI verifiziert, Loop 6 ergänzt (kein Code-Sprint, reine
+  Doku/Prozess-Änderung, CACHE_VERSION/CSS/SCHEMA unverändert):** Nutzer
+  bat um einen SRI-Hash-Fix für GoatCounter (unversionierte URL ohne
+  Integritätsprüfung). Vor der Umsetzung geprüft: der Fix existiert
+  bereits seit train-v182/v183 (`index.html`, `<script>`-Tag mit
+  `src="https://gc.zgo.at/count.v5.js"` + `integrity="sha384-..."` +
+  `crossorigin="anonymous"`, echter Site-Code `train.goatcounter.com`)
+  — kein neuer Fund, keine Änderung an index.html nötig. Nutzer bat
+  danach um eine dauerhafte periodische Prüfung, ob GoatCounter eine
+  neuere `count.js`-Version veröffentlicht hat. Reale Release-Historie
+  recherchiert (v1 Dez 2020 → v2 Mär 2021 → v3 Dez 2021 → v4 Dez 2023 →
+  v5 Jun 2025, kürzester Abstand 3 Monate) — auf Basis dieser Cadence
+  ein 90-Tage-Intervall statt der ursprünglich vorgeschlagenen 2-4
+  Wochen empfohlen (der Hash ist ohnehin bewusst gepinnt, kein
+  Sicherheitsrisiko bei Veralten, daher kein Grund für eine
+  hochfrequente Prüfung) — vom Nutzer bestätigt. Neuer **Loop 6** in
+  LOOPS.md: liest bei jedem Sessionstart nur ein gespeichertes
+  "Letzte Prüfung"-Datum (billig), macht den echten Abruf von
+  `https://www.goatcounter.com/help/countjs-versions` nur wenn ≥90 Tage
+  vergangen sind; bei neuerer Version wird NICHT automatisch
+  umgestellt, sondern der Nutzer informiert und um Bestätigung gebeten
+  (analog zur bestehenden Push-Policy für Loop 1/3). Aktueller Stand
+  (2026-07-21): count.v5.js weiterhin aktuell, Hash bestätigt korrekt.
+  Siehe BUGS.md B80.
 - **B79 — Session Summary + Schlaf-Korrelation + Compound/Isolation-Balance
   + Deload-Plan (train-v194):** Nutzer-Anfrage ("SPRINT 3 — Session Summary
   + Schlaf-Korrelation"), vorab per technischer Spec abgestimmt und über
