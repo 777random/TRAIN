@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-21, B82 Session Coach "heute" = aktiver Tag der aktuellen Woche statt kalendarisch (train-v196, SCHEMA 32 unverändert)*
-*Nächster Schritt: B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md) — braucht Name+Adresse+E-Mail vom Nutzer. B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten. B78 (autoStartPauseTimer respektiert nur den confirm-set-Pfad) bleibt offen, low priority. B83 (_skippedCheckIn nicht zwischen Wochen zurückgesetzt) neu dokumentiert, Low. Loops 7-11 aktiv: Advisor-Exports werden am Ende jeder Session automatisch aktualisiert. for-advisor-consolidated.txt = Startpunkt für neue externe Chats. Keine weiteren offenen Rückfragen aus diesem Sprint.*
+*Letzte Aktualisierung: 2026-07-21, B84 reduzierte Tagesform dämpft keine echte Steigerung mehr (train-v197, SCHEMA 32 unverändert)*
+*Nächster Schritt: B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md) — braucht Name+Adresse+E-Mail vom Nutzer. B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten. B78 (autoStartPauseTimer respektiert nur den confirm-set-Pfad) bleibt offen, low priority. B83 (_skippedCheckIn nicht zwischen Wochen zurückgesetzt) weiterhin offen, Low. Loops 7-11 aktiv: Advisor-Exports werden am Ende jeder Session automatisch aktualisiert. for-advisor-consolidated.txt = Startpunkt für neue externe Chats. Keine weiteren offenen Rückfragen aus diesem Sprint.*
 
 ---
 
@@ -20,6 +20,36 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
   dem bestehenden Plateau-Mechanismus)
 - Letzter Commit: siehe `git log` (dieser Sprint noch nicht gepusht,
   siehe Sprint-Ende-Workflow).
+- **B84 — reduzierte Tagesform dämpft keine echte Steigerung mehr
+  (train-v197):** Nutzer meldete, `nextWeight` scheine vom falschen Satz
+  berechnet zu werden (Satz 1: 90kg RPE10 → korrekt 87.5kg; Satz 2: 98kg
+  RPE6 → 95kg statt erwarteter ~100,5kg). Per Diagnose-zuerst-Auftrag
+  untersucht — die vom Nutzer selbst vorgeschlagene Hypothese ("falscher
+  Satz/falsches Gewicht wird verwendet") wurde WIDERLEGT: ein Diagnose-
+  Log direkt in `buildSetFeedback()` bestätigte, Satz 2 übergibt korrekt
+  `{weight: 98, rpe: 6}` — kein Index-/Verwechslungs-Fehler. Eine
+  isolierte Reproduktion (bereits bewertete Sätze, kein UI-Interaktions-
+  Weg) reproduzierte "95kg" exakt, aber nur mit `sessionModifier=
+  'reduced'` gesetzt. **Echter Root Cause:** `_applyModifier()`
+  (sessionCoach.js) dämpfte bei reduziertem Tagesstart JEDEN
+  Empfehlungswert identisch über `Math.max(nextWeight*0.9, currentWeight
+  -step)` — sinnvoll für Halten/Reduzieren, aber bei einer echten
+  Steigerung (RPE≤6) ergab dieselbe Formel eine Zahl UNTER dem gerade
+  gehobenen Gewicht (98kg → 95kg), obwohl der Hinweistext "steigern"
+  zeigte. Satz 1 war korrekterweise gedämpft (Reduzieren-Zweig bei
+  RPE10) — der Nutzer hatte diesen Fall fälschlich als unproblematischen
+  Referenzwert eingeordnet, unterlag aber derselben (dort passenden)
+  Logik. **Fix:** `_applyModifier()` dämpft nur noch wenn `nextWeight <=
+  currentWeight`; eine echte Steigerung bleibt immer exakt
+  `currentWeight + step`. Nur `sessionCoach.js` geändert (ui.js-Aufruf
+  war bereits korrekt, Constraint eingehalten). 3 neue Tests
+  (`tests/session_coach_reduced_modifier.spec.js`, in CI): Steigerung
+  bei reduziertem Tagesstart jetzt korrekt 100kg (nicht mehr 95kg),
+  Halten-Fall bleibt weiterhin korrekt gedämpft (kein Regress),
+  Normalfall ohne Modifier unverändert. Neue DECISIONS.md-Entscheidung
+  ("Reduzierte Tagesform dämpft nur Halten/Reduzieren, nie eine echte
+  Steigerung"). Volle Suite 82/82 grün. CACHE_VERSION train-v196→v197,
+  CSS/SCHEMA unverändert.
 - **B82 — Session Coach "heute" = aktiver Tag statt kalendarisch
   (train-v196):** direkter Anschluss an die vorherige reine Diagnose-
   Session (keine Änderungen dort). Root Cause bereits vollständig

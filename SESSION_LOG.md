@@ -2,6 +2,26 @@
 # Automatisch von Claude Code
 # befüllt beim Session-Start
 
+## 2026-07-21 train-v197 (B84 — reduzierte Tagesform dämpft keine echte Steigerung mehr)
+Loop 1: 10/10 grün ✓, volle Suite 82/82 grün nach dem Fix
+Loop 2: aktuell ✓ (CLAUDE.md/HANDOFF.md/BUGS.md auf train-v197 gebracht)
+Loop 3: übersprungen — Stop-Bedingung bereits erfüllt (17/15 Edge-Case-Fixtures)
+Loop 6: übersprungen (zuletzt: 2026-07-21, 90-Tage-Intervall noch nicht erreicht)
+Eigentliche Aufgabe: Nutzer meldete nextWeight-Bug (Diagnose-zuerst-
+  Auftrag, Nutzer-Hypothese: falscher Satz wird verwendet). Diagnose per
+  echter Reproduktion (nicht nur Code-Lesen) widerlegte die Hypothese —
+  ein Diagnose-Log in buildSetFeedback() bestätigte korrekte Satz-2-
+  Werte ({weight:98, rpe:6}). Isolierte Reproduktion mit bereits
+  bewerteten Sätzen fand den echten Root Cause: `_applyModifier()`
+  (sessionCoach.js) dämpft bei sessionModifier='reduced' JEDE
+  Empfehlung identisch, auch echte Steigerungen — 98kg RPE6 ergab
+  dadurch 95kg (unter dem gehobenen Gewicht) statt der erwarteten
+  ~100,5kg. Fix: Dämpfung nur noch bei nextWeight<=currentWeight
+  (Halten/Reduzieren), echte Steigerungen bleiben unangetastet. Nur
+  sessionCoach.js geändert. 3 neue Tests
+  (tests/session_coach_reduced_modifier.spec.js). DECISIONS.md-Eintrag
+  ergänzt. CACHE_VERSION train-v196→v197. Committed + gepusht.
+
 ## 2026-07-21 train-v196 (B82 — Session Coach "heute" = aktiver Tag statt kalendarisch)
 Loop 1: 10/10 grün ✓ (vor UND nach dem Fix), volle Suite grün (1 bekannter
   Flake bei delete_all_data.spec.js unter Parallel-Last, isoliert grün,

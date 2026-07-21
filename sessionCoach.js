@@ -16,9 +16,18 @@ function _round(weight, step) {
   return Math.round(weight / step) * step;
 }
 
-/** Dämpft einen vorgeschlagenen Wert bei reduzierter Tagesform (B76-Modifier). */
+/**
+ * Dämpft einen vorgeschlagenen Wert bei reduzierter Tagesform (B76-Modifier)
+ * — aber NUR bei Halten/Reduzieren-Empfehlungen. Eine echte Steigerung
+ * (RPE<=6, nextWeight > currentWeight — das Gewicht war trotz reduziertem
+ * Tagesstart leicht) darf NIE unter das gerade gehobene Gewicht gedämpft
+ * werden, sonst widerspricht die angezeigte Zahl dem gleichzeitig gezeigten
+ * "steigern"-Hinweistext (B84: 98kg RPE6 zeigte "95kg" statt "steigern"
+ * auf >98kg, weil Math.max(nextWeight*0.9, currentWeight-step) bei einer
+ * Erhöhung fälschlich unter currentWeight fallen kann).
+ */
 function _applyModifier(nextWeight, currentWeight, sessionModifier, step) {
-  if (sessionModifier !== 'reduced') return nextWeight;
+  if (sessionModifier !== 'reduced' || nextWeight > currentWeight) return nextWeight;
   return Math.max(nextWeight * 0.9, currentWeight - step);
 }
 

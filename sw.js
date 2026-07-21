@@ -16,7 +16,7 @@
  *   asset conflicts.
  */
 
-const CACHE_VERSION  = 'train-v196';
+const CACHE_VERSION  = 'train-v197';
 
 /**
  * App shell – every file the app needs to render its first frame offline.
