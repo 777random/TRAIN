@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-21, Intra-Session Coach (B77, train-v193, SCHEMA 32 unverändert)*
-*Nächster Schritt: B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md) — braucht Name+Adresse+E-Mail vom Nutzer. B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten. B78 (autoStartPauseTimer respektiert nur den confirm-set-Pfad) neu dokumentiert, low priority, nicht dringend. Keine weiteren offenen Rückfragen aus diesem Sprint.*
+*Letzte Aktualisierung: 2026-07-21, Session Summary + Schlaf-Korrelation + Compound/Isolation-Balance + Deload-Plan (B79, train-v194, SCHEMA 32 unverändert)*
+*Nächster Schritt: B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md) — braucht Name+Adresse+E-Mail vom Nutzer. B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten. B78 (autoStartPauseTimer respektiert nur den confirm-set-Pfad) bleibt offen, low priority. Keine weiteren offenen Rückfragen aus diesem Sprint.*
 
 ---
 
@@ -11,13 +11,57 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v193 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v194 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
-- CSS: ?v=196 (neue `.set-feedback`/`.warmup-rec-block`/`.rpe-nudge--favorite`-Klassen)
-- SCHEMA: 32 (unverändert — B77 fügt keine neuen State-Felder hinzu)
+- CSS: ?v=197 (neue `.session-summary-screen`/`.sleep-insight-card`/`.deload-plan-card`-Klassen)
+- SCHEMA: 32 (unverändert — B79 fügt keine neuen State-Felder hinzu, nutzt
+  `day.sessionCheckIn`/`sessionModifier` aus B76 und `ex.nextWeekPlan` aus
+  dem bestehenden Plateau-Mechanismus)
 - Letzter Commit: siehe `git log` (dieser Sprint noch nicht gepusht,
   siehe Sprint-Ende-Workflow).
+- **B79 — Session Summary + Schlaf-Korrelation + Compound/Isolation-Balance
+  + Deload-Plan (train-v194):** Nutzer-Anfrage ("SPRINT 3 — Session Summary
+  + Schlaf-Korrelation"), vorab per technischer Spec abgestimmt und über
+  eine Rückfrage-Runde bestätigt (`AskUserQuestion`, Deload-Plan-Scope).
+  Vorlage enthielt 6 Diskrepanzen zum echten Code, offengelegt statt
+  stillschweigend übernommen: (1) "sessionEnergyPost-Abfrage (aus Sprint 1)"
+  existiert nicht — B76 hat sich explizit GEGEN dieses Feld entschieden, der
+  reale Flow ist der schon lange bestehende `_showDayCompletionModal()` →
+  `_finishCompletion()` → `_showCompletionScreen()`. (2) `weekSuccessCounts()`
+  arbeitet auf einer Woche, nicht einem Tag — eigene Tages-Formel in
+  `sessionSummary.js` geschrieben. (3) "Deload einplanen" kommt als Text
+  nirgends vor — reale Strukturkarte zeigt "X Wochen ohne Deload —
+  Regenerationswoche einplanen.". (4) PR-Delta lässt sich zum
+  Abschlusszeitpunkt nicht aus `ex.prWeight` rekonstruieren (bereits
+  überschrieben, wie B63/B70) — Delta stattdessen gegen `exWeightHistory()`
+  der Vorwochen berechnet. (5) Vorlagen-Beispieltext nannte "Zielerreichung",
+  die vorgegebene Berechnung liefert aber Erfolgsquote — korrekt beschriftet.
+  (6) `EX_AUTO_PRESELECT_NEXT_WEEK_PLAN` existiert bereits als Batch-Action
+  für den Deload-Plan — wiederverwendet statt neuer Action.
+  **Umsetzung:** neues Modul `sessionSummary.js` (Tiefe 3):
+  `buildSessionHighlights()` (max. 3, Priorität PR > RPE-Warnung >8.5 >
+  Ziel erreicht), `buildSessionEinordnung()` (Kaskade a-f), `buildNext
+  SessionPreview()`, `calcSleepCorrelation()`. Neuer Session-Summary-Screen
+  (Vollbild-Overlay mit "Weiter"-Button) zwischen `_finishCompletion()` und
+  dem bestehenden Tagesabschluss-Screen, Urlaubstage überspringen sie.
+  Schlaf-Erkenntnis einmalig bei ≥8 echten Wochen + ≥6 Tagen mit
+  `sessionCheckIn.sleep` + Diff ≥15% (`localStorage['train_sleep_insight_shown']`).
+  Neues 5. Strukturkarten-Signal `_checkCompoundIsolationBalance()`
+  (weeklyFocus.js, niedrigste Priorität) bei <60% Compound-Sätzen. Deload-
+  Plan-Tabelle unter der `deload_preventive`-Karte (alle Übungen aller Tage
+  der aktuellen Woche — Rückfrage bestätigt, Coach-Tab kennt keinen
+  "aktuellen Tag"), "Plan übernehmen" dispatcht `EX_AUTO_PRESELECT_
+  NEXT_WEEK_PLAN` mit den Gewichts-Deltas für alle Übungen auf einmal.
+  **Test-Infrastruktur-Erkenntnis:** mehrwöchige Fixtures mit weit
+  zurückliegenden, aber `markedDone:true`-Wochen lösten den bestehenden
+  Wiedereinstiegs-Popup aus (2s nach App-Start) — alle B79-Tests nutzen
+  seither Datums-Helper relativ zu "heute" (siehe BUGS.md Fallstricke-Tabelle).
+  Verifiziert per 13 neuen Tests (`tests/session_summary.spec.js`, in CI, 2×
+  hintereinander stabil grün) + 2 Screenshots. 1 bestehender Test
+  (`share_image.spec.js`) um einen Klick auf den neuen "Weiter"-Button
+  ergänzt. CACHE_VERSION train-v193→v194, CSS ?v=196→197, SCHEMA
+  unverändert. Volle Suite 72/72 grün.
 - **B77 — Intra-Session Coach (train-v193):** Nutzer-Anfrage ("SPRINT 2 —
   Intra-Session Coach"), vorab per technischer Spec abgestimmt und über 2
   Rückfrage-Runden bestätigt (`AskUserQuestion`). Vorlage enthielt mehrere

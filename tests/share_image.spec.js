@@ -56,6 +56,11 @@ test('PR-Teilen-Button: erscheint nach echtem PR am Tagesabschluss und löst PNG
   await page.click('.completion-modal__rate-btn[data-val="2"]');
   await page.click('.completion-modal__skip');
 
+  // B79: Session Summary erscheint jetzt vor dem Tagesabschluss-Screen —
+  // hier nicht Testgegenstand, per "Weiter" durchklicken.
+  await page.waitForSelector('#session-summary-continue', { timeout: 5000 });
+  await page.click('#session-summary-continue');
+
   await page.waitForSelector('#dcs-share-btn', { timeout: 5000 });
 
   const [download] = await Promise.all([

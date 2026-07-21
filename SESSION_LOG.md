@@ -1942,3 +1942,130 @@ Eigentliche Aufgabe: Nutzer-Anfrage "SPRINT 2 — Intra-Session Coach"
   erweitert, neuer "NIE parallel"-Eintrag), `.github/workflows/test.yml`
   (neuer CI-Schritt für `intra_session_coach.spec.js`).
 Loop 5: for-advisor.txt aktualisiert (am Ende der Session).
+
+## 2026-07-21 train-v193→v194 (B79 — Session Summary + Schlaf-Korrelation + Compound/Isolation-Balance + Deload-Plan — SCHEMA 32 unverändert)
+Loop 1: 59/59 effektiv grün ✓ (Session-Start, 1 bekannter Flake bei
+  delete_all_data.spec.js unter Parallel-Last, im Retry grün)
+Loop 2: aktuell ✓ — HANDOFF.md/CLAUDE.md waren nach dem B77-Sprintabschluss
+  bereits auf train-v193/?v=196/SCHEMA 32 synchron
+Loop 3: übersprungen — Stop-Bedingung (≥15 Fixtures) mit 17 weiterhin
+  erfüllt
+Eigentliche Aufgabe: Nutzer-Anfrage "SPRINT 3 — Session Summary +
+  Schlaf-Korrelation" (Teile A-D: Session Summary, Schlaf-Korrelation,
+  Compound/Isolation-Balance im Coach-Tab, Deload-Plan).
+  **Vorlage vor der Umsetzung gegen den echten Code geprüft, 6 echte
+  Diskrepanzen gefunden und offengelegt statt stillschweigend
+  übernommen:** (1) "sessionEnergyPost-Abfrage (aus Sprint 1)" existiert
+  nicht — B76 hat sich in DECISIONS.md explizit GEGEN ein solches Feld
+  entschieden ("bestehendes energyLevel wiederverwenden"). Der reale
+  Tagesabschluss-Flow ist unverändert der schon lange bestehende
+  `_showDayCompletionModal()` (Bewertung + Schlaf/Energie-Slider, deutlich
+  älter als alle Sprints dieser Session) → `_finishCompletion()` →
+  `_showCompletionScreen()`. (2) `weekSuccessCounts()` (setUtils.js)
+  arbeitet auf einer WOCHE, nicht einem TAG — Teil B braucht aber eine
+  tagesweise Gruppierung; eigene, kleine Tages-Erfolgsquote-Formel in der
+  neuen `sessionSummary.js` geschrieben statt die Wochen-Funktion
+  zweckzuentfremden. (3) "Deload einplanen" kommt als Text nirgends im
+  Code vor — die reale Strukturkarte (`_checkPreventiveDeload`,
+  `deload_preventive`) zeigt "X Wochen ohne Deload — Regenerationswoche
+  einplanen.", dort wurde Teil D angehängt. (4) Ein PR-Gewichts-Delta
+  ("+2.5kg") lässt sich zum Abschlusszeitpunkt NICHT aus `ex.prWeight`
+  rekonstruieren — das ist zu diesem Zeitpunkt bereits auf den neuen Wert
+  aktualisiert (derselbe Mechanismus, der B63/B70 verursacht hat).
+  Stattdessen Delta gegen `exWeightHistory()` der Vorwochen (insightEngine.js)
+  berechnet — "wie viel mehr als beim letzten Mal", nicht "wie viel mehr
+  als der alte Rekord" (bei einem echten Gewichts-PR in der Praxis fast
+  immer identisch). (5) Die Vorlagen-Textbeispiele für Teil B ("ø 64%
+  Zielerreichung") benannten eine andere Kennzahl als die vorgegebene
+  Berechnung tatsächlich liefert (Erfolgsquote succ/(succ+fail), nicht
+  Zielerfüllung achieved/target — zwei seit B67 bewusst unterschiedene
+  Werte) — als "Erfolgsquote" beschriftet, konsistent zur Berechnung.
+  (6) `EX_AUTO_PRESELECT_NEXT_WEEK_PLAN` (state.js) existiert bereits als
+  Batch-Action genau für "mehrere Übungen auf einmal mit `nextWeekPlan`
+  vorbelegen" (aus der "Neue Woche"-Chip-Automatik) — wiederverwendet
+  statt einer neuen Action; `ex.nextWeekPlan` ist ein DELTA, kein
+  Absolutwert.
+  Eine echte offene Design-Frage per `AskUserQuestion` geklärt: Teil D
+  (Deload-Plan) zeigt Übungen ALLER Tage der aktuellen Woche (nicht nur
+  eines einzelnen) — bestätigt, da der Coach-Tab wochenbasiert ist und
+  keinen "aktuellen Tag" kennt.
+  **Umsetzung:**
+  - Neues, importfreies Modul `sessionSummary.js` (Tiefe 3, importiert
+    `getSortedWeeks`/`exWeightHistory` aus insightEngine.js,
+    `isFullSuccess` aus setUtils.js, `buildCategoryMap`/`resolveCategory`
+    aus movementMap.js für einen lokal duplizierten Kategorie-Filter —
+    kein ui.js-Import, Muster wie weeklyFocus.js' Push/Pull-Duplikation):
+    `buildSessionHighlights()` (max. 3 Zeilen, Priorität PR > RPE-Warnung
+    >8.5 > Ziel erreicht, eine Zeile pro Übung), `buildSessionEinordnung()`
+    (Prioritätskaskade a-f: PR → voller Erfolg+RPE≤7 → voller Erfolg+
+    RPE≤8.5 → hartes Training RPE>8.5 [VOR "gemischt" geprüft, sonst würde
+    ein hartes aber teilweise erfolgreiches Training fälschlich als
+    "gemischt" statt "hart" eingeordnet] → gemischtes Training → reduced-
+    Fallback → neutraler Fallback), `buildNextSessionPreview()` (erste
+    Compound-Übung, `getWeightRecommendation()`-Wert vom Aufrufer übergeben
+    — der einzige legitime Gebrauch, siehe B76/B77-Präzedenz), `calc
+    SleepCorrelation()` (Tages-Gruppierung nach `sessionCheckIn.sleep`,
+    'poor'/'medium' vs. 'good'/'great', Diff ≥15% = signifikant).
+    "Wochen seit vorherigem Gewichts-Anstieg" (für "bestes Training seit N
+    Wochen") per Rückwärtssuche in `exWeightHistory()` — kein voriger
+    Anstieg gefunden → Fallback-Text ohne "seit N Wochen"-Teil.
+  - ui.js: neuer Session-Summary-Screen (Vollbild-Overlay, Muster
+    `_showCompletionScreen()`, aber mit "Weiter"-Button statt Auto-Dismiss
+    nach 4s — zu viel Inhalt zum Lesen), eingefügt zwischen
+    `_finishCompletion()`s Dispatches und dem bestehenden Tagesabschluss-
+    Screen (`setTimeout(() => _showSessionSummary(di, stats), 300)` statt
+    direkt `_showCompletionScreen`). Urlaubstage überspringen die Summary
+    direkt. Schlaf-Erkenntnis nur wenn ≥8 echte (nicht-Seed-)Wochen + ≥6
+    Tage mit `sessionCheckIn.sleep` gesetzt + Korrelation nachweisbar,
+    danach dauerhaft `localStorage['train_sleep_insight_shown']` (try/catch,
+    Muster shareImage.js' Consent-Flag).
+  - weeklyFocus.js: neues 5. Strukturkarten-Signal
+    `_checkCompoundIsolationBalance()` (identisches Muster zu
+    `_checkPushPullBalance`, niedrigste Priorität der 5, weiterhin max. 2
+    Signale gleichzeitig sichtbar) — Signal nur bei <60% Compound-Sätzen
+    (Squat/Hinge/Push/Pull) über `erkenntnisseHorizont`-Wochen, bewusst
+    KEIN Signal bei ≥60% (kein unnötiges Rauschen).
+  - ui.js: Deload-Plan-Tabelle direkt unter der `deload_preventive`-
+    Strukturkarte (`_buildDeloadPlanRows()`: alle Übungen aller Tage der
+    aktuellen Woche, Normalgewicht = höchstes aktuelles Satz-Gewicht,
+    Deload = `Math.round(currentWeight*deloadFactor/weightStep)*weightStep`),
+    "Plan übernehmen" dispatcht `EX_AUTO_PRESELECT_NEXT_WEEK_PLAN` mit den
+    Deltas (Deload-Gewicht minus aktuelles Gewicht) für alle Übungen auf
+    einmal — wirkt erst beim nächsten manuellen Wochenwechsel
+    (unverändertes `_applyPlannedProgression`-Verhalten, kein Sonderfall
+    für Deload nötig).
+  **Test-Infrastruktur-Erkenntnis (während des Testens gefunden, kein
+  Sprint-Scope-Fehler):** mehrwöchige Test-Fixtures mit weit in der
+  Vergangenheit liegenden, aber `markedDone:true` gesetzten Wochen lösen
+  den bestehenden Wiedereinstiegs-Popup (`_detectReentryPause()`, 2s nach
+  App-Start) aus, der über der neuen Summary erscheinen und Testklicks
+  abfangen kann (erste Testläufe zeigten dadurch einen Flake bei
+  `#session-summary-continue`). Alle B79-Testdaten wurden auf einen
+  `weeksAgoISO(n)`-Datums-Helper relativ zu "heute" umgestellt statt fixer
+  Kalenderdaten — seither 2 Testläufe hintereinander stabil grün. Als
+  neuer Eintrag in BUGS.md "Bekannte Fallstricke" dokumentiert.
+  12 (11 + 1 kleine Grammatik-Korrektur "seit 1 Woche" statt "seit 1
+  Wochen" nach Sichtprüfung des Screenshots) → 13 neue Tests
+  (`tests/session_summary.spec.js`, in CI): Summary mit Highlights/
+  Einordnung/Vorschau (PR-Fall), RPE-Warnung-Highlight, gemischtes
+  Training, hartes Training, solides Training, reduced-Fallback,
+  Weiter-Button-Navigation, Urlaubstag überspringt Summary,
+  Schlaf-Korrelation einmalig + nie wieder, Schlaf-Korrelation NICHT bei
+  <8 Wochen, Compound/Isolation-Signal bei <60%, KEIN Signal bei ≥60%,
+  Deload-Plan-Gewichte + "Plan übernehmen" setzt korrekte Deltas. 1
+  bestehender Test (`tests/share_image.spec.js`) musste um einen Klick auf
+  `#session-summary-continue` ergänzt werden (Summary erscheint jetzt vor
+  dem PR-Teilen-Screen). 2 Screenshots verifiziert (Session Summary mit
+  PR-Highlight + Vorschau, Schlaf-Korrelation-Karte). CACHE_VERSION
+  train-v193→v194, CSS ?v=196→197, SCHEMA unverändert (32). Volle Suite
+  72/72 grün, 2 vollständige Läufe hintereinander stabil.
+  Dokumentation aktualisiert: BUGS.md (neuer Eintrag B79 + neuer
+  Fallstricke-Eintrag zum Wiedereinstiegs-Popup in Tests), DECISIONS.md
+  (4 neue Einträge: PR-Delta-Quelle, Compound/Isolation-Priorität,
+  Deload-Plan-Action-Wiederverwendung), HANDOFF.md (STAND-Sektion),
+  CLAUDE.md (Versionsstand-Header + Modul-Tabelle + Coach-Tab-
+  Architektur-Abschnitt + Feature-Status-Tabelle), AGENTS.md
+  (Datei-Abhängigkeits-Matrix: sessionSummary.js neu, 2 neue "NIE
+  parallel"-Einträge), `.github/workflows/test.yml` (neuer CI-Schritt für
+  `session_summary.spec.js`).
+Loop 5: for-advisor.txt aktualisiert (am Ende der Session).

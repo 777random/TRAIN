@@ -1,7 +1,7 @@
 # TRAIN — CLAUDE.md
 # Vollständiger Projektkontext für Claude Code
-# Stand: train-v193 / SCHEMA 32 / Juli 2026
-# Letztes Update: nach train-v193 (B77 Intra-Session Coach)
+# Stand: train-v194 / SCHEMA 32 / Juli 2026
+# Letztes Update: nach train-v194 (B79 Session Summary + Schlaf-Korrelation + Compound/Isolation-Balance + Deload-Plan)
 
 ---
 
@@ -40,7 +40,7 @@ TRAIN ist eine deutschsprachige PWA für Krafttraining. Pure Vanilla ES Modules 
 
 - Repo: https://github.com/777random/TRAIN
 - Deployed: https://777random.github.io/TRAIN/
-- Aktueller Stand: SCHEMA_VERSION 32 · CACHE_VERSION train-v193 · CSS ?v=196
+- Aktueller Stand: SCHEMA_VERSION 32 · CACHE_VERSION train-v194 · CSS ?v=197
 
 ---
 
@@ -171,6 +171,7 @@ Bei unklarem Root Cause immer erst Diagnose → Ergebnis abwarten → dann Fix. 
 | `weekReview.js` | Wochenrückblick. |
 | `timer.js` | Session-Uhr + Pause-Timer. Vollständig entkoppelt von `ui.js` via custom `window` Events. Seit train-v193 (B77) importiert es zusätzlich `sessionCoach.js` (`buildSetFeedback()`) für die Pause-Dauer-Empfehlung — kein Bruch der ui.js-Entkopplung, siehe DECISIONS.md. |
 | `sessionCoach.js` | Seit train-v193 (B77). Intra-Session Coach: `buildSetFeedback()` (Gewichts-/Pause-Vorschlag für den nächsten Satz, RPE-Bereiche + session-lokale Logik ohne RPE), `buildLastSetMessage()` (Abschluss-Text der Übung), `buildWarmupSets()` (50/70/85%-Aufwärmformel). Importfrei (Tiefe 0), von `ui.js` UND `timer.js` genutzt — bewusst KEINE Wiederverwendung von `getWeightRecommendation()` (weightRecommendation.js) für Intra-Session-Vorschläge, siehe DECISIONS.md. |
+| `sessionSummary.js` | Seit train-v194 (B79). Session Summary + Schlaf-Korrelation: `buildSessionHighlights()`, `buildSessionEinordnung()`, `buildNextSessionPreview()`, `calcSleepCorrelation()`. Importiert `getSortedWeeks`/`exWeightHistory` (insightEngine.js), `isFullSuccess` (setUtils.js), `buildCategoryMap`/`resolveCategory` (movementMap.js) — Tiefe 3, kein ui.js-Import (lokal duplizierter Kategorie-Filter für die Fokus-Übung, gleiches Muster wie weeklyFocus.js' Push/Pull-Duplikation). PR-Deltas rechnen bewusst gegen `exWeightHistory()` der Vorwochen, nicht gegen `ex.prWeight`/`state.prs` (zum Abschlusszeitpunkt bereits überschrieben, siehe DECISIONS.md). |
 | `backup.js` | JSON Import/Export, CSV Export. |
 | `registerSW.js` | Service Worker Registrierung, Storage-Error, SW-Update Event. |
 | `dragdrop.js` | Minifizierter Third-Party Drag-Drop Polyfill — NICHT bearbeiten. |
@@ -281,9 +282,16 @@ _checkMultiExerciseFailure() // seit v163 (B29): Gesamterfolgsquote ≤20% über
 _checkPreventiveDeload()    // ≥8 Wochen ohne Deload + Volumen↑/RPE>7.5
 _checkConsistencyQuality()  // Frequenz stabil + Qualität↓ + curPct<75%
 _checkPushPullBalance()     // Ratio >1.5 über erkenntnisseHorizont
+_checkCompoundIsolationBalance() // seit v194 (B79): Compound-Sätze
+                              // (Squat/Hinge/Push/Pull) <60% über
+                              // erkenntnisseHorizont, sonst kein Signal
 ```
-Max. 2 gleichzeitig (multi_exercise_failure > deload > consistency_quality > push_pull).
-Unabhängig von Hauptkarte — erscheint auch neben Progression.
+Max. 2 gleichzeitig (multi_exercise_failure > deload > consistency_quality > push_pull > compound_isolation).
+Unabhängig von Hauptkarte — erscheint auch neben Progression. `deload_preventive` zeigt
+seit v194 (B79) zusätzlich eine konkrete Deload-Plan-Tabelle (alle Übungen aller Tage der
+aktuellen Woche, Gewicht × deloadFactor gerundet auf weightStep) mit
+"Plan übernehmen"-Button (`EX_AUTO_PRESELECT_NEXT_WEEK_PLAN`, wirkt beim nächsten
+manuellen Wochenwechsel).
 
 **Overload-Formulierungen (3 eigene):**
 - sleep → "Schlaf priorisieren"
@@ -325,11 +333,11 @@ Unabhängig von Hauptkarte — erscheint auch neben Progression.
 ## FEATURE-STATUS
 
 ### Implementiert ✓:
-**Training-Tab:** Wochenstruktur, Pillen-Nav, Satz-Bewertung (auto+manuell), Gewichtsempfehlung (seit v165 auch Distanz/Zeit-Progression für metric 'm'/'sec' via getMetricRecommendation(), B18; seit v172 pro-Übung-Schrittweite statt fixem Delta, B48), Schrittweite-Vorschlag aus Historie (v173, B49, nur sichtbarer Hinweis), anpassbare Steigerungsmenge im Empfehlungs-Chip (v173, B50), Progressions-Präferenz, PR-Erkennung, "Heute anders", Übung archivieren, Stoppuhr, Auto-Wochenerstellung, Deload/Urlaubsmodus, Körpergewicht, Schlaf+Energie, Share-Bild bei echtem PR (v186, B68 — Tagesabschluss-Screen; v189, B73 — zusätzlich sofortiger Toast direkt nach dem PR-Satz), Pre-Session Check-in + Session Briefing (v192, B76 — Zwei-Tap Schlaf/Energie-Check-in am heutigen Tag, Briefing mit Fokus-Übung + RPE-Ziel, -10%-Gewichtsreduktion bei schlechter Tagesform, per Settings-Toggle "Session Coach" abschaltbar), Intra-Session Coach (v193, B77 — Feedback direkt unter jedem bewerteten Satz: Gewichts-/Pause-Empfehlung nach RPE-Bereich bzw. Erfolg/Fehlschlag ohne RPE, Abschluss-Nachricht mit Nächste-Woche-Projektion, Weiterer-Satz-Vorschlag bei RPE≤6, Aufwärm-Empfehlung 50/70/85%, erweiterte Favoriten-RPE-Nudge — alles über denselben "Session Coach"-Toggle abschaltbar).
+**Training-Tab:** Wochenstruktur, Pillen-Nav, Satz-Bewertung (auto+manuell), Gewichtsempfehlung (seit v165 auch Distanz/Zeit-Progression für metric 'm'/'sec' via getMetricRecommendation(), B18; seit v172 pro-Übung-Schrittweite statt fixem Delta, B48), Schrittweite-Vorschlag aus Historie (v173, B49, nur sichtbarer Hinweis), anpassbare Steigerungsmenge im Empfehlungs-Chip (v173, B50), Progressions-Präferenz, PR-Erkennung, "Heute anders", Übung archivieren, Stoppuhr, Auto-Wochenerstellung, Deload/Urlaubsmodus, Körpergewicht, Schlaf+Energie, Share-Bild bei echtem PR (v186, B68 — Tagesabschluss-Screen; v189, B73 — zusätzlich sofortiger Toast direkt nach dem PR-Satz), Pre-Session Check-in + Session Briefing (v192, B76 — Zwei-Tap Schlaf/Energie-Check-in am heutigen Tag, Briefing mit Fokus-Übung + RPE-Ziel, -10%-Gewichtsreduktion bei schlechter Tagesform, per Settings-Toggle "Session Coach" abschaltbar), Intra-Session Coach (v193, B77 — Feedback direkt unter jedem bewerteten Satz: Gewichts-/Pause-Empfehlung nach RPE-Bereich bzw. Erfolg/Fehlschlag ohne RPE, Abschluss-Nachricht mit Nächste-Woche-Projektion, Weiterer-Satz-Vorschlag bei RPE≤6, Aufwärm-Empfehlung 50/70/85%, erweiterte Favoriten-RPE-Nudge — alles über denselben "Session Coach"-Toggle abschaltbar), Session Summary (v194, B79 — Vollbild-Screen direkt nach Tagesabschluss vor dem bestehenden Tagesabschluss-Screen: bis zu 3 Übungs-Highlights, 1-2-Satz-Einordnung nach Prioritätskaskade, Vorschau nächstes Training; einmalige Schlaf-Erfolgsquote-Korrelation wenn nachweisbar und genug Historie vorhanden).
 
 **Wochenrückblick-Modal:** Zusammenfassung/Highlights/Lowlights/Empfehlungen (weekReview.js/weekReviewModal.js), Share-Bild-Button (v186, B68; Sparkline-Redesign v187, B71; Favoriten-Kaskade v189, B73) — auch im manuellen Wochenrückblick-Dropdown im Fortschritt-Tab (v188, B72).
 
-**Coach-Tab:** Hauptkarte (8 akute Signale, seit v160 inkl. Konsistente Fehlschläge) + Strukturkarte (4 strukturelle Signale, seit v163 inkl. Mehr-Übungen-Aggregation), Adaptive Nachfrage-Karte, Coach-Bilanz Mini, Plateau-Konsequenz (EX_SET_NEXT_WEEK_PLAN).
+**Coach-Tab:** Hauptkarte (8 akute Signale, seit v160 inkl. Konsistente Fehlschläge) + Strukturkarte (5 strukturelle Signale, seit v163 inkl. Mehr-Übungen-Aggregation, seit v194/B79 inkl. Compound/Isolation-Balance), Adaptive Nachfrage-Karte, Coach-Bilanz Mini, Plateau-Konsequenz (EX_SET_NEXT_WEEK_PLAN), Deload-Plan-Tabelle mit "Plan übernehmen" bei aktiver präventiver Deload-Karte (v194, B79).
 
 **Fortschritt-Tab:** Erkenntnisse (geclampt), Gesamtperformance, Push/Pull-Ratio, Übungsfortschritt-Chart mit Prognose, Streak (neutral), Abzeichen-Galerie, Körpergewicht-Chart, Bewegungsschaubild, Coach-Bilanz, Relative Stärke / Pound-for-Pound (`renderRelativeStrengthChart()`, progressChart.js + `_weeklyP4PSeries()`, ui.js — war fälschlich noch unter "Offen/Konzept" gelistet, Doku-Drift im Deep-Check-Audit v169 gefunden).
 

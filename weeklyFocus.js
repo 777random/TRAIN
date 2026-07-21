@@ -38,8 +38,11 @@
  *                               aus overallPerformance.js, 1:1 wiederverwendet
  *      D. Push/Pull-Warnung   – deutliches muskuläres Ungleichgewicht über
  *                               erkenntnisseHorizont-Wochen, MOVEMENT_MAP-basiert
- *    Maximal 2 gleichzeitig (Priorität A > B > C > D), Rendering in ui.js als
- *    eigene, optisch sekundäre Karte unabhängig von computeWeeklyFocus().
+ *      E. Compound/Isolation  – Compound-Sätze (Squat/Hinge/Push/Pull) unter
+ *         (seit B79)            60% der bewerteten Sätze über erkenntnisse-
+ *                               Horizont-Wochen, identisches Muster zu D
+ *    Maximal 2 gleichzeitig (Priorität A > B > C > D > E), Rendering in ui.js
+ *    als eigene, optisch sekundäre Karte unabhängig von computeWeeklyFocus().
  *
  * Beide Funktionen sind pure, keine Seiteneffekte.
  */
@@ -713,6 +716,51 @@ function _checkPushPullBalance(state) {
   };
 }
 
+// Compound/Isolation-Balance (B79) — identisches Muster zu
+// _checkPushPullBalance oben (erkenntnisseHorizont, Nicht-Deload-Wochen,
+// buildCategoryMap/resolveCategory bereits importiert). Compound: Squat/
+// Hinge/Push/Pull, Isolation: alles andere (Core/Carry/unbekannt).
+// Signal NUR wenn compoundPct < 60% — bewusst kein Signal bei >=60%
+// (kein unnötiges Rauschen, siehe Sprint-Spec). Niedrigste Priorität der
+// 5 Strukturkarten-Signale (siehe computeStructuralSignals() unten) — ein
+// Compound/Isolation-Hinweis ist informativ, nie dringlich genug, um ein
+// akuteres Signal (Fehlschläge/Deload/Konsistenz/Push-Pull) zu verdrängen.
+function _checkCompoundIsolationBalance(state) {
+  const customCatMap = buildCategoryMap(state.customExercises);
+
+  const horizont = state.settings?.erkenntnisseHorizont ?? 8;
+  const lastN = _sortedWeeks(state)
+    .filter(w => w.mode !== 'deload')
+    .slice(-horizont);
+  if (lastN.length < 4) return null; // zu wenig Historie -> nicht auswertbar
+
+  let compoundSets = 0, totalSets = 0;
+  for (const wk of lastN) {
+    for (const day of wk.days) {
+      for (const ex of day.exercises) {
+        if (ex.archived) continue;
+        const baseName = ex.substituteFor ?? ex.name;
+        const cat = resolveCategory(baseName, customCatMap);
+        const n = ex.sets.filter(s => s.status === 'success' || s.status === 'fail').length;
+        totalSets += n;
+        if (cat === 'Squat' || cat === 'Hinge' || cat === 'Push' || cat === 'Pull') compoundSets += n;
+      }
+    }
+  }
+  if (totalSets === 0) return null;
+
+  const compoundPct = Math.round(compoundSets / totalSets * 100);
+  if (compoundPct >= 60) return null;
+
+  return {
+    status: 'compoundIsolationImbalance',
+    headline: 'Mehr Grundübungen',
+    reasoning: `Verhältnis der letzten ${lastN.length} Wochen: ${compoundPct}% Compound-Sätze (Squat/Hinge/Push/Pull) von ${totalSets} bewerteten Sätzen insgesamt.`,
+    recommendation: `Du trainierst ${compoundPct}% Compound — für Kraftaufbau empfiehlt sich >70%.`,
+    compoundPct,
+  };
+}
+
 // ─── Fallback: Auf Kurs ─────────────────────────────────────────────────────
 
 function _fallback(state) {
@@ -935,6 +983,9 @@ export function computeStructuralSignals(state) {
 
   const pp = _checkPushPullBalance(state);
   if (pp) signals.push({ type: 'push_pull', ...pp });
+
+  const ci = _checkCompoundIsolationBalance(state);
+  if (ci) signals.push({ type: 'compound_isolation', ...ci });
 
   return signals.slice(0, 2);
 }

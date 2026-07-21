@@ -39,6 +39,7 @@ import { computeQualityTrend, computeConsistencyTrend, computeVolumeTrend, compu
 import { weekSuccessCounts } from './setUtils.js';
 import { getSortedWeeks, exWeightHistory, exMetricHistory, detectRecurringStep } from './insightEngine.js';
 import { buildSetFeedback, buildLastSetMessage, buildWarmupSets } from './sessionCoach.js';
+import { buildSessionHighlights, buildSessionEinordnung, buildNextSessionPreview, calcSleepCorrelation } from './sessionSummary.js';
 
 // ─── Module-level UI state (transient, never persisted) ──────────────────────
 
@@ -2814,6 +2815,31 @@ const _FOCUS_ICONS = {
 // bewusst eigenständige, kurze Formulierungen statt Wiederverwendung von
 // headline/reasoning/recommendation: die Strukturkarte ist optisch sekundär
 // und braucht keinen "Warum?"-Collapse (siehe renderCoachTab()).
+/**
+ * B79: konkrete Deload-Gewichte für alle Übungen aller Tage der aktuellen
+ * Woche (state.curIdx) — der Coach-Tab ist wochenbasiert, kein "aktueller
+ * Tag" existiert dort. Normalgewicht = höchstes aktuell eingetragenes
+ * Satz-Gewicht der Übung (Math.max über ex.sets), Deload = gerundet auf
+ * die Übungs-Schrittweite, Formel identisch zur Sprint-Vorgabe.
+ */
+function _buildDeloadPlanRows(state) {
+  const wk = state.weeks[state.curIdx];
+  if (!wk) return [];
+  const deloadFactor = state.settings?.deloadFactor ?? 0.75;
+  const rows = [];
+  wk.days.forEach((day, di) => {
+    (day.exercises ?? []).forEach((ex, ei) => {
+      if (ex.archived) return;
+      const currentWeight = Math.max(0, ...(ex.sets ?? []).map(s => s.weight || 0));
+      if (currentWeight <= 0) return;
+      const step = ex.weightStep || 2.5;
+      const deloadWeight = Math.round(currentWeight * deloadFactor / step) * step;
+      rows.push({ di, ei, name: ex.name, currentWeight, deloadWeight });
+    });
+  });
+  return rows;
+}
+
 function _structuralSignalHtml(sig) {
   if (sig.type === 'multi_exercise_failure') {
     const names = sig.worst
@@ -2831,6 +2857,9 @@ function _structuralSignalHtml(sig) {
     return sig.dominant === 'Push'
       ? { icon: '⚖️', text: 'Push-lastig — mehr Pull-Übungen für Schultergesundheit.' }
       : { icon: '⚖️', text: 'Pull-lastig — mehr Push-Übungen für Balance.' };
+  }
+  if (sig.type === 'compound_isolation') {
+    return { icon: '🏋️', text: `Du trainierst ${sig.compoundPct}% Compound — für Kraftaufbau empfiehlt sich >70%.` };
   }
   return null;
 }
@@ -3253,6 +3282,27 @@ function renderCoachTab(state) {
     }).join('')}
   </div>` : '';
 
+  // B79: Deload-Plan — nur wenn die präventive Deload-Strukturkarte aktiv
+  // ist (siehe oben), konkrete Gewichte für alle Übungen der aktuellen
+  // Woche (alle Tage, nicht nur ein einzelner — der Coach-Tab kennt keinen
+  // "aktuellen Tag", per Rückfrage bestätigt).
+  const deloadSignal    = structuralSignals.find(s => s.type === 'deload_preventive');
+  const deloadPlanRows  = deloadSignal ? _buildDeloadPlanRows(state) : [];
+  const deloadPlanHtml  = deloadSignal && deloadPlanRows.length ? `
+  <div class="deload-plan-card">
+    <div class="deload-plan-card__title">DELOAD-PLAN NÄCHSTE WOCHE</div>
+    <div class="deload-plan-card__rows">
+      ${deloadPlanRows.map(r => `
+      <div class="deload-plan-row">
+        <span class="deload-plan-row__name">${h(r.name)}</span>
+        <span class="deload-plan-row__weights">${r.currentWeight}kg → ${r.deloadWeight}kg</span>
+      </div>`).join('')}
+    </div>
+    <button type="button" class="btn btn--accent btn--sm deload-plan-card__btn" data-action="apply-deload-plan">
+      Plan als Vorlage übernehmen
+    </button>
+  </div>` : '';
+
   const questionCardHtml  = _buildCoachQuestionCard(state, focus);
   const perfSummaryHtml   = _coachPerfSummaryHtml(state);
   container.innerHTML = `
@@ -3266,6 +3316,7 @@ function renderCoachTab(state) {
     ${plateauActionsHtml}
   </div>
   ${structuralCardHtml}
+  ${deloadPlanHtml}
   ${perfSummaryHtml}
   ${questionCardHtml}`;
 
@@ -4401,7 +4452,7 @@ function renderSettingsTab(state) {
   <div class="settings-section">
     <div class="settings-section__title">Info</div>
     <div class="settings-row">
-      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v193</div></div>
+      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v194</div></div>
     </div>
     <div class="settings-row">
       <div>
@@ -5090,6 +5141,25 @@ function _handleClick(e) {
       }
 
       showToast(isImplemented ? '✓ Als umgesetzt markiert' : 'Plateau-Hinweis ausgeblendet', 'ok');
+      break;
+    }
+
+    // B79: Deload-Plan übernehmen — EX_AUTO_PRESELECT_NEXT_WEEK_PLAN ist
+    // bereits die etablierte Batch-Action für "mehrere Übungen auf einmal
+    // mit nextWeekPlan vorbelegen" (aus der "Neue Woche"-Chip-Automatik) —
+    // nextWeekPlan ist ein DELTA, kein Absolutwert, daher deloadWeight
+    // minus currentWeight. Wirkt erst beim nächsten manuellen Wochenwechsel
+    // (_applyPlannedProgression, state.js) — unverändertes, bestehendes
+    // Verhalten, keine Sonderbehandlung für Deload nötig.
+    case 'apply-deload-plan': {
+      const _dpSt   = getState();
+      const _dpRows = _buildDeloadPlanRows(_dpSt);
+      if (!_dpRows.length) break;
+      dispatch(A.EX_AUTO_PRESELECT_NEXT_WEEK_PLAN, {
+        weekIdx: _dpSt.curIdx,
+        selections: _dpRows.map(r => ({ di: r.di, ei: r.ei, value: r.deloadWeight - r.currentWeight })),
+      });
+      showToast('✓ Deload-Plan übernommen — wirkt beim nächsten Wochenwechsel', 'ok', 4000);
       break;
     }
 
@@ -7336,6 +7406,100 @@ function _getDayCompletionStats(di) {
   return { successSets, totalSets, prCount, pct, effortPct, isVacation, quote: quotes[Math.floor(Math.random() * quotes.length)], prDetails };
 }
 
+/**
+ * B79: Daten für die neue Session Summary — Highlights, Einordnung,
+ * Vorschau nächstes Training, optional einmalige Schlaf-Korrelation.
+ * Reine Datensammlung (kein DOM), aufgerufen mit dem bereits gesperrten,
+ * final bewerteten Tag (nach DAY_TOGGLE_COMPLETE).
+ */
+function _buildSessionSummaryData(di) {
+  const state = getState();
+  const wk    = state.weeks[state.curIdx];
+  const day   = wk?.days[di];
+  if (!day) return null;
+
+  const sortedWeeks = getSortedWeeks(state);
+  const curWeekIdx  = sortedWeeks.indexOf(wk);
+
+  const highlights = buildSessionHighlights(day, sortedWeeks, curWeekIdx);
+  const einordnung = buildSessionEinordnung(day, sortedWeeks, curWeekIdx);
+
+  // Vorschau nächstes Training: "nächste Woche"-Projektion via
+  // getWeightRecommendation() ist hier legitim (echte Wochen-Historie,
+  // siehe DECISIONS.md/sessionSummary.js-Kommentar) — identisches
+  // Filter-Muster wie B77s renderExercise()-Berechnung.
+  let nextWeekWeight = null;
+  const focusEx = day.exercises.find(ex => {
+    if (ex.archived) return false;
+    if ((ex.metric ?? 'reps') !== 'reps') return false;
+    const cat = resolveCategory(ex.substituteFor ?? ex.name, buildCategoryMap(state.customExercises));
+    return cat === 'Squat' || cat === 'Hinge' || cat === 'Push' || cat === 'Pull';
+  });
+  if (focusEx && (focusEx.progressionType ?? 'weight') !== 'reps') {
+    const calcWeeks = state.weeks
+      .filter(w => w.mode !== 'deload' && w.mode !== 'vacation')
+      .filter(w => w.days.some(d => d.exercises.some(e => e.name === focusEx.name && e.sets.some(s => s.status === 'success'))));
+    if (calcWeeks.length >= 2) {
+      const step = focusEx.weightStep || state.settings?.plateStep || 2.5;
+      const rec = getWeightRecommendation(focusEx.name, calcWeeks, step, focusEx.progressionMode ?? 'weight_first', focusEx.targetRepsMax ?? null);
+      nextWeekWeight = rec?.recommendedWeight ?? null;
+    }
+  }
+  const nextPreview = buildNextSessionPreview(day, state.customExercises, nextWeekWeight);
+
+  // Schlaf-Korrelation: einmalig, nur wenn genug Historie + nachweisbar.
+  let sleepInsight = null;
+  let sleepShown = true;
+  try { sleepShown = localStorage.getItem('train_sleep_insight_shown') === 'true'; } catch (_) { /* localStorage blockiert -> nie anzeigen (sicherer Default) */ sleepShown = true; }
+  if (!sleepShown) {
+    const realWeeks = state.weeks.filter(w => !w.isSeedWeek &&
+      w.days.some(d => d.exercises.some(ex => ex.sets.some(s => s.status === 'success' || s.status === 'fail'))));
+    if (realWeeks.length >= 8) {
+      const corr = calcSleepCorrelation(sortedWeeks);
+      if (corr.hasSig && corr.totalDaysWithSleep >= 6) {
+        sleepInsight = corr;
+      }
+    }
+  }
+
+  return { highlights, einordnung, nextPreview, sleepInsight, isVacation: !!day.isVacation };
+}
+
+function _showSessionSummary(di, completionStats) {
+  const data = _buildSessionSummaryData(di);
+  if (!data || data.isVacation) { _showCompletionScreen(completionStats); return; }
+
+  document.getElementById('session-summary-screen')?.remove();
+  const el = document.createElement('div');
+  el.id        = 'session-summary-screen';
+  el.className = 'session-summary-screen';
+  el.innerHTML = `
+    <div class="session-summary-screen__inner">
+      <div class="session-summary-screen__title">Session Summary</div>
+      ${data.highlights.length ? `
+      <div class="session-summary-screen__highlights">
+        ${data.highlights.map(t => `<div class="session-summary-screen__highlight">${h(t)}</div>`).join('')}
+      </div>` : ''}
+      <p class="session-summary-screen__einordnung">${h(data.einordnung)}</p>
+      ${data.nextPreview ? `<div class="session-summary-screen__next">${h(data.nextPreview)}</div>` : ''}
+      ${data.sleepInsight ? `
+      <div class="sleep-insight-card">
+        <div class="sleep-insight-card__title">💡 ERKENNTNIS</div>
+        <p class="sleep-insight-card__body">Deine Trainings nach &lt;7h Schlaf: ø ${data.sleepInsight.poorAvg}% Erfolgsquote<br>Nach &gt;7h Schlaf: ø ${data.sleepInsight.goodAvg}%</p>
+        <p class="sleep-insight-card__conclusion">Schlaf ist dein größter Hebel für bessere Trainings.</p>
+      </div>` : ''}
+      <button type="button" class="btn btn--accent session-summary-screen__btn" id="session-summary-continue">Weiter</button>
+    </div>`;
+  document.body.appendChild(el);
+
+  if (data.sleepInsight) {
+    try { localStorage.setItem('train_sleep_insight_shown', 'true'); } catch (_) { /* best effort */ }
+  }
+
+  const proceed = () => { el.remove(); _showCompletionScreen(completionStats); };
+  el.querySelector('#session-summary-continue')?.addEventListener('click', proceed, { once: true });
+}
+
 function _finishCompletion(di, rating, sleepHours, energyLevel) {
   document.getElementById('day-completion-modal')?.remove();
   _completionModalDi = null;
@@ -7363,7 +7527,11 @@ function _finishCompletion(di, rating, sleepHours, energyLevel) {
     }
   }
 
-  setTimeout(() => _showCompletionScreen(stats), 300);
+  // B79: Session Summary erscheint VOR dem bestehenden Tagesabschluss-Screen
+  // (Highlights/Einordnung/Vorschau, optional einmalige Schlaf-Erkenntnis) —
+  // _showSessionSummary() ruft _showCompletionScreen() selbst als Fortsetzung
+  // auf (via "Weiter"-Button), Urlaubstage überspringen die Summary direkt.
+  setTimeout(() => _showSessionSummary(di, stats), 300);
 }
 
 function _showVacationWeekPopup() {
