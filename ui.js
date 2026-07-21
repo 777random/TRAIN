@@ -4452,7 +4452,7 @@ function renderSettingsTab(state) {
   <div class="settings-section">
     <div class="settings-section__title">Info</div>
     <div class="settings-row">
-      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v194</div></div>
+      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v195</div></div>
     </div>
     <div class="settings-row">
       <div>
@@ -7894,7 +7894,7 @@ function _showOnboarding() {
   let _optionalOpen    = false;   // <details> state — survives innerHTML rebuilds
   let _startwerteOpen  = false;   // <details> state for startwerte section
   let _startwerte      = {};      // { [exerciseName]: { weight, reps, rpe } }
-  let _obPhase         = 'setup'; // 'setup' | 'install' — Install-Screen läuft NACH der Vorlagen-Wahl, siehe _afterSetup()
+  let _obPhase         = 'setup'; // 'setup' | 'privacy' | 'install' — Datenschutz-Screen läuft NACH der Vorlagen-Wahl (siehe _afterSetup()), IMMER gezeigt (nicht plattform-abhängig); Install-Screen danach nur wenn sinnvoll (siehe _afterPrivacy())
   let _iosHelpOpen     = false;   // Anleitung ausgeklappt (iOS hat kein beforeinstallprompt, nur manuelle Anleitung möglich)
 
   const el = document.createElement('div');
@@ -7917,6 +7917,24 @@ function _showOnboarding() {
   document.body.appendChild(el);
 
   function _render() {
+    if (_obPhase === 'privacy') {
+      el.innerHTML = `
+        <div class="ob-screen">
+          <div style="font-size:48px;line-height:1">🔒</div>
+          <h2 class="ob-title ob-title--sm">Deine Daten bleiben bei dir</h2>
+          <p class="ob-sub">TRAIN hat kein Konto und keinen Server — alle deine Trainingsdaten (Sätze, Gewichte, Schlaf, Energie) bleiben ausschließlich auf diesem Gerät.</p>
+          <div class="ob-backup-warn">
+            ⚠️ Löschst du den Browser-Cache/die Website-Daten oder setzt du
+            dein Gerät zurück, sind diese Daten <strong>unwiderruflich weg</strong>
+            — TRAIN hat keine Kopie und kann sie nicht wiederherstellen.
+            Sichere sie deshalb regelmäßig über
+            <strong>Einstellungen → Backup</strong> (JSON-Export).
+          </div>
+          <button class="btn btn--accent ob-btn" data-ob="privacy-continue">Verstanden, weiter →</button>
+        </div>`;
+      return;
+    }
+
     if (_obPhase === 'install') {
       const isIOS = _isIOS();
       el.innerHTML = `
@@ -7924,9 +7942,6 @@ function _showOnboarding() {
           <div class="ob-logo">TRAIN</div>
           <h2 class="ob-title ob-title--sm">Bereit loszulegen</h2>
           <p class="ob-sub">Speichere TRAIN auf deinem Home-Bildschirm — startet dann wie eine echte App, ohne Browser-Leiste.</p>
-          <p class="ob-sub" style="font-size:13px">TRAIN ist 100% lokal — deine Trainingsdaten verlassen nie dieses Gerät.
-          <span style="color:var(--c-danger)">Löschst du Browser-Daten/Cache, sind sie unwiderruflich weg</span> —
-          sichere sie regelmäßig über Einstellungen → Backup.</p>
           <button class="btn btn--accent ob-btn" data-ob="${isIOS ? 'install-ios-help' : 'install-native'}">📲 Zum Home-Bildschirm hinzufügen</button>
           ${isIOS && _iosHelpOpen ? `
           <div class="ob-ios-help">
@@ -8077,17 +8092,30 @@ function _showOnboarding() {
       case 'install-ios-help':
         _iosHelpOpen = !_iosHelpOpen;
         _render(); break;
+      case 'privacy-continue':
+        _afterPrivacy(); break;
       case 'continue':
         _finish(); break;
     }
   });
+
+  // Datenschutz-Screen läuft nach JEDER Vorlagen-Wahl (Vorlage geladen ODER
+  // "Ohne Vorlage starten") — unconditional, anders als der Install-Screen
+  // unten. Vorher stand der einzige Hinweis auf lokale Speicherung/
+  // Datenverlust nur als ein einzelner Satz auf dem Install-Screen, der
+  // selbst plattformabhängig komplett übersprungen wird (Desktop-Firefox,
+  // bereits installiert) — dadurch sahen diese Nutzer den Hinweis nie.
+  function _afterSetup() {
+    _obPhase = 'privacy';
+    _render();
+  }
 
   // Install-Screen nur zeigen, wenn er auch etwas Sinnvolles tun kann: iOS
   // (nur Anleitung möglich, kein echter Prompt) ODER ein von index.html
   // eingefangenes beforeinstallprompt-Event liegt vor (Chrome/Edge/Android).
   // Sonst (Desktop-Firefox, bereits installiert, ...) direkt fertigstellen
   // statt einen Screen zu zeigen, der nichts bewirken kann.
-  function _afterSetup() {
+  function _afterPrivacy() {
     if (!_isStandalone() && (_isIOS() || window.__trainInstallPrompt)) {
       _obPhase = 'install';
       _render();

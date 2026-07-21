@@ -1,5 +1,5 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-21, Loops 7-11 (Advisor-Exports aus allen Perspektiven: Produkt/Markt/UX/Growth/Konsolidiert) ergänzt (nur Doku, train-v194/SCHEMA 32 unverändert)*
+*Letzte Aktualisierung: 2026-07-21, B81 eigener Datenschutz/Backup-Onboarding-Screen (train-v195, SCHEMA 32 unverändert)*
 *Nächster Schritt: B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md) — braucht Name+Adresse+E-Mail vom Nutzer. B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten. B78 (autoStartPauseTimer respektiert nur den confirm-set-Pfad) bleibt offen, low priority. Loops 7-11 aktiv: Advisor-Exports werden am Ende jeder Session automatisch aktualisiert. for-advisor-consolidated.txt = Startpunkt für neue externe Chats. Keine weiteren offenen Rückfragen aus diesem Sprint.*
 
 ---
@@ -20,6 +20,37 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
   dem bestehenden Plateau-Mechanismus)
 - Letzter Commit: siehe `git log` (dieser Sprint noch nicht gepusht,
   siehe Sprint-Ende-Workflow).
+- **B81 — eigener Datenschutz/Backup-Onboarding-Screen (train-v195):**
+  Nutzer fragte gezielt nach, ob die in den neuen Advisor-Exports
+  (for-advisor-product.txt/-ux.txt) genannte Lücke ("Vertrauens-Moment
+  für kein Cloud-Backup sollte im Onboarding selbst stehen, nicht nur in
+  den Einstellungen") bereits umgesetzt wurde. Antwort: teilweise — B60
+  (train-v182) hatte dafür einen einzelnen Satz auf dem plattform-
+  abhängigen Install-Screen ergänzt. Beim genaueren Hinsehen (Code-Fund,
+  nicht nur Doku-Abgleich): dieser Install-Screen selbst läuft nur
+  bedingt (`_afterPrivacy()`, ui.js) — nur bei iOS oder eingefangenem
+  `beforeinstallprompt` (Android/Chrome/Edge). Desktop-Firefox-Nutzer
+  oder bereits als PWA installierte Nutzer übersprangen den ganzen
+  Screen und sahen den Hinweis NIE. Nutzer bat darum, das jetzt richtig
+  zu lösen: ein eigener Screen statt nur ein Satz. **Umsetzung:** neuer
+  `_obPhase='privacy'` (ui.js) läuft UNCONDITIONAL direkt nach der
+  Vorlagen-Wahl (nach "Vorlage laden" UND nach "Ohne Vorlage starten"),
+  vor dem weiterhin bedingten Install-Screen — `_afterSetup()` führt
+  jetzt dorthin, die alte Install-Entscheidungslogik wanderte in eine
+  neue `_afterPrivacy()`. Eigener, optisch abgesetzter Warnkasten
+  (`.ob-backup-warn` — bereits seit einem früheren Onboarding-Entwurf in
+  styles.css vorhanden, aber bis dahin nirgends verwendet; jetzt
+  erstmals bespielt statt eine neue CSS-Klasse anzulegen, daher kein
+  CSS-Versions-Bump nötig). Der redundante Einzeiler auf dem Install-
+  Screen wurde entfernt (ersetzt, nicht dupliziert). Kein neues State-
+  Feld, SCHEMA unverändert. Verifiziert per 2 neuen Tests
+  (`tests/onboarding_privacy_screen.spec.js`, in CI): beide Pfade
+  (Vorlage laden / Leer-Start) zeigen den Screen, Fortsetzen führt in
+  Headless-Chromium (kein iOS, kein `beforeinstallprompt`) direkt zur
+  fertigen App. Per Screenshot visuell verifiziert (Schloss-Icon, Titel
+  "Deine Daten bleiben bei dir", Warnbox, Weiter-Button — konsistent zum
+  bestehenden Onboarding-Stil). Volle Suite 74/74 grün. CACHE_VERSION
+  train-v194→v195, CSS/SCHEMA unverändert.
 - **Loops 7-11 ergänzt: Advisor-Exports für alle Perspektiven (kein
   Code-Sprint, reine Doku/Prozess-Änderung, CACHE_VERSION/CSS/SCHEMA
   unverändert):** Bisher gab es nur zwei Advisor-Export-Formen: einen

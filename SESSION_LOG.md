@@ -2,6 +2,27 @@
 # Automatisch von Claude Code
 # befüllt beim Session-Start
 
+## 2026-07-21 train-v195 (B81 — eigener Datenschutz/Backup-Onboarding-Screen)
+Loop 1: 10/10 grün ✓ (Regressionstest), volle Suite 74/74 grün ✓ (2 neue Tests)
+Loop 2: aktuell ✓ (CLAUDE.md/HANDOFF.md/BUGS.md konsistent auf train-v195 gebracht)
+Loop 3: übersprungen — Stop-Bedingung bereits erfüllt (17/15 Edge-Case-Fixtures)
+Loop 6: übersprungen (zuletzt: 2026-07-21, 90-Tage-Intervall noch nicht erreicht)
+Eigentliche Aufgabe: Nutzer fragte nach, ob eine in den neuen Advisor-
+  Exports genannte Onboarding-Lücke ("Backup-Vertrauens-Hinweis nicht
+  prominent im Onboarding") bereits geschlossen ist. Antwort per Code-
+  Fund: teilweise (B60/v182, ein Satz auf dem plattformabhängigen
+  Install-Screen) — aber dieser Screen wird auf Desktop-Firefox/bereits-
+  installierten PWAs komplett übersprungen, diese Nutzer sahen den
+  Hinweis nie. Nutzer bat um eine echte Lösung: eigener Onboarding-
+  Screen statt nur ein Satz. Neuer `_obPhase='privacy'` (ui.js) läuft
+  jetzt unconditional nach der Vorlagen-Wahl, unabhängig vom weiterhin
+  bedingten Install-Screen danach. Wiederverwendet eine bereits
+  vorhandene, bis dahin unbenutzte CSS-Klasse (`.ob-backup-warn`) statt
+  eine neue anzulegen. 2 neue Tests (`tests/onboarding_privacy_screen.
+  spec.js`), Screenshot-Verifikation. CACHE_VERSION train-v194→v195.
+  CLAUDE.md/HANDOFF.md/BUGS.md (B81) aktualisiert, committed + gepusht,
+  Milestone-Backup angelegt.
+
 ## 2026-07-21 train-v194 (neuer-advisor-chat.txt auf Zwei-Datei-Prinzip umgestellt)
 Loop 1: 10/10 grün ✓ (keine Code-Änderung)
 Loop 2: aktuell ✓ (keine Abweichung gefunden)
