@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-21, B81 eigener Datenschutz/Backup-Onboarding-Screen (train-v195, SCHEMA 32 unverändert)*
-*Nächster Schritt: B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md) — braucht Name+Adresse+E-Mail vom Nutzer. B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten. B78 (autoStartPauseTimer respektiert nur den confirm-set-Pfad) bleibt offen, low priority. Loops 7-11 aktiv: Advisor-Exports werden am Ende jeder Session automatisch aktualisiert. for-advisor-consolidated.txt = Startpunkt für neue externe Chats. Keine weiteren offenen Rückfragen aus diesem Sprint.*
+*Letzte Aktualisierung: 2026-07-21, B82 Session Coach "heute" = aktiver Tag der aktuellen Woche statt kalendarisch (train-v196, SCHEMA 32 unverändert)*
+*Nächster Schritt: B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md) — braucht Name+Adresse+E-Mail vom Nutzer. B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten. B78 (autoStartPauseTimer respektiert nur den confirm-set-Pfad) bleibt offen, low priority. B83 (_skippedCheckIn nicht zwischen Wochen zurückgesetzt) neu dokumentiert, Low. Loops 7-11 aktiv: Advisor-Exports werden am Ende jeder Session automatisch aktualisiert. for-advisor-consolidated.txt = Startpunkt für neue externe Chats. Keine weiteren offenen Rückfragen aus diesem Sprint.*
 
 ---
 
@@ -20,6 +20,45 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
   dem bestehenden Plateau-Mechanismus)
 - Letzter Commit: siehe `git log` (dieser Sprint noch nicht gepusht,
   siehe Sprint-Ende-Workflow).
+- **B82 — Session Coach "heute" = aktiver Tag statt kalendarisch
+  (train-v196):** direkter Anschluss an die vorherige reine Diagnose-
+  Session (keine Änderungen dort). Root Cause bereits vollständig
+  bekannt: `_isTodayDay(wk, di)` leitete das Datum eines Tages rein aus
+  seinem Array-Index ab (`wk.startDate + di Tage`) — bei einem 3x/Woche-
+  Split (z.B. Mo/Mi/Fr) berechnete das für Tag-Index 2 ("Freitag"
+  gemeint) immer Mittwoch, wodurch Pre-Session Check-in, Intra-Session
+  Feedback UND Pause-Timer-Empfehlung (alle drei teilen sich exakt diese
+  eine Gating-Funktion) nie erschienen. Nutzer gab die Produktentscheidung
+  vor: "heute" bedeutet für den Session Coach nicht mehr kalendarisch,
+  sondern "offener Tag in der aktuellen Trainingswoche" (siehe
+  DECISIONS.md). **Abweichung von der vorgeschlagenen Umsetzung, nach
+  Verifikation gegen den echten Code korrigiert:** die Vorlage schlug
+  `wk.startDate === state.weeks[state.curIdx].startDate` vor — das ist
+  aber eine Tautologie (an jeder Aufrufstelle IST `wk` bereits exakt
+  `state.weeks[state.curIdx]`, siehe `render()` ui.js:647) und
+  `WEEK_NAVIGATE` ändert `curIdx` auch beim reinen Durchblättern
+  vergangener Wochen — mit der vorgeschlagenen Formel wäre Session Coach
+  fälschlich auch in alten, längst abgeschlossenen Wochen wieder
+  aufgetaucht, sobald der Nutzer dorthin navigiert (verifiziert per
+  eigenem Playwright-Test, der dieses Szenario abdeckt). Stattdessen
+  gegen `getLatestWeek(state.weeks)` verglichen — dieselbe, bereits an
+  anderer Stelle etablierte Lösung für "aktuelle Woche, unabhängig von
+  Navigation" (`_relativeWeekLabel()`, B72). Kein neues State-Feld,
+  SCHEMA unverändert, nur `ui.js` geändert (Constraint eingehalten).
+  **Nebenbefund dokumentiert, nicht gefixt (B83, Low):**
+  `_skippedCheckIn` (Modul-Set, keyed nur nach Tag-Index) wird nie
+  zurückgesetzt — Effekt verschwindet spätestens beim nächsten
+  Seiten-Reload, daher bewusst zurückgestellt. Verifiziert per 5 neuen
+  Tests (`tests/session_coach_active_week.spec.js`, in CI): Mo/Mi/Fr-
+  Split-Szenario zeigt jetzt korrekt Session Coach, abgeschlossene Tage
+  weiterhin nicht, eine vergangene Woche (nach Zurück-Navigation) zeigt
+  weiterhin nichts (genau der Fall, den die naive Umsetzung gebrochen
+  hätte), mehrere gleichzeitig offene Tage zeigen beide korrekt,
+  Intra-Session-Feedback erscheint nach Satz+RPE. Volle Suite grün (1
+  bekannter Flake bei `delete_all_data.spec.js` unter Parallel-Last,
+  isoliert erneut grün — vorbestehend, siehe LOOPS.md, kein
+  Zusammenhang mit diesem Fix). CACHE_VERSION train-v195→v196,
+  CSS/SCHEMA unverändert.
 - **B81 — eigener Datenschutz/Backup-Onboarding-Screen (train-v195):**
   Nutzer fragte gezielt nach, ob die in den neuen Advisor-Exports
   (for-advisor-product.txt/-ux.txt) genannte Lücke ("Vertrauens-Moment

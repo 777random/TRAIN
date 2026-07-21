@@ -1074,9 +1074,37 @@ function _prevWeekBanner(state, wk, di) {
   </div>`;
 }
 
-/** Ist (wk, di) das heutige Kalenderdatum? Nutzt den bestehenden _dayDate()-Helfer. */
+/**
+ * Ist (wk, di) der Tag, für den der Session Coach aktiv sein soll?
+ *
+ * Semantik seit diesem Fix: NICHT mehr "kalendarisch heute" (Diagnose
+ * ergab: die alte Implementierung leitete das Datum eines Tages rein aus
+ * `wk.startDate + di Tage` ab — das setzt tägliches Training an
+ * aufeinanderfolgenden Tagen voraus. Ein Mo/Mi/Fr-Split hätte für
+ * Tag-Index 2 ("Freitag" gemeint) immer Mittwoch berechnet und den
+ * Session Coach dadurch nie gezeigt, siehe BUGS.md). Neue Semantik:
+ * "offener Tag in der aktuellen Trainingswoche" — das Kalenderdatum ist
+ * irrelevant, ein Athlet der einen Tag aufklappt und trainiert, trainiert
+ * "heute" unabhängig vom Wochentag.
+ *
+ * WICHTIG (Abweichung von der ursprünglich vorgeschlagenen Umsetzung):
+ * "aktuelle Woche" wird NICHT über `state.weeks[state.curIdx]` bestimmt.
+ * `wk` ist an jeder Aufrufstelle hier bereits exakt `state.weeks[state.
+ * curIdx]` (siehe render(), ui.js) — ein Vergleich von `wk` gegen
+ * `state.weeks[state.curIdx]` wäre daher eine Tautologie (immer wahr) und
+ * WEEK_NAVIGATE ändert curIdx auch beim reinen Durchblättern vergangener
+ * Wochen (state.js, WEEK_NAVIGATE-Reducer). Das hätte den Session Coach
+ * fälschlich auch in alten Wochen gezeigt. Stattdessen wie bereits an
+ * anderer Stelle etabliert (_relativeWeekLabel, B72/DECISIONS.md
+ * "Letzte Woche mit echten Daten per Rückwärtssuche, nicht per Array-
+ * Position") gegen `getLatestWeek()` verglichen — die chronologisch
+ * letzte Woche, unabhängig von Navigation.
+ */
 function _isTodayDay(wk, di) {
-  return _dayDate(wk, di).toDateString() === new Date().toDateString();
+  const day = wk.days[di];
+  if (!day || day.markedDone) return false;
+  const latest = getLatestWeek(getState().weeks);
+  return !!latest && wk.startDate === latest.startDate;
 }
 
 /**
@@ -4452,7 +4480,7 @@ function renderSettingsTab(state) {
   <div class="settings-section">
     <div class="settings-section__title">Info</div>
     <div class="settings-row">
-      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v195</div></div>
+      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v196</div></div>
     </div>
     <div class="settings-row">
       <div>

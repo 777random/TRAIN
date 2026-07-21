@@ -2,6 +2,39 @@
 # Automatisch von Claude Code
 # befüllt beim Session-Start
 
+## 2026-07-21 train-v196 (B82 — Session Coach "heute" = aktiver Tag statt kalendarisch)
+Loop 1: 10/10 grün ✓ (vor UND nach dem Fix), volle Suite grün (1 bekannter
+  Flake bei delete_all_data.spec.js unter Parallel-Last, isoliert grün,
+  vorbestehend/unabhängig von diesem Fix)
+Loop 2: aktuell ✓ (CLAUDE.md/HANDOFF.md/BUGS.md auf train-v196 gebracht)
+Loop 3: übersprungen — Stop-Bedingung bereits erfüllt (17/15 Edge-Case-Fixtures)
+Loop 6: übersprungen (zuletzt: 2026-07-21, 90-Tage-Intervall noch nicht erreicht)
+Eigentliche Aufgabe: direkter Anschluss an die vorherige reine Diagnose-
+  Session. Root Cause bestätigt: `_isTodayDay(wk, di)` (ui.js) berechnete
+  das Datum eines Tages aus `wk.startDate + Array-Index`, was tägliches
+  Training an aufeinanderfolgenden Tagen voraussetzt — ein 3x/Woche-Split
+  (Mo/Mi/Fr) zeigte den Session Coach dadurch nie. Nutzer gab die Fix-
+  Richtung vor: "heute" = "offener Tag der aktuellen Woche", nicht mehr
+  kalendarisch. **Wichtige Korrektur während der Umsetzung:** die vom
+  Nutzer vorgeschlagene konkrete Implementierung (`wk.startDate ===
+  state.weeks[state.curIdx].startDate`) wäre eine Tautologie gewesen (wk
+  IST an jeder Aufrufstelle bereits state.weeks[state.curIdx]) und hätte
+  Session Coach fälschlich auch in vergangenen, per WEEK_NAVIGATE
+  besuchten Wochen gezeigt — nicht blind übernommen, sondern gegen den
+  echten Code verifiziert und stattdessen `getLatestWeek(state.weeks)`
+  verwendet (bereits etabliertes Muster aus B72). Dieser Unterschied
+  wurde per dediziertem Playwright-Test explizit nachgewiesen (Test
+  "Vergangene Woche" hätte mit der ursprünglichen Formel fehlgeschlagen).
+  5 neue Tests (`tests/session_coach_active_week.spec.js`), alle
+  Qualitätsprüfungs-Punkte manuell/automatisiert verifiziert.
+  CACHE_VERSION train-v195→v196. BUGS.md (B82 behoben, B83 Nebenbefund
+  offen dokumentiert), DECISIONS.md (neue "heute"-Definition),
+  HANDOFF.md aktualisiert. Committed + gepusht.
+Loop 5/7/11: for-advisor.txt / for-advisor-product.txt /
+  for-advisor-consolidated.txt aktualisiert (Session-Coach-Beschreibung
+  korrigiert: gilt jetzt für jeden offenen Tag der aktuellen Woche, nicht
+  nur "den heutigen Tag").
+
 ## 2026-07-21 train-v195 (B81 — eigener Datenschutz/Backup-Onboarding-Screen)
 Loop 1: 10/10 grün ✓ (Regressionstest), volle Suite 74/74 grün ✓ (2 neue Tests)
 Loop 2: aktuell ✓ (CLAUDE.md/HANDOFF.md/BUGS.md konsistent auf train-v195 gebracht)
