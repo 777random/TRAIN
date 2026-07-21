@@ -1,41 +1,168 @@
 # Neuen Advisor-Chat starten
 
-1. context-exports/for-advisor-consolidated.txt vollständig in den neuen
-   Chat einfügen (enthält Produkt + Markt vollständig, UX + Growth als
-   Kurzfassung, plus alle offenen Fragen priorisiert — siehe Teil 5
-   dieser Datei).
+## Prinzip
 
-2. Thematischen Fokus ergänzen — je nach Ziel des Gesprächs einen der
-   folgenden fünf Zusätze anhängen:
+Jeder thematische Chat bekommt genau zwei Dateien:
 
-   MARKT & KONKURRENZ:
-   "Fokus: Positionierung gegen Fitbod jetzt wo Session Coach existiert.
-   Preisvalidierung. Ist 'Intra-Session Coaching' eine kommunizierbare
-   Kategorie?"
+1. for-advisor-product.txt (IMMER — Basis-Kontext)
+2. Die thematische Datei (je nach Perspektive)
 
-   UX & ONBOARDING:
-   "Fokus: erster Eindruck neuer Nutzer. Wo ist der erste Aha-Moment?
-   Wie erklärt sich Session Coach von selbst?"
+NICHT den konsolidierten Export verwenden für fokussierte Chats. Den
+konsolidierten Export nur für strategische Gesamtentscheidungen die alle
+Perspektiven gleichzeitig brauchen.
 
-   GROWTH & DISTRIBUTION:
-   "Fokus: erste 20 Nutzer. Reddit-Post schreiben. Share-Feature als
-   Wachstumshebel nutzen."
+---
 
-   MONETARISIERUNG:
-   "Fokus: Freemium-Grenze, 8-12€ validieren, Paywall-UX ohne Dark
-   Patterns."
+## MARKT & KONKURRENZ
 
-   PRODUKT-ROADMAP:
-   "Fokus: Prioritäten nach Launch. Wie Nutzer-Feedback in Features
-   übersetzen?"
+Dateien:
+  context-exports/for-advisor-product.txt
+  context-exports/for-advisor-market.txt
 
-3. Teil 5 aus for-advisor-consolidated.txt ("Alle offenen Fragen",
-   priorisiert HOCH/MITTEL/NIEDRIG) als Gesprächseinstieg verwenden —
-   je nach gewähltem Fokus die dort passenden Fragen zuerst aufgreifen.
+Fokus ergänzen:
+  "Fokus: Markt & Konkurrenzanalyse.
 
-Hinweis: Für eine tiefere Diskussion in genau einem Einzelbereich kann
-statt der konsolidierten Datei auch direkt das jeweilige Volldokument
-verwendet werden (`for-advisor-product.txt`, `for-advisor-market.txt`,
-`for-advisor-ux.txt`, `for-advisor-growth.txt`, alle in
-context-exports/) — die Kurzfassungen (UX/Growth) enthalten weniger
-Detail als ihre Volldokumente.
+  TRAIN hat einen fundamentalen Shift gemacht: von 'Wochenanalyse' zu
+  'Intra-Session Coaching nach jedem Satz' (Session Coach, train-v192+).
+
+  Fragen:
+  1. Wer sind jetzt die echten Konkurrenten — hat sich das durch Session
+     Coach verändert?
+
+  2. Fitbod generiert Workouts, TRAIN coacht während der Ausführung.
+     Verschiedene Kategorien oder Überschneidung?
+
+  3. Ist 'Intra-Session Coaching' eine Kategorie die Athleten aktiv
+     suchen — oder muss TRAIN erst erklären dass sie dieses Problem
+     haben?
+
+  4. Rechtfertigt Session Coach einen anderen Preispunkt als 8-12€?
+
+  5. Gibt es Konkurrenten die wir noch nicht kennen?
+
+  Sei kritisch — nicht bestätigend."
+
+---
+
+## UX & ONBOARDING
+
+Dateien:
+  context-exports/for-advisor-product.txt
+  context-exports/for-advisor-ux.txt
+
+Fokus ergänzen:
+  "Fokus: UX & Onboarding.
+
+  Fragen:
+  1. Versteht ein neuer Nutzer in 3 Minuten was TRAIN anders macht als
+     Hevy/Strong?
+
+  2. Wann ist der erste Aha-Moment? Wie früher erlebbar machen?
+
+  3. Session Coach erklärt sich nicht selbst beim ersten Start — wie
+     lösen?
+
+  4. Wo springen neue Nutzer wahrscheinlich ab?
+
+  5. Backup-Verlust-Risiko: wann und wie kommunizieren ohne zu
+     erschrecken?
+
+  Sei kritisch — nicht bestätigend."
+
+---
+
+## GROWTH & DISTRIBUTION
+
+Dateien:
+  context-exports/for-advisor-product.txt
+  context-exports/for-advisor-growth.txt
+
+Fokus ergänzen:
+  "Fokus: Growth & Distribution.
+
+  Stand: 0 echte Nutzer, noch nicht öffentlich beworben, Launch steht
+  unmittelbar bevor.
+
+  Fragen:
+  1. Welcher Kanal bringt die ersten 20 Nutzer wirklich — nicht
+     theoretisch?
+
+  2. Share-Feature: Sparkline + Hook-Satz '+4kg in 5 Wochen' — wie als
+     Wachstumshebel aktivieren?
+
+  3. Reddit-Post: was ist der Unterschied zwischen einem Post der
+     ignoriert wird und einem der konvertiert?
+
+  4. Coach-Kooperation: wie lokale Trainer ansprechen?
+
+  5. Eigene Domain vs. github.io: wann ist der richtige Moment?
+
+  Sei kritisch — nicht bestätigend."
+
+---
+
+## MONETARISIERUNG & PRICING
+
+Dateien:
+  context-exports/for-advisor-product.txt
+  context-exports/for-advisor-market.txt
+
+Fokus ergänzen:
+  "Fokus: Monetarisierung & Pricing.
+
+  Stand: Logging kostenlos, Coaching 8-12€/Mo geplant, noch keine
+  zahlenden Nutzer.
+
+  Fragen:
+  1. Ist die Freemium-Grenze richtig gezogen — ist die kostenlose Stufe
+     zu großzügig?
+
+  2. 8-12€/Mo: zu viel, zu wenig, genau richtig für diese Zielgruppe?
+
+  3. Jahrestarif sofort einführen oder erst nach Monatsdaten?
+
+  4. Welche Features MÜSSEN hinter die Paywall damit der Upgrade-Anreiz
+     real ist?
+
+  5. Paywall-UX: wie ohne Dark Patterns aufbauen?
+
+  Sei kritisch — nicht bestätigend."
+
+---
+
+## PRODUKT-ROADMAP
+
+Dateien:
+  context-exports/for-advisor-product.txt
+  context-exports/for-advisor-growth.txt
+
+Fokus ergänzen:
+  "Fokus: Produkt-Roadmap nach dem Launch.
+
+  Fragen:
+  1. Welche Features aus der Konzept-Liste (Muskelkater, Aufwärmen,
+     Coaching-Filter) haben den höchsten Hebel für Retention?
+
+  2. Wie Nutzer-Feedback in Feature-Prioritäten übersetzen ohne in
+     Feature-Drift zu verfallen?
+
+  3. Wann ist der richtige Moment für Cloud-Sync?
+
+  4. Englisch: wann und wie?
+
+  5. Was würde TRAIN für fortgeschrittene Nutzer unverzichtbar machen die
+     bereits 2+ Jahre trainieren?
+
+  Sei kritisch — nicht bestätigend."
+
+---
+
+## STRATEGISCHE GESAMTENTSCHEIDUNGEN
+
+(Wenn alle Perspektiven gleichzeitig gebraucht werden)
+
+Datei:
+  context-exports/for-advisor-consolidated.txt
+
+Fokus: eigene Fragen formulieren basierend auf dem aktuellen
+strategischen Problem.
