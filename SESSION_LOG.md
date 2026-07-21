@@ -2,6 +2,24 @@
 # Automatisch von Claude Code
 # befüllt beim Session-Start
 
+## 2026-07-21 train-v194 (neuer-advisor-chat.txt auf Zwei-Datei-Prinzip umgestellt)
+Loop 1: 10/10 grün ✓ (keine Code-Änderung)
+Loop 2: aktuell ✓ (keine Abweichung gefunden)
+Loop 3: übersprungen — Stop-Bedingung bereits erfüllt (17/15 Edge-Case-Fixtures)
+Loop 6: übersprungen (zuletzt: 2026-07-21, 90-Tage-Intervall noch nicht erreicht)
+Eigentliche Aufgabe: prompts/neuer-advisor-chat.txt komplett ersetzt (Nutzer-
+  Vorgabe) — statt IMMER den konsolidierten Export zu verwenden, bekommt
+  jeder thematische Advisor-Chat jetzt genau 2 Dateien (for-advisor-
+  product.txt als Basis + die passende thematische Datei: market/ux/
+  growth), mit vorformulierten kritischen Fragen pro Perspektive (inkl.
+  neuer 6. Perspektive "Monetarisierung & Pricing", die vorher nicht als
+  eigener Fokus existierte). Der konsolidierte Export bleibt reserviert
+  für strategische Gesamtentscheidungen, die alle Perspektiven
+  gleichzeitig brauchen. Committed (`73bbdb6`) + gepusht.
+Loop 5/7-11: nicht erneut ausgeführt — reine Prompt-Vorlagen-Änderung
+  ohne inhaltlichen Anlass, die Advisor-Export-Dateien selbst sind
+  unverändert gültig.
+
 ## 2026-07-21 train-v194 (GoatCounter-SRI-Verifizierung + Loop 6 + Loops 7-11 Advisor-Exports)
 Loop 1: 10/10 grün ✓ (keine Code-Änderung in dieser Session)
 Loop 2: aktuell ✓ (HANDOFF.md/CLAUDE.md waren bereits konsistent mit sw.js/index.html)
