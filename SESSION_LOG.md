@@ -2,6 +2,51 @@
 # Automatisch von Claude Code
 # befüllt beim Session-Start
 
+## 2026-07-21 train-v194 (GoatCounter-SRI-Verifizierung + Loop 6 + Loops 7-11 Advisor-Exports)
+Loop 1: 10/10 grün ✓ (keine Code-Änderung in dieser Session)
+Loop 2: aktuell ✓ (HANDOFF.md/CLAUDE.md waren bereits konsistent mit sw.js/index.html)
+Loop 6 (neu, erstmals ausgeführt): geprüft — count.v5.js weiterhin aktuell,
+  Hash in index.html stimmt exakt mit der offiziell publizierten SRI-Angabe
+  überein. Nächste fällige Prüfung: ~2026-10-19 (90-Tage-Intervall).
+Eigentliche Aufgabe (Teil 1): Nutzer bat um einen SRI-Hash-Fix für
+  GoatCounter. Vor der Umsetzung geprüft: bereits seit train-v182/v183
+  korrekt umgesetzt, kein neuer Fund. Auf Nutzerwunsch stattdessen einen
+  periodischen (90-tägigen) Versions-Check als neuen Loop 6 in LOOPS.md
+  ergänzt (Begründung: reale Release-Historie von count.js zeigt Abstände
+  von 3-24 Monaten, ein 2-4-wöchentlicher Check wäre reiner Overhead).
+  BUGS.md B80 + HANDOFF.md dokumentiert, committed (`c1a8774`) + gepusht,
+  Milestone-Backup angelegt.
+Eigentliche Aufgabe (Teil 2): Nutzer bat um 5 neue Perspektiven-Advisor-
+  Exports (Produkt/Markt/UX/Growth/Konsolidiert) plus zugehörige Loops
+  7-11 in LOOPS.md. Alle 5 Dateien in context-exports/ erstellt (Produkt
+  + Markt vollständig, UX + Growth als Kurzfassung, Konsolidiert fasst
+  alle vier zusammen inkl. priorisierter Liste aller offenen Fragen).
+  Neue Datei `prompts/neuer-advisor-chat.txt` (5 thematische
+  Fokus-Varianten). CLAUDE.md-Projektdokumente-Tabelle und HANDOFF.md
+  entsprechend ergänzt.
+  **Wichtiger Fund während der Konsolidierung:** `context-exports/` ist
+  komplett gitignored (bestehende, dokumentierte Konvention aus Loop 5 —
+  "rein lokales Artefakt", vermutlich weil das Repo öffentlich ist und
+  diese Exporte Preis-/Wachstumsstrategie enthalten). Die Aufgabenvorlage
+  ging implizit davon aus, dass alle 5 neuen Dateien mitcommitted/
+  gepusht werden — das hätte der bestehenden Konvention widersprochen.
+  Per Rückfrage beim Nutzer geklärt: gitignored bleibt (Empfehlung
+  befolgt) — nur LOOPS.md/CLAUDE.md/HANDOFF.md/prompts/neuer-advisor-
+  chat.txt werden getrackt, die 5 Advisor-Dateien selbst bleiben lokal,
+  wie bereits bei for-advisor.txt (Loop 5) etabliert.
+Loop 5: for-advisor.txt aktualisiert (21. Fassung) — kurzer Hinweisabsatz
+  auf die beiden reinen Doku/Prozess-Änderungen dieser Session ergänzt
+  (GoatCounter-Verifizierung + neue Perspektiven-Exporte), Rest
+  unverändert (kein Code-Sprint).
+Loop 7: for-advisor-product.txt neu erstellt (vollständig).
+Loop 8: for-advisor-market.txt neu erstellt (vollständig, inkl. Hevy/
+  Strong/Fitbod/RP-Hypertrophy-Preisvergleich Stand 2026).
+Loop 9: for-advisor-ux.txt neu erstellt (Kurzfassung).
+Loop 10: for-advisor-growth.txt neu erstellt (Kurzfassung).
+Loop 11: for-advisor-consolidated.txt neu erstellt (letzter Loop der
+  Session) — Teil 5 enthält 15 konsolidierte, deduplizierte offene
+  Fragen aus allen vier Quellen, priorisiert HOCH/MITTEL/NIEDRIG.
+
 ## 2026-07-14 train-v175 (B54 — Install-Button im Onboarding)
 Eigentliche Aufgabe: direkter Anschluss an die Pre-Launch-Checkliste (B51-B53).
   Nutzer fragte, ob im Onboarding ein Button platziert werden kann, der die

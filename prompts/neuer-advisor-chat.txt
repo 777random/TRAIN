@@ -1,0 +1,41 @@
+# Neuen Advisor-Chat starten
+
+1. context-exports/for-advisor-consolidated.txt vollständig in den neuen
+   Chat einfügen (enthält Produkt + Markt vollständig, UX + Growth als
+   Kurzfassung, plus alle offenen Fragen priorisiert — siehe Teil 5
+   dieser Datei).
+
+2. Thematischen Fokus ergänzen — je nach Ziel des Gesprächs einen der
+   folgenden fünf Zusätze anhängen:
+
+   MARKT & KONKURRENZ:
+   "Fokus: Positionierung gegen Fitbod jetzt wo Session Coach existiert.
+   Preisvalidierung. Ist 'Intra-Session Coaching' eine kommunizierbare
+   Kategorie?"
+
+   UX & ONBOARDING:
+   "Fokus: erster Eindruck neuer Nutzer. Wo ist der erste Aha-Moment?
+   Wie erklärt sich Session Coach von selbst?"
+
+   GROWTH & DISTRIBUTION:
+   "Fokus: erste 20 Nutzer. Reddit-Post schreiben. Share-Feature als
+   Wachstumshebel nutzen."
+
+   MONETARISIERUNG:
+   "Fokus: Freemium-Grenze, 8-12€ validieren, Paywall-UX ohne Dark
+   Patterns."
+
+   PRODUKT-ROADMAP:
+   "Fokus: Prioritäten nach Launch. Wie Nutzer-Feedback in Features
+   übersetzen?"
+
+3. Teil 5 aus for-advisor-consolidated.txt ("Alle offenen Fragen",
+   priorisiert HOCH/MITTEL/NIEDRIG) als Gesprächseinstieg verwenden —
+   je nach gewähltem Fokus die dort passenden Fragen zuerst aufgreifen.
+
+Hinweis: Für eine tiefere Diskussion in genau einem Einzelbereich kann
+statt der konsolidierten Datei auch direkt das jeweilige Volldokument
+verwendet werden (`for-advisor-product.txt`, `for-advisor-market.txt`,
+`for-advisor-ux.txt`, `for-advisor-growth.txt`, alle in
+context-exports/) — die Kurzfassungen (UX/Growth) enthalten weniger
+Detail als ihre Volldokumente.

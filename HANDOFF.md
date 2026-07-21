@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-21, GoatCounter-SRI verifiziert (kein neuer Fund) + Loop 6 (periodischer Versions-Check) ergänzt (nur Doku, train-v194/SCHEMA 32 unverändert)*
-*Nächster Schritt: B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md) — braucht Name+Adresse+E-Mail vom Nutzer. B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten. B78 (autoStartPauseTimer respektiert nur den confirm-set-Pfad) bleibt offen, low priority. Keine weiteren offenen Rückfragen aus diesem Sprint.*
+*Letzte Aktualisierung: 2026-07-21, Loops 7-11 (Advisor-Exports aus allen Perspektiven: Produkt/Markt/UX/Growth/Konsolidiert) ergänzt (nur Doku, train-v194/SCHEMA 32 unverändert)*
+*Nächster Schritt: B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md) — braucht Name+Adresse+E-Mail vom Nutzer. B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten. B78 (autoStartPauseTimer respektiert nur den confirm-set-Pfad) bleibt offen, low priority. Loops 7-11 aktiv: Advisor-Exports werden am Ende jeder Session automatisch aktualisiert. for-advisor-consolidated.txt = Startpunkt für neue externe Chats. Keine weiteren offenen Rückfragen aus diesem Sprint.*
 
 ---
 
@@ -20,6 +20,42 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
   dem bestehenden Plateau-Mechanismus)
 - Letzter Commit: siehe `git log` (dieser Sprint noch nicht gepusht,
   siehe Sprint-Ende-Workflow).
+- **Loops 7-11 ergänzt: Advisor-Exports für alle Perspektiven (kein
+  Code-Sprint, reine Doku/Prozess-Änderung, CACHE_VERSION/CSS/SCHEMA
+  unverändert):** Bisher gab es nur zwei Advisor-Export-Formen: einen
+  rein technischen Code-Export (`for-advisor.txt`, Loop 5) und vier
+  einmalige, nicht wiederkehrende Cross-AI-Review-Dokumente (Legal/
+  Security/Produkt-UX/Business-Ethik, Stand 2026-07-18, in
+  `context-exports/advisor-*.txt`). Nutzer bat um fünf neue, REGELMÄSSIG
+  aktualisierte Perspektiven-Exporte in Alltagssprache (kein Code
+  vorausgesetzt): `for-advisor-product.txt` (vollständig — Nordstern,
+  komplette User Journey inkl. Session Coach, Coach-Kaskade in
+  Alltagssprache, Feature-Status, bewusste Entscheidungen, offene
+  Produktfragen), `for-advisor-market.txt` (vollständig — Positionierung
+  als "Intra-Session Decision Support", 4 direkte Konkurrenten mit
+  aktuellen Preisen 2026 [Hevy Pro ~2-9$/Mo, Strong Pro ~2,50-5$/Mo,
+  Fitbod ~8-16$/Mo, RP Hypertrophy konzeptionell], Preispositionierung,
+  Zielgruppen-Überschneidung, grobe Marktgröße, offene Marktfragen),
+  `for-advisor-ux.txt` (Kurzfassung — Onboarding-Flow, bekannte
+  UX-Probleme inkl. "kein Usability-Test je gemacht", was bereits gut
+  funktioniert, offene UX-Fragen), `for-advisor-growth.txt` (Kurzfassung
+  — aktueller Stand [0 Nutzer, B55 einziger Blocker], geplante Kanäle,
+  Share-Feature als Wachstums-Hebel, Retention-Mechanismus,
+  Monetarisierung-Timing, offene Growth-Fragen), sowie
+  `for-advisor-consolidated.txt` (liest die vier vorigen Dateien und
+  fasst sie zusammen: Produkt+Markt vollständig, UX+Growth als
+  Kurzfassung ohne die reinen Flow-/Kanal-Details, plus eine
+  konsolidierte, deduplizierte, in HOCH/MITTEL/NIEDRIG priorisierte
+  Liste ALLER offenen Fragen aus allen vier Quellen — der empfohlene
+  Startpunkt für neue externe Advisor-Chats). Neue **Loops 7-11** in
+  LOOPS.md (alle AKTIV, laufen am Ende jeder Session nach Loop 5+6 in
+  dieser Reihenfolge) sowie neue Datei `prompts/neuer-advisor-chat.txt`
+  (Anleitung: `for-advisor-consolidated.txt` in einen neuen externen Chat
+  einfügen + einen von 5 thematischen Fokus-Zusätzen ergänzen: Markt &
+  Konkurrenz / UX & Onboarding / Growth & Distribution /
+  Monetarisierung / Produkt-Roadmap). CLAUDE.md-Projektdokumente-Tabelle
+  um die 5 neuen Dateien ergänzt. Regressionstest trivial grün (keine
+  Code-Änderung in diesem Sprint).
 - **GoatCounter-SRI verifiziert, Loop 6 ergänzt (kein Code-Sprint, reine
   Doku/Prozess-Änderung, CACHE_VERSION/CSS/SCHEMA unverändert):** Nutzer
   bat um einen SRI-Hash-Fix für GoatCounter (unversionierte URL ohne

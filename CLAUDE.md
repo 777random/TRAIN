@@ -68,6 +68,11 @@ Bei CSS-Änderungen: Cache-Buster in `index.html` erhöhen:
 | `LOOPS.md` | Automatische Session-Loops (beim Start jeder Session ausführen) |
 | `SESSION_LOG.md` | Protokoll aller Sessions und Loop-Ergebnisse |
 | `prompts/` | Wiederverwendbare Prompt-Vorlagen für Claude Code und externe Beratung |
+| `context-exports/for-advisor-product.txt` | Produkt + User Journey für externe Beratung (Loop 7) |
+| `context-exports/for-advisor-market.txt` | Markt + Konkurrenz für externe Beratung (Loop 8) |
+| `context-exports/for-advisor-ux.txt` | UX + Onboarding für externe Beratung (Loop 9) |
+| `context-exports/for-advisor-growth.txt` | Growth + Distribution für externe Beratung (Loop 10) |
+| `context-exports/for-advisor-consolidated.txt` | Konsolidierter Export aus allen Perspektiven — für neue externe Chats (Loop 11) |
 
 Nach jedem Sprint: `HANDOFF.md` und `BUGS.md` aktualisieren (behobene Bugs verschieben, Commit-Hash eintragen, nächsten Schritt setzen).
 

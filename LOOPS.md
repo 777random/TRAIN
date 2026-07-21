@@ -255,6 +255,103 @@ Stopp-Bedingung: keine (wiederkehrender Loop, läuft dauerhaft mit)
 
 ---
 
+## LOOP 7 — for-advisor-product.txt (AKTIV)
+Priorität: Am ENDE jeder Session, nach Loop 5+6
+
+Ausführung:
+  context-exports/for-advisor-product.txt erstellen/aktualisieren.
+  Datum + CACHE_VERSION oben in die Datei.
+  In Alltagssprache — keine Funktionsnamen ohne Erklärung, kein Code
+  vorausgesetzt (Ziel-Publikum: externe Berater-KI ohne Repo-Zugriff).
+
+  Inhalt:
+  1. Was TRAIN ist (Nordstern, Zielgruppe, was TRAIN nicht ist,
+     Lokal-first als USP)
+  2. Vollständige User Journey (Onboarding, Vor/Während/Nach dem
+     Training, wöchentlich)
+  3. Coach-Logik in Alltagssprache (Hauptkarte-Situationen,
+     Strukturkarte-Muster, warum der Session Coach TRAIN unverzichtbar
+     macht)
+  4. Feature-Status (vorhanden/nicht gebaut mit Begründung/
+     zurückgestellt/Konzept)
+  5. Bewusste Entscheidungen (nicht rückgängig ohne neue Entscheidung)
+  6. Offene Produktfragen
+
+Stopp-Bedingung: Datei geschrieben, alle 6 Abschnitte vorhanden
+
+---
+
+## LOOP 8 — for-advisor-market.txt (AKTIV)
+Priorität: Am ENDE jeder Session, nach Loop 7
+Nur inhaltlich aktualisieren wenn: neue Markt-Erkenntnisse oder
+  Konkurrenz-Preise bekannt geworden sind (sonst nur Datum/
+  CACHE_VERSION im Kopf auffrischen)
+
+Ausführung:
+  context-exports/for-advisor-market.txt erstellen/aktualisieren.
+  Inhalt: Marktpositionierung, direkte Konkurrenten (aktuelle Preise +
+  Stärken/Schwächen + wo TRAIN gewinnt), Preispositionierung,
+  Zielgruppen-Überschneidung, Marktgröße (grob), offene Marktfragen.
+
+Stopp-Bedingung: Datei geschrieben, alle Konkurrenten mit aktuellem
+  Preisstand vorhanden
+
+---
+
+## LOOP 9 — for-advisor-ux.txt (AKTIV)
+Priorität: Am ENDE jeder Session, nach Loop 8
+Nur inhaltlich aktualisieren wenn: UX-relevante Änderungen (neues
+  Onboarding, neue Session-Coach-Bausteine o.ä.) im Sprint passiert sind
+
+Ausführung:
+  context-exports/for-advisor-ux.txt erstellen/aktualisieren.
+  Bewusst KOMPAKT (Kurzfassung, nicht die volle User Journey — die lebt
+  in for-advisor-product.txt).
+  Inhalt: aktueller Onboarding-Flow (Schritt für Schritt + was fehlt),
+  bekannte UX-Probleme (inkl. "kein Usability-Test gemacht"), was
+  bereits gut funktioniert, offene UX-Fragen.
+
+Stopp-Bedingung: Datei geschrieben
+
+---
+
+## LOOP 10 — for-advisor-growth.txt (AKTIV)
+Priorität: Am ENDE jeder Session, nach Loop 9
+Nur inhaltlich aktualisieren wenn: neue Nutzer-Zahlen oder
+  Kanal-Erkenntnisse vorliegen
+
+Ausführung:
+  context-exports/for-advisor-growth.txt erstellen/aktualisieren.
+  Bewusst KOMPAKT.
+  Inhalt: aktueller Stand (Nutzerzahl, Blocker), geplante Kanäle,
+  Share-Feature als Wachstums-Hebel, Retention-Mechanismus,
+  Monetarisierung-Timing, offene Growth-Fragen.
+
+Stopp-Bedingung: Datei geschrieben
+
+---
+
+## LOOP 11 — for-advisor-consolidated.txt (AKTIV)
+Priorität: IMMER nach Loop 7-10 (letzter Advisor-Export-Loop jeder
+  Session)
+
+Ausführung:
+  context-exports/for-advisor-consolidated.txt erstellen/aktualisieren.
+  WICHTIG: diese Datei hat KEINEN eigenen Inhalt — sie liest die vier
+  Dateien aus Loop 7-10 und fasst sie zusammen (Teil 1 = Produkt
+  vollständig, Teil 2 = Markt vollständig, Teil 3 = UX nur "bekannte
+  Probleme"/"was funktioniert"/"offene Fragen" ohne den Onboarding-Flow,
+  Teil 4 = Growth nur "Share-Feature"/"Monetarisierung-Timing"/"offene
+  Fragen" ohne die Kanal-Details, Teil 5 = alle offenen Fragen aus allen
+  vier Dateien konsolidiert, ohne Duplikate, priorisiert in HOCH/
+  MITTEL/NIEDRIG).
+  Diese Datei ist der empfohlene Startpunkt für neue externe
+  Advisor-Chats — siehe prompts/neuer-advisor-chat.txt.
+
+Stopp-Bedingung: Datei geschrieben, enthält alle 5 Teile
+
+---
+
 ## LOOP 4 — Diagnose offener Bugs (INAKTIV)
 # Aktivieren wenn: alle UX-Hoch Bugs
 # behoben und Edge-Case-Audit abgeschlossen
@@ -294,6 +391,11 @@ Eintrag in SESSION_LOG.md hinzufügen:
   Loop 6: geprüft (neue Version: [ja/nein]) / übersprungen (zuletzt: [Datum])
   Eigentliche Aufgabe: [was gemacht wurde]
   Loop 5: for-advisor.txt aktualisiert (am Ende der Session)
+  Loop 7: for-advisor-product.txt aktualisiert
+  Loop 8: for-advisor-market.txt aktualisiert / unverändert (keine neuen Markt-Erkenntnisse)
+  Loop 9: for-advisor-ux.txt aktualisiert / unverändert
+  Loop 10: for-advisor-growth.txt aktualisiert / unverändert
+  Loop 11: for-advisor-consolidated.txt aktualisiert (letzter Loop der Session)
 
 ---
 
