@@ -1,7 +1,7 @@
 # TRAIN — Parallel Agent Regeln
 # Wird nach jedem Multi-Agent Sprint
 # automatisch aktualisiert.
-# Letzte Aktualisierung: 2026-07-20 / train-v192
+# Letzte Aktualisierung: 2026-07-21 / train-v193
 
 ---
 
@@ -36,6 +36,7 @@ sondern der Einstiegspunkt, der `state.js`, `backup.js`, `ui.js`,
 | setUtils.js | — | plateauDetector.js, weeklyFocus.js, weightRecommendation.js, weekReview.js (seit train-v170, siehe unten), ui.js (seit train-v171 — B45-Konsolidierung: `weekSuccessCounts()`) |
 | movementMap.js | — | overallPerformance.js, ui.js, weeklyFocus.js |
 | progressChart.js | — | ui.js |
+| sessionCoach.js | — | ui.js, timer.js (beide seit train-v193 — B77: `buildSetFeedback()`/`buildLastSetMessage()`/`buildWarmupSets()`, importfrei/Tiefe 0, siehe DECISIONS.md für die bewusste Ausnahme von der "NIEMALS ui.js↔timer.js"-Regel) |
 | weekReview.js | setUtils.js, state.js (seit train-v170 — B44/B45-Konsolidierung: `isTrainingDay()` für `_reachableDays()`, `weekSuccessCounts()` für `_calcSuccessScore()`; seit train-v190/B74 zusätzlich `calcCurrentStreak()` für `_calcStreak()`; alle reine, zustandslose Funktionen, kein `getState()`/`dispatch()` — Datei ist weiterhin "State-frei" im ursprünglich gemeinten Sinn) | ui.js |
 | weekReviewModal.js | shareImage.js (seit train-v186 — B68: Teilen-Button im Wochenrückblick-Modal, ruft `buildWeekShareCanvas()`/`shareCanvas()` direkt auf), insightEngine.js (seit train-v187 — B71: `getSortedWeeks`/`exWeightHistory` für die Sparkline-Datenquelle) | ui.js |
 | shareImage.js | — | ui.js, weekReviewModal.js (beide seit train-v186 — B68) |
@@ -43,7 +44,7 @@ sondern der Einstiegspunkt, der `state.js`, `backup.js`, `ui.js`,
 | registerSW.js | — | index.html |
 | dragdrop.js | — | **kein ES-Import** — seit train-v156 aber per `<script src="./dragdrop.js">` klassisch in index.html geladen (vor dem Module-Script) und in sw.js precached. Kein JS-Modul importiert es, aber es ist jetzt aktiv ladungsrelevant, nicht mehr totes Legacy-Modul. |
 | backup.js | state.js | ui.js, index.html |
-| timer.js | state.js | index.html (kein JS-Modul importiert es, nur der Einstiegspunkt) |
+| timer.js | state.js, sessionCoach.js (seit train-v193 — B77, siehe oben) | index.html (kein JS-Modul importiert es, nur der Einstiegspunkt) |
 | plateauDetector.js | setUtils.js | insightEngine.js, weeklyFocus.js |
 | weightRecommendation.js | setUtils.js | insightEngine.js, ui.js, weeklyFocus.js |
 | insightEngine.js | weightRecommendation.js, plateauDetector.js | consistencyUtils.js, overallPerformance.js, progressInsights.js, triggerEngine.js, ui.js (seit train-v173 — B49: `getSortedWeeks`, `exWeightHistory`, `exMetricHistory`, `detectRecurringStep` für den Schrittweite-Vorschlag), weekReviewModal.js (seit train-v187 — B71) |
@@ -52,7 +53,7 @@ sondern der Einstiegspunkt, der `state.js`, `backup.js`, `ui.js`,
 | progressInsights.js | insightEngine.js | overallPerformance.js, ui.js |
 | overallPerformance.js | insightEngine.js, consistencyUtils.js, progressInsights.js, movementMap.js | ui.js, weeklyFocus.js |
 | weeklyFocus.js | state.js, plateauDetector.js, weightRecommendation.js, setUtils.js, consistencyUtils.js, overallPerformance.js, movementMap.js | ui.js |
-| ui.js | state.js, backup.js, icons.js, triggerEngine.js, weightRecommendation.js, progressChart.js, weekReview.js, weekReviewModal.js, weeklyFocus.js, exerciseNameCleanup.js, progressInsights.js, movementMap.js, overallPerformance.js, insightEngine.js (seit train-v173), setUtils.js (seit train-v171), shareImage.js (seit train-v186 — B68) | — (Einstiegspunkt via index.html) |
+| ui.js | state.js, backup.js, icons.js, triggerEngine.js, weightRecommendation.js, progressChart.js, weekReview.js, weekReviewModal.js, weeklyFocus.js, exerciseNameCleanup.js, progressInsights.js, movementMap.js, overallPerformance.js, insightEngine.js (seit train-v173), setUtils.js (seit train-v171), shareImage.js (seit train-v186 — B68), sessionCoach.js (seit train-v193 — B77) | — (Einstiegspunkt via index.html) |
 | sw.js | — (kein ES-Import; referenziert Dateipfade als Precache-Liste) | — (via registerSW.js als Service Worker registriert, kein JS-Import) |
 
 **Abhängigkeitstiefe (0 = keine internen Imports, aufsteigend = mehr
@@ -60,10 +61,11 @@ Kettenglieder bis zum Blatt):**
 ```
 Tiefe 0: state.js, icons.js, setUtils.js, movementMap.js, progressChart.js,
          exerciseNameCleanup.js, shareImage.js (seit train-v186 — B68),
-         registerSW.js, dragdrop.js*
-Tiefe 1: backup.js, timer.js, plateauDetector.js, weightRecommendation.js,
-         weekReview.js (seit train-v170 — importiert jetzt setUtils.js/
-         state.js, war vorher Tiefe 0)
+         sessionCoach.js (seit train-v193 — B77), registerSW.js, dragdrop.js*
+Tiefe 1: backup.js, timer.js (importiert jetzt state.js + sessionCoach.js,
+         beide Tiefe 0, bleibt daher Tiefe 1), plateauDetector.js,
+         weightRecommendation.js, weekReview.js (seit train-v170 —
+         importiert jetzt setUtils.js/state.js, war vorher Tiefe 0)
 Tiefe 2: insightEngine.js
 Tiefe 3: triggerEngine.js, consistencyUtils.js, progressInsights.js,
          weekReviewModal.js (seit train-v187 — B71: importiert jetzt
@@ -164,6 +166,11 @@ movementMap.js weeklyFocus.js UND ui.js gleichzeitig treffen könnte).
 - **index.html + sw.js** (CSS-Version + CACHE_VERSION müssen konsistent
   im selben Commit steigen) bzw. **index.html + registerSW.js** (SW-
   Registrierungslogik muss zur aktuellen sw.js-Version passen).
+- **sessionCoach.js + eine seiner 2 Importer** (ui.js, timer.js, beide
+  seit train-v193/B77) — Signaturänderungen an `buildSetFeedback()`/
+  `buildLastSetMessage()`/`buildWarmupSets()` brechen sofort beide
+  Aufrufer, die zudem in unterschiedlichen Dateien liegen (leicht zu
+  übersehen bei einer nur-ui.js-fokussierten Änderung).
 
 ### KONSOLIDIERUNGS-AGENT (immer letzter):
 

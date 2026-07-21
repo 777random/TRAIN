@@ -38,6 +38,7 @@ import { buildCategoryMap, resolveCategory } from './movementMap.js';
 import { computeQualityTrend, computeConsistencyTrend, computeVolumeTrend, computeBreadthProgress } from './overallPerformance.js';
 import { weekSuccessCounts } from './setUtils.js';
 import { getSortedWeeks, exWeightHistory, exMetricHistory, detectRecurringStep } from './insightEngine.js';
+import { buildSetFeedback, buildLastSetMessage, buildWarmupSets } from './sessionCoach.js';
 
 // ─── Module-level UI state (transient, never persisted) ──────────────────────
 
@@ -138,6 +139,10 @@ let _exFormCategory = null;
 let _rpeNudgeKey = null;
 /** Auto-dismiss timer for the RPE nudge. */
 let _rpeNudgeTimer = null;
+/** B77: Variante der gerade angezeigten RPE-Nudge ('plain'|'favorite'), am Trigger-Zeitpunkt entschieden (nicht bei jedem Render neu). */
+let _rpeNudgeVariant = 'plain';
+/** B77: Übungsnamen, für die die erweiterte Favoriten-Nudge in dieser Sitzung bereits gezeigt wurde — max. 1x pro Übung pro Sitzung. */
+let _favNudgeShownFor = new Set();
 
 // B76: Pre-Session Check-in — Entwurf pro Tag (di → {sleep, energyPre}),
 // rein UI-lokal bis beide Felder gesetzt sind (dann dispatch + verworfen).
@@ -149,6 +154,12 @@ let _checkInDraft = new Map();
 let _skippedCheckIn = new Set();
 /** Manuelles Auf-/Zuklappen des Briefings pro Tag (di → boolean), überschreibt den Default. */
 let _briefingExpandedOverride = new Map();
+
+// B77: Intra-Session Coach — rein UI-lokale, nicht persistierte Zustände.
+/** "Fertig"-Dismiss für den Weiterer-Satz-Vorschlag (Keys `${di}-${ei}-${si}`). */
+let _optionalSetDismissed = new Set();
+/** Auf-/Zuklappen der Aufwärm-Empfehlung pro Tag (di), Default zu. */
+let _warmupExpanded = new Set();
 
 /** Last rendered week index – used to detect week navigation. */
 let _lastRenderedCurIdx = null;
@@ -1101,6 +1112,67 @@ function _findFocusExercise(day, customExercises) {
   return null;
 }
 
+/**
+ * B77: erste Compound-Übung des Tages für die Aufwärm-Empfehlung — bewusst
+ * ein eigener, breiterer Kategorie-Satz (inkl. Pull) als _findFocusExercise()
+ * oben (B76, nur Squat/Hinge/Push für die RPE-Ziel-Framing) — zwei
+ * unabhängige Features mit unterschiedlichem Zweck, keine Vereinheitlichung.
+ * Nur Gewichts-Übungen (metric 'reps') — Distanz/Zeit-Übungen haben keine
+ * Gewichtsachse (B18), ein Aufwärmgewicht wäre dort bedeutungslos.
+ */
+function _findFirstCompoundExercise(day, customExercises) {
+  const catMap = buildCategoryMap(customExercises ?? []);
+  for (const ex of day.exercises ?? []) {
+    if (ex.archived) continue;
+    if ((ex.metric ?? 'reps') !== 'reps') continue;
+    const cat = resolveCategory(ex.name, catMap);
+    if (cat === 'Squat' || cat === 'Hinge' || cat === 'Push' || cat === 'Pull') return ex;
+  }
+  return null;
+}
+
+/** B77: Pause-Sekunden menschenlesbar — 90 -> "90s", 180 -> "3min", 300 -> "5min+". */
+function _fmtPause(sec) {
+  // < 120s bleibt in Sekunden (90 -> "90s", nicht "2min" durch Aufrundung),
+  // ab da Minuten, ab 300s zusätzlich "+" (Sprint-Vorgabe: "5min+" bei RPE 10).
+  if (sec < 120) return `${sec}s`;
+  const min = Math.round(sec / 60);
+  return sec >= 300 ? `${min}min+` : `${min}min`;
+}
+
+/**
+ * B77: entscheidet, ob die RPE-Nudge für eine gerade bestätigte Übung die
+ * erweiterte Favoriten-Variante zeigt ("💡 RPE für X? ... Nie für diese
+ * Übung") statt der bestehenden generischen ("Wie anstrengend?"). Wird NUR
+ * an den beiden Trigger-Stellen aufgerufen (nicht bei jedem Render), damit
+ * der Nudge-Zähler nicht bei jedem Re-Render hochgezählt wird.
+ */
+function _decideRpeNudgeVariant(exName, state) {
+  if (state.settings?.sessionCoach === false) return 'plain';
+  if (!(state.favoriteExercises ?? []).includes(exName)) return 'plain';
+  if (_favNudgeShownFor.has(exName)) return 'plain';
+  let skip = false;
+  try { skip = localStorage.getItem(`train_rpe_skip_${exName}`) === 'true'; } catch (_) { /* localStorage blockiert -> Standardverhalten */ }
+  if (skip) return 'plain';
+  let count = 0;
+  try { count = parseInt(localStorage.getItem('train_rpe_nudge_count') ?? '0', 10) || 0; } catch (_) { /* best effort */ }
+  if (count >= 3) return 'plain';
+  const realWeeks = state.weeks.filter(w => !w.isSeedWeek).sort((a, b) => a.startDate.localeCompare(b.startDate));
+  const curWk = state.weeks[state.curIdx];
+  const idx = realWeeks.findIndex(w => w === curWk || w.startDate === curWk?.startDate);
+  if (idx < 0 || idx >= 4) return 'plain';
+  return 'favorite';
+}
+
+/** B77: markiert die Favoriten-Nudge als gezeigt (Session-Set + localStorage-Zähler) — nur bei tatsächlicher Anzeige aufrufen, nicht bei jeder Prüfung. */
+function _markFavNudgeShown(exName) {
+  _favNudgeShownFor.add(exName);
+  try {
+    const c = (parseInt(localStorage.getItem('train_rpe_nudge_count') ?? '0', 10) || 0) + 1;
+    localStorage.setItem('train_rpe_nudge_count', String(c));
+  } catch (_) { /* best effort */ }
+}
+
 /** Ø RPE der success-Sätze derselben Übung in der chronologisch vorigen Woche, oder null. */
 function _lastWeekAvgRpe(exName, wk, state) {
   const sorted = [...state.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
@@ -1252,8 +1324,9 @@ function renderDayBody(wk, di, state) {
   // offenen Tag, und nur wenn der Nutzer den Session Coach nicht
   // deaktiviert hat. Check-in zeigt sich, solange weder eingegeben noch
   // übersprungen wurde; danach (oder sofort bei Skip) das Briefing.
+  const sessionCoachActive = !isVacDay && !done && state.settings?.sessionCoach !== false && _isTodayDay(wk, di);
   let sessionCoachHtml = '';
-  if (!isVacDay && !done && state.settings?.sessionCoach !== false && _isTodayDay(wk, di)) {
+  if (sessionCoachActive) {
     if (!day.sessionCheckIn && !_skippedCheckIn.has(di)) {
       sessionCoachHtml = _renderSessionCheckIn(di);
     } else {
@@ -1261,10 +1334,35 @@ function renderDayBody(wk, di, state) {
     }
   }
 
+  // B77: Aufwärm-Empfehlung — eigener, klar anders benannter Block
+  // ("📋 Aufwärm-Empfehlung") getrennt vom bestehenden freien Aufwärm-
+  // Textfeld weiter unten ("🔥 Aufwärmen") — gleiche Gating-Bedingung wie
+  // Check-in/Briefing oben (heutiger, offener, nicht-Urlaubstag).
+  let warmupRecHtml = '';
+  if (sessionCoachActive) {
+    const compoundEx = _findFirstCompoundExercise(day, state.customExercises);
+    const workingWeight = compoundEx?.sets?.[0]?.weight ?? 0;
+    if (compoundEx && workingWeight > 0) {
+      const warmupSets = buildWarmupSets(workingWeight, compoundEx.weightStep);
+      if (warmupSets.length > 0) {
+        const isOpen = _warmupExpanded.has(di);
+        const setsText = warmupSets.map(ws => `${ws.weight}kg × ${ws.reps}`).join(' · ');
+        warmupRecHtml = `
+    <div class="warmup-rec-block">
+      <button type="button" class="warmup-rec-toggle" data-action="toggle-warmup-rec" data-di="${di}" aria-expanded="${isOpen}">
+        <span class="warmup-rec-toggle__arrow" aria-hidden="true">${isOpen ? '▾' : '▸'}</span> 📋 Aufwärm-Empfehlung
+      </button>
+      ${isOpen ? `<div class="warmup-rec-body">${h(compoundEx.name)} — Aufwärmen: ${setsText}</div>` : ''}
+    </div>`;
+      }
+    }
+  }
+
   return `
     ${_renderRitualAnchor(state, wk, di)}
     ${isVacDay ? '<div class="day-vacation-banner">🏖 Urlaubstag — unterbricht deinen Trainingsrhythmus nicht</div>' : ''}
     ${sessionCoachHtml}
+    ${warmupRecHtml}
     ${noteBlock}
     ${warmupBlock}
     <div data-ex-list="${di}">${exHtml}</div>
@@ -1390,8 +1488,37 @@ function renderExercise(wk, di, ei, state) {
   }
 
   const rpeEnabled = state.settings?.rpeEnabled ?? true;
+
+  // B77: Intra-Session Coach — gleiche Gating-Bedingung wie Check-in/
+  // Briefing/Aufwärm-Empfehlung (B76/B77): heutiger, offener, nicht-
+  // Urlaubstag, Session Coach nicht deaktiviert.
+  const showIntraCoach = !locked && !wk.days[di].isVacation && state.settings?.sessionCoach !== false && _isTodayDay(wk, di);
+  const sessionModifier = wk.days[di]?.sessionModifier ?? null;
+
+  // "Nächste Woche"-Projektion für die Abschluss-Nachricht des letzten
+  // Satzes — NUR hier ist getWeightRecommendation() legitim (echte
+  // nächste-Woche-Empfehlung, siehe sessionCoach.js-Kommentar), lazy
+  // berechnet nur wenn der letzte Satz bereits mit RPE bewertet ist.
+  let _nextWeekWeight = null;
+  if (showIntraCoach) {
+    const _lastS = ex.sets[ex.sets.length - 1];
+    if (_lastS && (_lastS.status === 'success' || _lastS.status === 'fail') && _lastS.rpe != null) {
+      const exMetric = ex.metric === 'sec' || ex.metric === 'm' ? ex.metric : 'reps';
+      if (exMetric === 'reps' && (ex.progressionType ?? 'weight') !== 'reps') {
+        const calcWeeks = state.weeks
+          .filter(w => w.mode !== 'deload' && w.mode !== 'vacation')
+          .filter(w => w.days.some(d => d.exercises.some(e => e.name === ex.name && e.sets.some(s2 => s2.status === 'success'))));
+        if (calcWeeks.length >= 2) {
+          const recStep = ex.weightStep || state.settings?.plateStep || 2.5;
+          const rec = getWeightRecommendation(ex.name, calcWeeks, recStep, ex.progressionMode ?? 'weight_first', ex.targetRepsMax ?? null);
+          _nextWeekWeight = rec?.recommendedWeight ?? null;
+        }
+      }
+    }
+  }
+
   const setsHtml = ex.sets.map((s, si) =>
-    renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled)
+    renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled, showIntraCoach, sessionModifier, _nextWeekWeight)
   ).join('');
 
   const step = ex.weightStep ?? 2.5;
@@ -1819,13 +1946,14 @@ function renderExercise(wk, di, ei, state) {
         aria-label="Nächsten Satz bestätigen"
       >✓ Satz bestätigen</button>
       ${_nudgeSi != null ? `
-      <div class="rpe-nudge" role="group" aria-label="RPE eingeben">
-        <span class="rpe-nudge__label">Wie anstrengend?</span>
+      <div class="rpe-nudge${_rpeNudgeVariant === 'favorite' ? ' rpe-nudge--favorite' : ''}" role="group" aria-label="RPE eingeben">
+        <span class="rpe-nudge__label${_rpeNudgeVariant === 'favorite' ? ' rpe-nudge__label--favorite' : ''}">${_rpeNudgeVariant === 'favorite' ? `💡 RPE für ${h(ex.name)}?` : 'Wie anstrengend?'}</span>
         ${[7,8,9,10].map(v => `
           <button class="rpe-nudge__btn"
             data-action="rpe-nudge-select"
             data-di="${di}" data-ei="${ei}" data-si="${_nudgeSi}" data-rpe="${v}"
           >${v}</button>`).join('')}
+        ${_rpeNudgeVariant === 'favorite' ? `<button type="button" class="rpe-nudge__skip" data-action="rpe-nudge-never" data-exname="${h(ex.name)}">Nie für diese Übung</button>` : ''}
       </div>` : ''}
     </div>`;
   })() : ''}
@@ -1864,7 +1992,7 @@ function renderExercise(wk, di, ei, state) {
 </div>`;
 }
 // ─── Set row ─────────────────────────────────────────────────────────────────
-function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true) {
+function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true, showIntraCoach = false, sessionModifier = null, nextWeekWeight = null) {
   // B17: prevEx wird in renderExercise() bei einer Ausweichübung (substituteFor)
   // bewusst über den NAMEN DER URSPRÜNGLICHEN Übung gesucht (siehe _lookupName
   // dort) — für den Fulfill-Meter-Metrik-Check dort ist das sinnvoll, aber hier
@@ -1963,6 +2091,44 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
       _prevWeightHint = `<button type="button" class="prev-hint prev-hint--btn" data-action="adopt-prev-weight" data-di="${di}" data-ei="${ei}" data-si="${si}" data-value="${prevSet.weight ?? 0}" aria-label="Vorwoche ${_pw} kg">${_arr}${_pw}kg</button>`;
     } else {
       _prevWeightHint = `<span class="prev-hint" aria-hidden="true">${_arr}${_pw}kg</span>`;
+    }
+  }
+
+  // B77: Intra-Session Coach — Feedback direkt unter dem gerade bewerteten
+  // Satz. Rein render-abhängig (status/rpe des Satzes selbst), funktioniert
+  // daher identisch egal ob der Satz über "Satz bestätigen" oder das
+  // manuelle ✓/✗-Icon bewertet wurde.
+  let intraCoachHtml = '';
+  if (showIntraCoach && st !== 'pending') {
+    const isLastSet = si === ex.sets.length - 1;
+    if (isLastSet) {
+      const msg = buildLastSetMessage(s, ex, nextWeekWeight);
+      const dismissKey = `${di}-${ei}-${si}`;
+      const dismissed = msg.canAddSet && _optionalSetDismissed.has(dismissKey);
+      if (!dismissed) {
+        intraCoachHtml = `
+<div class="set-feedback${msg.canAddSet ? ' set-feedback--action' : ''}">
+  <span class="set-feedback__line">→ ${h(msg.text)}</span>
+  ${msg.canAddSet ? `<div class="set-feedback__actions">
+    <button type="button" class="set-feedback__btn" data-action="add-optional-set" data-di="${di}" data-ei="${ei}" data-weight="${msg.suggestedWeight}">+ Satz hinzufügen</button>
+    <button type="button" class="set-feedback__btn set-feedback__btn--ghost" data-action="dismiss-optional-set" data-di="${di}" data-ei="${ei}" data-si="${si}">Fertig</button>
+  </div>` : ''}
+</div>`;
+      }
+    } else {
+      const fb = buildSetFeedback(s, ex, sessionModifier);
+      if (fb && fb.nextWeight != null) {
+        intraCoachHtml = fb.hint
+          ? `
+<div class="set-feedback">
+  <span class="set-feedback__line">→ Nächster Satz: ${fb.nextWeight}kg</span>
+  <span class="set-feedback__line set-feedback__line--sub">${h(fb.hint)}${fb.pauseSec ? ` · Pause: ${_fmtPause(fb.pauseSec)}` : ''}</span>
+</div>`
+          : `
+<div class="set-feedback">
+  <span class="set-feedback__line">→ Nächster Satz: ${fb.nextWeight}kg</span>
+</div>`;
+      }
     }
   }
 
@@ -2071,7 +2237,7 @@ ${s._showNote ? `
     aria-label="Notiz zu Satz ${si + 1}"
     maxlength="120"
   />
-</div>` : ''}`;
+</div>` : ''}${intraCoachHtml}`;
 }
 
 // ─── Body tab ────────────────────────────────────────────────────────────────
@@ -4235,7 +4401,7 @@ function renderSettingsTab(state) {
   <div class="settings-section">
     <div class="settings-section__title">Info</div>
     <div class="settings-row">
-      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v192</div></div>
+      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v193</div></div>
     </div>
     <div class="settings-row">
       <div>
@@ -4481,6 +4647,7 @@ function _handleClick(e) {
     clearTimeout(_rpeNudgeTimer);
     _rpeNudgeKey  = null;
     _rpeNudgeTimer = null;
+    _rpeNudgeVariant = 'plain';
     scheduleRender();
   }
 
@@ -5604,8 +5771,14 @@ function _handleClick(e) {
         if (_aft.settings?.rpeEnabled !== false && _aftSet.rpe == null) {
           clearTimeout(_rpeNudgeTimer);
           _rpeNudgeKey  = `${di}-${ei}-${_csi}`;
+          // B77: Variante (plain/favorite) EINMALIG am Trigger-Zeitpunkt
+          // entscheiden, nicht bei jedem Render neu — sonst würde der
+          // Nudge-Zähler bei jedem Re-Render erneut hochgezählt.
+          const _cexName = _aft.weeks[_aft.curIdx]?.days[+di]?.exercises[+ei]?.name;
+          _rpeNudgeVariant = _cexName ? _decideRpeNudgeVariant(_cexName, _aft) : 'plain';
+          if (_rpeNudgeVariant === 'favorite') _markFavNudgeShown(_cexName);
           scheduleRender();
-          _rpeNudgeTimer = setTimeout(() => { _rpeNudgeKey = null; _rpeNudgeTimer = null; scheduleRender(); }, 4000);
+          _rpeNudgeTimer = setTimeout(() => { _rpeNudgeKey = null; _rpeNudgeTimer = null; _rpeNudgeVariant = 'plain'; scheduleRender(); }, 4000);
           _maybeShowTip('tip-02', 'RPE = wie anstrengend war der Satz? 7 = leicht · 8 = moderat · 9 = schwer · 10 = Maximum');
         }
       }
@@ -5620,7 +5793,17 @@ function _handleClick(e) {
       }
       const isLastSet = _csi === (_aftEx?.sets?.length ?? 0) - 1;
       if (!isLastSet && _aft.settings?.autoStartPauseTimer) {
-        window.dispatchEvent(new CustomEvent('train:set-done', { detail: { pauseSec: _cex.pauseSec ?? 90, di: +di } }));
+        // B77: die berechnete Intra-Session-Pause-Empfehlung ersetzt den
+        // bisher statischen ex.pauseSec, wenn eine existiert (gleiche
+        // Gating-Bedingung wie das restliche Intra-Session-Feedback).
+        let _feedbackPauseSec = null;
+        const _fbWk  = _aft.weeks[_aft.curIdx];
+        const _fbDay = _fbWk?.days[+di];
+        if (_fbDay && _aft.settings?.sessionCoach !== false && !_fbDay.isVacation && _isTodayDay(_fbWk, +di)) {
+          const _fb = buildSetFeedback(_aftSet, _aftEx, _fbDay.sessionModifier ?? null);
+          if (_fb?.pauseSec) _feedbackPauseSec = _fb.pauseSec;
+        }
+        window.dispatchEvent(new CustomEvent('train:set-done', { detail: { pauseSec: _feedbackPauseSec ?? (_cex.pauseSec ?? 90), di: +di } }));
       }
       const nextPending = (_aftEx?.sets ?? []).findIndex(s => s.status === 'pending');
       if (nextPending !== -1) {
@@ -5657,6 +5840,7 @@ function _handleClick(e) {
       dispatch(A.SET_RPE, { di: +di, ei: +ei, si: +si, rpe: +el.dataset.rpe });
       _rpeNudgeKey   = null;
       _rpeNudgeTimer = null;
+      _rpeNudgeVariant = 'plain';
       scheduleRender();
       break;
     }
@@ -5911,6 +6095,41 @@ function _handleClick(e) {
       break;
     }
 
+    // B77: Intra-Session Coach
+    case 'toggle-warmup-rec': {
+      const _wDi = +di;
+      if (_warmupExpanded.has(_wDi)) _warmupExpanded.delete(_wDi); else _warmupExpanded.add(_wDi);
+      scheduleRender();
+      break;
+    }
+
+    case 'add-optional-set': {
+      const _weight = parseFloat(el.dataset.weight) || 0;
+      dispatch(A.SET_ADD, { di: +di, ei: +ei });
+      const _osSt = getState();
+      const _osEx = _osSt.weeks[_osSt.curIdx]?.days[+di]?.exercises[+ei];
+      const _osSi = (_osEx?.sets?.length ?? 1) - 1;
+      if (_osEx && _weight > 0) {
+        dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: _osSi, field: 'weight', value: _weight });
+      }
+      break;
+    }
+
+    case 'dismiss-optional-set': {
+      _optionalSetDismissed.add(`${di}-${ei}-${si}`);
+      scheduleRender();
+      break;
+    }
+
+    case 'rpe-nudge-never': {
+      const _neverName = el.dataset.exname;
+      try { localStorage.setItem(`train_rpe_skip_${_neverName}`, 'true'); } catch (_) { /* best effort */ }
+      clearTimeout(_rpeNudgeTimer);
+      _rpeNudgeKey = null; _rpeNudgeTimer = null; _rpeNudgeVariant = 'plain';
+      scheduleRender();
+      break;
+    }
+
     default:
       // Unknown action – ignore silently
       break;
@@ -6035,8 +6254,11 @@ function _handleBlur(e) {
     if (aftSet?.status === 'success' && aft.settings?.rpeEnabled !== false && aftSet.rpe == null) {
       clearTimeout(_rpeNudgeTimer);
       _rpeNudgeKey   = `${_di}-${_ei}-${_si}`;
+      const _aeExName = aft.weeks[aft.curIdx]?.days[_di]?.exercises[_ei]?.name;
+      _rpeNudgeVariant = _aeExName ? _decideRpeNudgeVariant(_aeExName, aft) : 'plain';
+      if (_rpeNudgeVariant === 'favorite') _markFavNudgeShown(_aeExName);
       scheduleRender();
-      _rpeNudgeTimer = setTimeout(() => { _rpeNudgeKey = null; _rpeNudgeTimer = null; scheduleRender(); }, 4000);
+      _rpeNudgeTimer = setTimeout(() => { _rpeNudgeKey = null; _rpeNudgeTimer = null; _rpeNudgeVariant = 'plain'; scheduleRender(); }, 4000);
     }
   }, 0);
 }

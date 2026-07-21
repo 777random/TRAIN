@@ -1,7 +1,7 @@
 # TRAIN — CLAUDE.md
 # Vollständiger Projektkontext für Claude Code
-# Stand: train-v192 / SCHEMA 32 / Juli 2026
-# Letztes Update: nach train-v192 (B76 Pre-Session Check-in + Session Briefing)
+# Stand: train-v193 / SCHEMA 32 / Juli 2026
+# Letztes Update: nach train-v193 (B77 Intra-Session Coach)
 
 ---
 
@@ -40,7 +40,7 @@ TRAIN ist eine deutschsprachige PWA für Krafttraining. Pure Vanilla ES Modules 
 
 - Repo: https://github.com/777random/TRAIN
 - Deployed: https://777random.github.io/TRAIN/
-- Aktueller Stand: SCHEMA_VERSION 32 · CACHE_VERSION train-v192 · CSS ?v=195
+- Aktueller Stand: SCHEMA_VERSION 32 · CACHE_VERSION train-v193 · CSS ?v=196
 
 ---
 
@@ -169,7 +169,8 @@ Bei unklarem Root Cause immer erst Diagnose → Ergebnis abwarten → dann Fix. 
 | `movementMap.js` | Übungsname → Kategorie (Push/Pull/Squat/Hinge/Core/Carry). 50+ Übungen inkl. 32 englische Synonyme. Seit train-v170 auch `buildCategoryMap()`/`resolveCategory()` — einzige Quelle für den Kategorie-Override-Lookup (`state.customExercises`-Override vor `MOVEMENT_MAP`-Fallback), genutzt von ui.js, weeklyFocus.js UND overallPerformance.js. |
 | `progressChart.js` | Übungsfortschritt-Chart. |
 | `weekReview.js` | Wochenrückblick. |
-| `timer.js` | Session-Uhr + Pause-Timer. Vollständig entkoppelt von `ui.js` via custom `window` Events. |
+| `timer.js` | Session-Uhr + Pause-Timer. Vollständig entkoppelt von `ui.js` via custom `window` Events. Seit train-v193 (B77) importiert es zusätzlich `sessionCoach.js` (`buildSetFeedback()`) für die Pause-Dauer-Empfehlung — kein Bruch der ui.js-Entkopplung, siehe DECISIONS.md. |
+| `sessionCoach.js` | Seit train-v193 (B77). Intra-Session Coach: `buildSetFeedback()` (Gewichts-/Pause-Vorschlag für den nächsten Satz, RPE-Bereiche + session-lokale Logik ohne RPE), `buildLastSetMessage()` (Abschluss-Text der Übung), `buildWarmupSets()` (50/70/85%-Aufwärmformel). Importfrei (Tiefe 0), von `ui.js` UND `timer.js` genutzt — bewusst KEINE Wiederverwendung von `getWeightRecommendation()` (weightRecommendation.js) für Intra-Session-Vorschläge, siehe DECISIONS.md. |
 | `backup.js` | JSON Import/Export, CSV Export. |
 | `registerSW.js` | Service Worker Registrierung, Storage-Error, SW-Update Event. |
 | `dragdrop.js` | Minifizierter Third-Party Drag-Drop Polyfill — NICHT bearbeiten. |
@@ -237,11 +238,12 @@ Set → { weight, reps, rpe, status ('pending'|'success'|'fail'), done }
 
 ### Timer-Entkopplung:
 
-`timer.js` importiert nur `state.js`. Kommuniziert mit `ui.js` ausschließlich via custom `window` Events:
-- `ui.js` → `timer.js`: `train:set-done`, `train:set-input`, `train:warmup-click`, `train:day-complete`
+`timer.js` importiert `state.js` sowie (seit train-v193, B77) `sessionCoach.js` — ein importfreies, reines Berechnungsmodul (Tiefe 0), das auch `ui.js` nutzt. Kommuniziert mit `ui.js` ausschließlich via custom `window` Events:
+- `ui.js` → `timer.js`: `train:set-input`, `train:warmup-click`, `train:day-complete`
+- `train:set-done`: wird sowohl von `ui.js` (`confirm-set`-Klick-Handler) als auch von `timer.js` selbst gefeuert (`_bindAppInteractions()` erkennt `[data-action="toggle-done"]`-Klicks direkt auf `#app`, ohne über ui.js' eigenes Klick-Routing zu gehen — historisch gewachsen, siehe BUGS.md B78 für eine daraus resultierende Inkonsistenz bei `autoStartPauseTimer`)
 - `train:show-update-banner`: von `index.html` gefeuert, direkt von `ui.js` gehört
 
-**NIEMALS:** `ui.js` von `timer.js` importieren oder umgekehrt.
+**NIEMALS:** `ui.js` von `timer.js` importieren oder umgekehrt. Ausnahmen sind ausschließlich importfreie Tiefe-0-Module (wie `sessionCoach.js`), die von beiden unabhängig genutzt werden — nie eine direkte Kopplung der beiden Dateien selbst.
 
 ### Neue Action hinzufügen:
 1. Konstante zum `A` Object in `state.js` hinzufügen
@@ -323,7 +325,7 @@ Unabhängig von Hauptkarte — erscheint auch neben Progression.
 ## FEATURE-STATUS
 
 ### Implementiert ✓:
-**Training-Tab:** Wochenstruktur, Pillen-Nav, Satz-Bewertung (auto+manuell), Gewichtsempfehlung (seit v165 auch Distanz/Zeit-Progression für metric 'm'/'sec' via getMetricRecommendation(), B18; seit v172 pro-Übung-Schrittweite statt fixem Delta, B48), Schrittweite-Vorschlag aus Historie (v173, B49, nur sichtbarer Hinweis), anpassbare Steigerungsmenge im Empfehlungs-Chip (v173, B50), Progressions-Präferenz, PR-Erkennung, "Heute anders", Übung archivieren, Stoppuhr, Auto-Wochenerstellung, Deload/Urlaubsmodus, Körpergewicht, Schlaf+Energie, Share-Bild bei echtem PR (v186, B68 — Tagesabschluss-Screen; v189, B73 — zusätzlich sofortiger Toast direkt nach dem PR-Satz), Pre-Session Check-in + Session Briefing (v192, B76 — Zwei-Tap Schlaf/Energie-Check-in am heutigen Tag, Briefing mit Fokus-Übung + RPE-Ziel, -10%-Gewichtsreduktion bei schlechter Tagesform, per Settings-Toggle "Session Coach" abschaltbar).
+**Training-Tab:** Wochenstruktur, Pillen-Nav, Satz-Bewertung (auto+manuell), Gewichtsempfehlung (seit v165 auch Distanz/Zeit-Progression für metric 'm'/'sec' via getMetricRecommendation(), B18; seit v172 pro-Übung-Schrittweite statt fixem Delta, B48), Schrittweite-Vorschlag aus Historie (v173, B49, nur sichtbarer Hinweis), anpassbare Steigerungsmenge im Empfehlungs-Chip (v173, B50), Progressions-Präferenz, PR-Erkennung, "Heute anders", Übung archivieren, Stoppuhr, Auto-Wochenerstellung, Deload/Urlaubsmodus, Körpergewicht, Schlaf+Energie, Share-Bild bei echtem PR (v186, B68 — Tagesabschluss-Screen; v189, B73 — zusätzlich sofortiger Toast direkt nach dem PR-Satz), Pre-Session Check-in + Session Briefing (v192, B76 — Zwei-Tap Schlaf/Energie-Check-in am heutigen Tag, Briefing mit Fokus-Übung + RPE-Ziel, -10%-Gewichtsreduktion bei schlechter Tagesform, per Settings-Toggle "Session Coach" abschaltbar), Intra-Session Coach (v193, B77 — Feedback direkt unter jedem bewerteten Satz: Gewichts-/Pause-Empfehlung nach RPE-Bereich bzw. Erfolg/Fehlschlag ohne RPE, Abschluss-Nachricht mit Nächste-Woche-Projektion, Weiterer-Satz-Vorschlag bei RPE≤6, Aufwärm-Empfehlung 50/70/85%, erweiterte Favoriten-RPE-Nudge — alles über denselben "Session Coach"-Toggle abschaltbar).
 
 **Wochenrückblick-Modal:** Zusammenfassung/Highlights/Lowlights/Empfehlungen (weekReview.js/weekReviewModal.js), Share-Bild-Button (v186, B68; Sparkline-Redesign v187, B71; Favoriten-Kaskade v189, B73) — auch im manuellen Wochenrückblick-Dropdown im Fortschritt-Tab (v188, B72).
 

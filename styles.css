@@ -508,6 +508,49 @@ button, input, select, textarea { font: inherit; }
 }
 .session-briefing-card.is-collapsed .session-briefing-card__focus { display: none; }
 
+/* ── Intra-Session Coach (B77) ──────────────────────────────── */
+.set-feedback {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 2px var(--sp-2) var(--sp-1) calc(var(--sp-2) + 18px);
+  animation: set-feedback-fade-in 200ms ease;
+}
+@keyframes set-feedback-fade-in { from { opacity: 0; } to { opacity: 1; } }
+.set-feedback__line { font-size: 11px; color: var(--c-text-2); line-height: 1.4; }
+.set-feedback__line--sub { opacity: .85; }
+.set-feedback--action { padding-bottom: var(--sp-2); }
+.set-feedback__actions { display: flex; gap: var(--sp-2); margin-top: var(--sp-1); }
+.set-feedback__btn {
+  min-height: 32px; padding: 0 var(--sp-3); border-radius: var(--r-sm);
+  background: var(--c-accent); border: 1px solid var(--c-accent);
+  color: #000; font-size: 11px; font-weight: 600;
+}
+.set-feedback__btn--ghost {
+  background: none; color: var(--c-text-2); border-color: var(--c-border);
+}
+
+.rpe-nudge--favorite { border-color: var(--c-accent); }
+.rpe-nudge__label--favorite { color: var(--c-accent); opacity: .9; flex-basis: 100%; }
+.rpe-nudge__skip {
+  flex-basis: 100%; background: none; border: none;
+  color: var(--c-text-3); opacity: .6; font-size: 10px;
+  min-height: 28px; text-align: left; padding: 0;
+}
+
+.warmup-rec-block {
+  background: var(--c-surface); border: 1px solid var(--c-border);
+  border-radius: var(--r-lg); padding: var(--sp-3) var(--sp-4); margin-bottom: var(--sp-3);
+}
+.warmup-rec-toggle {
+  display: flex; align-items: center; gap: var(--sp-2); width: 100%;
+  background: none; border: none; color: var(--c-text); text-align: left;
+  font-size: 13px; min-height: var(--touch); padding: 0;
+}
+.warmup-rec-toggle__arrow { font-size: 11px; color: var(--c-text-2); flex-shrink: 0; }
+.warmup-rec-body {
+  margin-top: var(--sp-2); padding-top: var(--sp-2); border-top: 1px solid var(--c-border);
+  font-size: 12px; color: var(--c-text-2); line-height: 1.6;
+}
+
 /* Sprint B (train-v107): Badge sitzt jetzt rechtsbündig in der
    Pillen-Zeile (.day-tab-pills-row) statt in einer eigenen sticky-Zeile —
    .day-tab-bar__streak-row entfällt. */

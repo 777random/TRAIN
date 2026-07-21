@@ -1841,4 +1841,104 @@ Eigentliche Aufgabe: Nutzer-Anfrage ("SPRINT 1 — Pre-Session Check-in +
   unverändert, keine neuen Cross-Datei-Imports), `.github/workflows/
   test.yml` (neuer CI-Schritt für `session_coach.spec.js`).
 Loop 5: for-advisor.txt aktualisiert (17. Fassung, v192/SCHEMA 32)
+
+## 2026-07-20/21 train-v192→v193 (B77 — Intra-Session Coach — SCHEMA 32 unverändert)
+Loop 1: 49/49 grün ✓ (Session-Start, vor Umsetzung)
+Loop 2: aktuell ✓ — HANDOFF.md/CLAUDE.md waren nach dem B76-Sprintabschluss
+  bereits auf train-v192/?v=195/SCHEMA 32 synchron
+Loop 3: übersprungen — Stop-Bedingung (≥15 Fixtures) mit 17 weiterhin
+  erfüllt
+Eigentliche Aufgabe: Nutzer-Anfrage "SPRINT 2 — Intra-Session Coach"
+  (Teile A-E) — dezentes Feedback direkt unter jedem bewerteten Satz statt
+  erst rückblickend am Wochenende.
+  **Vorlage vor der Umsetzung gegen den echten Code geprüft, 5 echte
+  Diskrepanzen gefunden und offengelegt statt stillschweigend
+  übernommen:** (1) RPE hat im echten Popover Halbschritte
+  (6/6.5/7/7.5/8/8.5/9/9.5/10) — die Vorlagen-Logik prüfte nur exakte
+  Ganzzahlen, RPE 7.5/8.5 hätten keinen Branch getroffen. (2) Teil A hatte
+  zwei sich überschneidende `if`-Blöcke für RPE 8 ohne `else` (zweiter
+  überschrieb den ersten still). (3) Teil B wollte `getWeightRecommendation()`
+  für den nächsten SATZ derselben Session verwenden — widerspricht der
+  B76-Entscheidung ("nur nächste Woche") und liefert bei <2 Wochen
+  Historie `null`. (4) Teil C (Favoriten-RPE-Nudge) hätte eine zweite,
+  parallele Komponente neben der bereits bestehenden `.rpe-nudge` gebaut.
+  (5) Teil E (Aufwärm-Empfehlung) hätte denselben Namen wie das bestehende
+  freie Aufwärm-Textfeld (`day.warmup`, "🔥 Aufwärmen") verwendet.
+  Korrigierte Spec vorgelegt, 2 Rückfragen-Runden per `AskUserQuestion`
+  geklärt: (1) bestehende `.rpe-nudge` erweitern statt duplizieren —
+  bestätigt ("empfohlen"). (2) eigener, klar anders benannter Aufwärm-Block
+  statt Integration ins bestehende Feld — bestätigt ("empfohlen"). Danach
+  eine dritte Rückfrage zu Teil B: Nutzer bestätigte explizit, dass ein
+  echter Gewichts-Vorschlag (nicht nur der bereits geplante Wert) gezeigt
+  werden soll — Klärung, OB das über `getWeightRecommendation()` oder eine
+  neue eigene Funktion laufen soll: Nutzer wählte "neue eigene Funktion"
+  (empfohlen) — B76-Entscheidung bleibt damit unrevidiert gültig, Teil B
+  bekommt eine session-lokale Logik ohne Wochen-Minimum.
+  Finale Bestätigung: "passt so, leg los".
+  **Umsetzung:**
+  - Neues, importfreies Modul `sessionCoach.js` (Tiefe 0, Muster
+    movementMap.js/setUtils.js — weeklyFocus.js/Coach-Tab bewusst
+    unangetastet): `buildSetFeedback(s, ex, sessionModifier)` (RPE-Bereiche
+    korrigiert per Punkt 1/2 oben, ohne RPE eigene session-lokale
+    success/fail-Logik für Teil B), `buildLastSetMessage(s, ex,
+    nextWeekWeight)` (Abschluss-Text, `nextWeekWeight` als einzig
+    legitimer `getWeightRecommendation()`-Aufruf, lazy nur bei bereits
+    bewertetem letztem Satz), `buildWarmupSets(workingWeight, weightStep)`
+    (50/70/85%-Formel).
+  - ui.js: Feedback-Text ist rein render-abhängig (Status/RPE des Satzes)
+    — erscheint identisch ob per `toggle-done` (manuelles ✓/✗) oder
+    `confirm-set` bewertet, kein neuer Click-Handler für die Anzeige
+    selbst nötig. `.rpe-nudge` erweitert: Variante (`plain`/`favorite`)
+    wird einmalig am Trigger-Zeitpunkt entschieden (nicht bei jedem
+    Render, sonst hätte sich der `localStorage`-Nudge-Zähler bei jedem
+    Re-Render erhöht), Favoriten-Variante nur bei Favorit + erste 4 echte
+    (nicht-Seed-)Wochen + Sitzungs-/Zähler-Caps (max. 3 total,
+    `localStorage['train_rpe_nudge_count']`), "Nie für diese Übung" per
+    `localStorage['train_rpe_skip_<name>']` (try/catch, Muster
+    shareImage.js' Consent-Flag). Neuer "📋 Aufwärm-Empfehlung"-Block
+    (bewusst anders benannt als das bestehende "🔥 Aufwärmen"-Textfeld),
+    Default zugeklappt, Kategorie-Satz Squat/Hinge/Push/Pull (breiter als
+    B76s Fokus-Übung-Satz — zwei unabhängige Features, keine
+    Vereinheitlichung), nur Gewichts-Übungen (metric 'reps').
+  - **Zusatzfund während der Umsetzung (nicht in der Vorlage, nicht in der
+    Spec-Phase erkannt):** `timer.js` hat eine EIGENE, von ui.js
+    unabhängige Klick-Erkennung für `[data-action="toggle-done"]`
+    (`_bindAppInteractions()`, Zeile ~622) — löst den Pause-Timer
+    UNCONDITIONAL (nicht `autoStartPauseTimer`-gated wie der
+    `confirm-set`-Pfad) mit dem statischen `ex.pauseSec` aus. Ohne
+    zusätzlichen Fix hätte die neue Pause-Empfehlung nur den selteneren
+    `confirm-set`-Pfad erreicht, nicht den vermutlich häufigeren manuellen
+    ✓/✗-Icon-Pfad. Per eigenem Debug-Skript verifiziert (Pause-Ring zeigte
+    vor dem Fix weiterhin 90s bei RPE 8 trotz `autoStartPauseTimer:false`
+    UND trotz korrekter Berechnung — weil der Trigger komplett am
+    gepatchten Code vorbeilief). Gefixt: `timer.js` importiert neu
+    `buildSetFeedback` aus `sessionCoach.js` — zweiter Import neben
+    `state.js`, aber kein Bruch der "NIEMALS ui.js↔timer.js"-Regel, da
+    sessionCoach.js importfrei und von beiden unabhängig ist (DECISIONS.md
+    neuer Eintrag dazu). Die vorbestehende `autoStartPauseTimer`-
+    Inkonsistenz selbst (nur `confirm-set` respektiert die Einstellung)
+    wurde NICHT mitgefixt — als neuer, niedrigpriorer Kandidat **B78** in
+    BUGS.md dokumentiert, out of scope für diesen Sprint.
+  10 neue Tests (`tests/intra_session_coach.spec.js`, in CI): RPE 6/8/10
+  (nicht letzter Satz) mit korrekten Hint-/Pause-Texten, letzter Satz zeigt
+  "Nächste Woche" statt "Nächster Satz", ohne RPE nur Gewicht ohne
+  Hint/Pause, Timer übernimmt die berechnete Pause als Voreinstellung,
+  Favoriten-Nudge einmalig + "Nie für diese Übung" persistiert dauerhaft,
+  RPE≤6 nach letztem Satz → Weiterer-Satz-Vorschlag inkl. "+ Satz
+  hinzufügen" mit korrektem Vorschlagsgewicht, Aufwärm-Empfehlung
+  eingeklappt per Default + korrekte 50/70/85%-Formel, sessionCoach=false
+  deaktiviert alles Neue (bestehende generische RPE-Nudge bleibt
+  unberührt). 2 Screenshots verifiziert (Aufwärm-Empfehlung aufgeklappt,
+  Intra-Session-Feedback nach RPE 6 mit "→ Nächster Satz: 105kg" /
+  "Noch Luft — steigern · Pause: 90s"). CACHE_VERSION train-v192→v193, CSS
+  ?v=195→196, SCHEMA unverändert (32). Volle Suite 59/59 grün.
+  Dokumentation aktualisiert: BUGS.md (neuer Eintrag B77 + neuer Kandidat
+  B78), DECISIONS.md (3 neue Einträge: session-lokale Logik statt
+  getWeightRecommendation()-Zweckentfremdung, sessionCoach.js als
+  Tiefe-0-Ausnahme von der ui.js↔timer.js-Kopplungsregel), HANDOFF.md
+  (STAND-Sektion), CLAUDE.md (Versionsstand-Header + Modul-Tabelle +
+  Timer-Entkopplung-Abschnitt + Feature-Status-Tabelle), AGENTS.md
+  (Datei-Abhängigkeits-Matrix: sessionCoach.js neu, timer.js-Import
+  erweitert, neuer "NIE parallel"-Eintrag), `.github/workflows/test.yml`
+  (neuer CI-Schritt für `intra_session_coach.spec.js`).
 Loop 5: for-advisor.txt aktualisiert (am Ende der Session).

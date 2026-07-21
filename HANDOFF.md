@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-20, Pre-Session Check-in + Session Briefing (B76, train-v192, SCHEMA 32)*
-*Nächster Schritt: B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md) — braucht Name+Adresse+E-Mail vom Nutzer. B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten. Keine weiteren offenen Rückfragen aus diesem Sprint.*
+*Letzte Aktualisierung: 2026-07-21, Intra-Session Coach (B77, train-v193, SCHEMA 32 unverändert)*
+*Nächster Schritt: B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md) — braucht Name+Adresse+E-Mail vom Nutzer. B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten. B78 (autoStartPauseTimer respektiert nur den confirm-set-Pfad) neu dokumentiert, low priority, nicht dringend. Keine weiteren offenen Rückfragen aus diesem Sprint.*
 
 ---
 
@@ -11,13 +11,54 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v192 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v193 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
-- CSS: ?v=195 (neue `.session-checkin-card`/`.session-briefing-card`-Klassen)
-- SCHEMA: 32 (neue `day.sessionCheckIn`/`sessionModifier`-Felder, v31→v32)
+- CSS: ?v=196 (neue `.set-feedback`/`.warmup-rec-block`/`.rpe-nudge--favorite`-Klassen)
+- SCHEMA: 32 (unverändert — B77 fügt keine neuen State-Felder hinzu)
 - Letzter Commit: siehe `git log` (dieser Sprint noch nicht gepusht,
   siehe Sprint-Ende-Workflow).
+- **B77 — Intra-Session Coach (train-v193):** Nutzer-Anfrage ("SPRINT 2 —
+  Intra-Session Coach"), vorab per technischer Spec abgestimmt und über 2
+  Rückfrage-Runden bestätigt (`AskUserQuestion`). Vorlage enthielt mehrere
+  Diskrepanzen zum echten Code, offengelegt statt stillschweigend
+  übernommen: (1) RPE hat Halbschritte (6/6.5/7/7.5/8/8.5/9/9.5/10) — die
+  Vorlagen-Logik prüfte nur Ganzzahlen, per Bereichsvergleichen korrigiert.
+  (2) Zwei sich überschneidende `if`-Blöcke für RPE 8 in der Vorlage — durch
+  `s.status` (kanonisches "Ziel-Wdh erreicht?") statt erneuter
+  reps-Prüfung ersetzt. (3) Teil B (Gewicht ohne RPE) sollte laut Vorlage
+  `getWeightRecommendation()` für den nächsten SATZ derselben Session
+  verwenden — widerspricht der B76-Entscheidung ("nur nächste Woche") und
+  liefert bei <2 Wochen Historie `null`; nach Rückfrage: eigene,
+  session-lokale Logik in neuer `sessionCoach.js`, B76-Entscheidung bleibt
+  unangetastet. (4) Teil C (Favoriten-RPE-Nudge) hätte eine zweite,
+  parallele Nudge-Komponente neben der bereits bestehenden `.rpe-nudge`
+  gebaut — nach Rückfrage: bestehende Komponente erweitert statt dupliziert.
+  (5) Teil E (Aufwärm-Empfehlung) hätte denselben Namen wie das bestehende
+  freie Aufwärm-Textfeld (`day.warmup`) verwendet — nach Rückfrage: eigener,
+  klar anders benannter Block.
+  **Zusatzfund während der Umsetzung:** `timer.js` hat eine eigene, von
+  ui.js unabhängige Klick-Erkennung für `[data-action="toggle-done"]`
+  (`_bindAppInteractions()`) — löst den Pause-Timer UNCONDITIONAL mit dem
+  statischen `ex.pauseSec` aus (anders als der `confirm-set`-Pfad, der
+  `autoStartPauseTimer` respektiert). Ohne Fix hätte die neue
+  Pause-Empfehlung nur den selteneren `confirm-set`-Pfad erreicht, nicht
+  den vermutlich häufigeren manuellen ✓/✗-Icon-Pfad. Gefixt: `timer.js`
+  importiert neu `sessionCoach.js` (importfrei, Tiefe 0 — keine
+  ui.js-Kopplung). Die vorbestehende `autoStartPauseTimer`-Inkonsistenz
+  selbst NICHT mitgefixt (out of scope), als **B78** in BUGS.md dokumentiert.
+  **Umsetzung:** neues Modul `sessionCoach.js` (Tiefe 0): `buildSetFeedback()`
+  (Gewicht/Pause/Hint für den nächsten Satz), `buildLastSetMessage()`
+  (Abschluss-Text, einziger legitimer `getWeightRecommendation()`-Aufrufer
+  für die Nächste-Woche-Projektion), `buildWarmupSets()` (50/70/85%-Formel).
+  Feedback-Text rein render-abhängig — erscheint identisch ob per
+  `toggle-done` oder `confirm-set` bewertet. `.rpe-nudge` erweitert um
+  Favoriten-Variante (Favorit + erste 4 echte Wochen + Sitzungs-/
+  localStorage-Zähler-Caps, "Nie für diese Übung" persistiert). Neuer
+  "📋 Aufwärm-Empfehlung"-Block, Default zugeklappt, gated wie Check-in/
+  Briefing. Verifiziert per 10 neuen Tests (`tests/intra_session_coach.spec.js`,
+  in CI) + 2 Screenshots. CACHE_VERSION train-v192→v193, CSS ?v=195→196,
+  SCHEMA unverändert (32).
 - **B76 — Pre-Session Check-in + Session Briefing (train-v192):** Nutzer-
   Anfrage, vorab per technischer Spec abgestimmt und bestätigt ("passt so,
   leg los"). Vorlage enthielt mehrere Diskrepanzen zum echten Code, per

@@ -38,6 +38,7 @@
  */
 
 import { dispatch, subscribe, getState, A } from './state.js';
+import { buildSetFeedback } from './sessionCoach.js';
 
 // ─── Wake Lock ────────────────────────────────────────────────────────────────
 
@@ -630,12 +631,24 @@ function _bindAppInteractions() {
       _ensureSessionStart(di);
       queueMicrotask(() => {
         const newState  = getState();
-        const newEx     = newState.weeks[newState.curIdx]?.days?.[di]?.exercises?.[ei];
+        const newDay    = newState.weeks[newState.curIdx]?.days?.[di];
+        const newEx     = newDay?.exercises?.[ei];
         const newSet    = newEx?.sets?.[+doneBtn.dataset.si];
         const isLastSet = +doneBtn.dataset.si === (newEx?.sets?.length ?? 0) - 1;
         if (newSet?.done && !isLastSet) {
+          // B77: Intra-Session Coach — die berechnete Pause-Empfehlung
+          // ersetzt den bisher statischen ex.pauseSec, wenn eine existiert
+          // (sessionModifier vom Tag, dieselbe Logik wie in ui.js' confirm-
+          // set-Pfad). timer.js importiert dafür sessionCoach.js — ein
+          // reines, importfreies Berechnungsmodul (Tiefe 0), keine
+          // ui.js-Kopplung.
+          let pauseSec = ex?.pauseSec ?? 90;
+          if (newState.settings?.sessionCoach !== false) {
+            const fb = buildSetFeedback(newSet, newEx, newDay?.sessionModifier ?? null);
+            if (fb?.pauseSec) pauseSec = fb.pauseSec;
+          }
           window.dispatchEvent(new CustomEvent('train:set-done', {
-            detail: { pauseSec: ex?.pauseSec ?? 90, di },
+            detail: { pauseSec, di },
           }));
         }
       });
