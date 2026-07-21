@@ -2069,3 +2069,51 @@ Eigentliche Aufgabe: Nutzer-Anfrage "SPRINT 3 — Session Summary +
   parallel"-Einträge), `.github/workflows/test.yml` (neuer CI-Schritt für
   `session_summary.spec.js`).
 Loop 5: for-advisor.txt aktualisiert (am Ende der Session).
+
+## 2026-07-21 train-v194 (Diagnose: Session-Coach-Vollständigkeit B76/B77/B79 — keine Code-Änderungen)
+Loop 1: 72/72 grün ✓
+Loop 2: aktuell ✓ — CACHE_VERSION (sw.js: train-v194), CSS (index.html:
+  ?v=197), SCHEMA_VERSION (state.js: 32) stimmen mit HANDOFF.md/CLAUDE.md
+  überein, keine Aktualisierung nötig
+Loop 3: übersprungen — Stop-Bedingung (≥15 Fixtures) mit 17 weiterhin
+  erfüllt
+Eigentliche Aufgabe: Nutzer bat um eine reine Diagnose (explizit "KEINE
+  ÄNDERUNGEN"), ob alle in B76/B77/B79 zugesagten Punkte tatsächlich
+  umgesetzt sind — 7 gezielte Fragen mit Datei:Zeile-Nachweispflicht.
+  **Ergebnis: keine Lücken gefunden, alle bestätigten Spec-Punkte korrekt
+  implementiert:**
+  1. `sessionEnergyPost` (B76) existiert nicht — war nie im bestätigten
+     Scope, DECISIONS.md dokumentiert die explizite Entscheidung,
+     stattdessen das schon lange vor B76 bestehende `day.energyLevel`
+     (`_showDayCompletionModal()`, ui.js:7679-7682) wiederzuverwenden.
+  2. Intra-Session-Feedback (B77): exakter HTML/CSS-Nachweis erbracht
+     (ui.js:2110-2131, styles.css:512-529) — dezent (11px,
+     `var(--c-text-2)`, kein Rand/Karte), erscheint ohne Klick sofort
+     nach jeder Satz-Bewertung (rein render-abhängig von `s.status`).
+  3. Skip → Briefing MIT Standardwerten (sleep/energy je 'medium'), nicht
+     nichts — nachgewiesen in `_buildSessionBriefing()` (ui.js:1090-1091)
+     und dem Skip-Handler (ui.js:6151-6152).
+  4. Weiterer-Satz-Vorschlag nur nach dem LETZTEN geplanten Satz (nicht
+     nach jedem Satz mit RPE≤6) — `buildLastSetMessage()` wird
+     ausschließlich im `isLastSet`-Zweig aufgerufen (ui.js:2104-2106).
+     "+ Satz hinzufügen" fügt einen echten, persistierten Satz hinzu
+     (`SET_ADD`, state.js:1950-1954).
+  5. Schlaf-Korrelation: kein In-App-Debug-Modus zum Umgehen der 8-Wochen-
+     Schwelle (bewusst, konsistent mit anderen Horizont-Signalen), nur
+     über Test-Fixtures testbar. Exakte Formel nachgewiesen
+     (sessionSummary.js:182-207, Gating ui.js:7452-7462).
+  6. Compound/Isolation-Signal sitzt korrekt in der Strukturkarte
+     (`computeStructuralSignals()`, weeklyFocus.js:987-988), nicht in der
+     Hauptkarte — Kategorie-Zuordnung über `resolveCategory()`
+     (weeklyFocus.js:728-762), identisches Muster zu Push/Pull.
+  7. Empfehlung zu einer möglichen künftigen echten Post-Session-Energie-
+     Frage (falls je gewünscht): zeitlich VOR der Session Summary, da der
+     bestehende Energie-Slider im Tagesabschluss-Modal ohnehin schon vor
+     `_showSessionSummary()` läuft — reine Einordnungs-Antwort, keine
+     Implementierung angestoßen.
+Loop 5: for-advisor.txt aktualisiert (20. Fassung) — neuer Abschnitt
+  "Verifizierungs-Durchlauf 2026-07-21" mit der Diagnose-Zusammenfassung
+  für externe Berater/KIs ergänzt, Rest unverändert (kein Code-Sprint).
+Sitzung wird auf Nutzerwunsch geschlossen — keine Code-Änderungen in
+  diesem Eintrag, daher kein Feature-Commit; nur dieser Doku-Eintrag wird
+  committed.
