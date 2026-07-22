@@ -2442,3 +2442,87 @@ Loop 11: for-advisor-consolidated.txt aktualisiert (letzter Loop der
   Session)
 CACHE_VERSION train-v202→v203, CSS ?v=198→199, SCHEMA unverändert.
 Commit: "feat: Session Coach Entscheidungsmatrix v2 + B91 Fix (v202->v203)"
+
+## 2026-07-22 (Infrastruktur-Session, kein Code-Sprint, kein CACHE_VERSION-Bump)
+Eigentliche Aufgabe: Nutzer meldete vollen OneDrive-Cloud-Speicher.
+  Diagnose ergab: `TRAIN\backups\` (Milestone-Snapshots-Konvention) war
+  auf 181 Ordner / ~2 GB angewachsen — `.gitignore`d, nie auf GitHub,
+  reine lokale Snapshots, größter Speicherposten mit Abstand (94% der
+  Projektordnergröße).
+  Schritt 1: `backups/` nach `Downloads\TRAIN_fuer_externe_platte\`
+    verschoben (Downloads bestätigt NICHT OneDrive-synchronisiert, im
+    Unterschied zu Desktop), Original aus dem Projekt gelöscht.
+  Schritt 2: Rest des Projekts zusätzlich nach Downloads kopiert
+    (Nutzerwunsch: alles für die externe Festplatte griffbereit).
+  Schritt 3: Nutzer fragte nach Claude Codes eigenen OneDrive-
+    Speicherorten — `.claude`-Verzeichnis (220 MB) liegt NICHT unter
+    OneDrive, ebensowenig der Temp/Scratchpad-Ordner (dort aber ein
+    unabhängiger Fund: 4,5 GB verwaiste Sitzungsdaten eines anderen,
+    alten Projekts in `AppData\Local\Temp\claude` — dem Nutzer gemeldet,
+    auf Rückfrage noch nicht zur Löschung freigegeben).
+  Schritt 4: Ein kleinerer Sibling-`backups`-Ordner auf ClaudeCode-Ebene
+    (zunächst nur 4 Snapshots sichtbar — Git-Bash/`ls` unterberichtete
+    den tatsächlichen Inhalt bei OneDrive-Cloud-Platzhaltern; PowerShell/
+    Robocopy zeigten korrekt 60 Snapshots) gefunden und besprochen.
+  Nutzerentscheidung: statt nur `backups/` zu verschieben, das GESAMTE
+    Projekt dauerhaft aus OneDrive heraus verlagern, damit das Problem
+    nicht wiederkehrt. Neuer Standort: `C:\ClaudeProjects\TRAIN`
+    (bewusst kein OneDrive-Known-Folder — nicht Desktop/Documents/
+    Pictures, daher nie Cloud-synchronisiert).
+  Durchgeführt (jeder Schritt vor dem nächsten per Dateianzahl/-größe
+    verifiziert, robocopy-Trockenlauf vor jeder Löschung):
+    1. `TRAIN\` komplett nach `C:\ClaudeProjects\TRAIN\` kopiert (406,86
+       MB, 16761 Dateien) — Git-Integrität am neuen Ort bestätigt
+       (`git log`/`git remote` korrekt, keine Neukonfiguration nötig).
+    2. Sibling `.claude\` (Projekt-Settings) und der ältere Sibling-
+       `backups\` (60 Snapshots, 10,51 MB — die vorherige 4er-Zählung war
+       ein `ls`-Artefakt, kein echter Datenunterschied) mit übernommen,
+       in `TRAIN\backups\` konsolidiert.
+    3. Verwaisten, leeren Git-Ordner (`UsersjoojoOneDriveDesktopClaudeCodeTRAIN`)
+       geprüft: 155 Commits, alle bereits Teil der aktuellen 430-Commit-
+       Historie des echten Repos — vollständig redundant, gefahrlos
+       gelöscht.
+    4. **Zwischenfall:** beim finalen Verifizieren tauchten in
+       `TRAIN\backups\` (OneDrive-Original) plötzlich 60 längst gelöschte
+       Juni-Snapshots wieder auf (Zeitstempel = Zeitpunkt der laufenden
+       Sitzung) — ein OneDrive-Sync-Artefakt unter der ungewöhnlich hohen
+       Datei-Churn dieser Sitzung, kein von mir ausgelöster Datenverlust.
+       Vor jeder Löschung nochmals vollständig neu synchronisiert und per
+       Robocopy-Trockenlauf (`/L`) verifiziert: 0 fehlende Dateien.
+    5. Originale gelöscht: `TRAIN\`, Sibling-`backups\`, Sibling-`.claude\`,
+       verwaister Git-Ordner. `.cursor\` bewusst unangetastet gelassen
+       (Nutzer-Vorgabe: keine projektfremden Ordner anfassen).
+    6. `TRAIN\`-Ordnerhülle selbst blieb nach der Löschung gesperrt
+       (vermutlich OneDrive-Sync-Prozess) — Inhalt aber vollständig leer
+       (0 Bytes/Elemente verifiziert), kein relevanter Restspeicher.
+  Endzustand: `C:\ClaudeProjects\TRAIN` (417,4 MB, bestätigt NICHT unter
+    OneDrive), Git funktioniert unverändert (`git log -1` zeigt korrekt
+    `8e3871a`, Remote korrekt). CLAUDE.md/HANDOFF.md um den neuen
+    Projektpfad ergänzt.
+Loop 1: **erster Lauf am neuen Standort schlug komplett fehl (107/107 rot,
+  alle mit `TimeoutError: page.waitForSelector`)** — keine echten
+  Regressionen, sondern ein Infrastruktur-Nebeneffekt des Umzugs:
+  `playwright.config.js` hat `webServer.reuseExistingServer: true` (Port
+  8080) — ein verwaister `http-server`-Prozess (PID, seit 14.07.2026
+  durchgehend gelaufen, aus einer weit zurückliegenden Sitzung, servierte
+  eine inzwischen nicht mehr existierende Verzeichnisstruktur) beantwortete
+  Anfragen auf Port 8080 mit HTTP 404 statt der App — Playwright hat ihn
+  brav "wiederverwendet" statt einen neuen zu starten. Prozess beendet,
+  Port frei, Suite danach sauber grün: **106 passed + 1 bekannter Flake
+  (`delete_all_data.spec.js`, siehe HANDOFF.md, vorbestehend und
+  unabhängig vom Umzug) = 107/107.** Für künftige Sessions relevant: nach
+  einem Standortwechsel oder ungewöhnlich langer Sitzungspause immer
+  prüfen, ob Port 8080 noch von einem alten Testlauf belegt ist
+  (`Get-NetTCPConnection -LocalPort 8080 -State Listen`), bevor ein rotes
+  Ergebnis als echte Regression gewertet wird.
+Loop 2: aktuell ✓ — CACHE_VERSION/CSS/SCHEMA unverändert seit train-v203
+Loop 3: übersprungen — 17 Fixtures ≥ 15
+Loop 5: for-advisor.txt aktualisiert (27. Fassung, reiner Freshness-Hinweis
+  auf die Infrastruktur-Session, keine Code-Fakten geändert)
+Loop 6: übersprungen — letzte Prüfung 2026-07-21, <90 Tage
+Loop 7/11: for-advisor-product.txt/for-advisor-consolidated.txt geprüft,
+  bereits aktuell (kein Produkt-relevanter Inhalt geändert)
+Kein Commit für Code nötig (keine Code-Änderung) — die Doku-Updates
+  (CLAUDE.md/HANDOFF.md/SESSION_LOG.md/context-exports) werden trotzdem
+  committed und gepusht, damit der neue Projektpfad für künftige Sessions
+  dokumentiert ist.

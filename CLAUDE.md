@@ -40,6 +40,15 @@ TRAIN ist eine deutschsprachige PWA für Krafttraining. Pure Vanilla ES Modules 
 
 - Repo: https://github.com/777random/TRAIN
 - Deployed: https://777random.github.io/TRAIN/
+- **Lokaler Projektpfad (seit 2026-07-22): `C:\ClaudeProjects\TRAIN`** — vorher
+  unter `C:\Users\joojo\OneDrive\Desktop\ClaudeCode\TRAIN` (OneDrive-
+  synchronisiert). Wurde verschoben, weil der dortige `backups/`-Ordner
+  (181 Milestone-Snapshots, ~2 GB) den Cloud-Speicher des Nutzers gefüllt
+  hatte. `C:\ClaudeProjects\` liegt bewusst außerhalb jeder Cloud-Sync
+  (nicht unter `OneDrive\Desktop`/`Documents`/`Pictures`) — künftige
+  Sessions müssen aus diesem neuen Pfad heraus gestartet werden, sonst
+  landet man am alten (jetzt leeren) OneDrive-Ort. Nutzer zieht den Ordner
+  regelmäßig manuell auf eine externe Festplatte statt über Cloud-Sync.
 - Aktueller Stand: SCHEMA_VERSION 32 · CACHE_VERSION train-v203 · CSS ?v=199
 
 ---

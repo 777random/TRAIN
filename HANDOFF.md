@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-22, B91-B94 Session Coach Entscheidungsmatrix v2 + Begründung + dauerhafte Übernehmen-Bestätigung (train-v203, SCHEMA 32 unverändert)*
-*Nächster Schritt: B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md) — braucht Name+Adresse+E-Mail vom Nutzer. B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten — weiterhin blockiert auf echte GoatCounter-Telemetrie (`js_error:`-Events im Dashboard prüfen). Aktuell keine weiteren offenen Bugs außer B55/B66. Loops 7-11 aktiv: Advisor-Exports werden am Ende jeder Session automatisch aktualisiert. for-advisor-consolidated.txt = Startpunkt für neue externe Chats.*
+*Letzte Aktualisierung: 2026-07-22 — kein Code-Sprint, reine Infrastruktur-Session: Projekt von OneDrive (`C:\Users\joojo\OneDrive\Desktop\ClaudeCode\TRAIN`) nach lokal `C:\ClaudeProjects\TRAIN` verschoben (Cloud-Speicher war voll — `backups/` hatte auf ~2 GB/181 Snapshots angewachsen). Letzter echter Code-Sprint bleibt B91-B94 (train-v203, siehe unten).*
+*Nächster Schritt: **WICHTIG — künftige Sessions aus `C:\ClaudeProjects\TRAIN` starten**, nicht mehr aus dem alten OneDrive-Pfad (der ist geleert, nur eine leere Ordnerhülle + `.cursor` bleiben dort zurück). B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md) — braucht Name+Adresse+E-Mail vom Nutzer. B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten — weiterhin blockiert auf echte GoatCounter-Telemetrie (`js_error:`-Events im Dashboard prüfen). Aktuell keine weiteren offenen Bugs außer B55/B66. Loops 7-11 aktiv: Advisor-Exports werden am Ende jeder Session automatisch aktualisiert. for-advisor-consolidated.txt = Startpunkt für neue externe Chats.*
 
 ---
 
@@ -18,8 +18,42 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
   `.set-feedback__line--reverted`)
 - SCHEMA: 32 (unverändert — B91-B94 fügen keine neuen State-Felder hinzu,
   reine sessionCoach.js/ui.js-Logik- und Rendering-Änderungen)
-- Letzter Commit: siehe `git log` (dieser Sprint noch nicht gepusht,
-  siehe Sprint-Ende-Workflow).
+- Letzter Commit: `8e3871a` (train-v203), gepusht, CI grün (Regression +
+  Lighthouse).
+- **Projekt-Standort verschoben (2026-07-22, keine Code-Änderung):**
+  Nutzer meldete vollen OneDrive-Cloud-Speicher. Ursache: `backups/`
+  (Milestone-Snapshots, per Konvention nach jedem Sprint erzeugt) war auf
+  181 Ordner/~2 GB angewachsen — `.gitignore`d, nie auf GitHub, rein
+  lokale Snapshots. Schrittweise Lösung: zunächst `backups/` nach
+  `Downloads\` verschoben (lokal, nicht Cloud-synchronisiert) und aus dem
+  Projekt gelöscht. Nutzer entschied sich danach für eine dauerhafte
+  Lösung: das GESAMTE Projekt liegt jetzt unter `C:\ClaudeProjects\TRAIN`
+  (vorher `C:\Users\joojo\OneDrive\Desktop\ClaudeCode\TRAIN`) —
+  `C:\ClaudeProjects\` ist bewusst kein OneDrive-Known-Folder (nicht
+  Desktop/Documents/Pictures), daher nie Cloud-synchronisiert. Dabei
+  außerdem entdeckt und mit verschoben: ein kleinerer, älterer Sibling-
+  Backups-Ordner auf ClaudeCode-Ebene (60 Juni-Snapshots, die OneDrive
+  während der Aufräumaktion unerwartet aus der Versionshistorie
+  wiederhergestellt hatte — ein Sync-Artefakt, kein Datenverlust, alles
+  vor dem finalen Löschen per Robocopy-Trockenlauf verifiziert) sowie ein
+  verwaister, vollständig redundanter Alt-Klon (`.git`-Ordner mit 155
+  Commits, alle bereits Teil der aktuellen 430-Commit-Historie).
+  **Git funktioniert am neuen Ort unverändert** (Remote/Historie
+  unangetastet, reine Ordner-Verschiebung). **Wichtig für künftige
+  Sessions:** aus `C:\ClaudeProjects\TRAIN` starten, nicht aus dem alten
+  OneDrive-Pfad (dort nur noch eine leere, ungenutzte Ordnerhülle +
+  unangetastetes `.cursor`, siehe CLAUDE.md).
+  **Stolperstein nach dem Umzug (gelöst):** der erste Playwright-Lauf am
+  neuen Standort zeigte 107/107 rot (`TimeoutError:
+  page.waitForSelector`) — keine echte Regression, sondern ein
+  verwaister `http-server`-Prozess auf Port 8080 (seit 14.07.2026 gelaufen,
+  servierte eine nicht mehr existierende alte Verzeichnisstruktur mit HTTP
+  404), den `playwright.config.js`s `reuseExistingServer: true`
+  fälschlich wiederverwendet hat statt einen neuen zu starten. Prozess
+  beendet, Suite danach 106/107 grün + 1 bekannter Flake
+  (`delete_all_data.spec.js`). Bei einem roten Komplettausfall nach
+  Standortwechsel/langer Pause immer zuerst prüfen, ob Port 8080 noch
+  belegt ist, bevor eine echte Regression vermutet wird.
 - **B91-B94 — Session Coach Entscheidungsmatrix v2 + Begründung +
   dauerhafte Übernehmen-Bestätigung (train-v203):** vier zusammenhängende
   Verbesserungen an `buildSetFeedback()`/dem Intra-Session-Coach-Rendering
