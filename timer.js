@@ -217,6 +217,17 @@ function _startPause(seconds) {
     _pauseRingEl.style.strokeDashoffset = RING_CIRCUMF;
   }
 
+  // B85: die echte Sekundenzahl SOFORT synchron schreiben, nicht erst beim
+  // ersten requestAnimationFrame-Tick von _tickPause() -- sonst bleibt kurz
+  // (bis zum nächsten Frame) der statische Platzhalter "90" aus dem
+  // initialen Overlay-Markup sichtbar (_buildOverlayDOM()) bzw. bei einem
+  // erneuten Start ohne kompletten Ablauf der zuvor angezeigte Countdown-
+  // Rest. Auf einem langsameren/anders getakteten Client (CI-Runner,
+  // gedrosseltes Gerät) kann diese Lücke groß genug sein, dass sie
+  // tatsächlich wahrgenommen bzw. von einem Test ausgelesen wird, bevor
+  // der rAF-Tick den korrekten Wert einträgt.
+  if (_pauseNumEl) _pauseNumEl.textContent = seconds;
+
   _showPauseOverlay();
   _pauseRAF = requestAnimationFrame(_tickPause);
   _acquireWakeLock();

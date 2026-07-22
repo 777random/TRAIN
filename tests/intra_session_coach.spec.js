@@ -153,6 +153,41 @@ test('Timer übernimmt die berechnete Pause als Voreinstellung (nicht mehr fix e
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
 });
 
+// B85: die berechnete Pausenzahl wurde bisher erst beim ERSTEN
+// requestAnimationFrame-Tick von _tickPause() (timer.js) ins DOM
+// geschrieben -- _startPause() selbst schrieb sie nicht synchron. Auf
+// einem langsameren/anders getakteten Client (beobachtet in GitHub Actions
+// CI, nie lokal) konnte ein Auslesen VOR diesem ersten Tick noch den
+// statischen Platzhalter "90" aus dem initialen Overlay-Markup zeigen
+// statt der echten Sekundenzahl (hier: 180).
+//
+// Dieser Test klickt "Satz bestätigen" UND liest #pause-ring-num direkt
+// im selben page.evaluate()-Aufruf aus -- beides läuft synchron im
+// selben JS-Task der Seite, ohne Playwright-IPC-Rundreise dazwischen.
+// requestAnimationFrame-Callbacks können per Spezifikation frühestens
+// NACH Abschluss des aktuellen synchronen Tasks feuern -- ist die Zahl
+// hier bereits korrekt, kann das nur an einem synchronen Schreiben in
+// _startPause() liegen, nie am rAF-Tick. Deterministisch, unabhängig
+// von jeglicher Timing-Varianz (im Unterschied zum ursprünglichen Test
+// oben, der über zwei separate awaits/IPC-Rundreisen geht).
+test('B85: Pausenzahl ist synchron korrekt, unabhängig von requestAnimationFrame-Timing', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', err => pageErrors.push(err.message));
+  await page.goto('/');
+  await page.waitForSelector('#app.is-ready', { timeout: 10000 });
+  await seed(page, { exercises: [mkEx({ nSets: 2, targetReps: 5 })], autoStartPauseTimer: true });
+
+  await setRpe(page, 0, 0, 0, 8); // -> pauseSec 180
+
+  const numRightAfterClick = await page.evaluate(() => {
+    document.querySelector('[data-action="confirm-set"][data-di="0"][data-ei="0"]').click();
+    return document.getElementById('pause-ring-num').textContent;
+  });
+  expect(numRightAfterClick).toBe('180');
+
+  expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});
+
 test('Favoriten-Übung ohne RPE: erweiterte Nudge einmalig pro Sitzung, "Nie für diese Übung" wirkt dauerhaft', async ({ page }) => {
   const pageErrors = [];
   page.on('pageerror', err => pageErrors.push(err.message));

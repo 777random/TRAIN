@@ -2,6 +2,24 @@
 # Automatisch von Claude Code
 # befüllt beim Session-Start
 
+## 2026-07-22 train-v198 (B85 — Pause-Timer-Overlay zeigt sofort korrekte Sekundenzahl)
+Loop 1: 10/10 grün ✓, volle Suite 83/83 grün nach dem Fix
+Loop 2: aktuell ✓ (CLAUDE.md/HANDOFF.md/BUGS.md auf train-v198 gebracht)
+Eigentliche Aufgabe: direkter Anschluss an B84 — Nutzer bat, den in BUGS.md
+  dokumentierten CI-Timing-Flake zu fixen. Root Cause gefunden:
+  `_startPause()` (timer.js) schrieb die Pausendauer nie synchron ins DOM,
+  nur asynchron über den ersten `requestAnimationFrame`-Tick von
+  `_tickPause()` — das initiale Overlay-Markup zeigt bis dahin einen
+  hartkodierten Platzhalter "90". Auf einem langsameren CI-Runner konnte
+  ein Auslesen in dieser Lücke landen. Fix: Sekundenzahl sofort synchron
+  in `_startPause()` schreiben. Neuer deterministischer Test (Klick+Read
+  im selben `page.evaluate()`, unabhängig von rAF-Timing) — per
+  Fix-zurücknehmen-bestätigt-wieder-herstellen-Zyklus verifiziert, dass
+  er die Regression zuverlässig fängt (reproduzierte exakt das
+  CI-Symptom: `Received: "90"`). CACHE_VERSION train-v197→v198.
+  BUGS.md (B85 von OFFEN nach BEHOBEN verschoben), HANDOFF.md, CLAUDE.md
+  aktualisiert. Committed + gepusht.
+
 ## 2026-07-21 train-v197 (B84 — reduzierte Tagesform dämpft keine echte Steigerung mehr)
 Loop 1: 10/10 grün ✓, volle Suite 82/82 grün nach dem Fix
 Loop 2: aktuell ✓ (CLAUDE.md/HANDOFF.md/BUGS.md auf train-v197 gebracht)

@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-21, B84 reduzierte Tagesform dämpft keine echte Steigerung mehr (train-v197, SCHEMA 32 unverändert)*
-*Nächster Schritt: **CI-Badge aktuell ROT (train-v197-Push)** — B85 (neu, siehe BUGS.md): `intra_session_coach.spec.js:139` flakt in GitHub Actions (Ubuntu), lokal 3/3 grün, per Vergleich mit einem früheren rein-doku-Commit als VOR B84 bereits existierend bestätigt (nicht durch B84 verursacht) — trotzdem vor dem nächsten Sprint fixen (Timing-Race beim Pause-Countdown-Auslesen, siehe BUGS.md B85 für Diagnose-Ansatz). B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md) — braucht Name+Adresse+E-Mail vom Nutzer. B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten. B78 (autoStartPauseTimer respektiert nur den confirm-set-Pfad) bleibt offen, low priority. B83 (_skippedCheckIn nicht zwischen Wochen zurückgesetzt) weiterhin offen, Low. Loops 7-11 aktiv: Advisor-Exports werden am Ende jeder Session automatisch aktualisiert. for-advisor-consolidated.txt = Startpunkt für neue externe Chats.*
+*Letzte Aktualisierung: 2026-07-22, B85 Pause-Timer-Overlay zeigt sofort korrekte Sekundenzahl (train-v198, SCHEMA 32 unverändert)*
+*Nächster Schritt: B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md) — braucht Name+Adresse+E-Mail vom Nutzer. B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten. B78 (autoStartPauseTimer respektiert nur den confirm-set-Pfad) bleibt offen, low priority. B83 (_skippedCheckIn nicht zwischen Wochen zurückgesetzt) weiterhin offen, Low. CI-Badge sollte nach diesem Push wieder grün sein — bei erneutem Rot direkt prüfen, ob derselbe Test betroffen ist (dann echter Regress) oder ein anderer (dann neuer, unabhängiger Fund). Loops 7-11 aktiv: Advisor-Exports werden am Ende jeder Session automatisch aktualisiert. for-advisor-consolidated.txt = Startpunkt für neue externe Chats.*
 
 ---
 
@@ -20,6 +20,31 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
   dem bestehenden Plateau-Mechanismus)
 - Letzter Commit: siehe `git log` (dieser Sprint noch nicht gepusht,
   siehe Sprint-Ende-Workflow).
+- **B85 — Pause-Timer-Overlay zeigt sofort korrekte Sekundenzahl
+  (train-v198):** direkter Anschluss an B84 — nach dessen Push war das
+  CI-Badge rot (`intra_session_coach.spec.js:139`). Per Vergleich mit
+  einem früheren, rein dokumentations-basierten Commit bereits als VOR
+  B84 existierend bestätigt (nicht durch B84 verursacht), aber laut
+  Projektkonvention trotzdem vor dem nächsten Sprint zu fixen. **Root
+  Cause:** `_startPause(seconds)` (timer.js) schrieb die berechnete
+  Pausendauer nie synchron ins DOM — `#pause-ring-num` wird nur
+  innerhalb von `_tickPause()` aktualisiert, die selbst erst über
+  `requestAnimationFrame` (asynchron, frühestens nächster Frame) zum
+  ersten Mal läuft. Das initiale Overlay-Markup enthält einen
+  hartkodierten Platzhalter `90` — auf einem langsameren/anders
+  getakteten CI-Runner konnte ein Auslesen zwischen "Overlay sichtbar"
+  (synchron) und "erster rAF-Tick" (asynchron) noch diesen Platzhalter
+  zeigen. Reines Timing-Problem, keine Logik-Frage (lokal immer korrekt,
+  da der rAF-Tick dort praktisch sofort feuert). **Fix:** `_startPause()`
+  schreibt die Sekundenzahl jetzt sofort synchron, bevor der Overlay
+  gezeigt und der rAF-Loop gestartet wird — behebt die Race an der
+  Quelle statt nur den Test anzupassen. Neuer, deterministischer Test
+  (klickt und liest im selben `page.evaluate()`, keine Playwright-IPC-
+  Rundreise dazwischen, dadurch unabhängig von rAF-Timing) — per
+  Fix-zurücknehmen-und-wieder-herstellen bestätigt, dass er die
+  Regression tatsächlich fängt (schlug ohne Fix reproduzierbar mit
+  exakt `Received: "90"` fehl, identisch zum CI-Symptom). Volle Suite
+  83/83 grün. CACHE_VERSION train-v197→v198, CSS/SCHEMA unverändert.
 - **B84 — reduzierte Tagesform dämpft keine echte Steigerung mehr
   (train-v197):** Nutzer meldete, `nextWeight` scheine vom falschen Satz
   berechnet zu werden (Satz 1: 90kg RPE10 → korrekt 87.5kg; Satz 2: 98kg
