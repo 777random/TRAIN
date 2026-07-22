@@ -661,7 +661,7 @@ function _bindAppInteractions() {
           // ui.js-Kopplung.
           let pauseSec = ex?.pauseSec ?? 90;
           if (newState.settings?.sessionCoach !== false) {
-            const fb = buildSetFeedback(newSet, newEx, newDay?.sessionModifier ?? null);
+            const fb = buildSetFeedback(newSet, newEx, newDay?.sessionModifier ?? null, +doneBtn.dataset.si);
             if (fb?.pauseSec) pauseSec = fb.pauseSec;
           }
           window.dispatchEvent(new CustomEvent('train:set-done', {

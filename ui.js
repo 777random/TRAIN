@@ -177,12 +177,20 @@ let _editingCheckIn = new Set();
 let _optionalSetDismissed = new Set();
 /** Auf-/Zuklappen der Aufwärm-Empfehlung pro Tag (di), Default zu. */
 let _warmupExpanded = new Set();
-// B87 Fix 4+5: Sätze (Keys `${di}-${ei}-${si}` -> Zeitpunkt der Adoption),
-// deren "Übernehmen"-Button bereits getappt wurde. Key vorhanden + < 2s her
-// -> zeigt "✓ Übernommen"; Key vorhanden + älter -> zeigt nichts mehr (weder
-// Button noch Bestätigung, "dann weg" laut Spec); Key fehlt -> Button
-// erscheint, wenn die übrigen Bedingungen erfüllt sind.
-let _adoptedSetFeedback = new Map();
+// B87 Fix 4+5, seit B94 dauerhaft statt 2s-Ausblendung (siehe DECISIONS.md
+// "B89-Verhalten ersetzt durch B94"): Sätze (Keys `${di}-${ei}-${si}` ->
+// Snapshot des zum Adoptions-Zeitpunkt berechneten Feedbacks), deren
+// "Übernehmen"-Button bereits getappt wurde. Key vorhanden + Satz noch
+// bewertet (nicht pending) -> zeigt den gespeicherten Snapshot dauerhaft
+// ohne Button, mit "✓ Übernommen"; Key vorhanden + Satz wieder pending
+// (Undo ODER manuelles Zurücktippen auf "offen" — beides am Render-
+// Zeitpunkt nicht unterscheidbar, siehe DECISIONS.md) -> derselbe Snapshot
+// mit "(rückgängig gemacht)"; Key fehlt -> normales Feedback + Button wie
+// gehabt. Gelöscht (Prefix `${di}-`) bei Tagesabschluss, siehe _finishCompletion().
+let _acceptedFeedback = new Map();
+// B93: Sätze (Keys `${di}-${ei}-${si}`), deren "▾ Warum?"-Begründung gerade
+// aufgeklappt ist. Rein transient, nicht persistiert.
+let _setFeedbackExpanded = new Set();
 
 /** Last rendered week index – used to detect week navigation. */
 let _lastRenderedCurIdx = null;
@@ -1603,7 +1611,7 @@ function renderExercise(wk, di, ei, state) {
   }
 
   const setsHtml = ex.sets.map((s, si) =>
-    renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled, showIntraCoach, sessionModifier, _nextWeekWeight)
+    renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled, showIntraCoach, sessionModifier, _nextWeekWeight, wk.id)
   ).join('');
 
   const step = ex.weightStep ?? 2.5;
@@ -2076,8 +2084,51 @@ function renderExercise(wk, di, ei, state) {
   >${ic.plus()}<span>Satz hinzufügen</span></button>` : ''}
 </div>`;
 }
+// B93+B94: rendert den "Nächster Satz"-Feedback-Block (nicht der letzte Satz
+// einer Übung) für alle drei Zustände -- live (Button sichtbar), accepted
+// (Satz noch bewertet, Snapshot dauerhaft ohne Button) und reverted (Satz
+// wieder pending, Snapshot + "(rückgängig gemacht)"). `fb` ist entweder das
+// frische buildSetFeedback()-Ergebnis (live) oder der beim Übernehmen
+// gespeicherte Snapshot (accepted/reverted) -- identische Feldform in
+// beiden Fällen (siehe sessionCoach.js buildSetFeedback()-Rückgabe).
+function _renderIntraFeedback(fb, key, di, ei, si, mode, canAdopt) {
+  if (!fb.hint) {
+    return `
+<div class="set-feedback">
+  <span class="set-feedback__line">→ Nächster Satz: ${fb.nextWeight}kg</span>
+</div>`;
+  }
+  const expanded = _setFeedbackExpanded.has(key);
+  const confirmText = mode === 'accepted' ? '✓ Übernommen'
+    : mode === 'reverted' ? '✓ Übernommen (rückgängig gemacht)'
+    : null;
+  const confirmHtml = confirmText ? ` <span class="set-feedback__line--confirm">${confirmText}</span>` : '';
+  const adoptBtnHtml = (mode === 'live' && canAdopt)
+    ? ` <button type="button" class="set-feedback__adopt-btn" data-action="adopt-set-feedback" data-di="${di}" data-ei="${ei}" data-si="${si}" data-next-weight="${fb.nextWeight}" data-pause-sec="${fb.pauseSec ?? ''}">Übernehmen ↗</button>`
+    : '';
+  const whyToggleHtml = ` <button type="button" class="set-feedback__why-toggle" data-action="toggle-set-feedback-why" data-di="${di}" data-ei="${ei}" data-si="${si}">${expanded ? '▴' : '▾'} Warum?</button>`;
+  const repsLine = fb.repDiff == null
+    ? ''
+    : fb.repDiff <= 0
+      ? `${fb.reps}/${fb.targetReps} ${fb.unit} ✓ erreicht`
+      : `${fb.reps}/${fb.targetReps} ${fb.unit} ✗ ${fb.repDiff} gefehlt`;
+  const whyBodyHtml = expanded
+    ? `
+  <div class="set-feedback__why-body">
+    ${repsLine ? `<div class="set-feedback__line">${h(repsLine)}</div>` : ''}
+    ${fb.rpe != null ? `<div class="set-feedback__line">RPE ${fb.rpe} — ${fb.rpeZone}</div>` : ''}
+    <div class="set-feedback__line">→ ${h(fb.hint)}</div>
+  </div>`
+    : '';
+  return `
+<div class="set-feedback">
+  <span class="set-feedback__line">→ Nächster Satz: ${fb.nextWeight}kg</span>
+  <span class="set-feedback__line set-feedback__line--sub">${h(fb.hint)}${fb.pauseSec ? ` · Pause: ${_fmtPause(fb.pauseSec)}` : ''}${adoptBtnHtml}${confirmHtml}${whyToggleHtml}</span>${whyBodyHtml}
+</div>`;
+}
+
 // ─── Set row ─────────────────────────────────────────────────────────────────
-function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true, showIntraCoach = false, sessionModifier = null, nextWeekWeight = null) {
+function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true, showIntraCoach = false, sessionModifier = null, nextWeekWeight = null, wkId = null) {
   // B17: prevEx wird in renderExercise() bei einer Ausweichübung (substituteFor)
   // bewusst über den NAMEN DER URSPRÜNGLICHEN Übung gesucht (siehe _lookupName
   // dort) — für den Fulfill-Meter-Metrik-Check dort ist das sinnvoll, aber hier
@@ -2184,12 +2235,20 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
   // daher identisch egal ob der Satz über "Satz bestätigen" oder das
   // manuelle ✓/✗-Icon bewertet wurde.
   let intraCoachHtml = '';
+  const feedbackKey = `${di}-${ei}-${si}`;
+  // B94: _acceptedFeedback ist wk.id-präfixiert (anders als das rein
+  // kosmetische _setFeedbackExpanded/_optionalSetDismissed) -- der Snapshot
+  // trägt echte Daten (Gewicht/RPE/repDiff), ein Bluten über einen
+  // Wochenwechsel hinweg (day.id bleibt über geklonte Wochen hinweg gleich,
+  // siehe B83) würde sonst falsche Werte für einen frischen pending-Satz
+  // der NEUEN Woche zeigen.
+  const acceptedKey = `${wkId}-${feedbackKey}`;
+  const accepted = _acceptedFeedback.get(acceptedKey);
   if (showIntraCoach && st !== 'pending') {
     const isLastSet = si === ex.sets.length - 1;
     if (isLastSet) {
       const msg = buildLastSetMessage(s, ex, nextWeekWeight);
-      const dismissKey = `${di}-${ei}-${si}`;
-      const dismissed = msg.canAddSet && _optionalSetDismissed.has(dismissKey);
+      const dismissed = msg.canAddSet && _optionalSetDismissed.has(feedbackKey);
       if (!dismissed) {
         intraCoachHtml = `
 <div class="set-feedback${msg.canAddSet ? ' set-feedback--action' : ''}">
@@ -2201,39 +2260,22 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
 </div>`;
       }
     } else {
-      const fb = buildSetFeedback(s, ex, sessionModifier);
+      // B94: bereits übernommenes Feedback wird aus dem Snapshot gerendert
+      // (nicht neu berechnet) -- zeigt dauerhaft, was der Athlet damals
+      // entschieden hat, auch wenn sich s.reps/s.rpe zwischenzeitlich
+      // geändert haben sollte.
+      const fb = accepted ?? buildSetFeedback(s, ex, sessionModifier, si);
       if (fb && fb.nextWeight != null) {
-        // B87 Fix 4+5: "Übernehmen"-Button -- nur wenn RPE eingegeben wurde
-        // (fb.hint/fb.pauseSec sind beide nur bei RPE gesetzt, siehe
-        // sessionCoach.js) UND die Empfehlung tatsächlich vom aktuellen
-        // Gewicht abweicht (kein sinnloser Button bei "gleich bleiben").
-        const adoptKey    = `${di}-${ei}-${si}`;
-        const adoptedAt   = _adoptedSetFeedback.get(adoptKey);
-        const justAdopted = adoptedAt != null && (Date.now() - adoptedAt < 2000);
-        const canAdopt    = fb.hint != null && fb.nextWeight !== (s.weight ?? 0) && adoptedAt == null;
-        const adoptBtnHtml = canAdopt
-          ? ` <button type="button" class="set-feedback__adopt-btn" data-action="adopt-set-feedback" data-di="${di}" data-ei="${ei}" data-si="${si}" data-next-weight="${fb.nextWeight}" data-pause-sec="${fb.pauseSec ?? ''}">Übernehmen ↗</button>`
-          : '';
-        if (justAdopted) {
-          intraCoachHtml = `
-<div class="set-feedback">
-  <span class="set-feedback__line set-feedback__line--confirm">✓ Übernommen</span>
-</div>`;
-        } else if (adoptedAt == null) {
-          intraCoachHtml = fb.hint
-            ? `
-<div class="set-feedback">
-  <span class="set-feedback__line">→ Nächster Satz: ${fb.nextWeight}kg</span>
-  <span class="set-feedback__line set-feedback__line--sub">${h(fb.hint)}${fb.pauseSec ? ` · Pause: ${_fmtPause(fb.pauseSec)}` : ''}${adoptBtnHtml}</span>
-</div>`
-            : `
-<div class="set-feedback">
-  <span class="set-feedback__line">→ Nächster Satz: ${fb.nextWeight}kg</span>
-</div>`;
-        }
-        // adoptedAt gesetzt UND nicht mehr justAdopted -> "dann weg", kein Markup.
+        const canAdopt = !accepted && fb.hint != null && fb.nextWeight !== (s.weight ?? 0);
+        intraCoachHtml = _renderIntraFeedback(fb, feedbackKey, di, ei, si, accepted ? 'accepted' : 'live', canAdopt);
       }
     }
+  } else if (showIntraCoach && st === 'pending' && accepted) {
+    // B94: Satz wieder offen (Undo ODER manuelles Zurücktippen auf "offen" --
+    // beides am Render-Zeitpunkt nicht unterscheidbar, siehe DECISIONS.md) --
+    // der zum Adoptions-Zeitpunkt gespeicherte Snapshot bleibt sichtbar,
+    // damit der Athlet sieht, was er ursprünglich entschieden hatte.
+    intraCoachHtml = _renderIntraFeedback(accepted, feedbackKey, di, ei, si, 'reverted', false);
   }
 
   return `
@@ -4555,7 +4597,7 @@ function renderSettingsTab(state) {
   <div class="settings-section">
     <div class="settings-section__title">Info</div>
     <div class="settings-row">
-      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v202</div></div>
+      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v203</div></div>
     </div>
     <div class="settings-row">
       <div>
@@ -5973,7 +6015,7 @@ function _handleClick(e) {
         const _fbWk  = _aft.weeks[_aft.curIdx];
         const _fbDay = _fbWk?.days[+di];
         if (_fbDay && _aft.settings?.sessionCoach !== false && !_fbDay.isVacation && _isTodayDay(_fbWk, +di)) {
-          const _fb = buildSetFeedback(_aftSet, _aftEx, _fbDay.sessionModifier ?? null);
+          const _fb = buildSetFeedback(_aftSet, _aftEx, _fbDay.sessionModifier ?? null, _csi);
           if (_fb?.pauseSec) _feedbackPauseSec = _fb.pauseSec;
         }
         window.dispatchEvent(new CustomEvent('train:set-done', { detail: { pauseSec: _feedbackPauseSec ?? (_cex.pauseSec ?? 90), di: +di } }));
@@ -6346,7 +6388,10 @@ function _handleClick(e) {
       const _adNextWeight = parseFloat(el.dataset.nextWeight);
       const _adPauseSec   = el.dataset.pauseSec ? parseFloat(el.dataset.pauseSec) : null;
       const _adSt = getState();
-      const _adEx = _adSt.weeks[_adSt.curIdx]?.days[_adDi]?.exercises[_adEi];
+      const _adWk  = _adSt.weeks[_adSt.curIdx];
+      const _adDay = _adWk?.days[_adDi];
+      const _adEx = _adDay?.exercises[_adEi];
+      const _adS  = _adEx?.sets?.[_adSi];
       if (_adEx?.sets?.[_adSi + 1] && Number.isFinite(_adNextWeight)) {
         dispatch(A.SET_UPDATE, { di: _adDi, ei: _adEi, si: _adSi + 1, field: 'weight', value: _adNextWeight });
       }
@@ -6358,9 +6403,20 @@ function _handleClick(e) {
       if (!_pauseRunning && _adPauseSec) {
         window.dispatchEvent(new CustomEvent('train:set-done', { detail: { pauseSec: _adPauseSec, di: _adDi } }));
       }
-      _adoptedSetFeedback.set(`${_adDi}-${_adEi}-${_adSi}`, Date.now());
+      // B94: kompletter Feedback-Snapshot statt nur Zeitstempel -- bleibt
+      // dauerhaft sichtbar (siehe _renderIntraFeedback), nicht mehr nur 2s
+      // (ersetzt das B89-Verhalten, siehe DECISIONS.md).
+      const _adFb = _adS ? buildSetFeedback(_adS, _adEx, _adDay?.sessionModifier ?? null, _adSi) : null;
+      if (_adFb) _acceptedFeedback.set(`${_adWk?.id}-${_adDi}-${_adEi}-${_adSi}`, _adFb);
       scheduleRender();
-      setTimeout(() => scheduleRender(), 2000);
+      break;
+    }
+
+    case 'toggle-set-feedback-why': {
+      const _whyKey = `${di}-${ei}-${si}`;
+      if (_setFeedbackExpanded.has(_whyKey)) _setFeedbackExpanded.delete(_whyKey);
+      else _setFeedbackExpanded.add(_whyKey);
+      scheduleRender();
       break;
     }
 
@@ -7694,6 +7750,15 @@ function _finishCompletion(di, rating, sleepHours, energyLevel) {
   // erneut vorkäme) fälschlich "schon erledigt" vortäuscht.
   const _wkStart = afterSt.weeks[afterSt.curIdx]?.startDate;
   if (_wkStart) { try { localStorage.removeItem(`train_reduced_${_wkStart}_${di}`); } catch (_) { /* best effort */ } }
+  // B94: übernommenes Intra-Session-Feedback ist an den offenen Tag gebunden --
+  // nicht mehr relevant sobald er abgeschlossen ist (gleiches Prinzip wie der
+  // Reduzierungs-Flag-Cleanup direkt darüber). _acceptedFeedback ist
+  // wk.id-präfixiert (siehe renderSetRow-Kommentar), daher hier ebenso.
+  const _afWkId = afterSt.weeks[afterSt.curIdx]?.id;
+  const _acceptedPrefix = `${_afWkId}-${di}-`;
+  const _expandedPrefix = `${di}-`;
+  for (const _k of [..._acceptedFeedback.keys()]) if (_k.startsWith(_acceptedPrefix)) _acceptedFeedback.delete(_k);
+  for (const _k of [..._setFeedbackExpanded]) if (_k.startsWith(_expandedPrefix)) _setFeedbackExpanded.delete(_k);
   if (lockedDay?.markedDone) {
     const allDone   = afterSt.weeks[afterSt.curIdx]?.days.every(d => d.markedDone);
     const trigger   = allDone ? 'WOCHE_ABGESCHLOSSEN' : 'TAG_ABGESCHLOSSEN';

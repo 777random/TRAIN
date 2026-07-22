@@ -2382,3 +2382,63 @@ Loop 11: for-advisor-consolidated.txt aktualisiert (letzter Loop der
 CACHE_VERSION train-v201→v202, CSS ?v=197→198, SCHEMA unverändert.
 Commit: "feat: Session Coach UX-Fixes Spacing + Check-in Edit +
   Reduzierung + Übernehmen (v201->v202)"
+
+## 2026-07-22 train-v203 (Sprint: B91-B94 Session Coach Entscheidungsmatrix v2 + Bugfixes)
+Loop 1: grün ✓ (siehe Testlauf-Ergebnis unten)
+Loop 2: aktuell ✓ — CACHE_VERSION/CSS/SCHEMA in diesem Sprint selbst
+  aktualisiert (train-v202→v203, CSS ?v=198→199, SCHEMA unverändert)
+Loop 3: übersprungen — Stop-Bedingung (≥15 Fixtures) mit 17 weiterhin
+  erfüllt
+Loop 6: übersprungen — letzte Prüfung 2026-07-21, <90 Tage
+Eigentliche Aufgabe: Nutzer bat um Diagnose des RPE-7.5-Bugs (B91,
+  vorherige Session, keine Code-Änderung dort), dann in dieser Session um
+  einen vollen Sprint mit 4 Teilen: B91-Fix, neue Entscheidungsmatrix
+  (RPE + Wdh-Differenz kombiniert), Begründung sichtbar machen, Übernehmen-
+  Feedback bleibt dauerhaft sichtbar (auch nach Undo). Vor der Umsetzung
+  technische Spec geschrieben, dabei 6 Lücken/Diskrepanzen der Vorlage
+  gegen den echten Code geprüft und dem Nutzer zur Bestätigung vorgelegt
+  (No-RPE-Zweig unverändert, Wdh/Sek/m-Einheit statt hartcodiert,
+  gemeinsamer Pausen-Helper, Signatur-Erweiterung um `si`, rpeZone-
+  Schwellen, B89-Verhalten wird durch B94 ersetzt) — alle 6 vom Nutzer
+  bestätigt ("Alle 7 Fragen beantwortet").
+  - B91: `_applyModifier()` (sessionCoach.js) dämpfte fälschlich auch
+    HALTEN (nicht nur Reduzieren) bei reduzierter Tagesform — `>` → `>=`,
+    ein Zeichen.
+  - B92: `buildSetFeedback()` kombiniert RPE + `repDiff` (vier Gruppen),
+    plus Satz-zu-Satz-RPE-Trend-Erkennung. **Beim Implementieren
+    zusätzlich aufgedeckt:** die Vorlage widersprach sich selbst zwischen
+    ihrer Matrix-Definition (Gruppe A: "unabhängig von RPE reduzieren")
+    und einem eigenen Akzeptanzlisten-Beispiel ("6/8 Wdh @ RPE 7 →
+    Technik, halten") — die explizite Matrix-Regel wurde als bindend
+    behandelt, das Akzeptanzlisten-Beispiel als Dokumentations-
+    Inkonsistenz der Vorlage eingeordnet und im Test entsprechend korrekt
+    (nicht wörtlich) umgesetzt.
+  - B93: "▾ Warum?"-Umschalter zeigt Wdh-Status/RPE-Einordnung/Logik-
+    Aussage auf Tap auf.
+  - B94: Übernehmen-Bestätigung bleibt dauerhaft sichtbar (nicht mehr nur
+    2s) und auch nach Undo (mit "(rückgängig gemacht)") — bewusste
+    Revision von B89, kein Bugfix, vom Nutzer bestätigt.
+    **Zusätzlich beim Implementieren gefunden:** da der Snapshot jetzt
+    beliebig lange besteht statt nur 2s, hätte ein reiner
+    `di-ei-si`-Schlüssel (wie bei B89 unkritisch) über einen
+    Wochenwechsel hinweg bluten können (`day.id` bleibt über geklonte
+    Wochen identisch, siehe B83) — behoben durch zusätzliches
+    `wk.id`-Präfix, bevor es in Produktion hätte auffallen können.
+  Alle 4 riskantesten Teile (B91-Guard, Undo-Persistenz, Trend-
+  Erkennung, Reopen-Cleanup) per Fix-zurücknehmen/bestätigen/
+  wiederherstellen- bzw. echtem Reopen-Verhaltenstest verifiziert.
+  Verifiziert per 11 neuen Tests (`tests/session_coach_decision_matrix_v2.spec.js`)
+  + 3 angepassten Bestandstests (B92-Wortlautänderung in
+  `intra_session_coach.spec.js`, korrigierte B91-Erwartung in
+  `session_coach_reduced_modifier.spec.js`, ein jetzt obsoleter
+  B89-"verschwindet nach 2s"-Test in `session_coach_ux_fixes.spec.js`
+  entfernt). Nur `sessionCoach.js`/`ui.js`/`timer.js`/`styles.css`
+  geändert (Constraint eingehalten — `timer.js` nur wegen der
+  `si`-Parameter-Durchreichung an einer bestehenden Call-Site, kein neuer
+  Import). Volle Suite grün.
+Loop 5: for-advisor.txt aktualisiert
+Loop 7: for-advisor-product.txt aktualisiert
+Loop 11: for-advisor-consolidated.txt aktualisiert (letzter Loop der
+  Session)
+CACHE_VERSION train-v202→v203, CSS ?v=198→199, SCHEMA unverändert.
+Commit: "feat: Session Coach Entscheidungsmatrix v2 + B91 Fix (v202->v203)"

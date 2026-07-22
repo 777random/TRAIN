@@ -190,20 +190,10 @@ test('Fix 4+5: "Übernehmen"-Button setzt Gewicht des nächsten Satzes UND start
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
 });
 
-test('Fix 4+5: Übernehmen-Bestätigung verschwindet nach ~2s vollständig ("dann weg")', async ({ page }) => {
-  await page.goto('/');
-  await page.waitForSelector('#app.is-ready', { timeout: 10000 });
-  await seed(page, { exercises: [mkEx({ weight: 100, step: 2.5, nSets: 3 })] });
-
-  await setRpe(page, 0, 0, 0, 6);
-  await toggleDone(page, 0, 0, 0);
-  await page.click('[data-action="adopt-set-feedback"][data-si="0"]');
-  await expect(page.locator('.set-feedback__line--confirm')).toBeVisible();
-
-  await page.waitForTimeout(2200);
-  await expect(page.locator('.set-feedback__line--confirm')).toHaveCount(0);
-  await expect(page.locator('[data-action="adopt-set-feedback"][data-si="0"]')).toHaveCount(0);
-});
+// B94 (train-v203) ersetzt das vormalige "verschwindet nach 2s"-Verhalten
+// dieses Tests durch dauerhafte Sichtbarkeit -- siehe
+// tests/session_coach_decision_matrix_v2.spec.js ("Fix 4: nach
+// 'Übernehmen' bleibt Text dauerhaft sichtbar") für die aktuelle Erwartung.
 
 test('Fix 4+5: kein Übernehmen-Button nach dem letzten Satz', async ({ page }) => {
   await page.goto('/');

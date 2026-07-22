@@ -1,5 +1,5 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-22, B87-B90 Session Coach UX-Fixes aus dem ersten echten Nutzer-Test behoben (train-v202, SCHEMA 32 unverändert)*
+*Letzte Aktualisierung: 2026-07-22, B91-B94 Session Coach Entscheidungsmatrix v2 + Begründung + dauerhafte Übernehmen-Bestätigung (train-v203, SCHEMA 32 unverändert)*
 *Nächster Schritt: B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md) — braucht Name+Adresse+E-Mail vom Nutzer. B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten — weiterhin blockiert auf echte GoatCounter-Telemetrie (`js_error:`-Events im Dashboard prüfen). Aktuell keine weiteren offenen Bugs außer B55/B66. Loops 7-11 aktiv: Advisor-Exports werden am Ende jeder Session automatisch aktualisiert. for-advisor-consolidated.txt = Startpunkt für neue externe Chats.*
 
 ---
@@ -11,45 +11,51 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v202 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v203 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
-- CSS: ?v=198 (neue `.session-briefing-card__reduce-btn`/`__reduce-done`/
-  `__edit-link`, `.set-feedback__adopt-btn`, reduziertes Top-Padding auf
-  `.session-checkin-card`/`.session-briefing-card`)
-- SCHEMA: 32 (unverändert — B87-B90 fügen keine neuen State-Felder hinzu,
-  einzige neue Action `DAY_REDUCE_PENDING_WEIGHTS` nutzt bestehende
-  Day/Exercise/Set-Felder)
+- CSS: ?v=199 (neue `.set-feedback__why-toggle`/`__why-body`,
+  `.set-feedback__line--reverted`)
+- SCHEMA: 32 (unverändert — B91-B94 fügen keine neuen State-Felder hinzu,
+  reine sessionCoach.js/ui.js-Logik- und Rendering-Änderungen)
 - Letzter Commit: siehe `git log` (dieser Sprint noch nicht gepusht,
   siehe Sprint-Ende-Workflow).
-- **B87-B90 — Session Coach UX-Fixes aus dem ersten echten Nutzer-Test
-  (train-v202):** vier UX-Probleme aus dem allerersten echten Nutzertest
-  der Session-Coach-Serie (B76-B85) gemeldet und in einem Sprint behoben.
-  B90: zu viel Top-Padding über Check-in-/Briefing-Karte (uniformes
-  `var(--sp-4)` → `var(--sp-2)` oben, Rest unverändert, reines CSS, per
-  Vorher/Nachher-Screenshot verifiziert). B87: Check-in nach Abgabe nicht
-  korrigierbar → neuer "✎ Tagesform anpassen"-Link öffnet ihn erneut,
-  vorausgefüllt mit den letzten Werten (`_editingCheckIn`-Set, Key
-  `${wk.id}_${day.id}`, gleiche Konvention wie `_skippedCheckIn` aus
-  B83). B88: automatische -10%-Reduktion (B76) lief nur einmalig bei
-  Check-in-Abgabe, spätere Übungen blieben unreduziert → **wichtige
-  Diskrepanz zur Sprint-Vorlage vor der Umsetzung aufgedeckt und mit dem
-  Nutzer abgestimmt:** die Automatik existiert bereits, der neue Button
-  ist bewusst nur ein Catch-up (Option 1 von 3 vorgelegten, vom Nutzer
-  bestätigt), keine zweite unabhängige Reduktionslogik — neue
-  Single-Dispatch-Batch-Action `DAY_REDUCE_PENDING_WEIGHTS` (state.js)
-  statt einer Schleife aus `SET_UPDATE`-Dispatches (hätte sonst N
-  Undo-Schritte für einen Klick erzeugt). B89: kein Weg, eine
-  Satz-Empfehlung direkt zu übernehmen → neuer "Übernehmen ↗"-Button
-  setzt Gewicht des nächsten Satzes UND startet den Pause-Timer in
-  einem Tap (halbautomatisch, kein Toggle), mit DOM-Klassen-Guard
-  gegen Neustart eines bereits laufenden Timers (Timer-Entkopplungsregel
-  respektiert — kein neuer ui.js↔timer.js-Import). Alle 3 riskantesten
-  Teile (Check-in-Vorbefüllung, Undo-Atomarität, Timer-Guard) per
-  Fix-zurücknehmen/bestätigen/wiederherstellen-Zyklus verifiziert — jeder
-  Test schlug ohne den jeweiligen Fix reproduzierbar fehl. Verifiziert
-  per 10 neuen Tests (`tests/session_coach_ux_fixes.spec.js`). Volle
-  Suite 97/97 grün. Details siehe BUGS.md B87-B90, DECISIONS.md.
+- **B91-B94 — Session Coach Entscheidungsmatrix v2 + Begründung +
+  dauerhafte Übernehmen-Bestätigung (train-v203):** vier zusammenhängende
+  Verbesserungen an `buildSetFeedback()`/dem Intra-Session-Coach-Rendering
+  in einem Sprint. B91: `_applyModifier()` (sessionCoach.js) dämpfte
+  fälschlich auch eine korrekte HALTEN-Empfehlung bei reduzierter
+  Tagesform (RPE 7.5 zeigte 52.5kg statt 55kg) — der B84-Fix schützte per
+  `>` nur echte Steigerungen, nicht den Halten-Fall (`===`); korrigiert
+  auf `>=`. B92: `buildSetFeedback()` kombiniert jetzt RPE UND
+  `repDiff = targetReps - reps` (vier Gruppen: deutlich verfehlt/knapp
+  verfehlt/erreicht/übertroffen, Wdh-Differenz hat Vorrang vor RPE),
+  plus Satz-zu-Satz-RPE-Trend-Erkennung (Anstieg ≥1.5 → Pause ×1.5) —
+  neuer `si`-Parameter (Signatur-Erweiterung, alle 3 Call-Sites in
+  `ui.js`/`timer.js` angepasst). **Vor der Umsetzung aufgedeckte
+  Diskrepanz:** die Sprint-Vorlage widersprach sich selbst zwischen ihrer
+  Matrix-Definition und einem eigenen Akzeptanzlisten-Beispiel — nach
+  Rückfrage wurde die explizite Matrix-Regel als bindend behandelt. B93:
+  neuer "▾ Warum?"-Umschalter zeigt Wdh-Status + RPE-Einordnung +
+  Logik-Aussage auf Tap auf (`_setFeedbackExpanded`-Set, ui.js).
+  B94: die Übernehmen-Bestätigung (B89) bleibt jetzt dauerhaft sichtbar
+  statt nach 2s zu verschwinden, UND bleibt (mit "(rückgängig gemacht)")
+  auch nach Undo/manuellem Zurücktippen sichtbar — **bewusste Revision
+  von B89, kein Bugfix**, vom Nutzer nach Rückfrage bestätigt. `_acceptedFeedback`
+  (vormals `_adoptedSetFeedback`) speichert seit B94 einen vollen Snapshot
+  statt nur eines Zeitstempels und ist zusätzlich `wk.id`-präfixiert
+  (nicht nur `di-ei-si`) — sonst hätte ein day.id-stabiler Schlüssel
+  (siehe B83) über einen Wochenwechsel hinweg bluten können, da der
+  Snapshot jetzt beliebig lange bestehen bleibt statt nur 2s. Gelöscht
+  bei Tagesabschluss. Alle 4 riskantesten Teile (B91-Guard,
+  Undo-Persistenz, Trend-Erkennung, Reopen-Cleanup) per
+  Fix-zurücknehmen/bestätigen/wiederherstellen- bzw. echtem
+  Reopen-Verhaltenstest verifiziert. Verifiziert per 11 neuen Tests
+  (`tests/session_coach_decision_matrix_v2.spec.js`) + 3 angepassten
+  Bestandstests (Hint-Wortlaut-Änderung durch B92, korrigierte
+  B91-Erwartung, ein jetzt obsoleter B89-"verschwindet nach 2s"-Test
+  entfernt). Volle Suite grün. Details siehe BUGS.md B91-B94,
+  DECISIONS.md.
 - **B66 — erneut untersucht, weiterhin nicht reproduzierbar
   (keine Code-Änderung):** Nutzer bat, B66 erneut zu prüfen. 5 frische
   Reproduktionsversuche gegen den aktuellen Code (train-v200, gegenüber

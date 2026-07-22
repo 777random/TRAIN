@@ -70,7 +70,9 @@ test('RPE 6 (nicht letzter Satz) -> "Noch Luft — steigern" + Pause 90s', async
   await setRpe(page, 0, 0, 0, 6);
   await toggleDone(page, 0, 0, 0);
 
-  await expect(page.locator('.set-feedback').first()).toContainText('Noch Luft — steigern');
+  // B92: Hint-Text um "Ziel erreicht, " erweitert (Entscheidungsmatrix v2,
+  // repDiff===0 -> Gruppe C) -- Verhalten (Gewicht/Pause) unverändert.
+  await expect(page.locator('.set-feedback').first()).toContainText('Ziel erreicht, noch Luft — steigern');
   await expect(page.locator('.set-feedback').first()).toContainText('Pause: 90s');
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
 });

@@ -91,7 +91,7 @@ test('sessionModifier=normal: unverändertes Verhalten (kein Dämpfen)', async (
   expect(feedback[0]).toContain('100kg');
 });
 
-test('sessionModifier=reduced: Halten-Empfehlung (RPE optimal, gleiches Gewicht) bleibt weiterhin gedämpft', async ({ page }) => {
+test('sessionModifier=reduced: Halten-Empfehlung (RPE optimal, gleiches Gewicht) wird seit B91 NICHT mehr gedämpft', async ({ page }) => {
   await page.goto('/');
   await page.waitForSelector('#app.is-ready', { timeout: 10000 });
 
@@ -104,8 +104,9 @@ test('sessionModifier=reduced: Halten-Empfehlung (RPE optimal, gleiches Gewicht)
   });
 
   const feedback = await page.locator('.set-feedback').evaluateAll(els => els.map(el => el.textContent));
-  // "Halten" (RPE 6.5-7.5) -> nextWeight === currentWeight (100) VOR dem
-  // Modifier -> nextWeight > currentWeight ist FALSE -> weiterhin gedämpft
-  // (Math.max(90, 97.5) = 97.5). Unverändertes Verhalten, kein Regress.
-  expect(feedback[0]).toContain('97.5kg');
+  // B91: "Halten" (RPE 6.5-7.9) -> nextWeight === currentWeight (100) --
+  // _applyModifier() dämpft seit B91 nur noch eine ECHTE Reduktion
+  // (nextWeight < currentWeight), Halten bleibt exakt 100kg (vormals
+  // fälschlich auf 97.5kg gedämpft, siehe BUGS.md B91/DECISIONS.md).
+  expect(feedback[0]).toContain('100kg');
 });
