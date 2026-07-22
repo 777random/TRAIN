@@ -167,12 +167,22 @@ let _checkInDraft = new Map();
 let _skippedCheckIn = new Set();
 /** Manuelles Auf-/Zuklappen des Briefings pro Tag (di → boolean), überschreibt den Default. */
 let _briefingExpandedOverride = new Map();
+// B87 Fix 2: Tage (`${wk.id}_${day.id}`, gleiche Konvention wie _skippedCheckIn),
+// für die der Check-in aktuell zur Korrektur wieder geöffnet ist — zeigt die
+// Check-in-Karte auch wenn day.sessionCheckIn bereits gesetzt ist.
+let _editingCheckIn = new Set();
 
 // B77: Intra-Session Coach — rein UI-lokale, nicht persistierte Zustände.
 /** "Fertig"-Dismiss für den Weiterer-Satz-Vorschlag (Keys `${di}-${ei}-${si}`). */
 let _optionalSetDismissed = new Set();
 /** Auf-/Zuklappen der Aufwärm-Empfehlung pro Tag (di), Default zu. */
 let _warmupExpanded = new Set();
+// B87 Fix 4+5: Sätze (Keys `${di}-${ei}-${si}` -> Zeitpunkt der Adoption),
+// deren "Übernehmen"-Button bereits getappt wurde. Key vorhanden + < 2s her
+// -> zeigt "✓ Übernommen"; Key vorhanden + älter -> zeigt nichts mehr (weder
+// Button noch Bestätigung, "dann weg" laut Spec); Key fehlt -> Button
+// erscheint, wenn die übrigen Bedingungen erfüllt sind.
+let _adoptedSetFeedback = new Map();
 
 /** Last rendered week index – used to detect week navigation. */
 let _lastRenderedCurIdx = null;
@@ -1279,6 +1289,35 @@ function _renderSessionBriefing(di, day, wk, state) {
   }
   const defaultExpanded = !day.sessionStartTs;
   const isExpanded = _briefingExpandedOverride.has(di) ? _briefingExpandedOverride.get(di) : defaultExpanded;
+
+  // B87 Fix 3: manueller "Catch-up"-Button für die -10%-Reduzierung bei
+  // sessionModifier='reduced'. Die automatische Reduktion (SESSION_CHECKIN_SET,
+  // state.js) hat zum Zeitpunkt der Check-in-Abgabe bereits alle DAMALS
+  // pending Sätze mit Gewicht>0 reduziert -- dieser Button fängt Übungen ab,
+  // die ERST NACH dem Check-in zum Tag hinzugefügt wurden (die die
+  // automatische Schleife nie sah). Das localStorage-Flag verhindert
+  // doppeltes Auslösen durch DIESEN Button (nicht durch die automatische
+  // Reduktion, die davon unabhängig bleibt) — siehe DECISIONS.md für den
+  // bewusst in Kauf genommenen Grenzfall (erneutes Klicken vor dem ersten
+  // Tag-Abschluss würde bereits reduzierte, noch offene Sätze ein zweites
+  // Mal dämpfen; da die Richtung immer "weniger Gewicht" ist, ist das
+  // konservativ, nie riskant).
+  const reduceFlagKey = `train_reduced_${wk.startDate}_${di}`;
+  let reduceHtml = '';
+  if (modifier === 'reduced') {
+    let alreadyReduced = false;
+    try { alreadyReduced = localStorage.getItem(reduceFlagKey) === 'true'; } catch (_) { /* best effort, kein Blockieren */ }
+    reduceHtml = alreadyReduced
+      ? `<div class="session-briefing-card__reduce-done">✓ Gewichte angepasst</div>`
+      : `<button type="button" class="session-briefing-card__reduce-btn" data-action="reduce-today-weights" data-di="${di}">Gewichte heute anpassen (-10%)</button>`;
+  }
+
+  // B87 Fix 2: öffnet den Check-in erneut, vorausgefüllt mit den aktuellen
+  // Antworten (siehe renderDayBody-Weiche + edit-checkin-Handler).
+  const editLinkHtml = day.sessionCheckIn
+    ? `<button type="button" class="session-briefing-card__edit-link" data-action="edit-checkin" data-di="${di}">✎ Tagesform anpassen</button>`
+    : '';
+
   return `
   <div class="session-briefing-card${isExpanded ? '' : ' is-collapsed'}" data-di="${di}">
     <button type="button" class="session-briefing-card__toggle" data-action="toggle-session-briefing" data-di="${di}" aria-expanded="${isExpanded}">
@@ -1286,6 +1325,8 @@ function _renderSessionBriefing(di, day, wk, state) {
       <span class="session-briefing-card__msg">${h(message)}</span>
     </button>
     ${focusHtml}
+    ${reduceHtml}
+    ${editLinkHtml}
   </div>`;
 }
 
@@ -1368,7 +1409,10 @@ function renderDayBody(wk, di, state) {
   const sessionCoachActive = !isVacDay && !done && state.settings?.sessionCoach !== false && _isTodayDay(wk, di);
   let sessionCoachHtml = '';
   if (sessionCoachActive) {
-    if (!day.sessionCheckIn && !_skippedCheckIn.has(`${wk.id}_${day.id}`)) {
+    // B87 Fix 2: "✎ Tagesform anpassen" öffnet den Check-in erneut, auch wenn
+    // day.sessionCheckIn bereits gesetzt ist -- _editingCheckIn hat Vorrang
+    // vor der sonst üblichen Check-in-vs-Briefing-Weiche.
+    if (_editingCheckIn.has(`${wk.id}_${day.id}`) || (!day.sessionCheckIn && !_skippedCheckIn.has(`${wk.id}_${day.id}`))) {
       sessionCoachHtml = _renderSessionCheckIn(di);
     } else {
       sessionCoachHtml = _renderSessionBriefing(di, day, wk, state);
@@ -2159,16 +2203,35 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
     } else {
       const fb = buildSetFeedback(s, ex, sessionModifier);
       if (fb && fb.nextWeight != null) {
-        intraCoachHtml = fb.hint
-          ? `
+        // B87 Fix 4+5: "Übernehmen"-Button -- nur wenn RPE eingegeben wurde
+        // (fb.hint/fb.pauseSec sind beide nur bei RPE gesetzt, siehe
+        // sessionCoach.js) UND die Empfehlung tatsächlich vom aktuellen
+        // Gewicht abweicht (kein sinnloser Button bei "gleich bleiben").
+        const adoptKey    = `${di}-${ei}-${si}`;
+        const adoptedAt   = _adoptedSetFeedback.get(adoptKey);
+        const justAdopted = adoptedAt != null && (Date.now() - adoptedAt < 2000);
+        const canAdopt    = fb.hint != null && fb.nextWeight !== (s.weight ?? 0) && adoptedAt == null;
+        const adoptBtnHtml = canAdopt
+          ? ` <button type="button" class="set-feedback__adopt-btn" data-action="adopt-set-feedback" data-di="${di}" data-ei="${ei}" data-si="${si}" data-next-weight="${fb.nextWeight}" data-pause-sec="${fb.pauseSec ?? ''}">Übernehmen ↗</button>`
+          : '';
+        if (justAdopted) {
+          intraCoachHtml = `
+<div class="set-feedback">
+  <span class="set-feedback__line set-feedback__line--confirm">✓ Übernommen</span>
+</div>`;
+        } else if (adoptedAt == null) {
+          intraCoachHtml = fb.hint
+            ? `
 <div class="set-feedback">
   <span class="set-feedback__line">→ Nächster Satz: ${fb.nextWeight}kg</span>
-  <span class="set-feedback__line set-feedback__line--sub">${h(fb.hint)}${fb.pauseSec ? ` · Pause: ${_fmtPause(fb.pauseSec)}` : ''}</span>
+  <span class="set-feedback__line set-feedback__line--sub">${h(fb.hint)}${fb.pauseSec ? ` · Pause: ${_fmtPause(fb.pauseSec)}` : ''}${adoptBtnHtml}</span>
 </div>`
-          : `
+            : `
 <div class="set-feedback">
   <span class="set-feedback__line">→ Nächster Satz: ${fb.nextWeight}kg</span>
 </div>`;
+        }
+        // adoptedAt gesetzt UND nicht mehr justAdopted -> "dann weg", kein Markup.
       }
     }
   }
@@ -4492,7 +4555,7 @@ function renderSettingsTab(state) {
   <div class="settings-section">
     <div class="settings-section__title">Info</div>
     <div class="settings-row">
-      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v201</div></div>
+      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v202</div></div>
     </div>
     <div class="settings-row">
       <div>
@@ -6183,6 +6246,10 @@ function _handleClick(e) {
         const { modifier } = _buildSessionBriefing(_ciDay);
         dispatch(A.SESSION_CHECKIN_SET, { di: _ciDi, sleep: _draft.sleep, energyPre: _draft.energyPre, modifier });
         _checkInDraft.delete(_ciDi);
+        // B87 Fix 2: Korrektur abgeschlossen (falls dies ein edit-checkin-
+        // Neustart war) -- Briefing zeigt sich ab jetzt wieder statt der
+        // Check-in-Karte.
+        if (_ciWk) _editingCheckIn.delete(`${_ciWk.id}_${_ciWk.days[_ciDi]?.id}`);
       } else {
         scheduleRender();
       }
@@ -6193,6 +6260,44 @@ function _handleClick(e) {
       const _skipDay = _skipWk?.days[+di];
       if (_skipWk && _skipDay) _skippedCheckIn.add(`${_skipWk.id}_${_skipDay.id}`);
       _checkInDraft.delete(+di);
+      scheduleRender();
+      break;
+    }
+    case 'edit-checkin': {
+      // B87 Fix 2: Check-in erneut öffnen, mit den AKTUELLEN Antworten
+      // vorausgewählt (nicht leer) -- _checkInDraft wird dafür aus
+      // day.sessionCheckIn geseedet, exakt wie ein frischer, aber schon
+      // beantworteter Check-in.
+      const _editDi  = +di;
+      const _editWk  = getState().weeks[getState().curIdx];
+      const _editDay = _editWk?.days[_editDi];
+      if (!_editWk || !_editDay) break;
+      _checkInDraft.set(_editDi, {
+        sleep: _editDay.sessionCheckIn?.sleep ?? null,
+        energyPre: _editDay.sessionCheckIn?.energyPre ?? null,
+      });
+      _editingCheckIn.add(`${_editWk.id}_${_editDay.id}`);
+      scheduleRender();
+      break;
+    }
+    case 'reduce-today-weights': {
+      // B87 Fix 3: Catch-up-Reduktion, siehe Kommentar in _renderSessionBriefing().
+      // EIN Dispatch für den ganzen Tag (DAY_REDUCE_PENDING_WEIGHTS, state.js),
+      // nicht eine SET_UPDATE-Schleife -- SET_UPDATE ist undoable, eine
+      // Dispatch-Schleife hätte pro Satz einen eigenen Undo-Snapshot erzeugt
+      // und "Rückgängig" hätte nur den zuletzt geänderten Satz zurückgedreht,
+      // nicht den ganzen Klick (Muster wie EX_AUTO_PRESELECT_NEXT_WEEK_PLAN,
+      // siehe DECISIONS.md B79).
+      const _redDi = +di;
+      const _redWk = getState().weeks[getState().curIdx];
+      const _redDay = _redWk?.days[_redDi];
+      if (!_redWk || !_redDay) break;
+      const _redFlagKey = `train_reduced_${_redWk.startDate}_${_redDi}`;
+      let _redAlready = false;
+      try { _redAlready = localStorage.getItem(_redFlagKey) === 'true'; } catch (_) { /* best effort */ }
+      if (_redAlready) break;
+      dispatch(A.DAY_REDUCE_PENDING_WEIGHTS, { di: _redDi });
+      try { localStorage.setItem(_redFlagKey, 'true'); } catch (_) { /* best effort, kein Blockieren */ }
       scheduleRender();
       break;
     }
@@ -6230,6 +6335,32 @@ function _handleClick(e) {
     case 'dismiss-optional-set': {
       _optionalSetDismissed.add(`${di}-${ei}-${si}`);
       scheduleRender();
+      break;
+    }
+
+    case 'adopt-set-feedback': {
+      // B87 Fix 4+5: übernimmt das vorgeschlagene Gewicht für den NÄCHSTEN
+      // Satz (si+1) und startet den Pause-Timer mit der berechneten Dauer --
+      // beides in einem Tap, kein Toggle zwischen "nur Gewicht" und "beides".
+      const _adDi = +di, _adEi = +ei, _adSi = +si;
+      const _adNextWeight = parseFloat(el.dataset.nextWeight);
+      const _adPauseSec   = el.dataset.pauseSec ? parseFloat(el.dataset.pauseSec) : null;
+      const _adSt = getState();
+      const _adEx = _adSt.weeks[_adSt.curIdx]?.days[_adDi]?.exercises[_adEi];
+      if (_adEx?.sets?.[_adSi + 1] && Number.isFinite(_adNextWeight)) {
+        dispatch(A.SET_UPDATE, { di: _adDi, ei: _adEi, si: _adSi + 1, field: 'weight', value: _adNextWeight });
+      }
+      // Timer nur starten wenn er nicht schon läuft -- ui.js hat keinen
+      // direkten Zugriff auf timer.js' internen Zustand (bewusste
+      // Entkopplung, siehe CLAUDE.md), die einzige decoupling-konforme
+      // Prüfung ist der sichtbare DOM-Zustand des Overlays.
+      const _pauseRunning = document.getElementById('pause-overlay')?.classList.contains('pause-overlay--visible');
+      if (!_pauseRunning && _adPauseSec) {
+        window.dispatchEvent(new CustomEvent('train:set-done', { detail: { pauseSec: _adPauseSec, di: _adDi } }));
+      }
+      _adoptedSetFeedback.set(`${_adDi}-${_adEi}-${_adSi}`, Date.now());
+      scheduleRender();
+      setTimeout(() => scheduleRender(), 2000);
       break;
     }
 
@@ -7557,6 +7688,12 @@ function _finishCompletion(di, rating, sleepHours, energyLevel) {
 
   const afterSt   = getState();
   const lockedDay = afterSt.weeks[afterSt.curIdx]?.days[di];
+  // B87 Fix 3: Reduzierungs-Flag ist an den offenen Tag gebunden, nicht mehr
+  // relevant sobald er abgeschlossen ist — verhindert, dass ein alter Flag
+  // aus einer früheren Woche (falls derselbe weekStart+di-Schlüssel je
+  // erneut vorkäme) fälschlich "schon erledigt" vortäuscht.
+  const _wkStart = afterSt.weeks[afterSt.curIdx]?.startDate;
+  if (_wkStart) { try { localStorage.removeItem(`train_reduced_${_wkStart}_${di}`); } catch (_) { /* best effort */ } }
   if (lockedDay?.markedDone) {
     const allDone   = afterSt.weeks[afterSt.curIdx]?.days.every(d => d.markedDone);
     const trigger   = allDone ? 'WOCHE_ABGESCHLOSSEN' : 'TAG_ABGESCHLOSSEN';

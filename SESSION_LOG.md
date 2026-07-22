@@ -2325,3 +2325,60 @@ Loop 5: for-advisor.txt aktualisiert (20. Fassung) — neuer Abschnitt
 Sitzung wird auf Nutzerwunsch geschlossen — keine Code-Änderungen in
   diesem Eintrag, daher kein Feature-Commit; nur dieser Doku-Eintrag wird
   committed.
+
+## 2026-07-22 train-v202 (Sprint: B87-B90 Session Coach UX-Fixes aus dem ersten echten Nutzer-Test)
+Loop 1: 97/97 grün ✓ (87 bestehend + 10 neu)
+Loop 2: aktuell ✓ — CACHE_VERSION/CSS/SCHEMA in diesem Sprint selbst
+  aktualisiert (train-v201→v202, CSS ?v=197→198, SCHEMA unverändert)
+Loop 3: übersprungen — Stop-Bedingung (≥15 Fixtures) mit 17 weiterhin
+  erfüllt
+Eigentliche Aufgabe: erster echter Nutzertest der Session-Coach-Serie
+  (B76-B85) lieferte 5 konkrete UX-Rückmeldungen. Vor der Umsetzung
+  technische Spec geschrieben und auf Bestätigung gewartet (Nutzer-
+  Vorgabe). **Spec deckte eine wichtige Diskrepanz auf:** Fix 3
+  (Reduzierungs-Button) hätte naiv implementiert entweder doppelt
+  reduziert oder wäre wirkungslos gewesen, da die automatische
+  -10%-Reduktion (B76) bereits bei Check-in-Abgabe existiert — 3 Optionen
+  vorgelegt, Nutzer bestätigte Option 1 ("Übernehmen, go ahead" bzw.
+  "Option 1, go ahead"): Button bleibt reiner Catch-up für Sätze, die
+  die Automatik beim Check-in noch nicht sehen konnte.
+  - Fix 1 (B90): Top-Padding von `.session-checkin-card`/
+    `.session-briefing-card` reduziert (`var(--sp-4)` → `var(--sp-2)`
+    oben) — reines CSS, per Vorher/Nachher-Screenshot verifiziert.
+  - Fix 2 (B87): "✎ Tagesform anpassen"-Link im Briefing öffnet den
+    Check-in erneut, vorausgefüllt mit den zuletzt gespeicherten Werten.
+    Neues Modul-Set `_editingCheckIn` (ui.js), Key `${wk.id}_${day.id}`
+    (gleiche Konvention wie `_skippedCheckIn`, B83).
+  - Fix 3 (B88): neuer Catch-up-Button "Gewichte heute anpassen (-10%)"
+    im Briefing bei `sessionModifier==='reduced'`. Neue Batch-Action
+    `DAY_REDUCE_PENDING_WEIGHTS` (state.js) — ein einziger Dispatch für
+    den ganzen Tag statt einer Schleife aus `SET_UPDATE`-Dispatches
+    (`SET_UPDATE` ist nicht in `_NO_UNDO`, N Einzel-Dispatches hätten N
+    separate Undo-Schritte erzeugt). Reduktions-Formel aus
+    `SESSION_CHECKIN_SET` in gemeinsamen Helper `_reducePendingWeights()`
+    extrahiert. Dedup-Flag `localStorage['train_reduced_<weekStart>_<di>']`,
+    entfernt bei Tagesabschluss.
+  - Fix 4+5 (B89): "Übernehmen ↗"-Button im Intra-Session Coach setzt
+    Gewicht des nächsten Satzes UND startet den Pause-Timer in einem Tap
+    (halbautomatisch, kein Toggle). Gated auf: nicht letzter Satz,
+    `nextWeight !== currentWeight`, RPE vorhanden (`fb.hint != null` als
+    Proxy, kein neues Flag). Zeigt 2s "✓ Übernommen", dann verschwindet
+    die Zeile vollständig. Timer-Guard per DOM-Klassenabfrage
+    (`#pause-overlay.pause-overlay--visible`) verhindert Neustart eines
+    bereits laufenden Timers — respektiert die ui.js↔timer.js-
+    Entkopplungsregel (kein neuer Import).
+  Alle 3 riskantesten Teile (Check-in-Vorbefüllung, Undo-Atomarität bei
+  Fix 3, Timer-Guard bei Fix 4/5) per Fix-zurücknehmen/bestätigen/
+  wiederherstellen-Zyklus verifiziert — jeder zugehörige Test schlug ohne
+  den jeweiligen Fix reproduzierbar fehl. Verifiziert per 10 neuen Tests
+  (`tests/session_coach_ux_fixes.spec.js`) + 4 Screenshots (Vorher/Nachher
+  Spacing, Übernehmen-Button, Reduzierungs-Button, Check-in vorausgewählt).
+  Nur `state.js`/`ui.js`/`styles.css` geändert (Constraint eingehalten).
+  Volle Suite 97/97 grün.
+Loop 5: for-advisor.txt aktualisiert (B87-B90-Zusammenfassung ergänzt)
+Loop 7: for-advisor-product.txt aktualisiert
+Loop 11: for-advisor-consolidated.txt aktualisiert (letzter Loop der
+  Session)
+CACHE_VERSION train-v201→v202, CSS ?v=197→198, SCHEMA unverändert.
+Commit: "feat: Session Coach UX-Fixes Spacing + Check-in Edit +
+  Reduzierung + Übernehmen (v201->v202)"

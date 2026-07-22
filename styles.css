@@ -466,7 +466,10 @@ button, input, select, textarea { font: inherit; }
 /* ── Pre-Session Check-in + Briefing (B76) ─────────────────── */
 .session-checkin-card {
   background: var(--c-surface); border: 1px solid var(--c-border);
-  border-radius: var(--r-lg); padding: var(--sp-4); margin-bottom: var(--sp-3);
+  border-radius: var(--r-lg);
+  /* B87: weniger Padding oben als unten/seitlich -- sitzt direkt unter dem
+     Tag-Header, will keinen zusätzlichen Leerraum wie ein freistehendes Panel. */
+  padding: var(--sp-2) var(--sp-4) var(--sp-4); margin-bottom: var(--sp-3);
 }
 .session-checkin-card__headline {
   font-size: 11px; color: var(--c-text-2); letter-spacing: .1em;
@@ -493,7 +496,9 @@ button, input, select, textarea { font: inherit; }
 
 .session-briefing-card {
   background: var(--c-surface); border: 1px solid var(--c-border);
-  border-radius: var(--r-lg); padding: var(--sp-3) var(--sp-4); margin-bottom: var(--sp-3);
+  border-radius: var(--r-lg);
+  /* B87: siehe .session-checkin-card oben, gleicher Grund */
+  padding: var(--sp-2) var(--sp-4) var(--sp-3); margin-bottom: var(--sp-3);
 }
 .session-briefing-card__toggle {
   display: flex; align-items: center; gap: var(--sp-2); width: 100%;
@@ -508,6 +513,27 @@ button, input, select, textarea { font: inherit; }
 }
 .session-briefing-card.is-collapsed .session-briefing-card__focus { display: none; }
 
+/* B87 Fix 3: Reduzierungs-Button -- dämpfende Aktion, bewusst NICHT
+   --c-accent (das ist für positive/bestätigende Aktionen reserviert). */
+.session-briefing-card__reduce-btn {
+  display: block; width: 100%; margin-top: var(--sp-2);
+  min-height: var(--touch); padding: var(--sp-2) var(--sp-3);
+  background: var(--c-surface2); border: 1px solid var(--c-text);
+  border-radius: var(--r-md); color: var(--c-text); font-size: 12px;
+}
+.session-briefing-card__reduce-done {
+  margin-top: var(--sp-2); font-size: 12px; color: var(--c-text-2);
+}
+/* B87 Fix 2: bewusst wie ein reiner Text-Link, kein Button-Chrome. */
+.session-briefing-card__edit-link {
+  display: block; margin-top: var(--sp-2); background: none; border: none;
+  color: var(--c-text-2); opacity: .7; font-size: 11px; min-height: var(--touch);
+  padding: var(--sp-1) 0; text-align: left;
+}
+.session-briefing-card.is-collapsed .session-briefing-card__reduce-btn,
+.session-briefing-card.is-collapsed .session-briefing-card__reduce-done,
+.session-briefing-card.is-collapsed .session-briefing-card__edit-link { display: none; }
+
 /* ── Intra-Session Coach (B77) ──────────────────────────────── */
 .set-feedback {
   display: flex; flex-direction: column; gap: 2px;
@@ -517,6 +543,15 @@ button, input, select, textarea { font: inherit; }
 @keyframes set-feedback-fade-in { from { opacity: 0; } to { opacity: 1; } }
 .set-feedback__line { font-size: 11px; color: var(--c-text-2); line-height: 1.4; }
 .set-feedback__line--sub { opacity: .85; }
+/* B87 Fix 4+5: bestätigende Aktion -> --c-accent Text, im Unterschied zum
+   dämpfenden Reduzierungs-Button oben. */
+.set-feedback__line--confirm { color: var(--c-accent); font-weight: 600; }
+.set-feedback__adopt-btn {
+  display: inline-block; margin-left: var(--sp-2); min-height: 24px;
+  padding: 2px var(--sp-2); border-radius: var(--r-sm);
+  background: var(--c-surface2); border: none; color: var(--c-accent);
+  font-size: 11px; font-weight: 600; vertical-align: baseline;
+}
 .set-feedback--action { padding-bottom: var(--sp-2); }
 .set-feedback__actions { display: flex; gap: var(--sp-2); margin-top: var(--sp-1); }
 .set-feedback__btn {

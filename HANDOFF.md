@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-22, B86 ungültiges SVG height="auto"-Attribut in progressChart.js behoben (train-v201, SCHEMA 32 unverändert)*
-*Nächster Schritt: B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md) — braucht Name+Adresse+E-Mail vom Nutzer. B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten — erneut per 5 frischen Reproduktionsversuchen (inkl. aller seit v185 neuen Session-Coach-Code-Pfade) NICHT reproduziert, weiterhin blockiert auf echte GoatCounter-Telemetrie (`js_error:`-Events im Dashboard prüfen). Aktuell keine weiteren offenen Bugs außer B55/B66. Loops 7-11 aktiv: Advisor-Exports werden am Ende jeder Session automatisch aktualisiert. for-advisor-consolidated.txt = Startpunkt für neue externe Chats.*
+*Letzte Aktualisierung: 2026-07-22, B87-B90 Session Coach UX-Fixes aus dem ersten echten Nutzer-Test behoben (train-v202, SCHEMA 32 unverändert)*
+*Nächster Schritt: B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md) — braucht Name+Adresse+E-Mail vom Nutzer. B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten — weiterhin blockiert auf echte GoatCounter-Telemetrie (`js_error:`-Events im Dashboard prüfen). Aktuell keine weiteren offenen Bugs außer B55/B66. Loops 7-11 aktiv: Advisor-Exports werden am Ende jeder Session automatisch aktualisiert. for-advisor-consolidated.txt = Startpunkt für neue externe Chats.*
 
 ---
 
@@ -11,15 +11,45 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v194 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v202 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
-- CSS: ?v=197 (neue `.session-summary-screen`/`.sleep-insight-card`/`.deload-plan-card`-Klassen)
-- SCHEMA: 32 (unverändert — B79 fügt keine neuen State-Felder hinzu, nutzt
-  `day.sessionCheckIn`/`sessionModifier` aus B76 und `ex.nextWeekPlan` aus
-  dem bestehenden Plateau-Mechanismus)
+- CSS: ?v=198 (neue `.session-briefing-card__reduce-btn`/`__reduce-done`/
+  `__edit-link`, `.set-feedback__adopt-btn`, reduziertes Top-Padding auf
+  `.session-checkin-card`/`.session-briefing-card`)
+- SCHEMA: 32 (unverändert — B87-B90 fügen keine neuen State-Felder hinzu,
+  einzige neue Action `DAY_REDUCE_PENDING_WEIGHTS` nutzt bestehende
+  Day/Exercise/Set-Felder)
 - Letzter Commit: siehe `git log` (dieser Sprint noch nicht gepusht,
   siehe Sprint-Ende-Workflow).
+- **B87-B90 — Session Coach UX-Fixes aus dem ersten echten Nutzer-Test
+  (train-v202):** vier UX-Probleme aus dem allerersten echten Nutzertest
+  der Session-Coach-Serie (B76-B85) gemeldet und in einem Sprint behoben.
+  B90: zu viel Top-Padding über Check-in-/Briefing-Karte (uniformes
+  `var(--sp-4)` → `var(--sp-2)` oben, Rest unverändert, reines CSS, per
+  Vorher/Nachher-Screenshot verifiziert). B87: Check-in nach Abgabe nicht
+  korrigierbar → neuer "✎ Tagesform anpassen"-Link öffnet ihn erneut,
+  vorausgefüllt mit den letzten Werten (`_editingCheckIn`-Set, Key
+  `${wk.id}_${day.id}`, gleiche Konvention wie `_skippedCheckIn` aus
+  B83). B88: automatische -10%-Reduktion (B76) lief nur einmalig bei
+  Check-in-Abgabe, spätere Übungen blieben unreduziert → **wichtige
+  Diskrepanz zur Sprint-Vorlage vor der Umsetzung aufgedeckt und mit dem
+  Nutzer abgestimmt:** die Automatik existiert bereits, der neue Button
+  ist bewusst nur ein Catch-up (Option 1 von 3 vorgelegten, vom Nutzer
+  bestätigt), keine zweite unabhängige Reduktionslogik — neue
+  Single-Dispatch-Batch-Action `DAY_REDUCE_PENDING_WEIGHTS` (state.js)
+  statt einer Schleife aus `SET_UPDATE`-Dispatches (hätte sonst N
+  Undo-Schritte für einen Klick erzeugt). B89: kein Weg, eine
+  Satz-Empfehlung direkt zu übernehmen → neuer "Übernehmen ↗"-Button
+  setzt Gewicht des nächsten Satzes UND startet den Pause-Timer in
+  einem Tap (halbautomatisch, kein Toggle), mit DOM-Klassen-Guard
+  gegen Neustart eines bereits laufenden Timers (Timer-Entkopplungsregel
+  respektiert — kein neuer ui.js↔timer.js-Import). Alle 3 riskantesten
+  Teile (Check-in-Vorbefüllung, Undo-Atomarität, Timer-Guard) per
+  Fix-zurücknehmen/bestätigen/wiederherstellen-Zyklus verifiziert — jeder
+  Test schlug ohne den jeweiligen Fix reproduzierbar fehl. Verifiziert
+  per 10 neuen Tests (`tests/session_coach_ux_fixes.spec.js`). Volle
+  Suite 97/97 grün. Details siehe BUGS.md B87-B90, DECISIONS.md.
 - **B66 — erneut untersucht, weiterhin nicht reproduzierbar
   (keine Code-Änderung):** Nutzer bat, B66 erneut zu prüfen. 5 frische
   Reproduktionsversuche gegen den aktuellen Code (train-v200, gegenüber

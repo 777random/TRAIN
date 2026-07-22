@@ -1213,6 +1213,7 @@ export const A = Object.freeze({
   WEEK_LOAD_VACATION_PLAN:   'WEEK_LOAD_VACATION_PLAN',   // { plan: 'bodyweight'|'light_kb'|'heavy_kb'|'hotel_gym'|'custom'|'rest' }
   DAY_SET_FIELD:             'DAY_SET_FIELD',             // { di, field, value }
   SESSION_CHECKIN_SET:       'SESSION_CHECKIN_SET',       // { di, sleep, energyPre, modifier } — B76 Pre-Session Check-in
+  DAY_REDUCE_PENDING_WEIGHTS: 'DAY_REDUCE_PENDING_WEIGHTS', // { di } — B87 Fix 3: manueller Catch-up für die -10%-Reduktion (ein Dispatch für den ganzen Tag, nicht pro Satz, damit Undo den ganzen Klick in einem Schritt rückgängig macht)
   // Exercise
   EX_ADD:              'EX_ADD',              // { di, name, metric? }
   CUSTOM_EX_ADD:        'CUSTOM_EX_ADD',        // { name, metric, category }
@@ -1296,6 +1297,25 @@ export const A = Object.freeze({
 });
 
 // ─── Reducer ──────────────────────────────────────────────────────────────────
+
+/**
+ * Reduziert alle noch `pending` Sätze mit Gewicht>0 eines Tages um 10%,
+ * gerundet auf die pro-Übung-Schrittweite. Gemeinsam genutzt von
+ * SESSION_CHECKIN_SET (automatisch, bei Check-in-Abgabe mit modifier=
+ * 'reduced') und DAY_REDUCE_PENDING_WEIGHTS (manueller Catch-up-Button,
+ * B87 Fix 3) — identische Formel, ein einziger Ort.
+ */
+function _reducePendingWeights(day) {
+  for (const ex of day.exercises ?? []) {
+    if (ex.archived) continue;
+    const step = ex.weightStep || 2.5;
+    for (const s of ex.sets ?? []) {
+      if (s.status === 'pending' && (s.weight ?? 0) > 0) {
+        s.weight = Math.round((s.weight * 0.9) / step) * step;
+      }
+    }
+  }
+}
 
 function _resetClonedDays(days) {
   days.forEach(day => {
@@ -1800,16 +1820,20 @@ function reduce(state, action) {
         timestamp: Date.now(),
       };
       day.sessionModifier = p.modifier ?? 'normal';
-      if (p.modifier === 'reduced') {
-        for (const ex of day.exercises ?? []) {
-          const step = ex.weightStep || 2.5;
-          for (const s of ex.sets ?? []) {
-            if (s.status === 'pending' && (s.weight ?? 0) > 0) {
-              s.weight = Math.round((s.weight * 0.9) / step) * step;
-            }
-          }
-        }
-      }
+      if (p.modifier === 'reduced') _reducePendingWeights(day);
+      break;
+    }
+
+    // B87 Fix 3: manueller Catch-up für die -10%-Reduktion, z.B. für eine
+    // Übung die ERST NACH der Check-in-Abgabe zum Tag hinzugefügt wurde (die
+    // automatische Reduktion oben lief zu diesem Zeitpunkt schon und sah sie
+    // nie). Ein einziger Dispatch für den ganzen Tag (nicht pro Satz) — sonst
+    // würde Rückgängig nur den zuletzt geänderten Satz zurückdrehen, nicht
+    // den ganzen Klick. ui.js prüft per localStorage-Flag, dass dieser
+    // Dispatch nur einmal pro Tag ausgelöst wird.
+    case A.DAY_REDUCE_PENDING_WEIGHTS: {
+      const day = _currentWeek()?.days[p.di]; if (!day) break;
+      _reducePendingWeights(day);
       break;
     }
 

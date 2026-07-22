@@ -1,7 +1,7 @@
 # TRAIN — CLAUDE.md
 # Vollständiger Projektkontext für Claude Code
-# Stand: train-v201 / SCHEMA 32 / Juli 2026
-# Letztes Update: nach train-v201 (B86 ungültiges SVG height="auto"-Attribut in progressChart.js behoben)
+# Stand: train-v202 / SCHEMA 32 / Juli 2026
+# Letztes Update: nach train-v202 (B87-B90 Session Coach UX-Fixes aus dem ersten echten Nutzer-Test behoben)
 
 ---
 
@@ -40,7 +40,7 @@ TRAIN ist eine deutschsprachige PWA für Krafttraining. Pure Vanilla ES Modules 
 
 - Repo: https://github.com/777random/TRAIN
 - Deployed: https://777random.github.io/TRAIN/
-- Aktueller Stand: SCHEMA_VERSION 32 · CACHE_VERSION train-v201 · CSS ?v=197
+- Aktueller Stand: SCHEMA_VERSION 32 · CACHE_VERSION train-v202 · CSS ?v=198
 
 ---
 
@@ -338,7 +338,7 @@ manuellen Wochenwechsel).
 ## FEATURE-STATUS
 
 ### Implementiert ✓:
-**Training-Tab:** Wochenstruktur, Pillen-Nav, Satz-Bewertung (auto+manuell), Gewichtsempfehlung (seit v165 auch Distanz/Zeit-Progression für metric 'm'/'sec' via getMetricRecommendation(), B18; seit v172 pro-Übung-Schrittweite statt fixem Delta, B48), Schrittweite-Vorschlag aus Historie (v173, B49, nur sichtbarer Hinweis), anpassbare Steigerungsmenge im Empfehlungs-Chip (v173, B50), Progressions-Präferenz, PR-Erkennung, "Heute anders", Übung archivieren, Stoppuhr, Auto-Wochenerstellung, Deload/Urlaubsmodus, Körpergewicht, Schlaf+Energie, Share-Bild bei echtem PR (v186, B68 — Tagesabschluss-Screen; v189, B73 — zusätzlich sofortiger Toast direkt nach dem PR-Satz), Pre-Session Check-in + Session Briefing (v192, B76 — Zwei-Tap Schlaf/Energie-Check-in am heutigen Tag, Briefing mit Fokus-Übung + RPE-Ziel, -10%-Gewichtsreduktion bei schlechter Tagesform, per Settings-Toggle "Session Coach" abschaltbar), Intra-Session Coach (v193, B77 — Feedback direkt unter jedem bewerteten Satz: Gewichts-/Pause-Empfehlung nach RPE-Bereich bzw. Erfolg/Fehlschlag ohne RPE, Abschluss-Nachricht mit Nächste-Woche-Projektion, Weiterer-Satz-Vorschlag bei RPE≤6, Aufwärm-Empfehlung 50/70/85%, erweiterte Favoriten-RPE-Nudge — alles über denselben "Session Coach"-Toggle abschaltbar), Session Summary (v194, B79 — Vollbild-Screen direkt nach Tagesabschluss vor dem bestehenden Tagesabschluss-Screen: bis zu 3 Übungs-Highlights, 1-2-Satz-Einordnung nach Prioritätskaskade, Vorschau nächstes Training; einmalige Schlaf-Erfolgsquote-Korrelation wenn nachweisbar und genug Historie vorhanden).
+**Training-Tab:** Wochenstruktur, Pillen-Nav, Satz-Bewertung (auto+manuell), Gewichtsempfehlung (seit v165 auch Distanz/Zeit-Progression für metric 'm'/'sec' via getMetricRecommendation(), B18; seit v172 pro-Übung-Schrittweite statt fixem Delta, B48), Schrittweite-Vorschlag aus Historie (v173, B49, nur sichtbarer Hinweis), anpassbare Steigerungsmenge im Empfehlungs-Chip (v173, B50), Progressions-Präferenz, PR-Erkennung, "Heute anders", Übung archivieren, Stoppuhr, Auto-Wochenerstellung, Deload/Urlaubsmodus, Körpergewicht, Schlaf+Energie, Share-Bild bei echtem PR (v186, B68 — Tagesabschluss-Screen; v189, B73 — zusätzlich sofortiger Toast direkt nach dem PR-Satz), Pre-Session Check-in + Session Briefing (v192, B76 — Zwei-Tap Schlaf/Energie-Check-in am heutigen Tag, Briefing mit Fokus-Übung + RPE-Ziel, -10%-Gewichtsreduktion bei schlechter Tagesform, per Settings-Toggle "Session Coach" abschaltbar; seit v202/B87 nachträglich korrigierbar über "✎ Tagesform anpassen"; seit v202/B88 zusätzlicher manueller Catch-up-Button für die -10%-Reduktion), Intra-Session Coach (v193, B77 — Feedback direkt unter jedem bewerteten Satz: Gewichts-/Pause-Empfehlung nach RPE-Bereich bzw. Erfolg/Fehlschlag ohne RPE, Abschluss-Nachricht mit Nächste-Woche-Projektion, Weiterer-Satz-Vorschlag bei RPE≤6, Aufwärm-Empfehlung 50/70/85%, erweiterte Favoriten-RPE-Nudge — alles über denselben "Session Coach"-Toggle abschaltbar; seit v202/B89 mit "Übernehmen ↗"-Button, setzt Gewicht des nächsten Satzes + startet Pause-Timer in einem Tap), Session Summary (v194, B79 — Vollbild-Screen direkt nach Tagesabschluss vor dem bestehenden Tagesabschluss-Screen: bis zu 3 Übungs-Highlights, 1-2-Satz-Einordnung nach Prioritätskaskade, Vorschau nächstes Training; einmalige Schlaf-Erfolgsquote-Korrelation wenn nachweisbar und genug Historie vorhanden).
 
 **Wochenrückblick-Modal:** Zusammenfassung/Highlights/Lowlights/Empfehlungen (weekReview.js/weekReviewModal.js), Share-Bild-Button (v186, B68; Sparkline-Redesign v187, B71; Favoriten-Kaskade v189, B73) — auch im manuellen Wochenrückblick-Dropdown im Fortschritt-Tab (v188, B72).
 
