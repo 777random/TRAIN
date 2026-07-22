@@ -2,6 +2,22 @@
 # Automatisch von Claude Code
 # befüllt beim Session-Start
 
+## 2026-07-22 train-v199 (B78 — autoStartPauseTimer jetzt auch im toggle-done-Pfad respektiert)
+Loop 1: 10/10 grün ✓, volle Suite 85/85 grün nach dem Fix
+Loop 2: aktuell ✓ (CLAUDE.md/HANDOFF.md/BUGS.md auf train-v199 gebracht)
+Eigentliche Aufgabe: Nutzer bat, den seit B77 (train-v193) in BUGS.md
+  dokumentierten, bewusst zurückgestellten B78-Fund jetzt zu fixen.
+  Root Cause war bereits bekannt (nicht neu diagnostiziert): timer.js'
+  eigene toggle-done-Klick-Erkennung (_bindAppInteractions()) löste den
+  Pause-Timer unconditional aus, ohne autoStartPauseTimer zu prüfen —
+  der confirm-set-Pfad (ui.js) tat das bereits korrekt. Fix: identische
+  Gating-Bedingung im toggle-done-Pfad ergänzt, nur timer.js geändert.
+  2 neue Tests (tests/intra_session_coach.spec.js, "B78: ...") — per
+  Fix-zurücknehmen-bestätigt-wieder-herstellen-Zyklus verifiziert, dass
+  der negative Test die Regression zuverlässig fängt. CACHE_VERSION
+  train-v198→v199. BUGS.md (B78 von OFFEN nach BEHOBEN verschoben),
+  HANDOFF.md, CLAUDE.md aktualisiert. Committed + gepusht.
+
 ## 2026-07-22 train-v198 (B85 — Pause-Timer-Overlay zeigt sofort korrekte Sekundenzahl)
 Loop 1: 10/10 grün ✓, volle Suite 83/83 grün nach dem Fix
 Loop 2: aktuell ✓ (CLAUDE.md/HANDOFF.md/BUGS.md auf train-v198 gebracht)

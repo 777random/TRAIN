@@ -646,7 +646,13 @@ function _bindAppInteractions() {
         const newEx     = newDay?.exercises?.[ei];
         const newSet    = newEx?.sets?.[+doneBtn.dataset.si];
         const isLastSet = +doneBtn.dataset.si === (newEx?.sets?.length ?? 0) - 1;
-        if (newSet?.done && !isLastSet) {
+        // B78: dieser toggle-done-Pfad löste den Pause-Timer bisher UNCONDITIONAL
+        // aus, ohne die Einstellung zu prüfen — der confirm-set-Pfad (ui.js)
+        // respektiert `autoStartPauseTimer` bereits korrekt. Wer die Einstellung
+        // deaktiviert hatte, bekam trotzdem einen Auto-Timer über den manuellen
+        // ✓/✗-Button (vermutlich der häufiger genutzte Pfad). Gleiche Gating-
+        // Bedingung wie ui.js jetzt auch hier ergänzt.
+        if (newSet?.done && !isLastSet && newState.settings?.autoStartPauseTimer) {
           // B77: Intra-Session Coach — die berechnete Pause-Empfehlung
           // ersetzt den bisher statischen ex.pauseSec, wenn eine existiert
           // (sessionModifier vom Tag, dieselbe Logik wie in ui.js' confirm-

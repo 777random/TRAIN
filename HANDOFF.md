@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-22, B85 Pause-Timer-Overlay zeigt sofort korrekte Sekundenzahl (train-v198, SCHEMA 32 unverändert)*
-*Nächster Schritt: B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md) — braucht Name+Adresse+E-Mail vom Nutzer. B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten. B78 (autoStartPauseTimer respektiert nur den confirm-set-Pfad) bleibt offen, low priority. B83 (_skippedCheckIn nicht zwischen Wochen zurückgesetzt) weiterhin offen, Low. CI-Badge sollte nach diesem Push wieder grün sein — bei erneutem Rot direkt prüfen, ob derselbe Test betroffen ist (dann echter Regress) oder ein anderer (dann neuer, unabhängiger Fund). Loops 7-11 aktiv: Advisor-Exports werden am Ende jeder Session automatisch aktualisiert. for-advisor-consolidated.txt = Startpunkt für neue externe Chats.*
+*Letzte Aktualisierung: 2026-07-22, B78 autoStartPauseTimer jetzt auch im toggle-done-Pfad respektiert (train-v199, SCHEMA 32 unverändert)*
+*Nächster Schritt: B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md) — braucht Name+Adresse+E-Mail vom Nutzer. B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten. B83 (_skippedCheckIn nicht zwischen Wochen zurückgesetzt) weiterhin offen, Low — einziger noch offener Low-Priority-Fund aus der Session-Coach-Diagnose-Serie (B78/B82/B84/B85 jetzt alle behoben). Loops 7-11 aktiv: Advisor-Exports werden am Ende jeder Session automatisch aktualisiert. for-advisor-consolidated.txt = Startpunkt für neue externe Chats.*
 
 ---
 
@@ -20,6 +20,26 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
   dem bestehenden Plateau-Mechanismus)
 - Letzter Commit: siehe `git log` (dieser Sprint noch nicht gepusht,
   siehe Sprint-Ende-Workflow).
+- **B78 — autoStartPauseTimer jetzt auch im toggle-done-Pfad respektiert
+  (train-v199):** Nutzer bat darum, den seit der B77-Umsetzung (train-v193)
+  in BUGS.md dokumentierten, bewusst zurückgestellten Fund jetzt zu
+  fixen. Root Cause war bereits bekannt: `timer.js` hat eine eigene,
+  von ui.js unabhängige Klick-Erkennung für den manuellen ✓/✗-Button
+  (`_bindAppInteractions()`, `[data-action="toggle-done"]`) — löste den
+  Pause-Timer dort UNCONDITIONAL aus, ohne `settings.autoStartPauseTimer`
+  zu prüfen. Der `confirm-set`-Pfad (ui.js) prüfte die Einstellung
+  bereits korrekt, BEVOR überhaupt das `train:set-done`-Event gefeuert
+  wurde. Wer die Einstellung deaktiviert hatte, bekam trotzdem einen
+  Auto-Timer über den vermutlich häufiger genutzten manuellen Pfad.
+  **Fix:** identische Gating-Bedingung im `toggle-done`-Pfad ergänzt —
+  nur `timer.js` geändert, ein Zeilen-Zusatz. 2 neue Tests
+  (`tests/intra_session_coach.spec.js`, "B78: ..."): Overlay bleibt bei
+  deaktivierter Einstellung jetzt korrekt unsichtbar (per
+  Fix-zurücknehmen/bestätigen/wiederherstellen-Zyklus bewiesen, dass der
+  Test die Regression tatsächlich fängt), Pfad funktioniert bei
+  aktivierter Einstellung weiterhin wie zuvor (kein Regress). Volle
+  Suite 85/85 grün. CACHE_VERSION train-v198→v199, CSS/SCHEMA
+  unverändert.
 - **B85 — Pause-Timer-Overlay zeigt sofort korrekte Sekundenzahl
   (train-v198):** direkter Anschluss an B84 — nach dessen Push war das
   CI-Badge rot (`intra_session_coach.spec.js:139`). Per Vergleich mit

@@ -1,7 +1,7 @@
 # TRAIN — CLAUDE.md
 # Vollständiger Projektkontext für Claude Code
-# Stand: train-v198 / SCHEMA 32 / Juli 2026
-# Letztes Update: nach train-v198 (B85 Pause-Timer-Overlay zeigt sofort korrekte Sekundenzahl)
+# Stand: train-v199 / SCHEMA 32 / Juli 2026
+# Letztes Update: nach train-v199 (B78 autoStartPauseTimer jetzt auch im toggle-done-Pfad respektiert)
 
 ---
 
@@ -40,7 +40,7 @@ TRAIN ist eine deutschsprachige PWA für Krafttraining. Pure Vanilla ES Modules 
 
 - Repo: https://github.com/777random/TRAIN
 - Deployed: https://777random.github.io/TRAIN/
-- Aktueller Stand: SCHEMA_VERSION 32 · CACHE_VERSION train-v198 · CSS ?v=197
+- Aktueller Stand: SCHEMA_VERSION 32 · CACHE_VERSION train-v199 · CSS ?v=197
 
 ---
 
@@ -246,7 +246,7 @@ Set → { weight, reps, rpe, status ('pending'|'success'|'fail'), done }
 
 `timer.js` importiert `state.js` sowie (seit train-v193, B77) `sessionCoach.js` — ein importfreies, reines Berechnungsmodul (Tiefe 0), das auch `ui.js` nutzt. Kommuniziert mit `ui.js` ausschließlich via custom `window` Events:
 - `ui.js` → `timer.js`: `train:set-input`, `train:warmup-click`, `train:day-complete`
-- `train:set-done`: wird sowohl von `ui.js` (`confirm-set`-Klick-Handler) als auch von `timer.js` selbst gefeuert (`_bindAppInteractions()` erkennt `[data-action="toggle-done"]`-Klicks direkt auf `#app`, ohne über ui.js' eigenes Klick-Routing zu gehen — historisch gewachsen, siehe BUGS.md B78 für eine daraus resultierende Inkonsistenz bei `autoStartPauseTimer`)
+- `train:set-done`: wird sowohl von `ui.js` (`confirm-set`-Klick-Handler) als auch von `timer.js` selbst gefeuert (`_bindAppInteractions()` erkennt `[data-action="toggle-done"]`-Klicks direkt auf `#app`, ohne über ui.js' eigenes Klick-Routing zu gehen — historisch gewachsen). Beide Pfade respektieren `settings.autoStartPauseTimer` seit train-v199 konsistent (B78, vorher prüfte das nur der `confirm-set`-Pfad).
 - `train:show-update-banner`: von `index.html` gefeuert, direkt von `ui.js` gehört
 
 **NIEMALS:** `ui.js` von `timer.js` importieren oder umgekehrt. Ausnahmen sind ausschließlich importfreie Tiefe-0-Module (wie `sessionCoach.js`), die von beiden unabhängig genutzt werden — nie eine direkte Kopplung der beiden Dateien selbst.

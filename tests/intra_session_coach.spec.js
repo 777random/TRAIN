@@ -188,6 +188,44 @@ test('B85: Pausenzahl ist synchron korrekt, unabhängig von requestAnimationFram
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
 });
 
+// B78: der manuelle ✓/✗-Button (toggle-done) hatte eine eigene,
+// von ui.js unabhängige Klick-Erkennung in timer.js (_bindAppInteractions()),
+// die den Pause-Timer bisher UNCONDITIONAL auslöste — ohne die Einstellung
+// autoStartPauseTimer zu prüfen. Der confirm-set-Pfad (ui.js) respektierte
+// die Einstellung bereits korrekt. Diese beiden Tests sichern beide
+// Richtungen über den toggle-done-Pfad ab.
+test('B78: toggle-done startet den Pause-Timer NICHT wenn autoStartPauseTimer deaktiviert ist', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', err => pageErrors.push(err.message));
+  await page.goto('/');
+  await page.waitForSelector('#app.is-ready', { timeout: 10000 });
+  await seed(page, { exercises: [mkEx({ nSets: 2, targetReps: 5 })], autoStartPauseTimer: false });
+
+  await setRpe(page, 0, 0, 0, 8);
+  await toggleDone(page, 0, 0, 0);
+  await page.waitForTimeout(300);
+
+  await expect(page.locator('#pause-overlay')).not.toHaveClass(/pause-overlay--visible/);
+  expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});
+
+test('B78: toggle-done startet den Pause-Timer weiterhin korrekt wenn autoStartPauseTimer aktiviert ist', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', err => pageErrors.push(err.message));
+  await page.goto('/');
+  await page.waitForSelector('#app.is-ready', { timeout: 10000 });
+  await seed(page, { exercises: [mkEx({ nSets: 2, targetReps: 5 })], autoStartPauseTimer: true });
+
+  await setRpe(page, 0, 0, 0, 8); // -> pauseSec 180
+  await toggleDone(page, 0, 0, 0);
+
+  await expect(page.locator('#pause-overlay')).toHaveClass(/pause-overlay--visible/);
+  const num = await page.locator('#pause-ring-num').textContent();
+  expect(Number(num)).toBeGreaterThanOrEqual(177);
+  expect(Number(num)).toBeLessThanOrEqual(180);
+  expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});
+
 test('Favoriten-Übung ohne RPE: erweiterte Nudge einmalig pro Sitzung, "Nie für diese Übung" wirkt dauerhaft', async ({ page }) => {
   const pageErrors = [];
   page.on('pageerror', err => pageErrors.push(err.message));
