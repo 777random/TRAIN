@@ -2,6 +2,24 @@
 # Automatisch von Claude Code
 # befüllt beim Session-Start
 
+## 2026-07-22 train-v200 (B83 — _skippedCheckIn nach Woche+Tag statt nur Index geschlüsselt)
+Loop 1: 10/10 grün ✓, volle Suite 86/86 grün nach dem Fix
+Loop 2: aktuell ✓ (CLAUDE.md/HANDOFF.md/BUGS.md auf train-v200 gebracht)
+Eigentliche Aufgabe: letzter offener Nebenfund aus der B82-Diagnose-Serie.
+  Root Cause bereits bekannt (_skippedCheckIn nach Array-Index statt Woche
+  geschlüsselt). Erster Fix-Versuch (day.id statt Index) erwies sich beim
+  Testen als unzureichend -- WEEK_CREATE klont day.id bewusst unverändert
+  in neue Wochen (state.js, clone(lastWeek.days)), day.id ist daher NICHT
+  pro-Woche-eindeutig. Eigentlicher Fix: Set nach ${wk.id}_${day.id}
+  geschlüsselt (wk.id wird pro Wochenerstellung frisch vergeben). Nur
+  ui.js geändert. Neuer Test (tests/session_coach.spec.js, "B83: ...")
+  bewusst gegen beide unzureichenden Zwischenstände laufen gelassen und
+  schlug dort jeweils reproduzierbar fehl, bevor der finale Fix ihn grün
+  machte. CACHE_VERSION train-v199→v200. BUGS.md (B83 von OFFEN nach
+  BEHOBEN verschoben), HANDOFF.md, CLAUDE.md aktualisiert. Committed +
+  gepusht. Damit ist die gesamte Session-Coach-Diagnose-Serie (B78/B82/
+  B83/B84/B85) abgeschlossen.
+
 ## 2026-07-22 train-v199 (B78 — autoStartPauseTimer jetzt auch im toggle-done-Pfad respektiert)
 Loop 1: 10/10 grün ✓, volle Suite 85/85 grün nach dem Fix
 Loop 2: aktuell ✓ (CLAUDE.md/HANDOFF.md/BUGS.md auf train-v199 gebracht)

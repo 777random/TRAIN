@@ -151,7 +151,19 @@ let _favNudgeShownFor = new Set();
 // halb ausgefüllten Check-in, das ist bewusst akzeptiert (kein Datenverlust
 // im eigentlichen Sinn, nur ein UI-Zwischenstand).
 let _checkInDraft = new Map();
-/** Tage (di), für die der Check-in in dieser Sitzung übersprungen wurde. */
+// B83: keyed nach `${wk.id}_${day.id}`, NICHT nach Array-Index `di` allein
+// UND NICHT nach `day.id` allein. Ein Index ist über Wochen hinweg
+// wiederverwendbar (Tag-Index 1 existiert in jeder Woche neu) — aber auch
+// `day.id` reicht allein NICHT: WEEK_CREATE klont Tage per `clone(lastWeek.
+// days)` (state.js) und übernimmt dabei bewusst dieselbe `day.id` in die
+// neue Woche (repräsentiert denselben wiederkehrenden Wochenplan-Slot,
+// z.B. "Tag A" über alle Wochen hinweg). `wk.id` dagegen wird bei jeder
+// Wochenerstellung frisch per `Date.now()` vergeben (state.js) und ist
+// damit die einzige garantiert pro-Woche-eindeutige Komponente — die
+// Kombination stellt sicher, dass ein "Überspringen" nur für GENAU diese
+// eine Tag-Instanz in GENAU dieser einen Woche gilt, nicht für denselben
+// Tag-Slot in einer späteren (auch geklonten) Woche.
+/** Tage (`${wk.id}_${day.id}`), für die der Check-in in dieser Sitzung übersprungen wurde. */
 let _skippedCheckIn = new Set();
 /** Manuelles Auf-/Zuklappen des Briefings pro Tag (di → boolean), überschreibt den Default. */
 let _briefingExpandedOverride = new Map();
@@ -1356,7 +1368,7 @@ function renderDayBody(wk, di, state) {
   const sessionCoachActive = !isVacDay && !done && state.settings?.sessionCoach !== false && _isTodayDay(wk, di);
   let sessionCoachHtml = '';
   if (sessionCoachActive) {
-    if (!day.sessionCheckIn && !_skippedCheckIn.has(di)) {
+    if (!day.sessionCheckIn && !_skippedCheckIn.has(`${wk.id}_${day.id}`)) {
       sessionCoachHtml = _renderSessionCheckIn(di);
     } else {
       sessionCoachHtml = _renderSessionBriefing(di, day, wk, state);
@@ -4480,7 +4492,7 @@ function renderSettingsTab(state) {
   <div class="settings-section">
     <div class="settings-section__title">Info</div>
     <div class="settings-row">
-      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v199</div></div>
+      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v200</div></div>
     </div>
     <div class="settings-row">
       <div>
@@ -6177,7 +6189,9 @@ function _handleClick(e) {
       break;
     }
     case 'session-checkin-skip': {
-      _skippedCheckIn.add(+di);
+      const _skipWk  = getState().weeks[getState().curIdx];
+      const _skipDay = _skipWk?.days[+di];
+      if (_skipWk && _skipDay) _skippedCheckIn.add(`${_skipWk.id}_${_skipDay.id}`);
       _checkInDraft.delete(+di);
       scheduleRender();
       break;

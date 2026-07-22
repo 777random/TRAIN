@@ -125,6 +125,43 @@ test('"Überspringen" blendet Check-in aus, Briefing zeigt Standardwerte', async
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
 });
 
+// B83: _skippedCheckIn (ui.js, Modul-Set) war bisher nach Tag-ARRAY-INDEX
+// geschlüsselt, nicht nach der stabilen day.id — ein Index ist über Wochen
+// hinweg wiederverwendbar (Tag-Index 0 existiert in jeder neuen Woche neu).
+// Ohne Reload zwischen zwei Wochen (z.B. manuelles "Neue Woche" erstellen,
+// ohne die Seite neu zu laden) hätte ein "Überspringen" in der alten Woche
+// den Check-in der neuen Woche am gleichen Index fälschlich mit-übersprungen.
+test('B83: "Überspringen" in einer Woche überspringt NICHT den Check-in der nächsten Woche (ohne Reload)', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', err => pageErrors.push(err.message));
+  await page.goto('/');
+  await page.waitForSelector('#app.is-ready', { timeout: 10000 });
+  await seed(page);
+
+  // Check-in der aktuellen (ersten) Woche überspringen.
+  await page.click('[data-action="session-checkin-skip"]');
+  await expect(page.locator('.session-checkin-card')).toHaveCount(0);
+
+  // Neue Woche erstellen -- OHNE Seiten-Reload, damit das In-Memory-
+  // _skippedCheckIn-Set aus der vorherigen Woche bestehen bleibt. Kein
+  // Wochenrückblick-Zwischenschritt, da der Seed-Tag nicht markedDone ist
+  // (open-new-week zeigt .wr-modal nur wenn die letzte Woche einen
+  // abgeschlossenen Tag hat).
+  await page.click('[data-action="open-new-week"]');
+  await page.waitForSelector('#modal-new-week.is-open', { timeout: 5000 });
+  await page.click('[data-action="create-week"]');
+
+  // Die neue Woche klont day.id vom Vorlagen-Tag (WEEK_CREATE, state.js
+  // clone(lastWeek.days) -- day.id bleibt bewusst über Wochen hinweg
+  // stabil, repräsentiert denselben wiederkehrenden Wochenplan-Slot).
+  // sessionCheckIn wird beim Klonen aber zurückgesetzt (_resetClonedDays) --
+  // der Check-in muss dafür erneut erscheinen, nicht durch die alte Woche
+  // (andere wk.id) als "übersprungen" gelten.
+  await expect(page.locator('.session-checkin-card')).toBeVisible();
+
+  expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});
+
 test('Schlecht geschlafen -> modifier reduced, Gewichte -10% gerundet auf weightStep, RPE-Ziel -1', async ({ page }) => {
   const pageErrors = [];
   page.on('pageerror', err => pageErrors.push(err.message));

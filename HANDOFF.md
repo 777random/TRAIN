@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-22, B78 autoStartPauseTimer jetzt auch im toggle-done-Pfad respektiert (train-v199, SCHEMA 32 unverändert)*
-*Nächster Schritt: B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md) — braucht Name+Adresse+E-Mail vom Nutzer. B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten. B83 (_skippedCheckIn nicht zwischen Wochen zurückgesetzt) weiterhin offen, Low — einziger noch offener Low-Priority-Fund aus der Session-Coach-Diagnose-Serie (B78/B82/B84/B85 jetzt alle behoben). Loops 7-11 aktiv: Advisor-Exports werden am Ende jeder Session automatisch aktualisiert. for-advisor-consolidated.txt = Startpunkt für neue externe Chats.*
+*Letzte Aktualisierung: 2026-07-22, B83 _skippedCheckIn nach Woche+Tag statt nur Index geschlüsselt (train-v200, SCHEMA 32 unverändert)*
+*Nächster Schritt: B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md) — braucht Name+Adresse+E-Mail vom Nutzer. B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten. Die gesamte Session-Coach-Diagnose-Serie aus den letzten Sitzungen ist jetzt vollständig abgeschlossen (B78/B82/B83/B84/B85 alle behoben) — aktuell keine offenen Bugs außer B55/B66 (siehe oben). Loops 7-11 aktiv: Advisor-Exports werden am Ende jeder Session automatisch aktualisiert. for-advisor-consolidated.txt = Startpunkt für neue externe Chats.*
 
 ---
 
@@ -20,6 +20,30 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
   dem bestehenden Plateau-Mechanismus)
 - Letzter Commit: siehe `git log` (dieser Sprint noch nicht gepusht,
   siehe Sprint-Ende-Workflow).
+- **B83 — _skippedCheckIn nach Woche+Tag statt nur Index geschlüsselt
+  (train-v200):** Nutzer bat darum, den letzten offenen Nebenfund aus der
+  B82-Diagnose-Serie zu fixen. Root Cause war bereits bekannt:
+  `_skippedCheckIn` (ui.js, Modul-Set) war nach Tag-Array-Index `di`
+  geschlüsselt, nicht nach Woche — ein "Überspringen" hätte den Check-in
+  am gleich-indizierten Tag einer später (ohne Reload) betrachteten neuen
+  Woche fälschlich mit-übersprungen. **Erster Fix-Versuch (Set nach
+  `day.id` statt `di` schlüsseln) erwies sich beim Testen als
+  unzureichend** — Diagnose ergab: `WEEK_CREATE` (state.js) klont Tage
+  per `clone(lastWeek.days)` und übernimmt dabei bewusst dieselbe
+  `day.id` in die neue Woche (repräsentiert denselben wiederkehrenden
+  Wochenplan-Slot über alle Wochen hinweg) — im häufigsten Fall (neue
+  Woche aus der Vorwoche geklont) wäre das Problem mit `day.id` allein
+  also gar nicht gelöst gewesen. **Eigentlicher Fix:** Set jetzt nach
+  `${wk.id}_${day.id}` geschlüsselt — `wk.id` wird bei jeder
+  Wochenerstellung frisch vergeben und ist die einzige garantiert
+  pro-Woche-eindeutige Komponente. Nur `ui.js` geändert. Neuer Test
+  (`tests/session_coach.spec.js`, "B83: ...") erstellt eine neue Woche
+  OHNE Seiten-Reload und bestätigt, dass der Check-in dort korrekt
+  wieder erscheint — bewusst gegen BEIDE unzureichenden Zwischenstände
+  (reiner Index, reine `day.id`) laufen gelassen und schlug dort jeweils
+  reproduzierbar fehl, bevor der finale Fix ihn grün machte. Volle Suite
+  86/86 grün. CACHE_VERSION train-v199→v200, CSS/SCHEMA unverändert.
+  **Damit ist die gesamte Session-Coach-Diagnose-Serie abgeschlossen.**
 - **B78 — autoStartPauseTimer jetzt auch im toggle-done-Pfad respektiert
   (train-v199):** Nutzer bat darum, den seit der B77-Umsetzung (train-v193)
   in BUGS.md dokumentierten, bewusst zurückgestellten Fund jetzt zu
