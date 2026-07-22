@@ -2,6 +2,25 @@
 # Automatisch von Claude Code
 # befüllt beim Session-Start
 
+## 2026-07-22 train-v201 (B66 erneut geprüft, kein Fund — B86 SVG height="auto" behoben)
+Loop 1: 10/10 grün ✓, volle Suite 87/87 grün nach dem Fix
+Loop 2: aktuell ✓ (CLAUDE.md/HANDOFF.md/BUGS.md auf train-v201 gebracht)
+Eigentliche Aufgabe: Nutzer bat, B66 erneut zu prüfen. 5 frische
+  Reproduktionsversuche gegen aktuellen Code (viel hat sich seit train-v185
+  geändert: komplette Session-Coach-Serie) -- weiterhin kein pageerror/
+  unhandledrejection reproduzierbar. Bleibt offen, blockiert auf echte
+  GoatCounter-Telemetrie (dem Nutzer die konkreten Dashboard-Schritte
+  erklärt: js_error-Events per Suchfilter finden, Datumsbereich seit
+  2026-07-19 prüfen). Nebenfund dabei: SVG-Charts (progressChart.js)
+  loggten eine Konsolen-Warnung (height="auto" als ungültiges XML-
+  Attribut). Auf Nutzerwunsch separat gefixt: height:auto ins style-
+  Attribut verschoben (CSS erlaubt "auto", XML-Attribut nicht) -- rein
+  kosmetischer Markup-Fix, keine visuelle Änderung. Neuer Test
+  (tests/progress_chart_svg.spec.js), per Fix-zurücknehmen-bestätigt-
+  wiederherstellen-Zyklus verifiziert. CACHE_VERSION train-v200→v201.
+  BUGS.md (B86 neu, B66-Status aktualisiert), HANDOFF.md, CLAUDE.md
+  aktualisiert. Committed + gepusht.
+
 ## 2026-07-22 train-v200 (B83 — _skippedCheckIn nach Woche+Tag statt nur Index geschlüsselt)
 Loop 1: 10/10 grün ✓, volle Suite 86/86 grün nach dem Fix
 Loop 2: aktuell ✓ (CLAUDE.md/HANDOFF.md/BUGS.md auf train-v200 gebracht)

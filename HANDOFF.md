@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-22, B83 _skippedCheckIn nach Woche+Tag statt nur Index geschlüsselt (train-v200, SCHEMA 32 unverändert)*
-*Nächster Schritt: B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md) — braucht Name+Adresse+E-Mail vom Nutzer. B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten. Die gesamte Session-Coach-Diagnose-Serie aus den letzten Sitzungen ist jetzt vollständig abgeschlossen (B78/B82/B83/B84/B85 alle behoben) — aktuell keine offenen Bugs außer B55/B66 (siehe oben). Loops 7-11 aktiv: Advisor-Exports werden am Ende jeder Session automatisch aktualisiert. for-advisor-consolidated.txt = Startpunkt für neue externe Chats.*
+*Letzte Aktualisierung: 2026-07-22, B86 ungültiges SVG height="auto"-Attribut in progressChart.js behoben (train-v201, SCHEMA 32 unverändert)*
+*Nächster Schritt: B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md) — braucht Name+Adresse+E-Mail vom Nutzer. B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten — erneut per 5 frischen Reproduktionsversuchen (inkl. aller seit v185 neuen Session-Coach-Code-Pfade) NICHT reproduziert, weiterhin blockiert auf echte GoatCounter-Telemetrie (`js_error:`-Events im Dashboard prüfen). Aktuell keine weiteren offenen Bugs außer B55/B66. Loops 7-11 aktiv: Advisor-Exports werden am Ende jeder Session automatisch aktualisiert. for-advisor-consolidated.txt = Startpunkt für neue externe Chats.*
 
 ---
 
@@ -20,6 +20,34 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
   dem bestehenden Plateau-Mechanismus)
 - Letzter Commit: siehe `git log` (dieser Sprint noch nicht gepusht,
   siehe Sprint-Ende-Workflow).
+- **B66 — erneut untersucht, weiterhin nicht reproduzierbar
+  (keine Code-Änderung):** Nutzer bat, B66 erneut zu prüfen. 5 frische
+  Reproduktionsversuche gegen den aktuellen Code (train-v200, gegenüber
+  train-v185 beim letzten Check) — gezielt gegen alles, was seit der
+  Session-Coach-Serie (B76-B85) neu dazukam (frisches Onboarding, 8+
+  Wochen mit Schlaf-Korrelations-Schwelle, leeres `days`-Array, bereits
+  gesetzter `sessionCheckIn` + `sessionModifier: 'reduced'`, 50 Wochen mit
+  Plateau/Deload-Signalen). **Kein einziger `pageerror`/
+  `unhandledrejection`** in allen 5 Szenarien. Bleibt beim Stand aus
+  train-v185: nicht reproduzierbar, nächster echter Schritt ist weiterhin
+  das GoatCounter-Dashboard auf `js_error:`-Events zu prüfen (seit v185
+  instrumentiert) — das kann nur der Nutzer einsehen.
+- **B86 — ungültiges SVG `height="auto"`-Attribut in progressChart.js
+  behoben (train-v201):** Nebenfund während der B66-Reproduktionsversuche
+  (kein Zusammenhang mit B66 — reine Konsolen-Warnung, keine Exception,
+  kein Toast-Trigger). Drei SVG-Charts (Übungsfortschritt, Körpergewicht,
+  Relative Stärke) setzten `height="auto"` als XML-Attribut — ungültig
+  für SVG (nur Zahl/Prozent/Einheit erlaubt), der Browser loggte dafür
+  bei jedem Rendern `Error: <svg> attribute height: Expected length,
+  "auto".` in die Konsole. **Fix:** `height:auto` ins ohnehin vorhandene
+  `style`-Attribut verschoben (dort ist "auto" gültiges CSS) — rein
+  kosmetischer Markup-Fix, `viewBox` skaliert weiterhin identisch, keine
+  visuelle Änderung. Verifiziert per neuem Test
+  (`tests/progress_chart_svg.spec.js`) — bewusst mit zurückgenommenem
+  Fix laufen gelassen, schlug reproduzierbar mit derselben
+  Fehlermeldung fehl, danach Fix wiederhergestellt, Test grün. Volle
+  Suite 87/87 grün. CACHE_VERSION train-v200→v201, CSS/SCHEMA
+  unverändert.
 - **B83 — _skippedCheckIn nach Woche+Tag statt nur Index geschlüsselt
   (train-v200):** Nutzer bat darum, den letzten offenen Nebenfund aus der
   B82-Diagnose-Serie zu fixen. Root Cause war bereits bekannt:

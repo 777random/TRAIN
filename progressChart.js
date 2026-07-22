@@ -164,7 +164,7 @@ export function renderProgressChart(exerciseName, weeks, options = {}) {
     <line x1="${legX}" y1="${legY + 18}" x2="${legX + 18}" y2="${legY + 18}" stroke="#6B7280" stroke-width="1.5" stroke-dasharray="5,3"/>
     <text x="${legX + 22}" y="${legY + 22}" font-size="10" fill="#9CA3AF">Ø</text>`;
 
-  return `<svg viewBox="0 0 ${VBW} ${VBH}" width="100%" height="auto" role="img" aria-label="Gewichtsprogression ${exerciseName}" style="display:block;overflow:visible">
+  return `<svg viewBox="0 0 ${VBW} ${VBH}" width="100%" role="img" aria-label="Gewichtsprogression ${exerciseName}" style="display:block;overflow:visible;height:auto">
   ${gridLines}
   ${corridorFill}
   ${yLabels}
@@ -238,7 +238,7 @@ export function renderBodyWeightChart(points) {
     return `<text x="${xOf(i).toFixed(1)}" y="${VBH - 4}" text-anchor="${anchor}" font-size="10" fill="#6B7280">${h(points[i].label)}</text>`;
   }).join('');
 
-  return `<svg viewBox="0 0 ${VBW} ${VBH}" width="100%" height="auto" role="img" aria-label="Körpergewichtsverlauf" style="display:block;overflow:visible">
+  return `<svg viewBox="0 0 ${VBW} ${VBH}" width="100%" role="img" aria-label="Körpergewichtsverlauf" style="display:block;overflow:visible;height:auto">
   ${gridLines}
   ${yLabels}
   ${linePath}
@@ -321,7 +321,7 @@ export function renderRelativeStrengthChart(points, options = {}) {
     return `<text x="${xOf(i).toFixed(1)}" y="${VBH - 4}" text-anchor="${anchor}" font-size="10" fill="#6B7280">${h(points[i].label)}</text>`;
   }).join('');
 
-  return `<svg viewBox="0 0 ${VBW} ${VBH}" width="100%" height="auto" role="img" aria-label="Relative Stärke Verlauf" style="display:block;overflow:visible">
+  return `<svg viewBox="0 0 ${VBW} ${VBH}" width="100%" role="img" aria-label="Relative Stärke Verlauf" style="display:block;overflow:visible;height:auto">
   ${gridLines}
   ${yLabels}
   ${linePath}
