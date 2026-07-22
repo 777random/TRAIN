@@ -18,8 +18,9 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
   `.set-feedback__line--reverted`)
 - SCHEMA: 32 (unverändert — B91-B94 fügen keine neuen State-Felder hinzu,
   reine sessionCoach.js/ui.js-Logik- und Rendering-Änderungen)
-- Letzter Commit: `8e3871a` (train-v203), gepusht, CI grün (Regression +
-  Lighthouse).
+- Letzter Commit: `5137af9` (docs: Projekt-Umzug-Dokumentation, kein Code),
+  vorheriger Code-Commit `8e3871a` (train-v203), beide gepusht, CI grün
+  (Regression + Lighthouse).
 - **Projekt-Standort verschoben (2026-07-22, keine Code-Änderung):**
   Nutzer meldete vollen OneDrive-Cloud-Speicher. Ursache: `backups/`
   (Milestone-Snapshots, per Konvention nach jedem Sprint erzeugt) war auf

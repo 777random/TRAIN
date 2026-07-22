@@ -2526,3 +2526,16 @@ Kein Commit für Code nötig (keine Code-Änderung) — die Doku-Updates
   (CLAUDE.md/HANDOFF.md/SESSION_LOG.md/context-exports) werden trotzdem
   committed und gepusht, damit der neue Projektpfad für künftige Sessions
   dokumentiert ist.
+
+## 2026-07-22 train-v203
+Loop 1: 10/10 grün ✓ (npx playwright test tests/regression_core.spec.js)
+Loop 2: HANDOFF.md "Letzter Commit" war veraltet (8e3871a, aber neuester
+  Commit ist 5137af9 — reiner Doku-Commit zum Projekt-Umzug) → korrigiert.
+  CACHE_VERSION/CSS/SCHEMA in CLAUDE.md/sw.js/index.html stimmen weiterhin
+  überein (train-v203 / ?v=199 / SCHEMA 32), keine Änderung dort nötig.
+Loop 3: übersprungen — 17 Fixtures ≥ 15, keine UX-Hoch Bugs offen
+Loop 6: übersprungen — letzte Prüfung 2026-07-21, <90 Tage
+Eigentliche Aufgabe: SPRINT C1 (Pausenzeiten validiert) — Schritt 1 der
+  Sprint-Vorlage aufgedeckt, dass `state.settings.goal` nicht existiert.
+  Technische Spec wird erstellt und dem Nutzer zur Bestätigung vorgelegt,
+  bevor implementiert wird (siehe Antwort im Chat).
