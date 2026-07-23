@@ -1110,6 +1110,53 @@ function _templateWeekForNewWeek(weeks) {
 }
 
 /**
+ * Sprint C2 (Teil B): reduziert die Satz-Anzahl jeder nicht-archivierten
+ * Übung der übergebenen Tage auf 60% (min. 2 Sätze) — überzählige Sätze
+ * werden per `s.deloadSkip = true` markiert, NICHT gelöscht (der Athlet
+ * soll sehen was wegfällt). Gewicht bleibt unangetastet (Intensität halten,
+ * Volumen reduzieren, siehe DECISIONS.md/Pritchard et al. 2015). Idempotent:
+ * rekonstruiert deloadSkip immer neu aus ex.sets.length, ein erneuter Aufruf
+ * auf denselben Tagen produziert dasselbe Ergebnis (kein Doppel-Reduzieren).
+ */
+function _applyDeloadReduction(days) {
+  for (const day of days) {
+    for (const ex of day.exercises ?? []) {
+      if (ex.archived) continue;
+      const total = ex.sets.length;
+      const target = Math.min(total, Math.max(2, Math.round(total * 0.6)));
+      ex.sets.forEach((s, si) => { s.deloadSkip = si >= target; });
+    }
+  }
+}
+
+/** Letzte Woche vor einer Deload-Woche (rückwärts, schließt Deload/Urlaub/Seed-Wochen aus) — für den Restore nach der Deload-Woche (Sprint C2 Teil B). */
+function _findPreDeloadWeek(weeks) {
+  const sorted = _sortWeeksChrono(weeks);
+  for (let i = sorted.length - 1; i >= 0; i--) {
+    const w = sorted[i];
+    if (w.mode !== 'deload' && w.mode !== 'vacation' && !w.isSeedWeek) return w;
+  }
+  return null;
+}
+
+/**
+ * Gemeinsame Klon-Quellen-Auflösung für WEEK_CREATE(source:'prev') UND
+ * AUTO_WEEK_CREATE (Sprint C2 Teil B) — ein einziger Ort statt zweier
+ * Kopien, die sonst auseinanderdriften könnten. War die Vorlagen-Woche
+ * selbst eine Deload-Woche, wird stattdessen aus der Woche VOR dem Deload
+ * geklont (originale Satz-Anzahl/Gewichte, siehe DECISIONS.md) statt aus
+ * der reduzierten Deload-Woche selbst.
+ */
+function _resolveWeekCloneSource(weeks) {
+  const templateWeek = _templateWeekForNewWeek(weeks);
+  const pendingDeload = !!templateWeek?.deloadPlannedForNext;
+  const cloneSourceWeek = templateWeek?.mode === 'deload'
+    ? (_findPreDeloadWeek(weeks) ?? templateWeek)
+    : templateWeek;
+  return { templateWeek, cloneSourceWeek, pendingDeload };
+}
+
+/**
  * INVARIANT: state.weeks must always be sorted chronologically by startDate.
  * Every piece of code that does "curIdx - 1" / "curIdx + 1" / "weeks.length-1"
  * to mean "the previous/next/latest week" (WEEK_COPY_PREV, the Next-button
@@ -1200,6 +1247,7 @@ export const A = Object.freeze({
   WEEK_DELETE:         'WEEK_DELETE',         // { weekIdx?: number }  — omit to delete curIdx
   WEEK_COPY_PREV:      'WEEK_COPY_PREV',      // {}
   WEEK_SET_MODE:       'WEEK_SET_MODE',       // { mode: 'standard'|'deload'|'vacation' }
+  DELOAD_APPLY:        'DELOAD_APPLY',        // { weekIdx?, when: 'now'|'next' } – Sprint C2 Teil B: Volumen-Deload (Sätze reduzieren, Gewicht unverändert)
   WEEK_SET_NOTE:       'WEEK_SET_NOTE',       // { note }
   WEEK_SET_LABEL:      'WEEK_SET_LABEL',      // { label: string }
   // Day
@@ -1304,16 +1352,26 @@ export const A = Object.freeze({
  * Reduziert alle noch `pending` Sätze mit Gewicht>0 eines Tages um 10%,
  * gerundet auf die pro-Übung-Schrittweite. Gemeinsam genutzt von
  * SESSION_CHECKIN_SET (automatisch, bei Check-in-Abgabe mit modifier=
- * 'reduced') und DAY_REDUCE_PENDING_WEIGHTS (manueller Catch-up-Button,
- * B87 Fix 3) — identische Formel, ein einziger Ort.
+ * 'reduced'/'reduced_mild') und DAY_REDUCE_PENDING_WEIGHTS (manueller
+ * Catch-up-Button, B87 Fix 3) — identische Formel, ein einziger Ort.
+ *
+ * Seit Sprint C2 (Teil A): -5% statt -10% bei 'reduced_mild' (einmalig
+ * schlechter Schlaf), sowie optionaler Compound-Scope für 'reduced'
+ * (kumulierter Schlafmangel/niedrige Energie — nur Compound-Übungen, siehe
+ * DECISIONS.md). `compoundNames` kommt vom Aufrufer (ui.js, bereits
+ * movementMap.js importiert) als Liste von Übungsnamen — state.js bleibt
+ * dadurch importfrei (Muster wie Sprint C1).
  */
-function _reducePendingWeights(day) {
+function _reducePendingWeights(day, modifier, scope, compoundNames) {
+  const pct = modifier === 'reduced_mild' ? 0.95 : 0.9;
+  const compoundSet = new Set(compoundNames ?? []);
   for (const ex of day.exercises ?? []) {
     if (ex.archived) continue;
+    if (scope === 'compound' && !compoundSet.has(ex.name)) continue;
     const step = ex.weightStep || 2.5;
     for (const s of ex.sets ?? []) {
       if (s.status === 'pending' && (s.weight ?? 0) > 0) {
-        s.weight = Math.round((s.weight * 0.9) / step) * step;
+        s.weight = Math.round((s.weight * pct) / step) * step;
       }
     }
   }
@@ -1333,6 +1391,7 @@ function _resetClonedDays(days) {
     day.energyLevel     = null;
     day.sessionCheckIn  = null; // B76: Vorwoche-Check-in darf nicht mitgeklont werden
     day.sessionModifier = null;
+    day.sessionModifierScope = null; // Sprint C2 Teil A
     (day.exercises ?? []).forEach(ex => {
       if (ex._showCfg) ex._showCfg = false;
       if (ex.substituteFor) ex.name = ex.substituteFor;
@@ -1342,6 +1401,7 @@ function _resetClonedDays(days) {
         s.done   = false;
         s.reps   = null;
         s.rpe    = null;
+        s.deloadSkip = false; // Sprint C2 Teil B — nie aus einer geklonten Vorwoche übernehmen (Normalfall: cloneSourceWeek ist ohnehin nie die Deload-Woche selbst, siehe _resolveWeekCloneSource; dies ist der Fallback-Schutz, falls keine Vor-Deload-Woche gefunden wird)
       });
     });
   });
@@ -1471,9 +1531,16 @@ function reduce(state, action) {
       const source = p.source === 'template' ? 'template' : 'prev';
 
       let days;
+      let templateWeek = null, pendingDeload = false;
       if (source === 'prev' && state.weeks.length > 0) {
-        const lastWeek = _templateWeekForNewWeek(state.weeks);
-        days = clone(lastWeek.days);
+        // Sprint C2 (Teil B): war die Vorlagen-Woche eine Deload-Woche, wird
+        // stattdessen aus der Woche VOR dem Deload geklont (originale
+        // Satz-Anzahl/Gewichte, siehe DECISIONS.md) statt aus der reduzierten
+        // Deload-Woche selbst.
+        const resolved = _resolveWeekCloneSource(state.weeks);
+        templateWeek = resolved.templateWeek;
+        pendingDeload = resolved.pendingDeload;
+        days = clone(resolved.cloneSourceWeek.days);
         _applyPlannedProgression(days);
       } else {
         // Explicit restart: load global template as-is (no auto-progression mapping)
@@ -1484,9 +1551,16 @@ function reduce(state, action) {
 
       _resetClonedDays(days);
 
+      let newMode = 'standard';
+      if (pendingDeload) {
+        _applyDeloadReduction(days);
+        newMode = 'deload';
+        templateWeek.deloadPlannedForNext = false; // Marker konsumiert -- verhindert Stale-Re-Trigger nach WEEK_DELETE
+      }
+
       const newWeek = {
         id: Date.now(), startDate: p.startDate, note: p.note ?? '',
-        mode: 'standard', days, sessionLog: [], bodyData: {}, restDays: [],
+        mode: newMode, days, sessionLog: [], bodyData: {}, restDays: [],
       };
       state.weeks.push(newWeek);
       _resortWeeksKeepingCurrent(state, newWeek);
@@ -1510,17 +1584,30 @@ function reduce(state, action) {
       if (!p.startDate) break;
       if (state.weeks.find(w => w.startDate === p.startDate)) break; // dedupe
       if (!state.weeks.length) break; // braucht eine Vorwoche als Vorlage
-      const lastWeek = _templateWeekForNewWeek(state.weeks);
-      const days = clone(lastWeek.days);
+      // Sprint C2 (Teil B): dieselbe Klon-Quellen-Auflösung wie WEEK_CREATE
+      // (source:'prev') — eine für "Nächste Woche" geplante Deload-Reduktion
+      // greift bewusst auch hier (die Entscheidung wurde bereits beim Klick
+      // auf "Nächste Woche" getroffen, anders als eine automatische
+      // GEWICHTSSTEIGERUNG, die hier nie still angewendet wird — siehe
+      // DECISIONS.md).
+      const { templateWeek, cloneSourceWeek, pendingDeload } = _resolveWeekCloneSource(state.weeks);
+      const days = clone(cloneSourceWeek.days);
       days.forEach(d => (d.exercises ?? []).forEach(ex => {
         ex.nextWeekPlan = 0;
         ex.nextWeekPlanConfirmed = false;
       }));
       _resetClonedDays(days);
 
+      let newMode = 'standard';
+      if (pendingDeload) {
+        _applyDeloadReduction(days);
+        newMode = 'deload';
+        templateWeek.deloadPlannedForNext = false;
+      }
+
       const newWeek = {
         id: Date.now(), startDate: p.startDate, note: '',
-        mode: 'standard', days, sessionLog: [], bodyData: {}, restDays: [],
+        mode: newMode, days, sessionLog: [], bodyData: {}, restDays: [],
       };
       state.weeks.push(newWeek);
       _resortWeeksKeepingCurrent(state, newWeek);
@@ -1576,6 +1663,21 @@ function reduce(state, action) {
       }
       break;
     }
+    // Sprint C2 (Teil B, Pritchard et al. 2015): Deload reduziert Volumen
+    // (Satz-Anzahl), nicht Intensität (Gewicht) — evidenzbasiert wirksamer
+    // für Krafterhalt. `when:'now'` reduziert sofort die heute noch offenen
+    // (nicht markedDone) Tage der aktuellen Woche und markiert die Woche als
+    // Deload; `when:'next'` merkt den Wunsch nur vor, angewendet erst bei der
+    // nächsten Wochenerstellung (WEEK_CREATE/AUTO_WEEK_CREATE, siehe dort).
+    case A.DELOAD_APPLY: {
+      const idx = p.weekIdx ?? state.curIdx;
+      const wk = state.weeks[idx]; if (!wk) break;
+      if (p.when === 'next') { wk.deloadPlannedForNext = true; break; }
+      const openDays = wk.days.filter(d => !d.markedDone);
+      _applyDeloadReduction(openDays);
+      wk.mode = 'deload';
+      break;
+    }
     case A.WEEK_SET_NOTE: {
       const wk = _currentWeek(); if (!wk) break;
       wk.note = p.note;
@@ -1608,6 +1710,7 @@ function reduce(state, action) {
         energyLevel:    null,
         sessionCheckIn:  null,
         sessionModifier: null,
+        sessionModifierScope: null,
         exercises:      [],
       });
       break;
@@ -1630,9 +1733,10 @@ function reduce(state, action) {
         energyLevel:    null,
         sessionCheckIn:  null,
         sessionModifier: null,
+        sessionModifierScope: null,
         exercises:  srcDay ? srcDay.exercises.map(ex => ({
           ...JSON.parse(JSON.stringify(ex)),
-          sets: ex.sets.map(s => ({ ...s, status: 'pending', done: false })),
+          sets: ex.sets.map(s => ({ ...s, status: 'pending', done: false, deloadSkip: false })),
         })) : [],
       };
       wk.days.push(newDay);
@@ -1806,14 +1910,17 @@ function reduce(state, action) {
     }
 
     // B76: Pre-Session Check-in — der Reducer entscheidet NICHT selbst über
-    // den Modifier (Schlaf/Energie → 'reduced'/'normal'/'optimal'), das
-    // passiert bereits in ui.js' _buildSessionBriefing() und wird hier nur
-    // mechanisch angewendet. Bei 'reduced' werden die noch nicht bewerteten
-    // ('pending') Gewichtssätze der heutigen Übungen einmalig um 10%
-    // reduziert und auf die pro Übung eingestellte Schrittweite gerundet —
-    // bewusst NICHT über getWeightRecommendation() (die betrifft nur die
-    // Steigerungsempfehlung für die NÄCHSTE Woche, nicht die bereits
-    // gesetzten Gewichte der laufenden Session).
+    // den Modifier (Schlaf/Energie → 'reduced'/'reduced_mild'/'normal'/
+    // 'optimal'), das passiert bereits in ui.js' _buildSessionBriefing() und
+    // wird hier nur mechanisch angewendet. Bei 'reduced'/'reduced_mild'
+    // werden die noch nicht bewerteten ('pending') Gewichtssätze der
+    // heutigen Übungen einmalig reduziert und auf die pro Übung eingestellte
+    // Schrittweite gerundet — bewusst NICHT über getWeightRecommendation()
+    // (die betrifft nur die Steigerungsempfehlung für die NÄCHSTE Woche,
+    // nicht die bereits gesetzten Gewichte der laufenden Session). Seit
+    // Sprint C2 (Teil A): modifierScope ('compound'|'all') + compoundExer-
+    // ciseNames (von ui.js berechnet, siehe DECISIONS.md) steuern, ob nur
+    // Compound-Übungen oder alle betroffen sind.
     case A.SESSION_CHECKIN_SET: {
       const day = _currentWeek()?.days[p.di]; if (!day) break;
       day.sessionCheckIn = {
@@ -1822,20 +1929,26 @@ function reduce(state, action) {
         timestamp: Date.now(),
       };
       day.sessionModifier = p.modifier ?? 'normal';
-      if (p.modifier === 'reduced') _reducePendingWeights(day);
+      day.sessionModifierScope = p.modifierScope ?? 'all';
+      if (p.modifier === 'reduced' || p.modifier === 'reduced_mild') {
+        _reducePendingWeights(day, p.modifier, p.modifierScope, p.compoundExerciseNames);
+      }
       break;
     }
 
-    // B87 Fix 3: manueller Catch-up für die -10%-Reduktion, z.B. für eine
-    // Übung die ERST NACH der Check-in-Abgabe zum Tag hinzugefügt wurde (die
-    // automatische Reduktion oben lief zu diesem Zeitpunkt schon und sah sie
-    // nie). Ein einziger Dispatch für den ganzen Tag (nicht pro Satz) — sonst
-    // würde Rückgängig nur den zuletzt geänderten Satz zurückdrehen, nicht
-    // den ganzen Klick. ui.js prüft per localStorage-Flag, dass dieser
-    // Dispatch nur einmal pro Tag ausgelöst wird.
+    // B87 Fix 3: manueller Catch-up für die Tagesform-Reduktion, z.B. für
+    // eine Übung die ERST NACH der Check-in-Abgabe zum Tag hinzugefügt wurde
+    // (die automatische Reduktion oben lief zu diesem Zeitpunkt schon und
+    // sah sie nie). Ein einziger Dispatch für den ganzen Tag (nicht pro
+    // Satz) — sonst würde Rückgängig nur den zuletzt geänderten Satz
+    // zurückdrehen, nicht den ganzen Klick. ui.js prüft per localStorage-
+    // Flag, dass dieser Dispatch nur einmal pro Tag ausgelöst wird. Seit
+    // Sprint C2: nutzt denselben Modifier/Scope wie der ursprüngliche
+    // Check-in (day.sessionModifier/sessionModifierScope), nicht mehr
+    // hartcodiert -10%/alle Übungen.
     case A.DAY_REDUCE_PENDING_WEIGHTS: {
       const day = _currentWeek()?.days[p.di]; if (!day) break;
-      _reducePendingWeights(day);
+      _reducePendingWeights(day, day.sessionModifier, day.sessionModifierScope ?? 'all', p.compoundExerciseNames);
       break;
     }
 

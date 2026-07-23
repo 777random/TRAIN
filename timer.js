@@ -663,7 +663,7 @@ function _bindAppInteractions() {
           let pauseSec = ex?.pauseSec ?? 90;
           if (newState.settings?.sessionCoach !== false) {
             const isCompound = newEx ? isCompoundExercise(newEx.name, buildCategoryMap(newState.customExercises)) : true;
-            const fb = buildSetFeedback(newSet, newEx, newDay?.sessionModifier ?? null, +doneBtn.dataset.si, newState.settings?.goal ?? null, isCompound);
+            const fb = buildSetFeedback(newSet, newEx, newDay?.sessionModifier ?? null, +doneBtn.dataset.si, newState.settings?.goal ?? null, isCompound, newDay?.sessionModifierScope ?? 'all');
             if (fb?.pauseSec) pauseSec = fb.pauseSec;
           }
           window.dispatchEvent(new CustomEvent('train:set-done', {

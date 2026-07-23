@@ -344,13 +344,21 @@ test('Compound/Isolation-Signal erscheint NICHT bei >=60% Compound', async ({ pa
 function buildDeloadWeeks() {
   const weeks = [];
   for (let i = 0; i < 9; i++) {
-    const day = mkDay({ exercises: [mkEx({ name: 'Kniebeuge', sets: [mkSet(100 + i * 2.5, 5, 'success', 8.5)], weightStep: 5 })] });
+    // Letzte (aktuelle) Woche bekommt 5 Sätze -- damit die Deload-Plan-
+    // Vorschau (Sprint C2 Teil B: Sätze statt Gewicht) eine echte Reduktion
+    // zeigt; die 8 Vorwochen (1 Satz) bleiben unverändert für den Volumen-/
+    // RPE-Trend, der das deload_preventive-Signal auslöst.
+    const isLast = i === 8;
+    const sets = isLast
+      ? Array.from({ length: 5 }, () => mkSet(120, 5, 'success', 8.5))
+      : [mkSet(100 + i * 2.5, 5, 'success', 8.5)];
+    const day = mkDay({ exercises: [mkEx({ name: 'Kniebeuge', sets, weightStep: 5 })] });
     weeks.push(mkWeek({ id: i + 1, startDate: weeksAgoISO(8 - i), days: [day] }));
   }
   return weeks;
 }
 
-test('Deload-Plan zeigt konkrete Gewichte, "Plan übernehmen" setzt nextWeekPlan-Deltas', async ({ page }) => {
+test('Deload-Plan zeigt konkrete Sätze, "Diese Woche" reduziert Sätze sofort ohne Gewichtsänderung', async ({ page }) => {
   const pageErrors = [];
   page.on('pageerror', err => pageErrors.push(err.message));
   await page.goto('/');
@@ -361,19 +369,48 @@ test('Deload-Plan zeigt konkrete Gewichte, "Plan übernehmen" setzt nextWeekPlan
 
   await page.click('[data-tab="coach"]');
   await expect(page.locator('.deload-plan-card')).toBeVisible();
-  await expect(page.locator('.deload-plan-card')).toContainText('DELOAD-PLAN NÄCHSTE WOCHE');
+  await expect(page.locator('.deload-plan-card')).toContainText('DELOAD-PLAN');
 
-  // letztes Gewicht: 100 + 8*2.5 = 120kg, deloadFactor 0.75 -> 90kg (Schritt 5)
-  await expect(page.locator('.deload-plan-row')).toContainText('120kg → 90kg');
+  // 5 Sätze, Ziel Math.round(5*0.6)=3 -> "5 Sätze → 3 Sätze"
+  await expect(page.locator('.deload-plan-row')).toContainText('5 Sätze → 3 Sätze');
 
   await page.click('[data-action="apply-deload-plan"]');
-  const ex = await page.evaluate(() => {
+  await expect(page.locator('#deload-choice-modal')).toBeVisible();
+  await page.click('[data-deload="now"]');
+
+  const wk = await page.evaluate(() => {
     const st = JSON.parse(localStorage.getItem('train_v6'));
-    const wk = st.weeks[st.curIdx];
-    return wk.days[0].exercises[0];
+    return st.weeks[st.curIdx];
   });
-  expect(ex.nextWeekPlan).toBe(-30); // 90 - 120
-  expect(ex.nextWeekPlanConfirmed).toBe(true);
+  expect(wk.mode).toBe('deload');
+  const sets = wk.days[0].exercises[0].sets;
+  expect(sets.map(s => s.deloadSkip ?? false)).toEqual([false, false, false, true, true]);
+  // Gewicht bleibt unverändert (Intensität halten, Volumen reduzieren)
+  expect(sets.every(s => s.weight === 120)).toBe(true);
+
+  expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});
+
+test('Deload-Plan "Nächste Woche" plant nur vor, aktuelle Woche bleibt unangetastet', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', err => pageErrors.push(err.message));
+  await page.goto('/');
+  await page.waitForSelector('#app.is-ready', { timeout: 10000 });
+
+  const weeks = buildDeloadWeeks();
+  await seed(page, weeks, weeks.length - 1, { deloadFactor: 0.75 });
+
+  await page.click('[data-tab="coach"]');
+  await page.click('[data-action="apply-deload-plan"]');
+  await page.click('[data-deload="next"]');
+
+  const wk = await page.evaluate(() => {
+    const st = JSON.parse(localStorage.getItem('train_v6'));
+    return st.weeks[st.curIdx];
+  });
+  expect(wk.mode).toBe('standard');
+  expect(wk.deloadPlannedForNext).toBe(true);
+  expect(wk.days[0].exercises[0].sets.some(s => s.deloadSkip)).toBe(false);
 
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
 });

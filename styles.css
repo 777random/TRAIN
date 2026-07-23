@@ -820,6 +820,7 @@ exercise { position: unset; }
 .set-header span:first-child { text-align: left; }
 .set-row { padding: 3px 0; }
 .set-row + .set-row { border-top: 1px solid rgba(46,46,53,.5); }
+.set-row--deload-skip { opacity: .55; } /* Sprint C2 (Teil B) — Satz strukturell diese Woche übersprungen */
 .set-idx { font-size: 11px; color: var(--c-text-3); padding-top: 8px; }
 
 .set-cell { display: flex; flex-direction: column; gap: 2px; }

@@ -162,7 +162,13 @@ test('B83: "Überspringen" in einer Woche überspringt NICHT den Check-in der n�
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
 });
 
-test('Schlecht geschlafen -> modifier reduced, Gewichte -10% gerundet auf weightStep, RPE-Ziel -1', async ({ page }) => {
+test('Schlecht geschlafen, einmalig (keine kumulierte Historie) -> modifier reduced_mild, Gewichte -5% gerundet auf weightStep, RPE-Ziel -0.5', async ({ page }) => {
+  // Sprint C2 (Teil A): eine einzelne schlechte Nacht ohne kumulierten Befund
+  // (2 von 3 letzten Trainingstagen mit schlechtem Schlaf) löst nur noch die
+  // milde Reduktion aus -- die alte, immer volle "-10%"-Reaktion auf JEDE
+  // schlechte Nacht ist durch die sportwissenschaftliche Validierung ersetzt.
+  // Die volle Compound-Reduktion (kumuliert) wird in
+  // tests/tagesform_differenziert.spec.js getestet.
   const pageErrors = [];
   page.on('pageerror', err => pageErrors.push(err.message));
   await page.goto('/');
@@ -172,14 +178,15 @@ test('Schlecht geschlafen -> modifier reduced, Gewichte -10% gerundet auf weight
   await page.click('[data-action="session-checkin-select"][data-field="sleep"][data-val="poor"]');
   await page.click('[data-action="session-checkin-select"][data-field="energyPre"][data-val="medium"]');
 
-  await expect(page.locator('.session-briefing-card__msg')).toContainText('Heute reduzieren');
-  await expect(page.locator('.session-briefing-card__focus')).toContainText('RPE 7'); // 8 - 1
+  await expect(page.locator('.session-briefing-card__msg')).toContainText('Leicht reduzieren heute — Gewichte -5%');
+  await expect(page.locator('.session-briefing-card__focus')).toContainText('RPE 7.5'); // 8 - 0.5
 
   const day = await page.evaluate(() => JSON.parse(localStorage.getItem('train_v6')).weeks.at(-1).days[0]);
-  expect(day.sessionModifier).toBe('reduced');
-  // 80kg * 0.9 = 72, gerundet auf weightStep 5 -> 70
-  expect(day.exercises[0].sets[0].weight).toBe(70);
-  expect(day.exercises[0].sets[1].weight).toBe(70);
+  expect(day.sessionModifier).toBe('reduced_mild');
+  expect(day.sessionModifierScope).toBe('all');
+  // 80kg * 0.95 = 76, gerundet auf weightStep 5 -> 75
+  expect(day.exercises[0].sets[0].weight).toBe(75);
+  expect(day.exercises[0].sets[1].weight).toBe(75);
 
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
 });

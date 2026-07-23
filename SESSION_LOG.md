@@ -2558,3 +2558,31 @@ Loop 9: for-advisor-ux.txt unverändert (B95 ist keine Onboarding-Flow-Änderung
 Loop 10: for-advisor-growth.txt unverändert (keine neuen Growth-Erkenntnisse)
 Loop 11: for-advisor-consolidated.txt unverändert (keine der 4 Quellen mit
   substanziell neuem Inhalt für die konsolidierte Fassung)
+
+## 2026-07-23 (Fortsetzung) train-v205
+Eigentliche Aufgabe: SPRINT C2 (Gewichtsreduktion validiert) — /plan-Modus:
+  3 parallele Explore-Agenten (Teil A/B/C Code-Recherche) + 1 Plan-Agent
+  für den Implementierungsplan. Größte aufgedeckte Diskrepanz: der
+  bestehende "Plan übernehmen"-Button setzte nur einen Gewichts-Delta für
+  die NÄCHSTE Woche, wk.mode='deload' war komplett unabhängig davon gesetzt
+  — nach Rückfrage (AskUserQuestion, 4 Fragen) neu konzipiert: Wahl
+  "Diese Woche"/"Nächste Woche" per Popup, Satz-Reduktion statt
+  Gewichtsreduktion, gesperrte/ausgegraute deloadSkip-Sätze, Auto-Rollover
+  wendet aufgeschobene Deloads mit an. Plan-Datei
+  C:\Users\joojo\.claude\plans\shiny-pondering-flask.md, vom Nutzer
+  genehmigt. Umsetzung: state.js (DELOAD_APPLY, _applyDeloadReduction,
+  _findPreDeloadWeek, _resolveWeekCloneSource, _reducePendingWeights-
+  Erweiterung, WEEK_CREATE/AUTO_WEEK_CREATE), ui.js (_isCumulativeSleepDeficit,
+  _buildSessionBriefing, _showDeloadChoicePopup, _buildDeloadPlanRows,
+  renderSetRow, _getDayCompletionStats, _detectReentryPause), sessionCoach.js
+  (_applyModifier/buildSetFeedback +Scope-Parameter), styles.css
+  (.set-row--deload-skip). 16 neue Tests (tests/tagesform_differenziert.spec.js,
+  tests/deload_volumen.spec.js, tests/reentry_faktoren.spec.js) + 3
+  bestehende Tests angepasst (geänderte Modifier-Werte/Deload-Vorschau).
+  Volle Suite grün. CACHE_VERSION train-v204->v205, CSS ?v=199->200, SCHEMA
+  unverändert. HANDOFF.md/BUGS.md (B96)/DECISIONS.md (5 neue Einträge mit
+  Quellenangaben)/CLAUDE.md aktualisiert. Lokal committet, Push steht noch
+  aus. Research/TRAIN_Parameter_Review.md (Nutzer-Recherche) bewusst
+  uncommitted gelassen (Nutzer-Entscheidung).
+Loop 5: for-advisor.txt sollte am Sitzungsende aktualisiert werden (siehe
+  nächste Session, falls diese hier vor dem regulären Sitzungsende endet)

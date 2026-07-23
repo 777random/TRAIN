@@ -26,10 +26,22 @@ function _round(weight, step) {
  * 6.5-7.9) weiterhin ungeschützt durch die Dämpfung fallen (98kg halten
  * wurde zu 95kg reduziert, obwohl der Hinweistext "Gute Intensität" keine
  * Reduzierung meint). B91 korrigiert den Vergleich auf `>=`.
+ *
+ * Seit Sprint C2 (Teil A): 'reduced_mild' (einmalig schlechter Schlaf, -5%)
+ * neben 'reduced' (kumuliert/Energie niedrig, -10%). 'reduced' respektiert
+ * zusätzlich den Compound/Isolation-Scope (modifierScope/isCompound) —
+ * konsistent mit der Pre-Session-Reduktion (_reducePendingWeights, state.js):
+ * eine Isolationsübung wird bei modifierScope==='compound' NICHT gedämpft.
  */
-function _applyModifier(nextWeight, currentWeight, sessionModifier, step) {
-  if (sessionModifier !== 'reduced' || nextWeight >= currentWeight) return nextWeight;
-  return Math.max(nextWeight * 0.9, currentWeight - step);
+function _applyModifier(nextWeight, currentWeight, sessionModifier, step, modifierScope, isCompound) {
+  if (nextWeight >= currentWeight) return nextWeight;
+  if (sessionModifier === 'reduced' && (modifierScope !== 'compound' || isCompound)) {
+    return Math.max(nextWeight * 0.9, currentWeight - step);
+  }
+  if (sessionModifier === 'reduced_mild') {
+    return Math.max(nextWeight * 0.95, currentWeight - step);
+  }
+  return nextWeight;
 }
 
 /**
@@ -95,9 +107,10 @@ export function _pauseSecForRpe(rpe, goal, isCompound) {
  * @param {number} si              Index von `s` in ex.sets — für die Satz-zu-Satz-RPE-Trend-Erkennung
  * @param {string|null} goal       state.settings.goal ('kraftaufbau'|'muskelaufbau'|'fitness'|null)
  * @param {boolean} isCompound     movementMap.js isCompoundExercise(ex.name, categoryMap) — vom Aufrufer bestimmt (sessionCoach.js bleibt importfrei)
+ * @param {string} modifierScope   day.sessionModifierScope ('compound'|'all', Sprint C2 Teil A) — steuert ob 'reduced' auch Isolationsübungen dämpft
  * @returns {{ nextWeight: number, pauseSec: number|null, hint: string|null, repDiff: number|null, rpe: number|null, rpeZone: string|null, reps: number, targetReps: number, unit: string } | null}
  */
-export function buildSetFeedback(s, ex, sessionModifier, si, goal = null, isCompound = true) {
+export function buildSetFeedback(s, ex, sessionModifier, si, goal = null, isCompound = true, modifierScope = 'all') {
   if (!s || (s.status !== 'success' && s.status !== 'fail')) return null;
   const step = ex.weightStep || 2.5;
   const currentWeight = s.weight ?? 0;
@@ -113,7 +126,7 @@ export function buildSetFeedback(s, ex, sessionModifier, si, goal = null, isComp
   // keine RPE-Bänder, gegen die repDiff sinnvoll kombiniert werden könnte.
   if (rpe == null) {
     let nextWeight = s.status === 'success' ? currentWeight : currentWeight - step;
-    nextWeight = _applyModifier(nextWeight, currentWeight, sessionModifier, step);
+    nextWeight = _applyModifier(nextWeight, currentWeight, sessionModifier, step, modifierScope, isCompound);
     return { nextWeight: _round(nextWeight, step), pauseSec: null, hint: null, repDiff: null, rpe: null, rpeZone: null, reps, targetReps, unit };
   }
 
@@ -172,7 +185,7 @@ export function buildSetFeedback(s, ex, sessionModifier, si, goal = null, isComp
   }
 
   const rpeZone = rpe <= 6 ? 'leicht' : rpe < 8.5 ? 'optimal' : 'hart';
-  nextWeight = _applyModifier(nextWeight, currentWeight, sessionModifier, step);
+  nextWeight = _applyModifier(nextWeight, currentWeight, sessionModifier, step, modifierScope, isCompound);
   return { nextWeight: _round(nextWeight, step), pauseSec, hint, repDiff, rpe, rpeZone, reps, targetReps, unit };
 }
 

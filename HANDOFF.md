@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-23 — Sprint C1 (Pausenzeiten nach Trainingsziel + Übungstyp), train-v204, siehe unten.*
-*Nächster Schritt: Push dieses Sprints steht noch aus (Bestätigung ausstehend, siehe Push-Policy LOOPS.md). B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md) — braucht Name+Adresse+E-Mail vom Nutzer. B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten — weiterhin blockiert auf echte GoatCounter-Telemetrie (`js_error:`-Events im Dashboard prüfen). Aktuell keine weiteren offenen Bugs außer B55/B66. Möglicher Folge-Sprint (nicht angefordert): B79 (`_checkCompoundIsolationBalance`) auf die neue `isCompoundExercise()` umstellen, siehe DECISIONS.md. Loops 7-11 aktiv: Advisor-Exports werden am Ende jeder Session automatisch aktualisiert. for-advisor-consolidated.txt = Startpunkt für neue externe Chats.*
+*Letzte Aktualisierung: 2026-07-23 — Sprint C2 (Gewichtsreduktion validiert: Tagesform/Deload/Wiedereinstieg), train-v205, siehe unten. Sprint C1 (train-v204, Pausenzeiten) ist bereits gepusht und CI-grün (Commit `2c56877`).*
+*Nächster Schritt: Push dieses Sprints (C2) steht noch aus (Bestätigung ausstehend, siehe Push-Policy LOOPS.md). B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md) — braucht Name+Adresse+E-Mail vom Nutzer. B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten — weiterhin blockiert auf echte GoatCounter-Telemetrie (`js_error:`-Events im Dashboard prüfen). Aktuell keine weiteren offenen Bugs außer B55/B66. Möglicher Folge-Sprint (nicht angefordert): B79 (`_checkCompoundIsolationBalance`) auf die neue `isCompoundExercise()` umstellen, siehe DECISIONS.md. Loops 7-11 aktiv: Advisor-Exports werden am Ende jeder Session automatisch aktualisiert. for-advisor-consolidated.txt = Startpunkt für neue externe Chats. Nicht committet: `Research/TRAIN_Parameter_Review.md` (Nutzer-Recherche, bewusst uncommitted gelassen, siehe Sprint-C2-Sitzung).*
 
 ---
 
@@ -11,17 +11,45 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v204 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v205 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
-- CSS: ?v=199 (unverändert — Sprint C1 nutzt ausschließlich bestehende
-  Klassen, siehe unten)
-- SCHEMA: 32 (unverändert — `settings.goal` wurde additiv im
-  Always-apply-defaults-Block ergänzt, kein versionierter Migrations-Case
-  nötig)
+- CSS: ?v=200 (neue `.set-row--deload-skip`-Regel)
+- SCHEMA: 32 (unverändert — alle neuen Felder dieses Sprints
+  (`sessionModifierScope`, `deloadSkip`, `deloadPlannedForNext`) sind
+  optionale/sparse Felder mit sicherem Default bei Abwesenheit, kein
+  versionierter Migrations-Case nötig)
 - Letzter Commit: lokal committet, Push steht noch aus (siehe „Nächster
-  Schritt" oben). Vorheriger gepushter Commit `5137af9` (docs: Projekt-Umzug),
-  davor `8e3871a` (train-v203).
+  Schritt" oben). Vorheriger gepushter Commit `2c56877` (train-v204,
+  Sprint C1), davor `67fc834`/`5137af9`.
+- **B96 — Gewichtsreduktion validiert (Sprint C2, train-v205):** drei
+  unabhängige Teile, sportwissenschaftlich validiert (Knowles et al. 2018,
+  Bell et al. 2024, Bosquet et al. 2013, Pritchard et al. 2015 — siehe
+  Research/TRAIN_Parameter_Review.md und DECISIONS.md für vollständige
+  Quellenangaben je Parameter).
+  **Teil A (Tagesform):** `_isCumulativeSleepDeficit()` (ui.js) unterscheidet
+  einmalig schlechten Schlaf (neuer Modifier `reduced_mild`, -5%, alle
+  Übungen) von kumuliertem Schlafmangel/niedriger Energie (`reduced`, jetzt
+  -10% NUR bei Compound-Übungen, `modifierScope`-Feld). Intra-Session-Coach
+  respektiert denselben Scope (nach Rückfrage).
+  **Teil B (Deload):** grundlegend umgebaut — reduziert jetzt Volumen
+  (Satz-Anzahl, `s.deloadSkip`) statt Intensität (Gewicht). **Blockierende
+  Diskrepanz zur Vorlage aufgedeckt:** der bestehende "Plan übernehmen"-Button
+  setzte bisher nur einen Gewichts-Delta für die NÄCHSTE Woche, `wk.mode=
+  'deload'` war komplett unabhängig davon (manuelles Wochen-Menü) — nach
+  Rückfrage: Button öffnet jetzt eine Wahl "Diese Woche" (sofort, nur die
+  heute noch offenen Tage) / "Nächste Woche" (aufgeschoben, auch bei
+  automatischer Montags-Wocherstellung). Neue Woche NACH einer Deload-Woche
+  klont aus der Woche VOR dem Deload (`_findPreDeloadWeek()`). Deload-Sätze
+  sind gesperrt+ausgegraut mit "Deload"-Badge, zählen nicht als verpasst.
+  **Teil C (Wiedereinstieg):** `_detectReentryPause()` (ui.js) — untere zwei
+  Zeitfenster abgeschwächt (8-14 Tage: -10%→-5%, 15-28 Tage: -15%→-10%).
+  **Korrektur:** Vorlage nahm für die oberste Stufe fälschlich -30% als
+  aktuellen Wert an — real bereits -25%, keine Änderung nötig.
+  16 neue Tests (`tests/tagesform_differenziert.spec.js`,
+  `tests/deload_volumen.spec.js`, `tests/reentry_faktoren.spec.js`) + 3
+  bestehende Tests angepasst. Volle Suite grün. CACHE_VERSION
+  train-v204→v205, CSS ?v=199→200, SCHEMA unverändert.
 - **B95 — Pausenzeiten nach Trainingsziel + Übungstyp (Sprint C1, train-v204):**
   Nutzer-Anfrage mit vorgegebener, sportwissenschaftlich validierter Tabelle
   (de Salles et al. 2009, Schoenfeld et al. 2016, Grgic et al. 2017/2018),

@@ -1138,26 +1138,64 @@ function _isTodayDay(wk, di) {
 }
 
 /**
+ * Sprint C2 (Teil A, Knowles et al. 2018): unterscheidet einmalig schlechten
+ * Schlaf (kaum Kraftverlust laut Studienlage) von kumulierter Schlafrestrik-
+ * tion (2 von 3 letzten abgeschlossenen Trainingstagen mit schlechtem
+ * Schlaf) — nur letztere rechtfertigt die volle Compound-Reduktion. Prüft
+ * sowohl das ältere `sleepHours`-Feld (Post-Session) als auch das neuere
+ * `sessionCheckIn.sleep` (Pre-Session) — beide sind unabhängige Quellen für
+ * dasselbe Signal "schlecht geschlafen an diesem Tag".
+ */
+function _isCumulativeSleepDeficit(state) {
+  const recentDays = state.weeks.flatMap(w => w.days)
+    .filter(d => d.markedDone && (d.sleepHours !== null || d.sessionCheckIn?.sleep))
+    .slice(-3);
+  const poorCount = recentDays.filter(d =>
+    (d.sleepHours !== null && d.sleepHours < 6) || d.sessionCheckIn?.sleep === 'poor'
+  ).length;
+  return poorCount >= 2;
+}
+
+/**
  * B76: Kombinations-Matrix Schlaf × Energie → Trainingsempfehlung für heute.
  * Reine Funktion. sleep/energyPre defaulten auf 'medium' (kein Check-in
  * bzw. übersprungen) — ergibt dann immer modifier 'normal'. Der Reducer
  * (state.js, SESSION_CHECKIN_SET) wendet den zurückgegebenen modifier nur
  * noch mechanisch an, die Entscheidung selbst passiert ausschließlich hier.
+ *
+ * Seit Sprint C2 (Teil A): 'reduced' (kumulierter Schlafmangel ODER niedrige
+ * Energie) betrifft nur noch Compound-Übungen (`modifierScope:'compound'`),
+ * ein einmalig schlechter Schlaf ohne kumulierten Befund löst stattdessen
+ * das mildere 'reduced_mild' (-5%, alle Übungen) aus. Energie niedrig
+ * eskaliert IMMER zur vollen Compound-Reduktion, auch wenn Schlaf für sich
+ * genommen nur die milde Stufe ausgelöst hätte (siehe DECISIONS.md).
  */
-function _buildSessionBriefing(day) {
+function _buildSessionBriefing(day, state) {
   const sleep  = day.sessionCheckIn?.sleep ?? 'medium';
   const energy = day.sessionCheckIn?.energyPre ?? 'medium';
+  const cumulative = _isCumulativeSleepDeficit(state);
 
-  if (sleep === 'poor' || energy === 'low') {
-    return { modifier: 'reduced', message: 'Heute reduzieren — Gewichte -10%, nur Hauptübungen, RPE-Ziel max 7' };
+  let modifier = 'normal', modifierScope = 'all';
+
+  if (sleep === 'poor') {
+    if (cumulative) { modifier = 'reduced';      modifierScope = 'compound'; }
+    else            { modifier = 'reduced_mild'; modifierScope = 'all'; }
+  }
+  if (energy === 'low') { modifier = 'reduced'; modifierScope = 'compound'; }
+
+  if (modifier === 'reduced_mild') {
+    return { modifier, modifierScope, message: 'Leicht reduzieren heute — Gewichte -5%' };
+  }
+  if (modifier === 'reduced' && modifierScope === 'compound') {
+    return { modifier, modifierScope, message: 'Compound-Übungen heute reduzieren — Gewichte -10%, Isolation unverändert' };
   }
   if ((sleep === 'good' || sleep === 'great') && energy === 'high') {
-    return { modifier: 'optimal', message: 'Optimale Voraussetzungen — heute Steigerung versuchen' };
+    return { modifier: 'optimal', modifierScope: 'all', message: 'Optimale Voraussetzungen — heute Steigerung versuchen' };
   }
   if ((sleep === 'good' || sleep === 'great') && energy === 'medium') {
-    return { modifier: 'normal', message: 'Gute Basis — Training wie geplant' };
+    return { modifier: 'normal', modifierScope: 'all', message: 'Gute Basis — Training wie geplant' };
   }
-  return { modifier: 'normal', message: 'Normales Training — Ziele wie geplant' };
+  return { modifier: 'normal', modifierScope: 'all', message: 'Normales Training — Ziele wie geplant' };
 }
 
 /** Erste nicht-archivierte Compound-Übung des Tages (Squat/Hinge/Push) für das Briefing. */
@@ -1279,7 +1317,7 @@ function _renderSessionCheckIn(di) {
 }
 
 function _renderSessionBriefing(di, day, wk, state) {
-  const { message, modifier } = _buildSessionBriefing(day);
+  const { message, modifier, modifierScope } = _buildSessionBriefing(day, state);
   const focusEx = _findFocusExercise(day, state.customExercises);
   let focusHtml = '';
   if (focusEx) {
@@ -1287,7 +1325,10 @@ function _renderSessionBriefing(di, day, wk, state) {
     let rpeText = '';
     let pauseText = '';
     if (lastRpe != null) {
-      let targetRpe = modifier === 'optimal' ? lastRpe + 0.5 : modifier === 'reduced' ? lastRpe - 1 : lastRpe;
+      let targetRpe = modifier === 'optimal' ? lastRpe + 0.5
+        : modifier === 'reduced' ? lastRpe - 1
+        : modifier === 'reduced_mild' ? lastRpe - 0.5
+        : lastRpe;
       targetRpe = Math.max(1, Math.min(10, Math.round(targetRpe * 2) / 2));
       rpeText = ` @ RPE ${targetRpe}`;
       // Sprint C1: Pausenzeit-Vorschau auf Basis desselben targetRpe + Trainingsziel
@@ -1319,12 +1360,13 @@ function _renderSessionBriefing(di, day, wk, state) {
   // konservativ, nie riskant).
   const reduceFlagKey = `train_reduced_${wk.startDate}_${di}`;
   let reduceHtml = '';
-  if (modifier === 'reduced') {
+  if (modifier === 'reduced' || modifier === 'reduced_mild') {
     let alreadyReduced = false;
     try { alreadyReduced = localStorage.getItem(reduceFlagKey) === 'true'; } catch (_) { /* best effort, kein Blockieren */ }
+    const reducePct = modifier === 'reduced_mild' ? 5 : 10;
     reduceHtml = alreadyReduced
       ? `<div class="session-briefing-card__reduce-done">✓ Gewichte angepasst</div>`
-      : `<button type="button" class="session-briefing-card__reduce-btn" data-action="reduce-today-weights" data-di="${di}">Gewichte heute anpassen (-10%)</button>`;
+      : `<button type="button" class="session-briefing-card__reduce-btn" data-action="reduce-today-weights" data-di="${di}">Gewichte heute anpassen (-${reducePct}%)</button>`;
   }
 
   // B87 Fix 2: öffnet den Check-in erneut, vorausgefüllt mit den aktuellen
@@ -1594,6 +1636,7 @@ function renderExercise(wk, di, ei, state) {
   // Urlaubstag, Session Coach nicht deaktiviert.
   const showIntraCoach = !locked && !wk.days[di].isVacation && state.settings?.sessionCoach !== false && _isTodayDay(wk, di);
   const sessionModifier = wk.days[di]?.sessionModifier ?? null;
+  const sessionModifierScope = wk.days[di]?.sessionModifierScope ?? 'all';
 
   // "Nächste Woche"-Projektion für die Abschluss-Nachricht des letzten
   // Satzes — NUR hier ist getWeightRecommendation() legitim (echte
@@ -1618,7 +1661,7 @@ function renderExercise(wk, di, ei, state) {
   }
 
   const setsHtml = ex.sets.map((s, si) =>
-    renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled, showIntraCoach, sessionModifier, _nextWeekWeight, wk.id)
+    renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled, showIntraCoach, sessionModifier, _nextWeekWeight, wk.id, sessionModifierScope)
   ).join('');
 
   const step = ex.weightStep ?? 2.5;
@@ -2135,7 +2178,7 @@ function _renderIntraFeedback(fb, key, di, ei, si, mode, canAdopt) {
 }
 
 // ─── Set row ─────────────────────────────────────────────────────────────────
-function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true, showIntraCoach = false, sessionModifier = null, nextWeekWeight = null, wkId = null) {
+function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true, showIntraCoach = false, sessionModifier = null, nextWeekWeight = null, wkId = null, sessionModifierScope = 'all') {
   // B17: prevEx wird in renderExercise() bei einer Ausweichübung (substituteFor)
   // bewusst über den NAMEN DER URSPRÜNGLICHEN Übung gesucht (siehe _lookupName
   // dort) — für den Fulfill-Meter-Metrik-Check dort ist das sinnvoll, aber hier
@@ -2165,7 +2208,12 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
         ? `${prevVal} m`
         : `${prevVal}×`;
 
-  const hasAutofill = !locked && si < ex.sets.length - 1;
+  // Sprint C2 (Teil B): ein deloadSkip-Satz ist für Eingaben gesperrt (wie
+  // locked), nicht nur optisch ausgegraut — der Satz soll diese Woche
+  // strukturell nicht bearbeitbar sein.
+  const isDeloadSkip = s.deloadSkip === true;
+  const rowLocked = locked || isDeloadSkip;
+  const hasAutofill = !rowLocked && si < ex.sets.length - 1;
   const metricValLabel = metric === 'sec' ? 'Sekunden' : metric === 'm' ? 'Meter' : 'Wiederholungen';
   const autofillBtn = hasAutofill ? `
     <button
@@ -2174,7 +2222,7 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
       data-action="autofill-down" data-di="${di}" data-ei="${ei}" data-si="${si}"
       aria-label="Gewicht und ${metricValLabel} von Satz ${si + 1} auf alle folgenden Sätze übernehmen"
     >${ic.autofillDown()}</button>` : '';
-  const prevRepsAdopt = (!locked && prevVal != null && prevVal !== '')
+  const prevRepsAdopt = (!rowLocked && prevVal != null && prevVal !== '')
     ? `<button type="button" class="prev-hint prev-hint--btn" data-action="adopt-prev-reps" data-di="${di}" data-ei="${ei}" data-si="${si}" data-value="${prevVal}" aria-label="Vorwoche ${prevRepHint}">${prevRepHint}</button>`
     : (prevRepHint ? `<span class="prev-hint" aria-hidden="true">${prevRepHint}</span>` : '');
   const metricCellFooter = hasAutofill
@@ -2273,7 +2321,7 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
       // geändert haben sollte.
       const _rsrState = getState();
       const _rsrIsCompound = isCompoundExercise(ex.name, buildCategoryMap(_rsrState.customExercises));
-      const fb = accepted ?? buildSetFeedback(s, ex, sessionModifier, si, _rsrState.settings?.goal ?? null, _rsrIsCompound);
+      const fb = accepted ?? buildSetFeedback(s, ex, sessionModifier, si, _rsrState.settings?.goal ?? null, _rsrIsCompound, sessionModifierScope);
       if (fb && fb.nextWeight != null) {
         const canAdopt = !accepted && fb.hint != null && fb.nextWeight !== (s.weight ?? 0);
         intraCoachHtml = _renderIntraFeedback(fb, feedbackKey, di, ei, si, accepted ? 'accepted' : 'live', canAdopt);
@@ -2288,18 +2336,19 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
   }
 
   return `
-<div class="set-row" role="listitem" data-di="${di}" data-ei="${ei}" data-si="${si}">
+<div class="set-row${isDeloadSkip ? ' set-row--deload-skip' : ''}" role="listitem" data-di="${di}" data-ei="${ei}" data-si="${si}">
 
   <span class="set-idx" aria-hidden="true">${si + 1}</span>
 
   <div class="set-cell">
     <input class="num-input" type="number" inputmode="decimal"
       min="0" step="0.5" value="${dispW}"
-      ${locked ? 'disabled' : ''}
+      ${rowLocked ? 'disabled' : ''}
       data-action="set-weight" data-di="${di}" data-ei="${ei}" data-si="${si}"
       placeholder=""
       aria-label="Satz ${si + 1} Gewicht in kg"
     />
+    ${isDeloadSkip ? `<span class="deload-badge">Deload</span>` : ''}
     ${isWeightPR ? `<span class="pr-badge"           aria-label="Gewichts-PR! ${s.weight} kg">🏆 ${s.weight} kg</span>` : ''}
     ${isEffortGoal ? `<span class="pr-badge pr-badge--goal" aria-label="${effortScore}% Zielerfüllung">✓ ${effortScore}% Ziel</span>` : ''}
     ${_prevWeightHint}
@@ -2309,7 +2358,7 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
   <div class="set-cell">
     <input class="num-input" type="number" inputmode="${repMode}"
       min="0" step="${repStep}" placeholder="${ex.targetReps ?? ''}" value="${s.reps != null && s.reps !== '' ? s.reps : ''}"
-      ${locked ? 'disabled' : ''}
+      ${rowLocked ? 'disabled' : ''}
       data-action="set-reps" data-di="${di}" data-ei="${ei}" data-si="${si}"
       aria-label="${repAria}"
     />
@@ -2319,7 +2368,7 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
 
   <!-- RPE popover trigger (2.2) -->
   <div class="set-cell set-cell--rpe">
-    ${!rpeEnabled ? '' : locked
+    ${!rpeEnabled ? '' : rowLocked
       ? `<span class="rpe-static">${s.rpe ?? '–'}</span>${prevSet?.rpe != null ? `<span class="prev-hint" aria-hidden="true">RPE ${prevSet.rpe}</span>` : ''}`
       : (() => {
           const cur    = s.rpe ?? null;
@@ -2357,7 +2406,7 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
   <div class="set-done-wrap">
     <button
       class="set-done-btn${doneClass}${isPR ? ' is-pr' : ''}"
-      ${locked ? 'disabled' : ''}
+      ${rowLocked ? 'disabled' : ''}
       data-action="toggle-done" data-di="${di}" data-ei="${ei}" data-si="${si}"
       aria-label="Satz ${si + 1}: ${stLabel}${isPR ? ' – Bestleistung!' : ''}. Tippen für nächsten Status (offen → erfolgreich → nicht geschafft)."
     >${doneIcon}</button>
@@ -2366,12 +2415,12 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
 
   <button
     class="set-remove-btn"
-    ${locked ? 'disabled' : ''}
+    ${rowLocked ? 'disabled' : ''}
     data-action="remove-set" data-di="${di}" data-ei="${ei}" data-si="${si}"
     aria-label="Satz ${si + 1} entfernen"
   >${ic.minus()}</button>
 
-  ${!locked ? `
+  ${!rowLocked ? `
   <button
     class="set-note-btn${s.note ? ' has-note' : ''}"
     data-action="toggle-set-note" data-di="${di}" data-ei="${ei}" data-si="${si}"
@@ -2387,7 +2436,7 @@ ${s._showNote ? `
     type="text"
     value="${h(s.note ?? '')}"
     placeholder="Notiz zu Satz ${si + 1} …"
-    ${locked ? 'disabled' : ''}
+    ${rowLocked ? 'disabled' : ''}
     data-action="set-note" data-di="${di}" data-ei="${ei}" data-si="${si}"
     aria-label="Notiz zu Satz ${si + 1}"
     maxlength="120"
@@ -2970,25 +3019,26 @@ const _FOCUS_ICONS = {
 // headline/reasoning/recommendation: die Strukturkarte ist optisch sekundär
 // und braucht keinen "Warum?"-Collapse (siehe renderCoachTab()).
 /**
- * B79: konkrete Deload-Gewichte für alle Übungen aller Tage der aktuellen
- * Woche (state.curIdx) — der Coach-Tab ist wochenbasiert, kein "aktueller
- * Tag" existiert dort. Normalgewicht = höchstes aktuell eingetragenes
- * Satz-Gewicht der Übung (Math.max über ex.sets), Deload = gerundet auf
- * die Übungs-Schrittweite, Formel identisch zur Sprint-Vorgabe.
+ * B79, umgebaut in Sprint C2 (Teil B): konkrete Deload-Satzanzahl für alle
+ * Übungen aller Tage der aktuellen Woche (state.curIdx) — der Coach-Tab ist
+ * wochenbasiert, kein "aktueller Tag" existiert dort. Zeigt Sätze statt
+ * Gewicht: Deload reduziert jetzt Volumen (Satz-Anzahl), Gewicht bleibt
+ * unverändert (siehe DECISIONS.md, Pritchard et al. 2015). Formel identisch
+ * zu `_applyDeloadReduction()` (state.js) — reine Vorschau, keine eigene
+ * Berechnung. Gilt auch für Körpergewichtsübungen ohne Gewichtsfeld (anders
+ * als die alte gewichtsbasierte Tabelle, die solche Übungen ausblendete).
  */
 function _buildDeloadPlanRows(state) {
   const wk = state.weeks[state.curIdx];
   if (!wk) return [];
-  const deloadFactor = state.settings?.deloadFactor ?? 0.75;
   const rows = [];
   wk.days.forEach((day, di) => {
     (day.exercises ?? []).forEach((ex, ei) => {
       if (ex.archived) return;
-      const currentWeight = Math.max(0, ...(ex.sets ?? []).map(s => s.weight || 0));
-      if (currentWeight <= 0) return;
-      const step = ex.weightStep || 2.5;
-      const deloadWeight = Math.round(currentWeight * deloadFactor / step) * step;
-      rows.push({ di, ei, name: ex.name, currentWeight, deloadWeight });
+      const currentSets = ex.sets?.length ?? 0;
+      if (currentSets <= 0) return;
+      const deloadSets = Math.min(currentSets, Math.max(2, Math.round(currentSets * 0.6)));
+      rows.push({ di, ei, name: ex.name, currentSets, deloadSets });
     });
   });
   return rows;
@@ -3437,19 +3487,23 @@ function renderCoachTab(state) {
   </div>` : '';
 
   // B79: Deload-Plan — nur wenn die präventive Deload-Strukturkarte aktiv
-  // ist (siehe oben), konkrete Gewichte für alle Übungen der aktuellen
+  // ist (siehe oben), konkrete Satzanzahl für alle Übungen der aktuellen
   // Woche (alle Tage, nicht nur ein einzelner — der Coach-Tab kennt keinen
-  // "aktuellen Tag", per Rückfrage bestätigt).
+  // "aktuellen Tag", per Rückfrage bestätigt). Seit Sprint C2 (Teil B) eine
+  // reine Ganze-Woche-Illustration — die tatsächliche Anwendung bei "Diese
+  // Woche" (siehe _showDeloadChoicePopup) betrifft nur die heute noch
+  // offenen Tage, Titel daher bewusst zeitraum-neutral (nicht mehr "NÄCHSTE
+  // WOCHE" — die tatsächliche Anwendung wird erst per Popup gewählt).
   const deloadSignal    = structuralSignals.find(s => s.type === 'deload_preventive');
   const deloadPlanRows  = deloadSignal ? _buildDeloadPlanRows(state) : [];
   const deloadPlanHtml  = deloadSignal && deloadPlanRows.length ? `
   <div class="deload-plan-card">
-    <div class="deload-plan-card__title">DELOAD-PLAN NÄCHSTE WOCHE</div>
+    <div class="deload-plan-card__title">DELOAD-PLAN</div>
     <div class="deload-plan-card__rows">
       ${deloadPlanRows.map(r => `
       <div class="deload-plan-row">
         <span class="deload-plan-row__name">${h(r.name)}</span>
-        <span class="deload-plan-row__weights">${r.currentWeight}kg → ${r.deloadWeight}kg</span>
+        <span class="deload-plan-row__weights">${r.currentSets} Sätze → ${r.deloadSets} Sätze</span>
       </div>`).join('')}
     </div>
     <button type="button" class="btn btn--accent btn--sm deload-plan-card__btn" data-action="apply-deload-plan">
@@ -4235,10 +4289,14 @@ function _detectReentryPause(state) {
   const vacTrainingDays = activeDays.filter(d => d.isVacation && d.vacationPlan !== 'rest' && d.vacationPlan !== null);
   const isVacationOverride = vacTrainingDays.length > activeDays.length / 2;
 
+  // Sprint C2 (Teil C, Bosquet et al. 2013): Kraftverlust bei Trainierten
+  // nach 1-2 Wochen Pause meist minimal, spürbarer Abfall erst ab Woche 3-4
+  // -- untere zwei Stufen entsprechend abgeschwächt. Obere zwei Stufen
+  // unverändert (bereits literaturkonform).
   let factor;
   if (isVacationOverride)    factor = 0.05;
-  else if (pauseDays <= 14)  factor = 0.10;
-  else if (pauseDays <= 28)  factor = 0.15;
+  else if (pauseDays <= 14)  factor = 0.05;
+  else if (pauseDays <= 28)  factor = 0.10;
   else if (pauseDays <= 56)  factor = 0.20;
   else                       factor = 0.25;
 
@@ -4271,6 +4329,39 @@ function _showReentryPopup(pauseDays, factor) {
       showToast('Volles Gewicht — viel Erfolg!', 'ok');
     }
     dispatch(A.REENTRY_HANDLED, {});
+    overlay.remove();
+  });
+}
+
+/**
+ * Sprint C2 (Teil B): Wahl zwischen sofortiger Deload-Anwendung ("Diese
+ * Woche" -- reduziert die heute noch offenen Tage der aktuellen Woche sofort,
+ * markiert die Woche als Deload) und aufgeschobener Anwendung ("Nächste
+ * Woche" -- merkt den Wunsch nur vor, wirkt erst bei der nächsten Wochen-
+ * erstellung). Modal-Muster 1:1 von _showReentryPopup übernommen.
+ */
+function _showDeloadChoicePopup() {
+  document.getElementById('deload-choice-modal')?.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'deload-choice-modal';
+  overlay.className = 'vac-plan-modal-overlay';
+  overlay.innerHTML = `
+    <div class="vac-plan-modal">
+      <div class="vac-plan-modal__title">🔻 Deload-Plan übernehmen</div>
+      <p class="vac-plan-modal__sub">Sätze werden reduziert (Volumen), Gewichte bleiben unverändert (Intensität halten).</p>
+      <button class="btn btn--accent" data-deload="now" style="width:100%;min-height:var(--touch)">Diese Woche</button>
+      <button class="btn btn--ghost" data-deload="next" style="width:100%;min-height:var(--touch)">Nächste Woche</button>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) return; // require explicit choice, no backdrop-dismiss
+    const btn = e.target.closest('[data-deload]');
+    if (!btn) return;
+    dispatch(A.DELOAD_APPLY, { weekIdx: getState().curIdx, when: btn.dataset.deload });
+    showToast(btn.dataset.deload === 'now'
+      ? '✓ Deload angewendet — Sätze reduziert, Gewichte unverändert'
+      : '✓ Deload geplant — wirkt beim nächsten Wochenwechsel', 'ok', 4000);
     overlay.remove();
   });
 }
@@ -4620,7 +4711,7 @@ function renderSettingsTab(state) {
   <div class="settings-section">
     <div class="settings-section__title">Info</div>
     <div class="settings-row">
-      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v204</div></div>
+      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v205</div></div>
     </div>
     <div class="settings-row">
       <div>
@@ -5312,22 +5403,13 @@ function _handleClick(e) {
       break;
     }
 
-    // B79: Deload-Plan übernehmen — EX_AUTO_PRESELECT_NEXT_WEEK_PLAN ist
-    // bereits die etablierte Batch-Action für "mehrere Übungen auf einmal
-    // mit nextWeekPlan vorbelegen" (aus der "Neue Woche"-Chip-Automatik) —
-    // nextWeekPlan ist ein DELTA, kein Absolutwert, daher deloadWeight
-    // minus currentWeight. Wirkt erst beim nächsten manuellen Wochenwechsel
-    // (_applyPlannedProgression, state.js) — unverändertes, bestehendes
-    // Verhalten, keine Sonderbehandlung für Deload nötig.
+    // Sprint C2 (Teil B): Deload reduziert jetzt Volumen (Satz-Anzahl) statt
+    // Intensität (Gewicht) — EX_AUTO_PRESELECT_NEXT_WEEK_PLAN/nextWeekPlan-
+    // Delta wird dafür nicht mehr verwendet (Gewicht ändert sich nie mehr).
+    // Öffnet stattdessen eine Wahl zwischen sofortiger ("Diese Woche") und
+    // aufgeschobener ("Nächste Woche") Anwendung, siehe _showDeloadChoicePopup().
     case 'apply-deload-plan': {
-      const _dpSt   = getState();
-      const _dpRows = _buildDeloadPlanRows(_dpSt);
-      if (!_dpRows.length) break;
-      dispatch(A.EX_AUTO_PRESELECT_NEXT_WEEK_PLAN, {
-        weekIdx: _dpSt.curIdx,
-        selections: _dpRows.map(r => ({ di: r.di, ei: r.ei, value: r.deloadWeight - r.currentWeight })),
-      });
-      showToast('✓ Deload-Plan übernommen — wirkt beim nächsten Wochenwechsel', 'ok', 4000);
+      _showDeloadChoicePopup();
       break;
     }
 
@@ -6039,7 +6121,7 @@ function _handleClick(e) {
         const _fbDay = _fbWk?.days[+di];
         if (_fbDay && _aft.settings?.sessionCoach !== false && !_fbDay.isVacation && _isTodayDay(_fbWk, +di)) {
           const _fbIsCompound = isCompoundExercise(_aftEx.name, buildCategoryMap(_aft.customExercises));
-          const _fb = buildSetFeedback(_aftSet, _aftEx, _fbDay.sessionModifier ?? null, _csi, _aft.settings?.goal ?? null, _fbIsCompound);
+          const _fb = buildSetFeedback(_aftSet, _aftEx, _fbDay.sessionModifier ?? null, _csi, _aft.settings?.goal ?? null, _fbIsCompound, _fbDay.sessionModifierScope ?? 'all');
           if (_fb?.pauseSec) _feedbackPauseSec = _fb.pauseSec;
         }
         window.dispatchEvent(new CustomEvent('train:set-done', { detail: { pauseSec: _feedbackPauseSec ?? (_cex.pauseSec ?? 90), di: +di } }));
@@ -6314,10 +6396,15 @@ function _handleClick(e) {
         // Zwei Taps (ein Feld pro Kategorie) reichen — Entscheidungslogik
         // lebt allein in _buildSessionBriefing(), der Reducer wendet den
         // gelieferten modifier nur noch mechanisch an.
-        const _ciWk  = getState().weeks[getState().curIdx];
+        const _ciState = getState();
+        const _ciWk  = _ciState.weeks[_ciState.curIdx];
         const _ciDay = { ..._ciWk.days[_ciDi], sessionCheckIn: { sleep: _draft.sleep, energyPre: _draft.energyPre } };
-        const { modifier } = _buildSessionBriefing(_ciDay);
-        dispatch(A.SESSION_CHECKIN_SET, { di: _ciDi, sleep: _draft.sleep, energyPre: _draft.energyPre, modifier });
+        const { modifier, modifierScope } = _buildSessionBriefing(_ciDay, _ciState);
+        const _ciCatMap = buildCategoryMap(_ciState.customExercises);
+        const _ciCompoundNames = (_ciDay.exercises ?? [])
+          .filter(ex => isCompoundExercise(ex.name, _ciCatMap))
+          .map(ex => ex.name);
+        dispatch(A.SESSION_CHECKIN_SET, { di: _ciDi, sleep: _draft.sleep, energyPre: _draft.energyPre, modifier, modifierScope, compoundExerciseNames: _ciCompoundNames });
         _checkInDraft.delete(_ciDi);
         // B87 Fix 2: Korrektur abgeschlossen (falls dies ein edit-checkin-
         // Neustart war) -- Briefing zeigt sich ab jetzt wieder statt der
@@ -6369,7 +6456,11 @@ function _handleClick(e) {
       let _redAlready = false;
       try { _redAlready = localStorage.getItem(_redFlagKey) === 'true'; } catch (_) { /* best effort */ }
       if (_redAlready) break;
-      dispatch(A.DAY_REDUCE_PENDING_WEIGHTS, { di: _redDi });
+      const _redCatMap = buildCategoryMap(getState().customExercises);
+      const _redCompoundNames = (_redDay.exercises ?? [])
+        .filter(ex => isCompoundExercise(ex.name, _redCatMap))
+        .map(ex => ex.name);
+      dispatch(A.DAY_REDUCE_PENDING_WEIGHTS, { di: _redDi, compoundExerciseNames: _redCompoundNames });
       try { localStorage.setItem(_redFlagKey, 'true'); } catch (_) { /* best effort, kein Blockieren */ }
       scheduleRender();
       break;
@@ -6438,7 +6529,7 @@ function _handleClick(e) {
       // dauerhaft sichtbar (siehe _renderIntraFeedback), nicht mehr nur 2s
       // (ersetzt das B89-Verhalten, siehe DECISIONS.md).
       const _adIsCompound = _adEx ? isCompoundExercise(_adEx.name, buildCategoryMap(_adSt.customExercises)) : true;
-      const _adFb = _adS ? buildSetFeedback(_adS, _adEx, _adDay?.sessionModifier ?? null, _adSi, _adSt.settings?.goal ?? null, _adIsCompound) : null;
+      const _adFb = _adS ? buildSetFeedback(_adS, _adEx, _adDay?.sessionModifier ?? null, _adSi, _adSt.settings?.goal ?? null, _adIsCompound, _adDay?.sessionModifierScope ?? 'all') : null;
       if (_adFb) _acceptedFeedback.set(`${_adWk?.id}-${_adDi}-${_adEi}-${_adSi}`, _adFb);
       scheduleRender();
       break;
@@ -7614,6 +7705,7 @@ function _getDayCompletionStats(di) {
   // exakt dieselbe historisch-korrekte Quelle wie der Satz-Pokal seit B63.
   for (const ex of day.exercises ?? []) {
     for (const s of ex.sets ?? []) {
+      if (s.deloadSkip) continue; // Sprint C2 Teil B — zählt nicht als verpasst
       totalSets++;
       if (s.status === 'success') {
         successSets++;
@@ -7644,6 +7736,7 @@ function _getDayCompletionStats(di) {
     if (!ex.targetReps) continue;
     const targetReps = parseFloat(ex.targetReps) || 0;
     for (const s of ex.sets ?? []) {
+      if (s.deloadSkip) continue; // Sprint C2 Teil B
       effortTarget += targetReps;
       if (s.status === 'success' || s.status === 'fail') {
         effortAchieved += parseFloat(s.reps) || 0;
