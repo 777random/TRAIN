@@ -34,11 +34,11 @@ import { computeWeeklyFocus, computeStructuralSignals, isInRecoveryWindow, build
 import { findExactDuplicates, findSimilarCandidates } from './exerciseNameCleanup.js';
 import { computeErkenntnisLines, getProgressCorridorCalibration } from './progressInsights.js';
 import { buildPrShareCanvas, shareCanvas } from './shareImage.js';
-import { buildCategoryMap, resolveCategory } from './movementMap.js';
+import { buildCategoryMap, resolveCategory, isCompoundExercise } from './movementMap.js';
 import { computeQualityTrend, computeConsistencyTrend, computeVolumeTrend, computeBreadthProgress } from './overallPerformance.js';
 import { weekSuccessCounts } from './setUtils.js';
 import { getSortedWeeks, exWeightHistory, exMetricHistory, detectRecurringStep } from './insightEngine.js';
-import { buildSetFeedback, buildLastSetMessage, buildWarmupSets } from './sessionCoach.js';
+import { buildSetFeedback, buildLastSetMessage, buildWarmupSets, _pauseSecForRpe } from './sessionCoach.js';
 import { buildSessionHighlights, buildSessionEinordnung, buildNextSessionPreview, calcSleepCorrelation } from './sessionSummary.js';
 
 // ─── Module-level UI state (transient, never persisted) ──────────────────────
@@ -1285,15 +1285,22 @@ function _renderSessionBriefing(di, day, wk, state) {
   if (focusEx) {
     const lastRpe = _lastWeekAvgRpe(focusEx.name, wk, state);
     let rpeText = '';
+    let pauseText = '';
     if (lastRpe != null) {
       let targetRpe = modifier === 'optimal' ? lastRpe + 0.5 : modifier === 'reduced' ? lastRpe - 1 : lastRpe;
       targetRpe = Math.max(1, Math.min(10, Math.round(targetRpe * 2) / 2));
       rpeText = ` @ RPE ${targetRpe}`;
+      // Sprint C1: Pausenzeit-Vorschau auf Basis desselben targetRpe + Trainingsziel
+      // + Compound/Isolation der Fokus-Übung — dieselbe Tabelle wie im Intra-
+      // Session Coach (sessionCoach.js _pauseSecForRpe), keine eigene Logik hier.
+      const focusIsCompound = isCompoundExercise(focusEx.name, buildCategoryMap(state.customExercises));
+      const previewPauseSec = _pauseSecForRpe(targetRpe, state.settings?.goal ?? null, focusIsCompound);
+      if (previewPauseSec != null) pauseText = `<br>Erwartete Pause: ${_fmtPause(previewPauseSec)}`;
     }
     const w = focusEx.sets?.[0]?.weight;
     const weightText = w != null ? `${w} kg × ` : '';
     const setsReps = `${focusEx.targetSets ?? focusEx.sets?.length ?? '–'}×${focusEx.targetReps ?? '–'}`;
-    focusHtml = `<div class="session-briefing-card__focus">Fokus heute: ${h(focusEx.name)}<br>Ziel: ${weightText}${setsReps}${rpeText}</div>`;
+    focusHtml = `<div class="session-briefing-card__focus">Fokus heute: ${h(focusEx.name)}<br>Ziel: ${weightText}${setsReps}${rpeText}${pauseText}</div>`;
   }
   const defaultExpanded = !day.sessionStartTs;
   const isExpanded = _briefingExpandedOverride.has(di) ? _briefingExpandedOverride.get(di) : defaultExpanded;
@@ -2264,7 +2271,9 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
       // (nicht neu berechnet) -- zeigt dauerhaft, was der Athlet damals
       // entschieden hat, auch wenn sich s.reps/s.rpe zwischenzeitlich
       // geändert haben sollte.
-      const fb = accepted ?? buildSetFeedback(s, ex, sessionModifier, si);
+      const _rsrState = getState();
+      const _rsrIsCompound = isCompoundExercise(ex.name, buildCategoryMap(_rsrState.customExercises));
+      const fb = accepted ?? buildSetFeedback(s, ex, sessionModifier, si, _rsrState.settings?.goal ?? null, _rsrIsCompound);
       if (fb && fb.nextWeight != null) {
         const canAdopt = !accepted && fb.hint != null && fb.nextWeight !== (s.weight ?? 0);
         intraCoachHtml = _renderIntraFeedback(fb, feedbackKey, di, ei, si, accepted ? 'accepted' : 'live', canAdopt);
@@ -4362,6 +4371,20 @@ function renderSettingsTab(state) {
     ${tog('sessionCoach', 'Session Coach', 'Echtzeit-Feedback während des Trainings (Pre-Session Check-in + Briefing)')}
     <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:var(--sp-2)">
       <div>
+        <div class="settings-row__label">Trainingsziel</div>
+        <div class="settings-row__desc">Bestimmt die empfohlene Pausendauer im Session Coach (Sprint C1)</div>
+      </div>
+      <div class="weight-step-opts">
+        ${[['kraftaufbau', 'Stärker werden'], ['muskelaufbau', 'Mehr Muskeln'], ['fitness', 'Fitter werden']].map(([val, label]) => `
+          <button type="button"
+            class="weight-step-btn${(s.goal ?? null) === val ? ' is-selected' : ''}"
+            data-action="set-goal" data-goal="${val}"
+            aria-pressed="${(s.goal ?? null) === val}"
+          >${label}</button>`).join('')}
+      </div>
+    </div>
+    <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:var(--sp-2)">
+      <div>
         <div class="settings-row__label">Kleinstmögliche Steigerung</div>
         <div class="settings-row__desc">Rundung für KI-Gewichtsempfehlungen</div>
       </div>
@@ -4597,7 +4620,7 @@ function renderSettingsTab(state) {
   <div class="settings-section">
     <div class="settings-section__title">Info</div>
     <div class="settings-row">
-      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v203</div></div>
+      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v204</div></div>
     </div>
     <div class="settings-row">
       <div>
@@ -6015,7 +6038,8 @@ function _handleClick(e) {
         const _fbWk  = _aft.weeks[_aft.curIdx];
         const _fbDay = _fbWk?.days[+di];
         if (_fbDay && _aft.settings?.sessionCoach !== false && !_fbDay.isVacation && _isTodayDay(_fbWk, +di)) {
-          const _fb = buildSetFeedback(_aftSet, _aftEx, _fbDay.sessionModifier ?? null, _csi);
+          const _fbIsCompound = isCompoundExercise(_aftEx.name, buildCategoryMap(_aft.customExercises));
+          const _fb = buildSetFeedback(_aftSet, _aftEx, _fbDay.sessionModifier ?? null, _csi, _aft.settings?.goal ?? null, _fbIsCompound);
           if (_fb?.pauseSec) _feedbackPauseSec = _fb.pauseSec;
         }
         window.dispatchEvent(new CustomEvent('train:set-done', { detail: { pauseSec: _feedbackPauseSec ?? (_cex.pauseSec ?? 90), di: +di } }));
@@ -6256,6 +6280,13 @@ function _handleClick(e) {
       break;
     }
 
+    case 'set-goal': {
+      const g = el.dataset.goal;
+      const cur = getState().settings?.goal ?? null;
+      dispatch(A.SETTING_SET, { key: 'goal', value: cur === g ? null : g });
+      break;
+    }
+
     case 'set-max-session': {
       const ms = parseInt(el.dataset.ms, 10);
       dispatch(A.SETTING_SET, { key: 'maxSessionMs', value: Number.isFinite(ms) && ms > 0 ? ms : 10800000 });
@@ -6406,7 +6437,8 @@ function _handleClick(e) {
       // B94: kompletter Feedback-Snapshot statt nur Zeitstempel -- bleibt
       // dauerhaft sichtbar (siehe _renderIntraFeedback), nicht mehr nur 2s
       // (ersetzt das B89-Verhalten, siehe DECISIONS.md).
-      const _adFb = _adS ? buildSetFeedback(_adS, _adEx, _adDay?.sessionModifier ?? null, _adSi) : null;
+      const _adIsCompound = _adEx ? isCompoundExercise(_adEx.name, buildCategoryMap(_adSt.customExercises)) : true;
+      const _adFb = _adS ? buildSetFeedback(_adS, _adEx, _adDay?.sessionModifier ?? null, _adSi, _adSt.settings?.goal ?? null, _adIsCompound) : null;
       if (_adFb) _acceptedFeedback.set(`${_adWk?.id}-${_adDi}-${_adEi}-${_adSi}`, _adFb);
       scheduleRender();
       break;
@@ -8457,6 +8489,10 @@ function _showOnboarding() {
       _d.setDate(_d.getDate() + (_dow === 0 ? -6 : 1 - _dow) - 7); // last Monday
       dispatch(A.ONBOARDING_SEED, { startDate: _d.toISOString().slice(0, 10), exercises: seedExs });
     }
+    // Sprint C1: das im Onboarding gewählte Hauptziel wird jetzt persistiert
+    // (vorher nur lokale Variable, siehe DECISIONS.md) — für die
+    // Pausenzeiten-Empfehlung des Session Coach.
+    if (_mainGoal) dispatch(A.SETTING_SET, { key: 'goal', value: _mainGoal });
     _onboardingActive = false;
     dispatch(A.ONBOARDING_DONE, {});
     _gcEvent('Onboarding abgeschlossen');

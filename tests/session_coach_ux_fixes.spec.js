@@ -243,13 +243,14 @@ test('Fix 4+5: Timer läuft bereits -> Übernehmen setzt nur das Gewicht, Timer 
   await seed(page, { exercises: [mkEx({ weight: 100, step: 2.5, nSets: 3 })], autoStartPauseTimer: false });
 
   // Satz 0 mit RPE 9 bewerten und über "Übernehmen" den Timer mit der
-  // LANGEN Pause (240s) starten.
+  // LANGEN Pause starten (Sprint C1: Bankdrücken=Compound, goal nicht
+  // gesetzt=Hypertrophie-Fallback -> 180s, nicht mehr die alte 240s-Tabelle).
   await setRpe(page, 0, 0, 0, 9);
   await toggleDone(page, 0, 0, 0);
   await page.click('[data-action="adopt-set-feedback"][data-si="0"]');
   await expect(page.locator('#pause-overlay')).toHaveClass(/pause-overlay--visible/);
   const numBefore = await page.locator('#pause-ring-num').textContent();
-  expect(Number(numBefore)).toBeGreaterThan(200); // ~240s, deutlich über der 90s-Pause von Satz 1
+  expect(Number(numBefore)).toBeGreaterThan(150); // ~180s, deutlich über der 90s-Pause von Satz 1
 
   // Jetzt Satz 1 mit RPE 6 bewerten -> eigener Übernehmen-Button mit Pause 90s.
   await setRpe(page, 0, 0, 1, 6);

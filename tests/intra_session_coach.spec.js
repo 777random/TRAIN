@@ -77,7 +77,7 @@ test('RPE 6 (nicht letzter Satz) -> "Noch Luft — steigern" + Pause 90s', async
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
 });
 
-test('RPE 8 (nicht letzter Satz, Ziel erreicht) -> "Optimale Zone" + Pause 3min', async ({ page }) => {
+test('RPE 8 (nicht letzter Satz, Ziel erreicht) -> "Optimale Zone" + Pause 2min', async ({ page }) => {
   const pageErrors = [];
   page.on('pageerror', err => pageErrors.push(err.message));
   await page.goto('/');
@@ -87,8 +87,12 @@ test('RPE 8 (nicht letzter Satz, Ziel erreicht) -> "Optimale Zone" + Pause 3min'
   await setRpe(page, 0, 0, 0, 8);
   await toggleDone(page, 0, 0, 0);
 
+  // Sprint C1: Pause hängt jetzt zusätzlich von Trainingsziel (state.settings.goal,
+  // hier nicht gesetzt -> Hypertrophie-Zweig) + Compound/Isolation ab ("Bankdrücken"
+  // = Push = Compound) -- Hyp-Compound bei RPE 8 = 120s, nicht mehr die alte
+  // flache 180s-RPE-Tabelle.
   await expect(page.locator('.set-feedback').first()).toContainText('Optimale Zone');
-  await expect(page.locator('.set-feedback').first()).toContainText('Pause: 3min');
+  await expect(page.locator('.set-feedback').first()).toContainText('Pause: 2min');
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
 });
 
@@ -145,13 +149,15 @@ test('Timer übernimmt die berechnete Pause als Voreinstellung (nicht mehr fix e
   await page.waitForSelector('#app.is-ready', { timeout: 10000 });
   await seed(page, { exercises: [mkEx({ nSets: 2, targetReps: 5 })], autoStartPauseTimer: true });
 
-  await setRpe(page, 0, 0, 0, 8); // -> pauseSec 180, ex.pauseSec ist 90
+  // Sprint C1: Bankdrücken (Compound) + goal nicht gesetzt (Hypertrophie-Fallback)
+  // + RPE 8 -> 120s, nicht mehr die alte flache 180s-RPE-Tabelle.
+  await setRpe(page, 0, 0, 0, 8); // -> pauseSec 120, ex.pauseSec ist 90
   await page.click('[data-action="confirm-set"][data-di="0"][data-ei="0"]');
 
   await expect(page.locator('#pause-overlay')).toHaveClass(/pause-overlay--visible/);
   const num = await page.locator('#pause-ring-num').textContent();
-  expect(Number(num)).toBeGreaterThanOrEqual(177); // 180s abzüglich minimaler Renderzeit
-  expect(Number(num)).toBeLessThanOrEqual(180);
+  expect(Number(num)).toBeGreaterThanOrEqual(117); // 120s abzüglich minimaler Renderzeit
+  expect(Number(num)).toBeLessThanOrEqual(120);
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
 });
 
@@ -179,13 +185,15 @@ test('B85: Pausenzahl ist synchron korrekt, unabhängig von requestAnimationFram
   await page.waitForSelector('#app.is-ready', { timeout: 10000 });
   await seed(page, { exercises: [mkEx({ nSets: 2, targetReps: 5 })], autoStartPauseTimer: true });
 
-  await setRpe(page, 0, 0, 0, 8); // -> pauseSec 180
+  // Sprint C1: Bankdrücken (Compound) + goal nicht gesetzt (Hypertrophie-Fallback)
+  // + RPE 8 -> 120s, nicht mehr die alte flache 180s-RPE-Tabelle.
+  await setRpe(page, 0, 0, 0, 8); // -> pauseSec 120
 
   const numRightAfterClick = await page.evaluate(() => {
     document.querySelector('[data-action="confirm-set"][data-di="0"][data-ei="0"]').click();
     return document.getElementById('pause-ring-num').textContent;
   });
-  expect(numRightAfterClick).toBe('180');
+  expect(numRightAfterClick).toBe('120');
 
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
 });
@@ -218,13 +226,15 @@ test('B78: toggle-done startet den Pause-Timer weiterhin korrekt wenn autoStartP
   await page.waitForSelector('#app.is-ready', { timeout: 10000 });
   await seed(page, { exercises: [mkEx({ nSets: 2, targetReps: 5 })], autoStartPauseTimer: true });
 
-  await setRpe(page, 0, 0, 0, 8); // -> pauseSec 180
+  // Sprint C1: Bankdrücken (Compound) + goal nicht gesetzt (Hypertrophie-Fallback)
+  // + RPE 8 -> 120s, nicht mehr die alte flache 180s-RPE-Tabelle.
+  await setRpe(page, 0, 0, 0, 8); // -> pauseSec 120
   await toggleDone(page, 0, 0, 0);
 
   await expect(page.locator('#pause-overlay')).toHaveClass(/pause-overlay--visible/);
   const num = await page.locator('#pause-ring-num').textContent();
-  expect(Number(num)).toBeGreaterThanOrEqual(177);
-  expect(Number(num)).toBeLessThanOrEqual(180);
+  expect(Number(num)).toBeGreaterThanOrEqual(117);
+  expect(Number(num)).toBeLessThanOrEqual(120);
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
 });
 

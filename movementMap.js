@@ -93,3 +93,43 @@ export function buildCategoryMap(customExercises) {
 export function resolveCategory(name, categoryMap) {
   return categoryMap[name] ?? MOVEMENT_MAP[name] ?? 'Sonstige';
 }
+
+/**
+ * Explizite Isolationsübungen (Sprint C1, train-v204) — MOVEMENT_MAP
+ * kategorisiert nach BewegungsMUSTER (Push/Pull/Squat/Hinge), nicht nach
+ * Compound/Isolation. Viele klassische Isolationsübungen stehen dort unter
+ * Push/Pull/Squat/Hinge (z.B. Bizepscurls unter 'Pull', da Zug-Bewegung) —
+ * für die Pausenzeiten-Empfehlung (isCompoundExercise() unten) reicht die
+ * Kategorie allein daher nicht, diese Liste überschreibt sie gezielt für
+ * bekannte Isolationsübungen. Bewusst getrennt von MOVEMENT_MAP (dessen
+ * Push/Pull/Squat/Hinge-Semantik von anderer Stelle bereits genutzt wird,
+ * z.B. weeklyFocus.js _checkCompoundIsolationBalance() — die bleibt
+ * unverändert auf der reinen Kategorie-Heuristik, siehe DECISIONS.md).
+ */
+const ISOLATION_EXERCISE_NAMES = new Set([
+  'Kabelbizeps', 'Bizepscurls', 'Hammercurls', 'Konzentrationscurls',
+  'Bicep Curl', 'Bicep Curls', 'Biceps Curl', 'Hammer Curl', 'Hammer Curls',
+  'Trizepsdrücken', 'Skull Crushers', 'Tricep Pushdown', 'Triceps Pushdown',
+  'KH Flys', 'Flys Kabel', 'Butterfly',
+  'Frontheben', 'Seitheben', 'Front Raise', 'Front Raises',
+  'Lateral Raise', 'Lateral Raises', 'Side Raise',
+  'Face Pulls', 'Reverse Flys',
+  'KH Shrugs', 'Shrugs', 'Dumbbell Shrugs',
+  'Beinstrecker', 'Leg Extension', 'Leg Extensions',
+  'Wadenheben', 'Calf Raise', 'Calf Raises',
+  'Beinbeuger', 'Leg Curl', 'Leg Curls', 'Hamstring Curl',
+]);
+
+/**
+ * Compound (mehrgelenkig) vs. Isolation (eingelenkig) für die Pausenzeiten-
+ * Empfehlung (Sprint C1). Prüft zuerst die explizite Isolationsliste oben,
+ * fällt sonst auf die Bewegungskategorie zurück: Core/Carry = Isolation,
+ * alles andere (inkl. unbekannte Übungen, category 'Sonstige') = Compound
+ * — sicherer Fallback laut Sprint-Vorgabe (unbekannt eher zu lang als zu
+ * kurz pausieren).
+ */
+export function isCompoundExercise(name, categoryMap) {
+  if (ISOLATION_EXERCISE_NAMES.has(name)) return false;
+  const cat = resolveCategory(name, categoryMap);
+  return cat !== 'Core' && cat !== 'Carry';
+}

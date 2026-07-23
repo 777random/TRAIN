@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-22 — kein Code-Sprint, reine Infrastruktur-Session: Projekt von OneDrive (`C:\Users\joojo\OneDrive\Desktop\ClaudeCode\TRAIN`) nach lokal `C:\ClaudeProjects\TRAIN` verschoben (Cloud-Speicher war voll — `backups/` hatte auf ~2 GB/181 Snapshots angewachsen). Letzter echter Code-Sprint bleibt B91-B94 (train-v203, siehe unten).*
-*Nächster Schritt: **WICHTIG — künftige Sessions aus `C:\ClaudeProjects\TRAIN` starten**, nicht mehr aus dem alten OneDrive-Pfad (der ist geleert, nur eine leere Ordnerhülle + `.cursor` bleiben dort zurück). B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md) — braucht Name+Adresse+E-Mail vom Nutzer. B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten — weiterhin blockiert auf echte GoatCounter-Telemetrie (`js_error:`-Events im Dashboard prüfen). Aktuell keine weiteren offenen Bugs außer B55/B66. Loops 7-11 aktiv: Advisor-Exports werden am Ende jeder Session automatisch aktualisiert. for-advisor-consolidated.txt = Startpunkt für neue externe Chats.*
+*Letzte Aktualisierung: 2026-07-23 — Sprint C1 (Pausenzeiten nach Trainingsziel + Übungstyp), train-v204, siehe unten.*
+*Nächster Schritt: Push dieses Sprints steht noch aus (Bestätigung ausstehend, siehe Push-Policy LOOPS.md). B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md) — braucht Name+Adresse+E-Mail vom Nutzer. B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten — weiterhin blockiert auf echte GoatCounter-Telemetrie (`js_error:`-Events im Dashboard prüfen). Aktuell keine weiteren offenen Bugs außer B55/B66. Möglicher Folge-Sprint (nicht angefordert): B79 (`_checkCompoundIsolationBalance`) auf die neue `isCompoundExercise()` umstellen, siehe DECISIONS.md. Loops 7-11 aktiv: Advisor-Exports werden am Ende jeder Session automatisch aktualisiert. for-advisor-consolidated.txt = Startpunkt für neue externe Chats.*
 
 ---
 
@@ -11,16 +11,39 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v203 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v204 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
-- CSS: ?v=199 (neue `.set-feedback__why-toggle`/`__why-body`,
-  `.set-feedback__line--reverted`)
-- SCHEMA: 32 (unverändert — B91-B94 fügen keine neuen State-Felder hinzu,
-  reine sessionCoach.js/ui.js-Logik- und Rendering-Änderungen)
-- Letzter Commit: `5137af9` (docs: Projekt-Umzug-Dokumentation, kein Code),
-  vorheriger Code-Commit `8e3871a` (train-v203), beide gepusht, CI grün
-  (Regression + Lighthouse).
+- CSS: ?v=199 (unverändert — Sprint C1 nutzt ausschließlich bestehende
+  Klassen, siehe unten)
+- SCHEMA: 32 (unverändert — `settings.goal` wurde additiv im
+  Always-apply-defaults-Block ergänzt, kein versionierter Migrations-Case
+  nötig)
+- Letzter Commit: lokal committet, Push steht noch aus (siehe „Nächster
+  Schritt" oben). Vorheriger gepushter Commit `5137af9` (docs: Projekt-Umzug),
+  davor `8e3871a` (train-v203).
+- **B95 — Pausenzeiten nach Trainingsziel + Übungstyp (Sprint C1, train-v204):**
+  Nutzer-Anfrage mit vorgegebener, sportwissenschaftlich validierter Tabelle
+  (de Salles et al. 2009, Schoenfeld et al. 2016, Grgic et al. 2017/2018),
+  vorab per technischer Spec abgestimmt und über 2 Rückfrage-Runden bestätigt.
+  **2 blockierende Diskrepanzen zur Vorlage vor der Umsetzung aufgedeckt:**
+  (1) `state.settings.goal` existierte nicht — Onboarding fragt zwar ein
+  "Hauptziel" ab (`_mainGoal`, ui.js), verwarf es aber bisher; jetzt
+  persistiert (kein SCHEMA-Bump, Always-apply-defaults-Muster), neue
+  Settings-Zeile zum späteren Ändern. (2) Die vorgeschlagene Compound/
+  Isolation-Erkennung über `resolveCategory()` (Squat/Hinge/Push/Pull=
+  Compound) widersprach der eigenen Akzeptanzliste der Vorlage — Bizepscurls
+  & Co. sind Isolationsübungen, stehen aber unter Push/Pull; neue, eigene
+  `isCompoundExercise()` in movementMap.js statt Wiederverwendung der
+  B79-Heuristik (die bewusst unverändert bleibt, siehe DECISIONS.md).
+  `_pauseSecForRpe(rpe, goal, isCompound)` (sessionCoach.js) ersetzt die alte
+  1-Parameter-Tabelle. `buildSetFeedback()` bekommt 2 neue Parameter, alle
+  4 Call-Sites (ui.js ×3, timer.js ×1) berechnen `isCompound` selbst —
+  `sessionCoach.js` bleibt importfrei (Tiefe 0). Session-Briefing zeigt neu
+  "Erwartete Pause". Neue Settings-Zeile "Trainingsziel". 4 bestehende Tests
+  an die jetzt korrekten (kleineren) Pausenwerte angepasst, 10 neue Tests
+  (`tests/session_coach_pause_matrix.spec.js`). Volle Suite 117/117 grün.
+  Details siehe BUGS.md B95, DECISIONS.md.
 - **Projekt-Standort verschoben (2026-07-22, keine Code-Änderung):**
   Nutzer meldete vollen OneDrive-Cloud-Speicher. Ursache: `backups/`
   (Milestone-Snapshots, per Konvention nach jedem Sprint erzeugt) war auf

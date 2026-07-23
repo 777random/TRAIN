@@ -34,7 +34,7 @@ sondern der Einstiegspunkt, der `state.js`, `backup.js`, `ui.js`,
 | state.js | — | backup.js, consistencyUtils.js, timer.js, triggerEngine.js, ui.js, weeklyFocus.js, weekReview.js (seit train-v170, siehe unten), index.html |
 | icons.js | — | ui.js |
 | setUtils.js | — | plateauDetector.js, weeklyFocus.js, weightRecommendation.js, weekReview.js (seit train-v170, siehe unten), ui.js (seit train-v171 — B45-Konsolidierung: `weekSuccessCounts()`) |
-| movementMap.js | — | overallPerformance.js, ui.js, weeklyFocus.js, sessionSummary.js (seit train-v194 — B79) |
+| movementMap.js | — | overallPerformance.js, ui.js, weeklyFocus.js, sessionSummary.js (seit train-v194 — B79), timer.js (seit train-v204 — Sprint C1: isCompoundExercise() für Pausenzeiten-Empfehlung) |
 | progressChart.js | — | ui.js |
 | sessionCoach.js | — | ui.js, timer.js (beide seit train-v193 — B77: `buildSetFeedback()`/`buildLastSetMessage()`/`buildWarmupSets()`, importfrei/Tiefe 0, siehe DECISIONS.md für die bewusste Ausnahme von der "NIEMALS ui.js↔timer.js"-Regel) |
 | weekReview.js | setUtils.js, state.js (seit train-v170 — B44/B45-Konsolidierung: `isTrainingDay()` für `_reachableDays()`, `weekSuccessCounts()` für `_calcSuccessScore()`; seit train-v190/B74 zusätzlich `calcCurrentStreak()` für `_calcStreak()`; alle reine, zustandslose Funktionen, kein `getState()`/`dispatch()` — Datei ist weiterhin "State-frei" im ursprünglich gemeinten Sinn) | ui.js |
@@ -44,7 +44,7 @@ sondern der Einstiegspunkt, der `state.js`, `backup.js`, `ui.js`,
 | registerSW.js | — | index.html |
 | dragdrop.js | — | **kein ES-Import** — seit train-v156 aber per `<script src="./dragdrop.js">` klassisch in index.html geladen (vor dem Module-Script) und in sw.js precached. Kein JS-Modul importiert es, aber es ist jetzt aktiv ladungsrelevant, nicht mehr totes Legacy-Modul. |
 | backup.js | state.js | ui.js, index.html |
-| timer.js | state.js, sessionCoach.js (seit train-v193 — B77, siehe oben) | index.html (kein JS-Modul importiert es, nur der Einstiegspunkt) |
+| timer.js | state.js, sessionCoach.js (seit train-v193 — B77, siehe oben), movementMap.js (seit train-v204 — Sprint C1: isCompoundExercise()) | index.html (kein JS-Modul importiert es, nur der Einstiegspunkt) |
 | plateauDetector.js | setUtils.js | insightEngine.js, weeklyFocus.js |
 | weightRecommendation.js | setUtils.js | insightEngine.js, ui.js, weeklyFocus.js |
 | sessionSummary.js | insightEngine.js, setUtils.js, movementMap.js (seit train-v194 — B79: `buildSessionHighlights()`/`buildSessionEinordnung()`/`buildNextSessionPreview()`/`calcSleepCorrelation()`, kein ui.js-Import — lokal duplizierter Kategorie-Filter, Muster wie weeklyFocus.js' Push/Pull-Duplikation) | ui.js |

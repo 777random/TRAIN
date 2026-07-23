@@ -2539,3 +2539,22 @@ Eigentliche Aufgabe: SPRINT C1 (Pausenzeiten validiert) — Schritt 1 der
   Sprint-Vorlage aufgedeckt, dass `state.settings.goal` nicht existiert.
   Technische Spec wird erstellt und dem Nutzer zur Bestätigung vorgelegt,
   bevor implementiert wird (siehe Antwort im Chat).
+Eigentliche Aufgabe (fortgesetzt): SPRINT C1 umgesetzt nach Nutzer-Bestätigung
+  der Spec. state.js (+settings.goal, kein SCHEMA-Bump), movementMap.js
+  (+isCompoundExercise()/ISOLATION_EXERCISE_NAMES), sessionCoach.js
+  (_pauseSecForRpe() neue Tabelle, buildSetFeedback() +2 Parameter), ui.js
+  (3 Call-Sites, Onboarding-Persistierung, neue Settings-Zeile, Briefing-
+  Pausenvorschau), timer.js (1 Call-Site + neuer movementMap.js-Import).
+  4 bestehende Tests an neue (kleinere) Pausenwerte angepasst, 10 neue Tests
+  (tests/session_coach_pause_matrix.spec.js). Volle Suite 117/117 grün.
+  CACHE_VERSION train-v203->v204, CSS/SCHEMA unverändert. HANDOFF.md/BUGS.md
+  (B95)/DECISIONS.md (2 neue Einträge)/AGENTS.md (Dependency-Matrix)/CLAUDE.md
+  aktualisiert. Lokal committet, Push steht noch aus (Bestätigung ausstehend).
+Loop 5: for-advisor.txt aktualisiert (28. Fassung, B95-Sprint eingearbeitet)
+Loop 7: for-advisor-product.txt aktualisiert (B95-Absatz ergänzt)
+Loop 8: for-advisor-market.txt unverändert (keine neuen Markt-Erkenntnisse)
+Loop 9: for-advisor-ux.txt unverändert (B95 ist keine Onboarding-Flow-Änderung
+  im engeren Sinn, nur eine zusätzliche persistierte Onboarding-Auswahl)
+Loop 10: for-advisor-growth.txt unverändert (keine neuen Growth-Erkenntnisse)
+Loop 11: for-advisor-consolidated.txt unverändert (keine der 4 Quellen mit
+  substanziell neuem Inhalt für die konsolidierte Fassung)

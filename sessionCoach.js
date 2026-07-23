@@ -32,15 +32,42 @@ function _applyModifier(nextWeight, currentWeight, sessionModifier, step) {
   return Math.max(nextWeight * 0.9, currentWeight - step);
 }
 
-/** RPE -> Standard-Pausendauer (Sekunden), gemeinsame Tabelle für alle
- * Matrix-Gruppen, die keinen eigenen abweichenden Wert vorschreiben. */
-function _pauseSecForRpe(rpe) {
-  if (rpe == null)  return null;
-  if (rpe <= 6)     return 90;
-  if (rpe < 8)      return 120;
-  if (rpe < 9)      return 180;
-  if (rpe < 10)     return 240;
-  return 300;
+/**
+ * RPE + Trainingsziel + Übungstyp -> Pausendauer (Sekunden), gemeinsame
+ * Tabelle für alle Matrix-Gruppen, die keinen eigenen abweichenden Wert
+ * vorschreiben (Sprint C1, train-v204 — sportwissenschaftliche
+ * Validierung: de Salles et al. 2009, Schoenfeld et al. 2016, Grgic et
+ * al. 2017/2018). `goal` kommt aus state.settings.goal ('kraftaufbau' |
+ * 'muskelaufbau' | 'fitness' | null) — nur 'kraftaufbau' zählt als
+ * Kraft-Ziel, 'muskelaufbau'/'fitness'/nicht gesetzt laufen alle über den
+ * Hypertrophie-Zweig (siehe DECISIONS.md).
+ */
+export function _pauseSecForRpe(rpe, goal, isCompound) {
+  if (rpe == null) return null;
+  const isStrength = goal === 'kraftaufbau';
+
+  if (rpe <= 6) return isStrength
+    ? (isCompound ? 120 : 90)
+    : (isCompound ? 90  : 60);
+  if (rpe <= 7) return isStrength
+    ? (isCompound ? 150 : 90)
+    : (isCompound ? 120 : 60);
+  if (rpe <= 8) return isStrength
+    ? (isCompound ? 180 : 120)
+    : (isCompound ? 120 : 90);
+  if (rpe <= 8.5) return isStrength
+    ? (isCompound ? 240 : 150)
+    : (isCompound ? 180 : 120);
+  if (rpe <= 9) return isStrength
+    ? (isCompound ? 240 : 180)
+    : (isCompound ? 180 : 120);
+  if (rpe <= 9.5) return isStrength
+    ? (isCompound ? 300 : 210)
+    : (isCompound ? 240 : 150);
+  // rpe === 10
+  return isStrength
+    ? (isCompound ? 300 : 240)
+    : (isCompound ? 300 : 180);
 }
 
 /**
@@ -56,13 +83,21 @@ function _pauseSecForRpe(rpe) {
  * status-basierte Logik unverändert (B92-Vorlage deckte diesen Fall nicht
  * ab, siehe DECISIONS.md).
  *
+ * Seit Sprint C1 (train-v204): Pausendauer berücksichtigt zusätzlich das
+ * Trainingsziel (state.settings.goal) und ob die Übung compound oder
+ * isolation ist (movementMap.js isCompoundExercise()) — sportwissenschaftlich
+ * validierte Differenzierung statt einer einzigen RPE-Spalte, siehe
+ * DECISIONS.md.
+ *
  * @param {Object} s               Der gerade bewertete Satz
  * @param {Object} ex               Die zugehörige Übung
  * @param {string|null} sessionModifier  day.sessionModifier ('reduced'|'normal'|'optimal'|null)
  * @param {number} si              Index von `s` in ex.sets — für die Satz-zu-Satz-RPE-Trend-Erkennung
+ * @param {string|null} goal       state.settings.goal ('kraftaufbau'|'muskelaufbau'|'fitness'|null)
+ * @param {boolean} isCompound     movementMap.js isCompoundExercise(ex.name, categoryMap) — vom Aufrufer bestimmt (sessionCoach.js bleibt importfrei)
  * @returns {{ nextWeight: number, pauseSec: number|null, hint: string|null, repDiff: number|null, rpe: number|null, rpeZone: string|null, reps: number, targetReps: number, unit: string } | null}
  */
-export function buildSetFeedback(s, ex, sessionModifier, si) {
+export function buildSetFeedback(s, ex, sessionModifier, si, goal = null, isCompound = true) {
   if (!s || (s.status !== 'success' && s.status !== 'fail')) return null;
   const step = ex.weightStep || 2.5;
   const currentWeight = s.weight ?? 0;
@@ -93,7 +128,7 @@ export function buildSetFeedback(s, ex, sessionModifier, si) {
       nextWeight = currentWeight - step;
       hint = `Ziel deutlich verfehlt (-${repDiff} ${unit}) — reduzieren`;
     }
-    pauseSec = _pauseSecForRpe(rpe);
+    pauseSec = _pauseSecForRpe(rpe, goal, isCompound);
   } else if (repDiff === 1) { // Gruppe B: Wdh knapp verfehlt
     if (rpe <= 7) {
       nextWeight = currentWeight;
@@ -105,7 +140,7 @@ export function buildSetFeedback(s, ex, sessionModifier, si) {
       nextWeight = currentWeight - step;
       hint = `1 ${unit} gefehlt bei RPE ${rpe} — reduzieren`;
     }
-    pauseSec = _pauseSecForRpe(rpe);
+    pauseSec = _pauseSecForRpe(rpe, goal, isCompound);
   } else if (repDiff < 0) { // Gruppe D: Wdh übertroffen
     if (rpe <= 7) {
       nextWeight = currentWeight + step;
@@ -117,14 +152,15 @@ export function buildSetFeedback(s, ex, sessionModifier, si) {
       nextWeight = currentWeight;
       hint = 'Mehr Wdh aber hohe Intensität — halten';
     }
-    pauseSec = _pauseSecForRpe(rpe);
+    pauseSec = _pauseSecForRpe(rpe, goal, isCompound);
   } else { // Gruppe C: repDiff === 0, Wdh erreicht
-    if (rpe <= 6)        { nextWeight = currentWeight + step;        pauseSec = 90;  hint = 'Ziel erreicht, noch Luft — steigern'; }
-    else if (rpe < 8)    { nextWeight = currentWeight;                pauseSec = 120; hint = 'Ziel erreicht, gute Intensität — halten'; }
-    else if (rpe < 8.5)  { nextWeight = currentWeight;                pauseSec = 180; hint = 'Optimale Zone — halten'; }
-    else if (rpe < 9)    { nextWeight = currentWeight;                pauseSec = 180; hint = 'Ziel erreicht aber hart — nächster Satz halten, Pause verlängern'; }
-    else if (rpe < 10)   { nextWeight = currentWeight - step;         pauseSec = 240; hint = 'Sehr hart — reduzieren'; }
-    else                 { nextWeight = currentWeight - (step * 2);   pauseSec = 300; hint = 'Maximum — deutlich reduzieren'; }
+    if (rpe <= 6)        { nextWeight = currentWeight + step;      hint = 'Ziel erreicht, noch Luft — steigern'; }
+    else if (rpe < 8)    { nextWeight = currentWeight;              hint = 'Ziel erreicht, gute Intensität — halten'; }
+    else if (rpe < 8.5)  { nextWeight = currentWeight;              hint = 'Optimale Zone — halten'; }
+    else if (rpe < 9)    { nextWeight = currentWeight;              hint = 'Ziel erreicht aber hart — nächster Satz halten, Pause verlängern'; }
+    else if (rpe < 10)   { nextWeight = currentWeight - step;       hint = 'Sehr hart — reduzieren'; }
+    else                 { nextWeight = currentWeight - (step * 2); hint = 'Maximum — deutlich reduzieren'; }
+    pauseSec = _pauseSecForRpe(rpe, goal, isCompound);
   }
 
   // Trend-Erkennung: RPE steigt gegenüber dem vorherigen bewerteten Satz

@@ -151,15 +151,16 @@ test('Trend-Erkennung: RPE steigt >=1.5 gegenüber Vorsatz -> längere Pause + H
   await setRpe(page, 0, 0, 0, 6);
   await toggleDone(page, 0, 0, 0);
 
-  // Satz 1: RPE 8 (Basiswert für repDiff=0/RPE<8.5 waere 180s) -- Anstieg
-  // 8-6=2 >= 1.5 -> Pause * 1.5 = 270s statt 180s.
+  // Satz 1: RPE 8 (Basiswert für repDiff=0/RPE<=8 -- Militärpress=Push=Compound,
+  // goal nicht gesetzt=Hypertrophie-Fallback -- waere 120s, Sprint C1) -- Anstieg
+  // 8-6=2 >= 1.5 -> Pause * 1.5 = 180s statt 120s.
   await setReps(page, 0, 0, 1, 8);
   await setRpe(page, 0, 0, 1, 8);
   await toggleDone(page, 0, 0, 1);
 
   const subLines = page.locator('.set-feedback__line--sub');
   await expect(subLines.nth(1)).toContainText('RPE steigt schnell');
-  await expect(subLines.nth(1)).toContainText('Pause: 5min'); // round(180*1.5)=270s -> "5min" (_fmtPause)
+  await expect(subLines.nth(1)).toContainText('Pause: 3min'); // round(120*1.5)=180 -> "3min" (_fmtPause)
 });
 
 // ─── Fix 3: Begründung ──────────────────────────────────────────────────────

@@ -39,6 +39,7 @@
 
 import { dispatch, subscribe, getState, A } from './state.js';
 import { buildSetFeedback } from './sessionCoach.js';
+import { buildCategoryMap, isCompoundExercise } from './movementMap.js';
 
 // ─── Wake Lock ────────────────────────────────────────────────────────────────
 
@@ -661,7 +662,8 @@ function _bindAppInteractions() {
           // ui.js-Kopplung.
           let pauseSec = ex?.pauseSec ?? 90;
           if (newState.settings?.sessionCoach !== false) {
-            const fb = buildSetFeedback(newSet, newEx, newDay?.sessionModifier ?? null, +doneBtn.dataset.si);
+            const isCompound = newEx ? isCompoundExercise(newEx.name, buildCategoryMap(newState.customExercises)) : true;
+            const fb = buildSetFeedback(newSet, newEx, newDay?.sessionModifier ?? null, +doneBtn.dataset.si, newState.settings?.goal ?? null, isCompound);
             if (fb?.pauseSec) pauseSec = fb.pauseSec;
           }
           window.dispatchEvent(new CustomEvent('train:set-done', {

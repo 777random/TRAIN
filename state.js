@@ -214,6 +214,7 @@ function buildDefaultState() {
       autoStartPauseTimer:            true,
       hideStreakBadge:                false, // B60: Streak-Badge im Trainings-Tab optional ausblendbar
       sessionCoach:                   true,  // B76: Pre-Session Check-in + Briefing
+      goal:                           null,  // Sprint C1: 'kraftaufbau'|'muskelaufbau'|'fitness'|null — für Pausenzeiten-Empfehlung
       dismissedNamePairs:             [], // [nameA, nameB][] – sortiert, getrimmt, lowercase
       autoWeek: {
         enabled:          false, // Hauptschalter automatische Wochenerstellung
@@ -940,6 +941,7 @@ function migrate(raw) {
   if (raw.settings.autoStartPauseTimer            === undefined) raw.settings.autoStartPauseTimer            = true;
   if (raw.settings.hideStreakBadge                === undefined) raw.settings.hideStreakBadge                = false;
   if (raw.settings.sessionCoach                   === undefined) raw.settings.sessionCoach                   = true;
+  if (raw.settings.goal                           === undefined) raw.settings.goal                           = null;
   if (!Array.isArray(raw.settings.dismissedNamePairs)) raw.settings.dismissedNamePairs = [];
   if (!raw.coachQuestion || typeof raw.coachQuestion !== 'object') {
     raw.coachQuestion = { weekStart: null, questionId: null, answer: null, outcome: null, measuredWeekStart: null };
