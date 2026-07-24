@@ -2586,3 +2586,27 @@ Eigentliche Aufgabe: SPRINT C2 (Gewichtsreduktion validiert) — /plan-Modus:
   uncommitted gelassen (Nutzer-Entscheidung).
 Loop 5: for-advisor.txt sollte am Sitzungsende aktualisiert werden (siehe
   nächste Session, falls diese hier vor dem regulären Sitzungsende endet)
+
+## 2026-07-24 train-v206
+Loop 1: 10/10 grün (1 Kaltstart-Flake beim ersten Versuch, danach sauber
+  reproduziert grün — bekanntes Muster)
+Loop 2: aktuell
+Loop 3: übersprungen — 17 Fixtures ≥15, keine UX-Hoch-Bugs
+Eigentliche Aufgabe: B97 (Übernehmen-Button auf Android/Mobile unsichtbar).
+  Diagnose aus Vorsession widerlegte die in der Vorlage angenommene
+  Flex-Wrap-Ursache (Root Cause war Scroll-Position, nicht CSS). Nutzer
+  bestätigte per Rückfrage: Scope auf ui.js erweitert (reines CSS hätte
+  nicht gereicht), UND die Priorität "zum eigenen Feedback scrollen" statt
+  "zum nächsten Satz zentrieren". Umsetzung: ui.js (data-di/ei/si auf
+  .set-feedback, toggle-done + confirm-set scrollen jetzt selbst,
+  setTimeout(50)-Muster wie move-ex-down wegen eines sonst verlorenen
+  Scrolls), styles.css (scroll-margin-bottom). 6 neue Tests
+  (tests/mobile_feedback_scroll.spec.js, 3 reale Mobile-Viewports + Desktop
+  + beide Bewertungs-Pfade) — Button nachweislich sichtbar UND klickbar.
+  Bekannter, nicht blockierender Restbefund: Pause-Pill überlappt noch
+  ~30% der rechten Button-Breite in einem Testfall (Zentrum bleibt
+  klickbar). Volle Suite grün (2 vorbestehende Flakes unter Parallel-Last
+  isoliert erneut grün, unabhängig von dieser Änderung). CACHE_VERSION
+  train-v205->v206, CSS ?v=200->201, SCHEMA unverändert. HANDOFF.md/
+  BUGS.md (B97)/DECISIONS.md/CLAUDE.md aktualisiert. Lokal committet,
+  Push steht noch aus.

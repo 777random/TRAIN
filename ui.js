@@ -2144,7 +2144,7 @@ function renderExercise(wk, di, ei, state) {
 function _renderIntraFeedback(fb, key, di, ei, si, mode, canAdopt) {
   if (!fb.hint) {
     return `
-<div class="set-feedback">
+<div class="set-feedback" data-di="${di}" data-ei="${ei}" data-si="${si}">
   <span class="set-feedback__line">→ Nächster Satz: ${fb.nextWeight}kg</span>
 </div>`;
   }
@@ -2171,7 +2171,7 @@ function _renderIntraFeedback(fb, key, di, ei, si, mode, canAdopt) {
   </div>`
     : '';
   return `
-<div class="set-feedback">
+<div class="set-feedback" data-di="${di}" data-ei="${ei}" data-si="${si}">
   <span class="set-feedback__line">→ Nächster Satz: ${fb.nextWeight}kg</span>
   <span class="set-feedback__line set-feedback__line--sub">${h(fb.hint)}${fb.pauseSec ? ` · Pause: ${_fmtPause(fb.pauseSec)}` : ''}${adoptBtnHtml}${confirmHtml}${whyToggleHtml}</span>${whyBodyHtml}
 </div>`;
@@ -2306,7 +2306,7 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
       const dismissed = msg.canAddSet && _optionalSetDismissed.has(feedbackKey);
       if (!dismissed) {
         intraCoachHtml = `
-<div class="set-feedback${msg.canAddSet ? ' set-feedback--action' : ''}">
+<div class="set-feedback${msg.canAddSet ? ' set-feedback--action' : ''}" data-di="${di}" data-ei="${ei}" data-si="${si}">
   <span class="set-feedback__line">→ ${h(msg.text)}</span>
   ${msg.canAddSet ? `<div class="set-feedback__actions">
     <button type="button" class="set-feedback__btn" data-action="add-optional-set" data-di="${di}" data-ei="${ei}" data-weight="${msg.suggestedWeight}">+ Satz hinzufügen</button>
@@ -4711,7 +4711,7 @@ function renderSettingsTab(state) {
   <div class="settings-section">
     <div class="settings-section__title">Info</div>
     <div class="settings-row">
-      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v205</div></div>
+      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v206</div></div>
     </div>
     <div class="settings-row">
       <div>
@@ -6023,6 +6023,20 @@ function _handleClick(e) {
           _maybeShowPrMomentToast(+di, +ei, +si, _prevPrWeight);
         }
       }
+      // Bugfix (Android-Report): das neu gerenderte Intra-Session-Feedback
+      // (inkl. "Übernehmen"-Button) konnte auf kurzen Mobile-Viewports
+      // unterhalb des sichtbaren Bereichs liegen, ohne dass hier je
+      // dorthin gescrollt wurde. block:'nearest' scrollt nur das nötige
+      // Minimum -- auf Desktop (meist ohnehin schon sichtbar) i.d.R. kein
+      // wahrnehmbarer Effekt. setTimeout wie beim bestehenden
+      // move-ex-down-Muster (Zeile ~5977) -- ein direkter, synchroner
+      // scrollIntoView traf hier noch den Render-Stand VOR dem finalen
+      // Re-Render und wurde von einem kurz danach folgenden Render wieder
+      // verworfen.
+      setTimeout(() => {
+        document.querySelector(`.set-feedback[data-di="${di}"][data-ei="${ei}"][data-si="${si}"]`)
+          ?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 50);
       break;
     }
 
@@ -6126,12 +6140,19 @@ function _handleClick(e) {
         }
         window.dispatchEvent(new CustomEvent('train:set-done', { detail: { pauseSec: _feedbackPauseSec ?? (_cex.pauseSec ?? 90), di: +di } }));
       }
-      const nextPending = (_aftEx?.sets ?? []).findIndex(s => s.status === 'pending');
-      if (nextPending !== -1) {
-        const nextRow = document.querySelector(`[data-action="toggle-done"][data-di="${di}"][data-ei="${ei}"][data-si="${nextPending}"]`)
-          ?.closest('.set-row');
-        nextRow?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
+      // Bugfix (Android-Report): bisher wurde hier aktiv zum NÄCHSTEN offenen
+      // Satz zentriert (block:'center') -- das drängte das gerade gerenderte
+      // Feedback (inkl. "Übernehmen"-Button) des SOEBEN bewerteten Satzes auf
+      // kurzen Mobile-Viewports aus dem sichtbaren Bereich. Der Athlet will
+      // nach der Bewertung zuerst sehen, was das System empfiehlt -- daher
+      // jetzt stattdessen zum eigenen Feedback scrollen, block:'nearest'
+      // (minimales Scrollen, auf Desktop meist kein wahrnehmbarer Effekt).
+      // setTimeout wie beim bestehenden move-ex-down-Muster (Zeile ~5977),
+      // siehe Kommentar im toggle-done-Fall oben.
+      setTimeout(() => {
+        document.querySelector(`.set-feedback[data-di="${di}"][data-ei="${ei}"][data-si="${_csi}"]`)
+          ?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 50);
       break;
     }
 

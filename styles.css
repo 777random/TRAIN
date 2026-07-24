@@ -539,6 +539,10 @@ button, input, select, textarea { font: inherit; }
   display: flex; flex-direction: column; gap: 2px;
   padding: 2px var(--sp-2) var(--sp-1) calc(var(--sp-2) + 18px);
   animation: set-feedback-fade-in 200ms ease;
+  /* Android-Bugfix: verhindert, dass scrollIntoView() das Feedback direkt an
+     der unteren Kante stoppt, wo der fixe Pause-Timer-Pill (timer.js,
+     bottom:88px) es sonst überlagern könnte. */
+  scroll-margin-bottom: 100px;
 }
 @keyframes set-feedback-fade-in { from { opacity: 0; } to { opacity: 1; } }
 .set-feedback__line { font-size: 11px; color: var(--c-text-2); line-height: 1.4; }

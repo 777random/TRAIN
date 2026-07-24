@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-23 — Sprint C2 (Gewichtsreduktion validiert: Tagesform/Deload/Wiedereinstieg), train-v205, siehe unten. Sprint C1 (train-v204, Pausenzeiten) ist bereits gepusht und CI-grün (Commit `2c56877`).*
-*Nächster Schritt: Push dieses Sprints (C2) steht noch aus (Bestätigung ausstehend, siehe Push-Policy LOOPS.md). B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md) — braucht Name+Adresse+E-Mail vom Nutzer. B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten — weiterhin blockiert auf echte GoatCounter-Telemetrie (`js_error:`-Events im Dashboard prüfen). Aktuell keine weiteren offenen Bugs außer B55/B66. Möglicher Folge-Sprint (nicht angefordert): B79 (`_checkCompoundIsolationBalance`) auf die neue `isCompoundExercise()` umstellen, siehe DECISIONS.md. Loops 7-11 aktiv: Advisor-Exports werden am Ende jeder Session automatisch aktualisiert. for-advisor-consolidated.txt = Startpunkt für neue externe Chats. Nicht committet: `Research/TRAIN_Parameter_Review.md` (Nutzer-Recherche, bewusst uncommitted gelassen, siehe Sprint-C2-Sitzung).*
+*Letzte Aktualisierung: 2026-07-24 — B97 (Übernehmen-Button auf Mobile unsichtbar, Scroll-Fix), train-v206, siehe unten. Sprint C2 (train-v205) ist bereits gepusht und CI-grün.*
+*Nächster Schritt: Push von B97 steht noch aus (Bestätigung ausstehend, siehe Push-Policy LOOPS.md). Bekannter, nicht blockierender Restbefund aus B97: der fixe Pause-Timer-Pill überlappt in einem getesteten Fall noch die rechten ~30% des Übernehmen-Buttons (Zentrum bleibt klickbar) — mögliche Folge-Politur, nicht angefordert. B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md) — braucht Name+Adresse+E-Mail vom Nutzer. B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten. Möglicher Folge-Sprint (nicht angefordert): B79 (`_checkCompoundIsolationBalance`) auf die neue `isCompoundExercise()` umstellen, siehe DECISIONS.md. Loops 7-11 aktiv. Nicht committet: `Research/TRAIN_Parameter_Review.md` (Nutzer-Recherche, bewusst uncommitted gelassen).*
 
 ---
 
@@ -11,17 +11,32 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v205 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v206 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
-- CSS: ?v=200 (neue `.set-row--deload-skip`-Regel)
-- SCHEMA: 32 (unverändert — alle neuen Felder dieses Sprints
-  (`sessionModifierScope`, `deloadSkip`, `deloadPlannedForNext`) sind
-  optionale/sparse Felder mit sicherem Default bei Abwesenheit, kein
-  versionierter Migrations-Case nötig)
+- CSS: ?v=201 (neue `scroll-margin-bottom` auf `.set-feedback`)
+- SCHEMA: 32 (unverändert)
+- **B97 — Übernehmen-Button auf Mobile unsichtbar, Scroll-Fix (train-v206):**
+  Diagnose (Vorsession) widerlegte die anfängliche Flex-Wrap/CSS-Hypothese
+  per Playwright-Reproduktion (360×800/375×667/412×915) — echter Root
+  Cause war ein Scroll-Positions-Problem: `toggle-done` scrollte nie zum
+  neuen Feedback, `confirm-set` zentrierte aktiv auf den NÄCHSTEN Satz
+  (drängte das gerade gerenderte Feedback aus dem Blickfeld). Nutzer
+  bestätigte Scope-Erweiterung auf `ui.js` (reines CSS hätte nicht
+  gereicht) und die neue Priorität ("zum eigenen Feedback scrollen" statt
+  "zum nächsten Satz zentrieren"). Fix: `data-di/ei/si` auf
+  `.set-feedback`, beide Klick-Pfade scrollen jetzt selbst zum eigenen
+  Feedback (`block:'nearest'`), via `setTimeout(50)` (existierendes
+  `move-ex-down`-Muster — ein synchroner Aufruf traf einen kurz danach
+  ersetzten DOM-Knoten). 6 neue Tests
+  (`tests/mobile_feedback_scroll.spec.js`). Bekannter Restbefund:
+  Pause-Pill überlappt noch ~30% der rechten Button-Breite in einem
+  Testfall, Zentrum bleibt klickbar — Kernbeschwerde (Button komplett
+  unsichtbar) behoben. Details siehe BUGS.md B97. CACHE_VERSION
+  train-v205→v206, CSS ?v=200→201, SCHEMA unverändert.
 - Letzter Commit: lokal committet, Push steht noch aus (siehe „Nächster
-  Schritt" oben). Vorheriger gepushter Commit `2c56877` (train-v204,
-  Sprint C1), davor `67fc834`/`5137af9`.
+  Schritt" oben). Vorheriger gepushter Commit `a8e6c45` (train-v205,
+  Sprint C2), davor `2c56877` (train-v204, Sprint C1).
 - **B96 — Gewichtsreduktion validiert (Sprint C2, train-v205):** drei
   unabhängige Teile, sportwissenschaftlich validiert (Knowles et al. 2018,
   Bell et al. 2024, Bosquet et al. 2013, Pritchard et al. 2015 — siehe
