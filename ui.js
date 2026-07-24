@@ -416,23 +416,56 @@ function _wkRangeFull(sd) {
 }
 
 /**
- * Relative Wochen-Bezeichnung (Sprint C1, train-v108) — Abstand in Wochen
- * zwischen der angezeigten Woche und der chronologisch LETZTEN Woche
- * (getLatestWeek(), nicht state.curIdx selbst, da curIdx genau die Woche
- * ist deren Label hier berechnet wird — der Vergleichsanker muss ein vom
- * Navigieren unabhängiger Fixpunkt sein). Liefert null wenn keine Wochen
- * existieren.
+ * Bugfix (Nutzer-Report): die vorherige _relativeWeekLabel() verglich gegen
+ * getLatestWeek(weeks) (chronologisch letzte Woche IM ARRAY) statt gegen das
+ * echte heutige Kalenderdatum — sobald eine im Voraus erstellte Zukunftswoche
+ * existierte, wurde SIE fälschlich "Aktuelle Woche" genannt, die tatsächlich
+ * laufende Woche dagegen "Letzte Woche". _calendarCurrentWeek() findet
+ * stattdessen die Woche, deren Datumsbereich das echte "heute" enthält —
+ * unabhängig von curIdx und unabhängig davon, welche Woche zuletzt im Array
+ * liegt. Lokale Datumsarithmetik (kein toISOString()) bewusst wie in
+ * _relDate() (Vorgänger-Funktion) gehalten, um Zeitzonen-Rollover beim
+ * UTC-Runden zu vermeiden.
  */
-function _relativeWeekLabel(wk, weeks) {
-  const latest = getLatestWeek(weeks);
-  if (!latest) return null;
-  const diffMs    = new Date(wk.startDate + 'T12:00:00').getTime() - new Date(latest.startDate + 'T12:00:00').getTime();
-  const diffWeeks = Math.round(diffMs / (7 * 24 * 60 * 60 * 1000));
-  if (diffWeeks === 0)  return 'Aktuelle Woche';
-  if (diffWeeks === -1) return 'Letzte Woche';
-  if (diffWeeks === -2) return 'Vorletzte Woche';
-  if (diffWeeks < 0)    return `Vor ${-diffWeeks} Wochen`;
-  return `In ${diffWeeks} Wochen`;
+function _calendarCurrentWeek(weeks) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return weeks.find(w => {
+    const start = new Date(w.startDate + 'T00:00:00');
+    const end   = new Date(start);
+    end.setDate(end.getDate() + 7);
+    return start <= today && today < end;
+  }) ?? null;
+}
+
+/** 'YYYY-MM-DD' aus lokalen Datumskomponenten (kein toISOString()/UTC-Rollover). */
+function _localISODate(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/**
+ * Wochen-Bezeichnung, konsolidiert aus der vormals getrennten
+ * _relativeWeekLabel() (Wochen-Navigations-Header) und _relDate()
+ * (Wochenrückblick-Dropdown, Fortschritt-Tab) — ein einziger Ort statt
+ * zweier ähnlicher Implementierungen (Muster wie B44/B45/B74). Liefert
+ * immer einen String (nie null) — auch wenn keine Woche im State das
+ * heutige Datum enthält (Fallback: KW-Anzeige für jede Woche).
+ */
+function _weekLabel(week, weeks) {
+  const currentWeek = _calendarCurrentWeek(weeks);
+  if (currentWeek) {
+    if (week.startDate === currentWeek.startDate) return 'Diese Woche';
+
+    const nextMonday = new Date(currentWeek.startDate + 'T00:00:00');
+    nextMonday.setDate(nextMonday.getDate() + 7);
+    if (week.startDate === _localISODate(nextMonday)) return 'Nächste Woche';
+
+    const lastMonday = new Date(currentWeek.startDate + 'T00:00:00');
+    lastMonday.setDate(lastMonday.getDate() - 7);
+    if (week.startDate === _localISODate(lastMonday)) return 'Letzte Woche';
+  }
+  const d = new Date(week.startDate + 'T12:00:00');
+  return `KW ${_isoWeek(d)} · ${d.getFullYear()}`;
 }
 
 /**
@@ -654,7 +687,7 @@ function renderWeekHeader(state) {
       const vacBadge = isVac ? ' <span class="wk-badge-vacation">🏖 Urlaub</span>' : '';
       // Bei manuell umbenannter Woche hat der Nutzer-Name Vorrang vor der
       // relativen Bezeichnung — KW+Datum bleibt in beiden Fällen sekundär.
-      const primary = wk.label ? h(wk.label) : (_relativeWeekLabel(wk, state.weeks) ?? range);
+      const primary = wk.label ? h(wk.label) : _weekLabel(wk, state.weeks);
       labelEl.innerHTML = `${primary}${vacBadge}`;
       if (rangeEl) rangeEl.textContent = `KW ${String(kw).padStart(2,'0')} · ${range}`;
     } else {
@@ -1124,11 +1157,13 @@ function _prevWeekBanner(state, wk, di) {
  * `state.weeks[state.curIdx]` wäre daher eine Tautologie (immer wahr) und
  * WEEK_NAVIGATE ändert curIdx auch beim reinen Durchblättern vergangener
  * Wochen (state.js, WEEK_NAVIGATE-Reducer). Das hätte den Session Coach
- * fälschlich auch in alten Wochen gezeigt. Stattdessen wie bereits an
- * anderer Stelle etabliert (_relativeWeekLabel, B72/DECISIONS.md
- * "Letzte Woche mit echten Daten per Rückwärtssuche, nicht per Array-
- * Position") gegen `getLatestWeek()` verglichen — die chronologisch
- * letzte Woche, unabhängig von Navigation.
+ * fälschlich auch in alten Wochen gezeigt. Stattdessen gegen `getLatestWeek()`
+ * verglichen — die chronologisch letzte Woche, unabhängig von Navigation.
+ * ACHTUNG: bewusst NICHT dasselbe wie `_weekLabel()`/`_calendarCurrentWeek()`
+ * (die dort gegen das echte Kalenderdatum vergleichen, seit dem Fix der
+ * Wochenbezeichnung, train-v208/B99) — Session Coach "heute" bleibt laut
+ * DECISIONS.md B82 bewusst an die zuletzt aktive Trainingswoche gekoppelt,
+ * nicht an den Kalender, um Mo/Mi/Fr-Splits zu unterstützen.
  */
 function _isTodayDay(wk, di) {
   const day = wk.days[di];
@@ -2860,16 +2895,6 @@ function _avgRepsLast4(exName, allWeeks) {
   return repsSum.length ? Math.round(repsSum.reduce((a, b) => a + b) / repsSum.length) : null;
 }
 
-function _relDate(startDate) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const weekStart = new Date(startDate + 'T00:00:00');
-  const diffDays = Math.round((today - weekStart) / 86_400_000);
-  if (diffDays < 7)  return 'Diese Woche';
-  if (diffDays < 14) return 'Letzte Woche';
-  const weeks = Math.floor(diffDays / 7);
-  return `Vor ${weeks} Wochen`;
-}
 
 function _renderMovementPattern(state) {
   const RADAR_CATS = ['Push', 'Pull', 'Squat', 'Hinge', 'Carry', 'Core'];
@@ -3801,7 +3826,7 @@ function renderProgressTab(state) {
   const reviewableWeeks = [...sorted].filter(w => w.days.some(d => d.markedDone)).reverse();
   const weekReviewHtml = reviewableWeeks.length ? (() => {
     const opts = reviewableWeeks.map((wk, i) => {
-      const lbl = `${_relDate(wk.startDate)} · ${wkRange(wk.startDate)}${wk.note ? ' · ' + wk.note : ''}`;
+      const lbl = `${_weekLabel(wk, state.weeks)} · ${wkRange(wk.startDate)}${wk.note ? ' · ' + wk.note : ''}`;
       return `<option value="${i}">${h(lbl)}</option>`;
     }).join('');
     return `<div class="chart-card" id="week-review-card">
@@ -4711,7 +4736,7 @@ function renderSettingsTab(state) {
   <div class="settings-section">
     <div class="settings-section__title">Info</div>
     <div class="settings-row">
-      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v207</div></div>
+      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v208</div></div>
     </div>
     <div class="settings-row">
       <div>
@@ -5311,8 +5336,8 @@ function _handleClick(e) {
 
     // Plateau-Aktionen im Coach-Tab (Sprint C2, train-v109) — "since" ist der
     // Wochenstart der chronologisch letzten Woche, dieselbe Anker-Konvention
-    // wie _isPlateauSuppressed()/_relativeWeekLabel() (nicht state.curIdx,
-    // das kann beim Navigieren auf eine andere Woche zeigen).
+    // wie _isPlateauSuppressed() (nicht state.curIdx, das kann beim
+    // Navigieren auf eine andere Woche zeigen).
     case 'coach-answer': {
       dispatch(A.COACH_ANSWER, {
         weekStart:  el.dataset.week,

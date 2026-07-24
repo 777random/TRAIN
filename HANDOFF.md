@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-24 — B98 (Teilen auf Android startet Download statt Share-Dialog), train-v207, siehe unten. B97 (train-v206) ist bereits gepusht und CI-grün.*
-*Nächster Schritt: Push von B98 steht noch aus (Bestätigung ausstehend, siehe Push-Policy LOOPS.md). B98 ist ehrlich als "wahrscheinlichster, nicht 100% verifizierter Fix" markiert — ohne echtes Android-Gerät nicht letztgültig nachweisbar; neues GoatCounter-Event (`share_failed: <ErrorName>`) liefert bei Wiederauftreten die tatsächliche Ursache. Bekannter, nicht blockierender Restbefund aus B97: der fixe Pause-Timer-Pill überlappt in einem getesteten Fall noch die rechten ~30% des Übernehmen-Buttons. B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md). B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten. Möglicher Folge-Sprint (nicht angefordert): B79 (`_checkCompoundIsolationBalance`) auf die neue `isCompoundExercise()` umstellen, siehe DECISIONS.md. Loops 7-11 aktiv. Nicht committet: `Research/TRAIN_Parameter_Review.md` (Nutzer-Recherche, bewusst uncommitted gelassen).*
+*Letzte Aktualisierung: 2026-07-24 — B99 (Wochenbezeichnung folgt jetzt echtem Kalenderdatum statt Array-Position), train-v208, siehe unten. B98 (train-v207, Teilen auf Android) ist bereits gepusht (`dcd0656`) und CI-grün.*
+*Nächster Schritt: Push von B99 steht noch aus (Bestätigung ausstehend, siehe Push-Policy LOOPS.md). Bekannter, nicht blockierender Restbefund aus B97: der fixe Pause-Timer-Pill überlappt in einem getesteten Fall noch die rechten ~30% des Übernehmen-Buttons. B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md). B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten. Möglicher Folge-Sprint (nicht angefordert): B79 (`_checkCompoundIsolationBalance`) auf die neue `isCompoundExercise()` umstellen, siehe DECISIONS.md. `_isTodayDay()` teilt bewusst (B82) dasselbe `getLatestWeek()`-Muster, das B99 im Header/Dropdown gefixt hat — kein Bug im selben Sinn, siehe BUGS.md B99. Loops 7-11 aktiv. Nicht committet: `Research/TRAIN_Parameter_Review.md` (Nutzer-Recherche, bewusst uncommitted gelassen).*
 
 ---
 
@@ -11,11 +11,35 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v207 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v208 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
-- CSS: ?v=201 (unverändert — B98 ist reines JS)
+- CSS: ?v=201 (unverändert — B99 ist reines JS)
 - SCHEMA: 32 (unverändert)
+- **B99 — Wochenbezeichnung folgt jetzt echtem Kalenderdatum (train-v208):**
+  Nutzer meldete: im Voraus erstellte Zukunftswoche hieß fälschlich
+  "Aktuelle Woche", die echte laufende Woche "Letzte Woche". Root Cause
+  (Diagnose vorab, separate Session): `_relativeWeekLabel()` verglich gegen
+  `getLatestWeek(weeks)` (chronologisch letzte Woche IM ARRAY), nicht gegen
+  das echte heutige Datum — abweichend von der Vorlagen-Annahme, die einen
+  Vergleich gegen `state.curIdx` vermutete. Zweite Diskrepanz: das
+  Wochenrückblick-Dropdown (Fortschritt-Tab) hatte entgegen der Vorlagen-
+  Annahme KEINEN Bug — es nutzte bereits die eigene, korrekte `_relDate()`
+  gegen echtes `new Date()`. Nach Rückfrage (`AskUserQuestion`, 2 Fragen):
+  Nutzer bestätigte (a) beide Funktionen trotzdem zu einer gemeinsamen
+  `_weekLabel()` zu konsolidieren (DRY-Präzedenz B44/B45/B74), (b) das
+  neue engere Label-Schema ("Diese/Nächste/Letzte Woche" +
+  "KW N · Jahr"-Fallback) exakt wie in der Vorlage zu übernehmen, die
+  alten Zwischenstufen ("Vorletzte Woche"/"Vor N Wochen"/"In N Wochen")
+  fallen weg. Neue `_calendarCurrentWeek(weeks)` + `_weekLabel(week,
+  weeks)` (ui.js) — lokale Datumsarithmetik (kein `toISOString()`,
+  Zeitzonen-Rollover-Schutz wie im Rest der Codebasis), wiederverwendet
+  die bestehende `_isoWeek()` statt einer Neuimplementierung. Beide
+  Aufrufstellen (Header, Dropdown) vereinheitlicht. `_isTodayDay()`
+  bewusst unverändert gelassen (B82 — Session-Coach-"heute" ist absichtlich
+  kein Kalenderdatum). 4 neue Tests (`tests/week_label_calendar.spec.js`).
+  Details siehe BUGS.md B99. Volle Suite 147/147 grün. Nur `ui.js`
+  geändert, CACHE_VERSION train-v207→v208, CSS/SCHEMA unverändert.
 - **B98 — Teilen startet auf Android Download statt Share-Dialog (train-v207):**
   Folge-Vorlage nahm zwei Root Causes an (`canShare()` nicht vor `share()`
   geprüft; `canvas.toBlob()` nicht Promise-gewrappt), die beide bereits
@@ -45,9 +69,10 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
   `move-ex-down`-Muster). 6 neue Tests
   (`tests/mobile_feedback_scroll.spec.js`). Details siehe BUGS.md B97.
   CACHE_VERSION train-v205→v206, CSS ?v=200→201, SCHEMA unverändert.
-- Letzter Commit: lokal committet, Push steht noch aus (siehe „Nächster
-  Schritt" oben). Vorheriger gepushter Commit `923be73` (train-v206,
-  B97), davor `a8e6c45` (train-v205, Sprint C2).
+- Letzter Commit: B99 lokal committet, Push steht noch aus (siehe
+  „Nächster Schritt" oben). Vorheriger gepushter Commit `dcd0656`
+  (train-v207, B98), davor `923be73` (train-v206, B97), davor `a8e6c45`
+  (train-v205, Sprint C2).
 - **B96 — Gewichtsreduktion validiert (Sprint C2, train-v205):** drei
   unabhängige Teile, sportwissenschaftlich validiert (Knowles et al. 2018,
   Bell et al. 2024, Bosquet et al. 2013, Pritchard et al. 2015 — siehe

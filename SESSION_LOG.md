@@ -2632,5 +2632,34 @@ Eigentliche Aufgabe: B98 (Teilen auf Android startet Download statt
   grün. Ehrlich als nicht 100% verifizierbar markiert (kein Android-Gerät
   verfügbar) — neues Event liefert bei Wiederauftreten die echte Ursache.
   CACHE_VERSION train-v206->v207, CSS/SCHEMA unverändert. HANDOFF.md/
-  BUGS.md (B98)/DECISIONS.md/CLAUDE.md aktualisiert. Lokal committet,
-  Push steht noch aus.
+  BUGS.md (B98)/DECISIONS.md/CLAUDE.md aktualisiert. Committet
+  (dcd0656) und nach Bestätigung gepusht, CI grün.
+
+## 2026-07-24 (Fortsetzung) train-v208
+Loop 1: 10/10 grün
+Loop 2: aktuell
+Loop 3: übersprungen — Fixtures ≥15, keine UX-Hoch-Bugs
+Eigentliche Aufgabe: B99 (Wochenbezeichnung folgt Array-Position statt
+  echtem Kalenderdatum — im Voraus erstellte Zukunftswoche hieß
+  fälschlich "Aktuelle Woche"). Diagnose (separate Session, keine
+  Änderungen) bestätigte den Root Cause, widersprach der Sprint-Vorlage
+  aber in zwei Details: die betroffene Funktion heißt `_relativeWeekLabel`
+  (nicht `_weekLabel`) und vergleicht gegen `getLatestWeek(weeks)` (nicht
+  `state.curIdx`); das Wochenrückblick-Dropdown hatte entgegen der
+  Annahme keinen Bug (nutzte bereits die korrekte `_relDate()`). Per
+  Rückfrage (AskUserQuestion, 2 Fragen) bestätigt: (a) trotzdem
+  konsolidieren (DRY-Präzedenz B44/B45/B74), (b) neues engeres
+  Label-Schema exakt wie in der Vorlage übernehmen (alte Zwischenstufen
+  "Vorletzte Woche"/"Vor N Wochen"/"In N Wochen" entfallen). Umsetzung:
+  neue `_calendarCurrentWeek(weeks)` + `_weekLabel(week, weeks)` (ui.js,
+  ersetzt `_relativeWeekLabel()` und `_relDate()`), lokale
+  zeitzonensichere Datumsarithmetik statt der in der Vorlage
+  vorgeschlagenen `toISOString()`-Rundung, Wiederverwendung der
+  bestehenden `_isoWeek()`. Beide Aufrufstellen (Header, Dropdown)
+  vereinheitlicht. `_isTodayDay()` (B82, Session-Coach-Gate) bewusst
+  unverändert gelassen — teilt zwar dasselbe `getLatestWeek()`-Muster,
+  ist aber eine separate, bereits begründete Design-Entscheidung. 4 neue
+  Tests (tests/week_label_calendar.spec.js). Volle Suite 147/147 grün.
+  Nur ui.js geändert, CACHE_VERSION train-v207->v208, CSS/SCHEMA
+  unverändert. HANDOFF.md/BUGS.md (B99)/DECISIONS.md/CLAUDE.md
+  aktualisiert. Lokal committet, Push steht noch aus.
