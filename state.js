@@ -1407,7 +1407,22 @@ function _resetClonedDays(days) {
   });
 }
 
-function _applyPlannedProgression(days) {
+/**
+ * B101: ex.nextWeekPlan ist ein bereits im "Neue Woche"-Modal bestätigter
+ * Delta (kg/Wdh/Sätze) — normalerweise bereits weightStep-ausgerichtet
+ * (getWeightRecommendation()'s fullDelta/halfDelta = ex.weightStep bzw.
+ * dessen Hälfte), AUSSER bei zwei Wegen, die einen nicht ausgerichteten
+ * Delta erzeugen können: dem Recovery-Boost (ui.js, `rec.delta *= 1.5` bei
+ * aktivem isInRecoveryWindow(), OHNE dass danach neu gerundet wird) und dem
+ * manuell im "Anderer Wert"-Feld eingetragenen Custom-Delta (beliebige
+ * Nutzereingabe). Ohne Rundung HIER wich das tatsächlich in der neuen Woche
+ * gesetzte Gewicht vom im Modal angezeigten `recommendedWeight` ab (Bug-
+ * Report: Modal versprach z.B. 85kg, neue Woche zeigte 83.75kg). Rundung
+ * an dieser einzigen Stelle (statt an jeder Delta-Berechnungsstelle
+ * einzeln) fängt beide Fälle ab, ohne die Delta-Speicherung selbst
+ * anzufassen.
+ */
+function _applyPlannedProgression(days, state) {
   days.forEach(day => {
     (day.exercises ?? []).forEach(ex => {
       const plan = ex.nextWeekPlan || 0;
@@ -1425,7 +1440,11 @@ function _applyPlannedProgression(days) {
           if (ex.targetSets !== undefined) ex.targetSets += toAdd;
           console.log(`[TRAIN] sets-progression: "${ex.name}" nachher: ${ex.sets.length} Sätze`);
         } else {
-          (ex.sets ?? []).forEach(s => { s.weight = (parseFloat(s.weight) || 0) + plan; });
+          const step = ex.weightStep || state?.settings?.plateStep || 2.5;
+          (ex.sets ?? []).forEach(s => {
+            const raw = (parseFloat(s.weight) || 0) + plan;
+            s.weight = Math.round(raw / step) * step;
+          });
         }
       }
       ex.nextWeekPlan = 0;
@@ -1541,7 +1560,7 @@ function reduce(state, action) {
         templateWeek = resolved.templateWeek;
         pendingDeload = resolved.pendingDeload;
         days = clone(resolved.cloneSourceWeek.days);
-        _applyPlannedProgression(days);
+        _applyPlannedProgression(days, state);
       } else {
         // Explicit restart: load global template as-is (no auto-progression mapping)
         days = clone(state.customTemplate ?? FACTORY_TEMPLATE);

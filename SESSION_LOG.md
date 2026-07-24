@@ -2693,4 +2693,37 @@ Eigentliche Aufgabe: B100 ("Letzte Einheit: vor X Tagen" zeigte je nach
   vorbestehende Parallel-Last-Flakes bei Volllast isoliert erneut grün,
   wie bei B97). Nur ui.js geändert, CACHE_VERSION train-v208->v209,
   CSS/SCHEMA unverändert. HANDOFF.md/BUGS.md (B100)/DECISIONS.md/
-  CLAUDE.md aktualisiert. Lokal committet, Push steht noch aus.
+  CLAUDE.md aktualisiert. Committet (a55cc98) und nach Bestätigung
+  gepusht, CI grün.
+
+## 2026-07-24 (Fortsetzung) train-v210
+Loop 1: 10/10 grün
+Loop 2: aktuell
+Loop 3: übersprungen — Fixtures ≥15, keine UX-Hoch-Bugs
+Eigentliche Aufgabe: B101 (Automatische Steigerung bei neuer Woche zeigte
+  falsche kg-Zahl). Vor der Umsetzung technische Spec geschrieben (per
+  Anweisung) und zwei Diskrepanzen zur Fix-Vorlage per AskUserQuestion
+  geklärt: Root Cause 1 ("plateStep statt weightStep") traf nicht auf
+  _applyPlannedProgression()/den "Neue Woche"-Empfehlungspfad zu (dort
+  bereits korrekt ex.weightStep-first) — die zwei echten plateStep-ohne-
+  Fallback-Stellen liegen in weeklyFocus.js (_checkPersistentFailure/
+  _checkMultiExerciseFailure, anderes Feature), auf Nutzer-Bestätigung
+  trotzdem mitgefixt. Root Cause 3 (null-Fallback ignoriert weightStep)
+  existiert im Code nicht — ohne ≥2 Wochen Historie wird bewusst keine
+  Empfehlung gezeigt; auf Nutzer-Bestätigung NICHT neu eingeführt (wäre
+  Feature, kein Bugfix). Root Cause 2 (fehlende Rundung) bestätigt real:
+  _applyPlannedProgression() (state.js) wandte den bestätigten Delta
+  (ex.nextWeekPlan) ungerundet an — der Recovery-Boost (rec.delta *= 1.5
+  bei isInRecoveryWindow(), rundet nur den Anzeigewert neu, nicht das
+  Delta selbst) und ein manueller Custom-Wert konnten dadurch ein nicht
+  weightStep-ausgerichtetes Delta erzeugen (Modal versprach 85kg, neue
+  Woche zeigte 83.75kg). Fix: Rundung auf ex.weightStep zentral in
+  _applyPlannedProgression() (state als 2. Parameter für plateStep-
+  Fallback), plus ex.weightStep-Vorrang in den zwei weeklyFocus.js-Stellen.
+  5 neue Tests (tests/progression_rounding.spec.js). Volle Suite 157/157
+  grün (5 Tests initial durch Dev-Server-Verbindungsabbruch unter
+  Parallel-Last fehlgeschlagen, isoliert erneut alle grün, kein
+  Zusammenhang mit der Änderung). state.js + weeklyFocus.js geändert,
+  CACHE_VERSION train-v209->v210, CSS/SCHEMA unverändert. HANDOFF.md/
+  BUGS.md (B101)/DECISIONS.md/CLAUDE.md aktualisiert. Lokal committet,
+  Push steht noch aus.

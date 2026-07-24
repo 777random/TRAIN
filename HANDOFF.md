@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-24 — B100 ("Letzte Einheit: vor X Tagen" nutzt jetzt echten Zeitstempel statt Array-Index-Schätzung), train-v209, siehe unten. B99 (train-v208, Wochenbezeichnung) ist bereits gepusht (`258b9b0`) und CI-grün.*
-*Nächster Schritt: Push von B100 steht noch aus (Bestätigung ausstehend, siehe Push-Policy LOOPS.md). Bekannter, nicht blockierender Restbefund aus B97: der fixe Pause-Timer-Pill überlappt in einem getesteten Fall noch die rechten ~30% des Übernehmen-Buttons. B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md). B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten. Möglicher Folge-Sprint (nicht angefordert): B79 (`_checkCompoundIsolationBalance`) auf die neue `isCompoundExercise()` umstellen, siehe DECISIONS.md. `_isTodayDay()` teilt bewusst (B82) dasselbe `getLatestWeek()`-Muster, das B99 im Header/Dropdown gefixt hat — kein Bug im selben Sinn, siehe BUGS.md B99. `_weekdayName()` (progressInsights.js, "erfolgreichster Wochentag") teilt dieselbe Index-als-Kalendertag-Annahme, die B100 in `_dayDate()`/`_trainingContextAnchor()` gefixt hat — nicht Teil dieses Fixes, siehe BUGS.md B100. Loops 7-11 aktiv. Nicht committet: `Research/TRAIN_Parameter_Review.md` (Nutzer-Recherche, bewusst uncommitted gelassen).*
+*Letzte Aktualisierung: 2026-07-24 — B101 (Automatische Steigerung bei neuer Woche rundet jetzt korrekt auf ex.weightStep), train-v210, siehe unten. B100 (train-v209, "Letzte Einheit") ist bereits gepusht (`a55cc98`) und CI-grün.*
+*Nächster Schritt: Push von B101 steht noch aus (Bestätigung ausstehend, siehe Push-Policy LOOPS.md). Bekannter, nicht blockierender Restbefund aus B97: der fixe Pause-Timer-Pill überlappt in einem getesteten Fall noch die rechten ~30% des Übernehmen-Buttons. B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md). B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten. Möglicher Folge-Sprint (nicht angefordert): B79 (`_checkCompoundIsolationBalance`) auf die neue `isCompoundExercise()` umstellen, siehe DECISIONS.md. `_isTodayDay()` teilt bewusst (B82) dasselbe `getLatestWeek()`-Muster, das B99 im Header/Dropdown gefixt hat — kein Bug im selben Sinn, siehe BUGS.md B99. `_weekdayName()` (progressInsights.js, "erfolgreichster Wochentag") teilt dieselbe Index-als-Kalendertag-Annahme, die B100 gefixt hat — nicht Teil dieses Fixes, siehe BUGS.md B100. Loops 7-11 aktiv. Nicht committet: `Research/TRAIN_Parameter_Review.md` (Nutzer-Recherche, bewusst uncommitted gelassen).*
 
 ---
 
@@ -11,11 +11,39 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v209 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v210 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
-- CSS: ?v=201 (unverändert — B100 ist reines JS)
+- CSS: ?v=201 (unverändert — B101 ist reines JS)
 - SCHEMA: 32 (unverändert)
+- **B101 — Automatische Steigerung bei neuer Woche rundet jetzt auf ex.weightStep (train-v210):**
+  Nutzer meldete "falsche kg-Zahl als Steigerung vorgeschlagen" mit
+  vorgegebenem Fix (3 angenommene Root Causes). Vor der Umsetzung geprüft
+  (technische Spec + `AskUserQuestion`): Root Cause 1 ("plateStep statt
+  weightStep") traf nicht auf `_applyPlannedProgression()`/den "Neue
+  Woche"-Empfehlungspfad zu — dort stand bereits überall korrekt
+  `ex.weightStep || plateStep || 2.5`. Root Cause 3 (Fallback ohne
+  Historie) existiert nicht im Code — ohne ≥2 Wochen wird bewusst gar
+  keine Empfehlung gezeigt, kein Bug; nach Rückfrage bewusst nicht neu
+  eingeführt. Echter Root Cause (Root Cause 2, bestätigt): der im Modal
+  bestätigte Delta (`ex.nextWeekPlan`) wurde ungerundet angewendet
+  (`_applyPlannedProgression()`, state.js) — folgenlos im Normalfall, aber
+  der Recovery-Boost (`rec.delta *= 1.5` bei `isInRecoveryWindow()`, ohne
+  danach neu zu runden) und ein manueller Custom-Delta konnten ein nicht
+  weightStep-ausgerichtetes Delta erzeugen (Modal versprach z.B. 85kg,
+  neue Woche zeigte 83.75kg). Fix: Rundung auf `ex.weightStep` direkt in
+  `_applyPlannedProgression()` (eine Stelle statt vieler), Funktion
+  bekommt `state` als zweiten Parameter für den `plateStep`-Fallback.
+  Per Rückfrage zusätzlich Fix B: `_checkPersistentFailure()`/
+  `_checkMultiExerciseFailure()` (weeklyFocus.js, Coach-Tab-
+  Reduktionsvorschlag bei Dauer-Fehlschlägen) nutzten bisher immer das
+  globale `plateStep` statt `ex.weightStep` — jetzt mit Vorrang für
+  `ex.weightStep`, analog zu `getWeightRecommendation()`. 5 neue Tests
+  (`tests/progression_rounding.spec.js`). Details siehe BUGS.md B101.
+  Volle Suite 157/157 grün (5 Tests initial durch Dev-Server-Abbruch
+  unter Parallel-Last fehlgeschlagen, isoliert erneut alle grün, kein
+  Zusammenhang mit dieser Änderung). state.js + weeklyFocus.js geändert,
+  CACHE_VERSION train-v209→v210, CSS/SCHEMA unverändert.
 - **B100 — "Letzte Einheit: vor X Tagen" nutzt echten Zeitstempel (train-v209):**
   Nutzer meldete inkonsistente "vor X Tagen"-Werte je nach betrachtetem Tag.
   Diagnose vorab (separate Session): `_dayDate()`/`_trainingContextAnchor()`
@@ -96,9 +124,10 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
   `move-ex-down`-Muster). 6 neue Tests
   (`tests/mobile_feedback_scroll.spec.js`). Details siehe BUGS.md B97.
   CACHE_VERSION train-v205→v206, CSS ?v=200→201, SCHEMA unverändert.
-- Letzter Commit: B100 lokal committet, Push steht noch aus (siehe
-  „Nächster Schritt" oben). Vorheriger gepushter Commit `258b9b0`
-  (train-v208, B99), davor `dcd0656` (train-v207, B98), davor `923be73`
+- Letzter Commit: B101 lokal committet, Push steht noch aus (siehe
+  „Nächster Schritt" oben). Vorheriger gepushter Commit `a55cc98`
+  (train-v209, B100), davor `258b9b0` (train-v208, B99), davor `dcd0656`
+  (train-v207, B98), davor `923be73`
   (train-v206, B97), davor `a8e6c45`
   (train-v205, Sprint C2).
 - **B96 — Gewichtsreduktion validiert (Sprint C2, train-v205):** drei

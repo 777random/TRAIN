@@ -840,7 +840,7 @@ function _checkPersistentFailure(state) {
   const exNames = [...new Set(last3.flatMap(w => w.days.flatMap(d => d.exercises.map(e => e.name))))];
 
   for (const name of exNames) {
-    let succ = 0, fail = 0, weeksAttempted = 0, lastFailWeight = null;
+    let succ = 0, fail = 0, weeksAttempted = 0, lastFailWeight = null, lastFailWeightStep = null;
     for (const wk of last3) {
       let wkEvaluated = 0;
       for (const d of wk.days) for (const ex of d.exercises) if (ex.name === name) {
@@ -848,7 +848,7 @@ function _checkPersistentFailure(state) {
           if (s.status === 'success') { succ++; wkEvaluated++; }
           else if (s.status === 'fail') {
             fail++; wkEvaluated++;
-            if ((s.weight ?? 0) > 0) lastFailWeight = s.weight;
+            if ((s.weight ?? 0) > 0) { lastFailWeight = s.weight; lastFailWeightStep = ex.weightStep ?? null; }
           }
         }
       }
@@ -858,7 +858,11 @@ function _checkPersistentFailure(state) {
     // eine ausgelassene Woche soll nicht fälschlich mitzählen.
     if (weeksAttempted < 3) continue;
     if (succ === 0 && fail >= 3) {
-      const plateStep    = state.settings?.plateStep ?? 2.5;
+      // B101: ex.weightStep hat Vorrang vor dem globalen settings.plateStep
+      // (analog zu getWeightRecommendation()) — vorher wurde hier immer der
+      // globale Hantelscheiben-Schritt gerundet, unabhängig von der pro
+      // Übung eingestellten Schrittweite (z.B. 1.25kg bei Bizepscurls).
+      const plateStep    = lastFailWeightStep ?? state.settings?.plateStep ?? 2.5;
       const deloadFactor = state.settings?.deloadFactor ?? 0.75;
       const suggestedWeight = lastFailWeight != null
         ? roundToPlate(lastFailWeight * deloadFactor, plateStep)
@@ -918,12 +922,12 @@ function _checkMultiExerciseFailure(state) {
   for (const wk of last3) {
     for (const d of wk.days) for (const ex of d.exercises) {
       let entry = perExercise.get(ex.name);
-      if (!entry) { entry = { succ: 0, fail: 0, lastFailWeight: null }; perExercise.set(ex.name, entry); }
+      if (!entry) { entry = { succ: 0, fail: 0, lastFailWeight: null, lastFailWeightStep: null }; perExercise.set(ex.name, entry); }
       for (const s of ex.sets) {
         if (s.status === 'success') { succ++; entry.succ++; }
         else if (s.status === 'fail') {
           fail++; entry.fail++;
-          if ((s.weight ?? 0) > 0) entry.lastFailWeight = s.weight;
+          if ((s.weight ?? 0) > 0) { entry.lastFailWeight = s.weight; entry.lastFailWeightStep = ex.weightStep ?? null; }
         }
       }
     }
@@ -938,16 +942,21 @@ function _checkMultiExerciseFailure(state) {
   const rate = succ / totalEvaluated;
   if (rate > 0.20) return null;
 
-  const plateStep    = state.settings?.plateStep ?? 2.5;
   const deloadFactor = state.settings?.deloadFactor ?? 0.75;
 
   const affected = [...perExercise.entries()]
     .filter(([, v]) => (v.succ + v.fail) >= 2 && v.fail > 0)
-    .map(([name, v]) => ({
-      name,
-      rate: v.succ / (v.succ + v.fail),
-      suggestedWeight: v.lastFailWeight != null ? roundToPlate(v.lastFailWeight * deloadFactor, plateStep) : null,
-    }));
+    .map(([name, v]) => {
+      // B101: ex.weightStep pro betroffener Übung hat Vorrang vor dem
+      // globalen settings.plateStep — vorher wurde hier für ALLE betroffenen
+      // Übungen derselbe globale Hantelscheiben-Schritt verwendet.
+      const plateStep = v.lastFailWeightStep ?? state.settings?.plateStep ?? 2.5;
+      return {
+        name,
+        rate: v.succ / (v.succ + v.fail),
+        suggestedWeight: v.lastFailWeight != null ? roundToPlate(v.lastFailWeight * deloadFactor, plateStep) : null,
+      };
+    });
 
   if (affected.length < 2) return null;
 
