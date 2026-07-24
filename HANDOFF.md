@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-24 — B99 (Wochenbezeichnung folgt jetzt echtem Kalenderdatum statt Array-Position), train-v208, siehe unten. B98 (train-v207, Teilen auf Android) ist bereits gepusht (`dcd0656`) und CI-grün.*
-*Nächster Schritt: Push von B99 steht noch aus (Bestätigung ausstehend, siehe Push-Policy LOOPS.md). Bekannter, nicht blockierender Restbefund aus B97: der fixe Pause-Timer-Pill überlappt in einem getesteten Fall noch die rechten ~30% des Übernehmen-Buttons. B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md). B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten. Möglicher Folge-Sprint (nicht angefordert): B79 (`_checkCompoundIsolationBalance`) auf die neue `isCompoundExercise()` umstellen, siehe DECISIONS.md. `_isTodayDay()` teilt bewusst (B82) dasselbe `getLatestWeek()`-Muster, das B99 im Header/Dropdown gefixt hat — kein Bug im selben Sinn, siehe BUGS.md B99. Loops 7-11 aktiv. Nicht committet: `Research/TRAIN_Parameter_Review.md` (Nutzer-Recherche, bewusst uncommitted gelassen).*
+*Letzte Aktualisierung: 2026-07-24 — B100 ("Letzte Einheit: vor X Tagen" nutzt jetzt echten Zeitstempel statt Array-Index-Schätzung), train-v209, siehe unten. B99 (train-v208, Wochenbezeichnung) ist bereits gepusht (`258b9b0`) und CI-grün.*
+*Nächster Schritt: Push von B100 steht noch aus (Bestätigung ausstehend, siehe Push-Policy LOOPS.md). Bekannter, nicht blockierender Restbefund aus B97: der fixe Pause-Timer-Pill überlappt in einem getesteten Fall noch die rechten ~30% des Übernehmen-Buttons. B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md). B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten. Möglicher Folge-Sprint (nicht angefordert): B79 (`_checkCompoundIsolationBalance`) auf die neue `isCompoundExercise()` umstellen, siehe DECISIONS.md. `_isTodayDay()` teilt bewusst (B82) dasselbe `getLatestWeek()`-Muster, das B99 im Header/Dropdown gefixt hat — kein Bug im selben Sinn, siehe BUGS.md B99. `_weekdayName()` (progressInsights.js, "erfolgreichster Wochentag") teilt dieselbe Index-als-Kalendertag-Annahme, die B100 in `_dayDate()`/`_trainingContextAnchor()` gefixt hat — nicht Teil dieses Fixes, siehe BUGS.md B100. Loops 7-11 aktiv. Nicht committet: `Research/TRAIN_Parameter_Review.md` (Nutzer-Recherche, bewusst uncommitted gelassen).*
 
 ---
 
@@ -11,11 +11,38 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v208 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v209 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
-- CSS: ?v=201 (unverändert — B99 ist reines JS)
+- CSS: ?v=201 (unverändert — B100 ist reines JS)
 - SCHEMA: 32 (unverändert)
+- **B100 — "Letzte Einheit: vor X Tagen" nutzt echten Zeitstempel (train-v209):**
+  Nutzer meldete inkonsistente "vor X Tagen"-Werte je nach betrachtetem Tag.
+  Diagnose vorab (separate Session): `_dayDate()`/`_trainingContextAnchor()`
+  (ui.js) schätzten das Datum eines Tages rein aus `startDate + dayIndex` —
+  korrekt nur bei täglichem Training in Array-Reihenfolge, falsch bei
+  Splits wie Mo/Mi/Fr. Fix-Vorlage nahm eine nicht existierende Funktion
+  `_daysSince()` an und schlug exakt dieselbe (bereits vorhandene, bereits
+  fehlerhafte) Index-Formel als "Fix" vor — vor der Umsetzung geprüft:
+  diese Formel kann die eigenen Akzeptanzkriterien AC1-5 (dichte Woche)
+  und AC6 (Mo/Mi/Fr-Split) nicht gleichzeitig erfüllen, weil eine reine
+  Funktion von `dayIndex` nicht wissen kann, welcher reale Wochentag ein
+  Slot ist — es gab dafür keine Datenquelle (kein `day.date`/`completedAt`
+  im State). Nach Rückfrage (`AskUserQuestion`): Scope-Erweiterung auf
+  state.js für ein neues Feld bestätigt. Beim Umsetzen zeigte sich: nicht
+  nötig — `day.sessionEndTs` (state.js, `DAY_TOGGLE_COMPLETE`) existiert
+  bereits seit SCHEMA 12 und wird bei jedem Tagesabschluss auf den echten
+  `Date.now()`-Zeitstempel gesetzt. Neue `_realDayDate(day, week, dayIdx)`
+  (ui.js) bevorzugt `sessionEndTs`, dann `sessionStartTs` (Session
+  begonnen, noch offen), erst danach die alte Index-Schätzung als
+  Fallback für Alt-Daten ganz ohne Zeitstempel. Bleibt dadurch doch bei
+  "Nur ui.js" — state.js unverändert. 5 neue Tests
+  (`tests/training_context_anchor.spec.js`), darunter ein direkter
+  Mo/Mi/Fr-Regressionstest (alt: "vor 9 Tagen" falsch → neu: "vor 2 Tagen"
+  richtig). Details siehe BUGS.md B100. Volle Suite 152/152 grün (2
+  unabhängige, vorbestehende Parallel-Last-Flakes bei Volllast erneut
+  isoliert grün, wie bei B97 dokumentiert). Nur `ui.js` geändert,
+  CACHE_VERSION train-v208→v209, CSS/SCHEMA unverändert.
 - **B99 — Wochenbezeichnung folgt jetzt echtem Kalenderdatum (train-v208):**
   Nutzer meldete: im Voraus erstellte Zukunftswoche hieß fälschlich
   "Aktuelle Woche", die echte laufende Woche "Letzte Woche". Root Cause
@@ -69,9 +96,10 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
   `move-ex-down`-Muster). 6 neue Tests
   (`tests/mobile_feedback_scroll.spec.js`). Details siehe BUGS.md B97.
   CACHE_VERSION train-v205→v206, CSS ?v=200→201, SCHEMA unverändert.
-- Letzter Commit: B99 lokal committet, Push steht noch aus (siehe
-  „Nächster Schritt" oben). Vorheriger gepushter Commit `dcd0656`
-  (train-v207, B98), davor `923be73` (train-v206, B97), davor `a8e6c45`
+- Letzter Commit: B100 lokal committet, Push steht noch aus (siehe
+  „Nächster Schritt" oben). Vorheriger gepushter Commit `258b9b0`
+  (train-v208, B99), davor `dcd0656` (train-v207, B98), davor `923be73`
+  (train-v206, B97), davor `a8e6c45`
   (train-v205, Sprint C2).
 - **B96 — Gewichtsreduktion validiert (Sprint C2, train-v205):** drei
   unabhängige Teile, sportwissenschaftlich validiert (Knowles et al. 2018,

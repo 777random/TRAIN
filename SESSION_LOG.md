@@ -2662,4 +2662,35 @@ Eigentliche Aufgabe: B99 (Wochenbezeichnung folgt Array-Position statt
   Tests (tests/week_label_calendar.spec.js). Volle Suite 147/147 grün.
   Nur ui.js geändert, CACHE_VERSION train-v207->v208, CSS/SCHEMA
   unverändert. HANDOFF.md/BUGS.md (B99)/DECISIONS.md/CLAUDE.md
-  aktualisiert. Lokal committet, Push steht noch aus.
+  aktualisiert. Committet (258b9b0) und nach Bestätigung gepusht, CI grün.
+
+## 2026-07-24 (Fortsetzung) train-v209
+Loop 1: 10/10 grün
+Loop 2: aktuell
+Loop 3: übersprungen — Fixtures ≥15, keine UX-Hoch-Bugs
+Eigentliche Aufgabe: B100 ("Letzte Einheit: vor X Tagen" zeigte je nach
+  betrachtetem Tag falsche Werte). Diagnose (separate Session, keine
+  Änderungen) hatte bereits ergeben: `_dayDate()`/`_trainingContextAnchor()`
+  schätzen das Datum eines Tages aus `startDate + dayIndex` — korrekt nur
+  bei täglichem Training in Array-Reihenfolge, falsch bei Splits wie
+  Mo/Mi/Fr. Fix-Vorlage nahm eine nicht existierende Funktion
+  `_daysSince()` an und schlug als "Fix" exakt dieselbe (bereits
+  fehlerhafte) Index-Formel vor. Vor der Umsetzung geprüft: diese Formel
+  kann die eigenen Akzeptanzkriterien AC1-5 (dichte Woche) und AC6
+  (Mo/Mi/Fr-Split) nicht gleichzeitig erfüllen — eine reine Funktion von
+  `dayIndex` kann nicht wissen, welcher reale Wochentag ein Slot ist,
+  ohne zusätzliche Datenquelle (kein `day.date`/`completedAt` im State).
+  Per Rückfrage (AskUserQuestion) Scope-Erweiterung auf state.js
+  bestätigt. Beim Umsetzen zeigte sich: nicht nötig — `day.sessionEndTs`
+  (state.js, DAY_TOGGLE_COMPLETE) existiert bereits seit SCHEMA 12 und
+  wird bei jedem Tagesabschluss auf den echten Zeitstempel gesetzt.
+  Neue `_realDayDate(day, week, dayIdx)` (ui.js) bevorzugt sessionEndTs,
+  dann sessionStartTs, erst danach die alte Index-Schätzung als
+  Fallback für Alt-Daten ohne Zeitstempel — bleibt dadurch doch bei
+  "Nur ui.js". 5 neue Tests (tests/training_context_anchor.spec.js),
+  darunter ein Mo/Mi/Fr-Regressionstest (alt "vor 9 Tagen" falsch -> neu
+  "vor 2 Tagen" richtig). Volle Suite 152/152 grün (2 unabhängige,
+  vorbestehende Parallel-Last-Flakes bei Volllast isoliert erneut grün,
+  wie bei B97). Nur ui.js geändert, CACHE_VERSION train-v208->v209,
+  CSS/SCHEMA unverändert. HANDOFF.md/BUGS.md (B100)/DECISIONS.md/
+  CLAUDE.md aktualisiert. Lokal committet, Push steht noch aus.

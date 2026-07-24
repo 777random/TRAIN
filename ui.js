@@ -999,11 +999,33 @@ function renderDayCard(wk, di, state) {
 }
 
 /** Kalenderdatum eines Tags innerhalb einer Woche — Tag-Index = Tage-Offset
- * ab week.startDate (gleiche Konvention wie _weekdayName() in progressInsights.js). */
+ * ab week.startDate (gleiche Konvention wie _weekdayName() in progressInsights.js).
+ * Nur noch Fallback-Schätzung, siehe _realDayDate() — korrekt nur, wenn an
+ * jedem Wochentag in Array-Reihenfolge trainiert wird. */
 function _dayDate(wk, dayIdx) {
   const d = new Date(wk.startDate + 'T12:00:00');
   d.setDate(d.getDate() + dayIdx);
   return d;
+}
+
+/**
+ * Bugfix (Nutzer-Report, B100): _dayDate() schätzt das Kalenderdatum eines
+ * Tages rein aus dem Array-Index (startDate + dayIdx) — korrekt nur, wenn
+ * an jedem Wochentag in Array-Reihenfolge trainiert wird. Bei Splits ohne
+ * tägliches Training (z.B. Mo/Mi/Fr) rutscht die Schätzung um einen Tag
+ * pro übersprungenem Tag (genau das gemeldete Verhalten). Ein echter
+ * Zeitstempel existiert bereits: `day.sessionEndTs` wird seit SCHEMA 12
+ * bei jedem Tagesabschluss gesetzt (`DAY_TOGGLE_COMPLETE`, state.js) — kein
+ * neues Feld, keine state.js-Änderung nötig. `sessionStartTs` als zweiter
+ * Fallback (Session begonnen, noch nicht abgeschlossen — z.B. ein Tag mit
+ * bereits bewerteten Sätzen, der noch offen ist). Nur für Alt-Daten ganz
+ * ohne Zeitstempel (vor SCHEMA 12) oder Tage ohne jede Timer-Nutzung
+ * bleibt die Index-Schätzung `_dayDate()` als letzter Fallback.
+ */
+function _realDayDate(day, week, dayIdx) {
+  if (day?.sessionEndTs)   return new Date(day.sessionEndTs);
+  if (day?.sessionStartTs) return new Date(day.sessionStartTs);
+  return _dayDate(week, dayIdx);
 }
 
 /**
@@ -1030,7 +1052,7 @@ function _trainingContextAnchor(state, wk, di) {
       if (!day) continue;
       const hasEvaluated = day.exercises.some(ex => ex.sets.some(s => s.status === 'success' || s.status === 'fail'));
       if (day.markedDone || hasEvaluated) {
-        found = { week: w, dayIdx: d };
+        found = { week: w, dayIdx: d, day };
         break;
       }
     }
@@ -1038,7 +1060,7 @@ function _trainingContextAnchor(state, wk, di) {
   if (!found) return null;
 
   const todayNoon = (() => { const d = new Date(); d.setHours(12, 0, 0, 0); return d; })();
-  const daysAgo = Math.max(0, Math.round((todayNoon - _dayDate(found.week, found.dayIdx)) / 86_400_000));
+  const daysAgo = Math.max(0, Math.round((todayNoon - _realDayDate(found.day, found.week, found.dayIdx)) / 86_400_000));
   const timeText = daysAgo === 0 ? 'heute' : daysAgo === 1 ? 'gestern' : `vor ${daysAgo} Tagen`;
   return { timeText };
 }
@@ -4736,7 +4758,7 @@ function renderSettingsTab(state) {
   <div class="settings-section">
     <div class="settings-section__title">Info</div>
     <div class="settings-row">
-      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v208</div></div>
+      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v209</div></div>
     </div>
     <div class="settings-row">
       <div>
