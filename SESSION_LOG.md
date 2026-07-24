@@ -2610,3 +2610,27 @@ Eigentliche Aufgabe: B97 (Übernehmen-Button auf Android/Mobile unsichtbar).
   train-v205->v206, CSS ?v=200->201, SCHEMA unverändert. HANDOFF.md/
   BUGS.md (B97)/DECISIONS.md/CLAUDE.md aktualisiert. Lokal committet,
   Push steht noch aus.
+
+## 2026-07-24 (Fortsetzung) train-v207
+Loop 1: 10/10 grün
+Loop 2: aktuell
+Loop 3: übersprungen — 17 Fixtures ≥15, keine UX-Hoch-Bugs
+Eigentliche Aufgabe: B98 (Teilen auf Android startet Download statt
+  Share-Dialog). Diagnose aus Vorsession widerlegte beide in der
+  Folge-Vorlage angenommenen Root Causes (canShare-Reihenfolge, toBlob-
+  Promise-Wrapping — beide bereits korrekt im Code). Nutzer bestätigte:
+  nicht 1:1 nach Vorlage umsetzen (hätte die bestehende Datenschutz-
+  Consent-Funktion B73 entfernt), stattdessen den tatsächlich
+  diagnostizierten Root Cause (verlorener User-Gesten-Kontext durch
+  mehrere await-Schritte vor navigator.share()) mit minimalem Eingriff
+  adressieren. Umsetzung: shareImage.js (Blob/File vor Consent-Await,
+  AbortError vs. andere Fehler unterschieden, neues GoatCounter-Event
+  bei anderen Fehlern nach B66-Observability-Muster). 3 neue Tests
+  (tests/share_error_handling.spec.js) — Zwischenfund: echtes,
+  asynchron nachladendes GoatCounter-Script überschrieb den Test-Mock,
+  externe Anfrage jetzt per page.route blockiert. Volle Suite 143/143
+  grün. Ehrlich als nicht 100% verifizierbar markiert (kein Android-Gerät
+  verfügbar) — neues Event liefert bei Wiederauftreten die echte Ursache.
+  CACHE_VERSION train-v206->v207, CSS/SCHEMA unverändert. HANDOFF.md/
+  BUGS.md (B98)/DECISIONS.md/CLAUDE.md aktualisiert. Lokal committet,
+  Push steht noch aus.

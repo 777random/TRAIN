@@ -474,13 +474,27 @@ function _ensureShareConsent() {
   });
 }
 
-/** Teilt den Canvas-Inhalt als PNG — natives Share-Sheet, sonst Download-Fallback. */
+/**
+ * Teilt den Canvas-Inhalt als PNG — natives Share-Sheet, sonst Download-Fallback.
+ *
+ * Bugfix (Android-Report, "Teilen startet Download statt Share-Dialog"):
+ * `navigator.share()` verlangt (besonders auf Android Chrome) einen noch
+ * "aktiven" User-Gesten-Kontext — jeder await dazwischen (Consent-Modal-Klick,
+ * canvas.toBlob() als echter Hintergrund-Task statt Microtask) kann diesen
+ * Kontext verfallen lassen, wodurch navigator.share() sofort mit einem Fehler
+ * abbricht, BEVOR ein natives Share-Sheet je erscheint. Blob/File werden
+ * daher jetzt VOR dem Consent-Await gebaut (ein asynchroner Schritt weniger
+ * zwischen letztem Klick und navigator.share() statt zwei) — behebt das
+ * Problem nicht mit Sicherheit (plattformseitige Einschränkung, ohne echtes
+ * Android-Gerät nicht abschließend verifizierbar), reduziert aber das Risiko.
+ * `_ensureShareConsent()` (B73) bleibt unverändert erhalten.
+ */
 export async function shareCanvas(canvas, filename, title) {
-  const consented = await _ensureShareConsent();
-  if (!consented) return;
-
   const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
   if (!blob) return;
+
+  const consented = await _ensureShareConsent();
+  if (!consented) return;
 
   if (navigator.share && navigator.canShare) {
     const file = new File([blob], filename, { type: 'image/png' });
@@ -488,8 +502,15 @@ export async function shareCanvas(canvas, filename, title) {
       try {
         await navigator.share({ files: [file], title });
         return;
-      } catch (_) {
-        // Nutzer hat abgebrochen oder Share fehlgeschlagen -> Download-Fallback
+      } catch (err) {
+        // AbortError = Nutzer hat den nativen Dialog selbst geschlossen ->
+        // das ist eine bewusste Entscheidung, kein Fehler und kein Download.
+        if (err?.name === 'AbortError') return;
+        // Jeder andere Fehler (z.B. verlorener Gesten-Kontext, siehe oben) ->
+        // anonymes GoatCounter-Event (nur der Fehlername, keine Nutzdaten,
+        // gleiches Muster wie der bestehende js_error-Pfad, siehe BUGS.md B66)
+        // + Download-Fallback wie bisher.
+        try { window.goatcounter?.count?.({ path: `share_failed: ${err?.name ?? 'unknown'}`, event: true }); } catch (_) { /* best effort */ }
       }
     }
   }

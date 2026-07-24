@@ -1,7 +1,7 @@
 # TRAIN — CLAUDE.md
 # Vollständiger Projektkontext für Claude Code
-# Stand: train-v206 / SCHEMA 32 / Juli 2026
-# Letztes Update: nach train-v206 (B97: Übernehmen-Button auf Mobile unsichtbar — Scroll-Fix)
+# Stand: train-v207 / SCHEMA 32 / Juli 2026
+# Letztes Update: nach train-v207 (B98: Teilen auf Android startet Download statt Share-Dialog)
 
 ---
 
@@ -49,7 +49,7 @@ TRAIN ist eine deutschsprachige PWA für Krafttraining. Pure Vanilla ES Modules 
   Sessions müssen aus diesem neuen Pfad heraus gestartet werden, sonst
   landet man am alten (jetzt leeren) OneDrive-Ort. Nutzer zieht den Ordner
   regelmäßig manuell auf eine externe Festplatte statt über Cloud-Sync.
-- Aktueller Stand: SCHEMA_VERSION 32 · CACHE_VERSION train-v206 · CSS ?v=201
+- Aktueller Stand: SCHEMA_VERSION 32 · CACHE_VERSION train-v207 · CSS ?v=201
 
 ---
 
@@ -190,7 +190,7 @@ Bei unklarem Root Cause immer erst Diagnose → Ergebnis abwarten → dann Fix. 
 | `registerSW.js` | Service Worker Registrierung, Storage-Error, SW-Update Event. |
 | `dragdrop.js` | Minifizierter Third-Party Drag-Drop Polyfill — NICHT bearbeiten. |
 | `icons.js` | SVG Icon Strings als named constants. |
-| `shareImage.js` | Seit train-v186 (B68), Wochenrückblick-Canvas seit v187 (B71) mit Bezier-Sparkline neu aufgebaut, seit v189 (B73) Favoriten-Kaskade/Retina-Deckelung/PR-Moment-Redesign/Datenschutz-Consent-Gate. Canvas-basierte Share-Bilder (PR-Moment + Wochenrückblick, 1080×1080 PNG, DPR max. 3x). Importfrei/State-frei (Tiefe 0), Farben live via `getComputedStyle()`. Teilen via `navigator.share`/`canShare` mit Download-Fallback (identisches Muster wie `backup.js`), kein Server-Upload. Einmaliger Datenschutz-Hinweis vor dem ersten Teilen (`localStorage['train_share_consent']`), zentral in `shareCanvas()` für alle Einstiegspunkte. |
+| `shareImage.js` | Seit train-v186 (B68), Wochenrückblick-Canvas seit v187 (B71) mit Bezier-Sparkline neu aufgebaut, seit v189 (B73) Favoriten-Kaskade/Retina-Deckelung/PR-Moment-Redesign/Datenschutz-Consent-Gate. Canvas-basierte Share-Bilder (PR-Moment + Wochenrückblick, 1080×1080 PNG, DPR max. 3x). Importfrei/State-frei (Tiefe 0), Farben live via `getComputedStyle()`. Teilen via `navigator.share`/`canShare` mit Download-Fallback (identisches Muster wie `backup.js`), kein Server-Upload. Einmaliger Datenschutz-Hinweis vor dem ersten Teilen (`localStorage['train_share_consent']`), zentral in `shareCanvas()` für alle Einstiegspunkte. Seit train-v207 (B98): Blob/File werden vor dem Consent-Await gebaut (weniger async-Schritte vor `navigator.share()`, Android-Bugfix — "transient activation" kann sonst verfallen); `AbortError` löst keinen Download aus, jeder andere Fehler zusätzlich ein anonymes GoatCounter-Event (`share_failed: <ErrorName>`). |
 
 ### State Layer (`state.js`):
 

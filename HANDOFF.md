@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-24 — B97 (Übernehmen-Button auf Mobile unsichtbar, Scroll-Fix), train-v206, siehe unten. Sprint C2 (train-v205) ist bereits gepusht und CI-grün.*
-*Nächster Schritt: Push von B97 steht noch aus (Bestätigung ausstehend, siehe Push-Policy LOOPS.md). Bekannter, nicht blockierender Restbefund aus B97: der fixe Pause-Timer-Pill überlappt in einem getesteten Fall noch die rechten ~30% des Übernehmen-Buttons (Zentrum bleibt klickbar) — mögliche Folge-Politur, nicht angefordert. B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md) — braucht Name+Adresse+E-Mail vom Nutzer. B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten. Möglicher Folge-Sprint (nicht angefordert): B79 (`_checkCompoundIsolationBalance`) auf die neue `isCompoundExercise()` umstellen, siehe DECISIONS.md. Loops 7-11 aktiv. Nicht committet: `Research/TRAIN_Parameter_Review.md` (Nutzer-Recherche, bewusst uncommitted gelassen).*
+*Letzte Aktualisierung: 2026-07-24 — B98 (Teilen auf Android startet Download statt Share-Dialog), train-v207, siehe unten. B97 (train-v206) ist bereits gepusht und CI-grün.*
+*Nächster Schritt: Push von B98 steht noch aus (Bestätigung ausstehend, siehe Push-Policy LOOPS.md). B98 ist ehrlich als "wahrscheinlichster, nicht 100% verifizierter Fix" markiert — ohne echtes Android-Gerät nicht letztgültig nachweisbar; neues GoatCounter-Event (`share_failed: <ErrorName>`) liefert bei Wiederauftreten die tatsächliche Ursache. Bekannter, nicht blockierender Restbefund aus B97: der fixe Pause-Timer-Pill überlappt in einem getesteten Fall noch die rechten ~30% des Übernehmen-Buttons. B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md). B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten. Möglicher Folge-Sprint (nicht angefordert): B79 (`_checkCompoundIsolationBalance`) auf die neue `isCompoundExercise()` umstellen, siehe DECISIONS.md. Loops 7-11 aktiv. Nicht committet: `Research/TRAIN_Parameter_Review.md` (Nutzer-Recherche, bewusst uncommitted gelassen).*
 
 ---
 
@@ -11,32 +11,43 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v206 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v207 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
-- CSS: ?v=201 (neue `scroll-margin-bottom` auf `.set-feedback`)
+- CSS: ?v=201 (unverändert — B98 ist reines JS)
 - SCHEMA: 32 (unverändert)
+- **B98 — Teilen startet auf Android Download statt Share-Dialog (train-v207):**
+  Folge-Vorlage nahm zwei Root Causes an (`canShare()` nicht vor `share()`
+  geprüft; `canvas.toBlob()` nicht Promise-gewrappt), die beide bereits
+  korrekt im Code waren — nach Rückfrage bestätigt: nicht 1:1 umgesetzt,
+  stattdessen der eigentlich diagnostizierte Root Cause (verlorener
+  User-Gesten-Kontext durch zwei `await`-Schritte vor `navigator.share()`)
+  adressiert, ohne die bestehende Datenschutz-Consent-Funktion (B73) zu
+  entfernen. `shareImage.js`: Blob/File jetzt vor dem Consent-Await gebaut
+  (ein async-Schritt weniger). `AbortError` löst keinen Download mehr aus,
+  jeder andere Fehler weiterhin Download + neues anonymes GoatCounter-Event
+  (`share_failed: <ErrorName>`, Observability-Muster wie B66). 3 neue Tests
+  (`tests/share_error_handling.spec.js`, gemockte `navigator.share`/
+  `canShare` — Zwischenfund: Mock wurde vom echten, asynchron nachladenden
+  GoatCounter-Script überschrieben, Tests blockieren die externe Anfrage
+  jetzt gezielt). **Nicht mit letzter Sicherheit als vollständig behoben
+  bestätigt** (plattformseitige Einschränkung, kein echtes Android-Gerät
+  verfügbar) — siehe BUGS.md B98. Volle Suite 143/143 grün. CACHE_VERSION
+  train-v206→v207, CSS/SCHEMA unverändert.
 - **B97 — Übernehmen-Button auf Mobile unsichtbar, Scroll-Fix (train-v206):**
-  Diagnose (Vorsession) widerlegte die anfängliche Flex-Wrap/CSS-Hypothese
-  per Playwright-Reproduktion (360×800/375×667/412×915) — echter Root
-  Cause war ein Scroll-Positions-Problem: `toggle-done` scrollte nie zum
-  neuen Feedback, `confirm-set` zentrierte aktiv auf den NÄCHSTEN Satz
-  (drängte das gerade gerenderte Feedback aus dem Blickfeld). Nutzer
-  bestätigte Scope-Erweiterung auf `ui.js` (reines CSS hätte nicht
-  gereicht) und die neue Priorität ("zum eigenen Feedback scrollen" statt
-  "zum nächsten Satz zentrieren"). Fix: `data-di/ei/si` auf
-  `.set-feedback`, beide Klick-Pfade scrollen jetzt selbst zum eigenen
+  Diagnose widerlegte die anfängliche Flex-Wrap/CSS-Hypothese per
+  Playwright-Reproduktion (360×800/375×667/412×915) — echter Root Cause
+  war ein Scroll-Positions-Problem: `toggle-done` scrollte nie zum neuen
+  Feedback, `confirm-set` zentrierte aktiv auf den NÄCHSTEN Satz (drängte
+  das gerade gerenderte Feedback aus dem Blickfeld). Fix: `data-di/ei/si`
+  auf `.set-feedback`, beide Klick-Pfade scrollen jetzt selbst zum eigenen
   Feedback (`block:'nearest'`), via `setTimeout(50)` (existierendes
-  `move-ex-down`-Muster — ein synchroner Aufruf traf einen kurz danach
-  ersetzten DOM-Knoten). 6 neue Tests
-  (`tests/mobile_feedback_scroll.spec.js`). Bekannter Restbefund:
-  Pause-Pill überlappt noch ~30% der rechten Button-Breite in einem
-  Testfall, Zentrum bleibt klickbar — Kernbeschwerde (Button komplett
-  unsichtbar) behoben. Details siehe BUGS.md B97. CACHE_VERSION
-  train-v205→v206, CSS ?v=200→201, SCHEMA unverändert.
+  `move-ex-down`-Muster). 6 neue Tests
+  (`tests/mobile_feedback_scroll.spec.js`). Details siehe BUGS.md B97.
+  CACHE_VERSION train-v205→v206, CSS ?v=200→201, SCHEMA unverändert.
 - Letzter Commit: lokal committet, Push steht noch aus (siehe „Nächster
-  Schritt" oben). Vorheriger gepushter Commit `a8e6c45` (train-v205,
-  Sprint C2), davor `2c56877` (train-v204, Sprint C1).
+  Schritt" oben). Vorheriger gepushter Commit `923be73` (train-v206,
+  B97), davor `a8e6c45` (train-v205, Sprint C2).
 - **B96 — Gewichtsreduktion validiert (Sprint C2, train-v205):** drei
   unabhängige Teile, sportwissenschaftlich validiert (Knowles et al. 2018,
   Bell et al. 2024, Bosquet et al. 2013, Pritchard et al. 2015 — siehe
