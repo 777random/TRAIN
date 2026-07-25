@@ -1295,6 +1295,7 @@ exercise { position: unset; }
 .coach-focus-reasoning { font-size: 13px; color: var(--c-text-2); margin: 0 0 var(--sp-3); }
 .coach-focus-recommendation { font-size: 14px; font-weight: 600; color: var(--c-text); margin: 0; }
 .coach-focus-directive { font-size: 16px; font-weight: 700; color: var(--c-text); margin: 0 0 var(--sp-2); line-height: 1.4; }
+.coach-focus-subtext { font-size: 12px; color: var(--c-text-2); margin: 0 0 var(--sp-2); line-height: 1.4; }
 .coach-plateau-feedback { font-size: 14px; font-weight: 600; color: var(--c-text); margin: 0; line-height: 1.4; }
 .coach-confidence { font-size: 13px; margin: 0 0 var(--sp-3); }
 .coach-confidence--high   { color: var(--c-ok); }
@@ -1343,6 +1344,17 @@ exercise { position: unset; }
 .coach-structural-item + .coach-structural-item { margin-top: var(--sp-2); }
 .coach-structural-icon { flex-shrink: 0; }
 .coach-structural-text { line-height: 1.4; }
+.deload-info { flex-basis: 100%; margin-top: 2px; }
+.deload-info__badge {
+  display: inline-block; font-size: 12px; color: var(--c-text-2);
+  border: 1px solid var(--c-border); border-radius: 50%; padding: 0 4px;
+  cursor: pointer; list-style: none;
+}
+.deload-info__badge::-webkit-details-marker { display: none; }
+.deload-info__body {
+  margin-top: var(--sp-2); background: var(--c-surface2); color: var(--c-text-2);
+  font-size: 12px; line-height: 1.5; border-radius: var(--r-md); padding: var(--sp-2) var(--sp-3);
+}
 .chart-wrap { position: relative; min-height: 60px; }
 .chart-wrap canvas { width: 100% !important; }
 #chart-ex-wrap svg { display: block; }
@@ -2454,7 +2466,7 @@ details[open] > .deload-details__summary::before { content: '▾ '; }
   margin: 0; max-width: 320px;
 }
 .ob-backup-warn {
-  background: rgba(255,160,0,.1); border: 1px solid rgba(255,160,0,.3);
+  background: var(--c-surface2); border: 1px solid var(--c-border);
   border-radius: var(--r-md); padding: var(--sp-3) var(--sp-4);
   font-size: 13px; color: var(--c-text-2); line-height: 1.6;
   text-align: center; max-width: 320px;
@@ -2487,6 +2499,7 @@ details[open] > .deload-details__summary::before { content: '▾ '; }
 .ob-tpl-title { font-size: 14px; font-weight: 600; color: var(--c-text); }
 .ob-tpl-meta { font-size: 12px; color: var(--c-text-2); margin-top: 2px; }
 .ob-tpl-sub { font-size: 11px; color: var(--c-text-3); margin-top: 1px; }
+.ob-tpl-exercises { font-size: 11px; color: var(--c-text-3); margin-top: 4px; }
 .ob-tpl-recommended { font-size: 11px; color: var(--c-ok); font-weight: 600; margin-top: 4px; }
 
 .ob-choice-block { width: 100%; }

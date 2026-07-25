@@ -19,7 +19,7 @@ test('Datenschutz-Screen erscheint nach "Ohne Vorlage starten" und lässt sich f
 
   await page.click('[data-ob="skip"]');
   await expect(page.locator('.ob-screen h2')).toHaveText('Deine Daten bleiben bei dir');
-  await expect(page.locator('.ob-backup-warn')).toContainText('unwiderruflich weg');
+  await expect(page.locator('.ob-backup-warn')).toContainText('verloren');
   await expect(page.locator('.ob-backup-warn')).toContainText('Einstellungen → Backup');
 
   await page.click('[data-ob="privacy-continue"]');

@@ -784,6 +784,11 @@ function _fallback(state) {
       headline: 'Auf Kurs',
       reasoning: `Du baust gerade deine Datenbasis auf. Ab Woche 2 kann TRAIN konkrete Empfehlungen geben.${seedNote}`,
       recommendation: null,
+      // Früh-Phase-Hinweis: Coach-Tab braucht Wochen-Historie, Session Coach
+      // (Intra-Session-Feedback) dagegen nicht — nur in diesem Zweig gesetzt,
+      // damit er ausschließlich in Woche 1 erscheint (ui.js rendert ihn nur
+      // wenn das Feld vorhanden ist).
+      subtext: 'Der Coach-Tab gibt ab Woche 2 konkrete Empfehlungen. Session Coach gibt dir bereits heute nach jedem Satz Echtzeit-Feedback.',
     };
   }
   const variants = [

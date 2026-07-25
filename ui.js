@@ -3099,7 +3099,11 @@ function _structuralSignalHtml(sig) {
     return { icon: '🛑', text: `Erfolgsquote insgesamt nur ${sig.rate}% — am stärksten betroffen: ${names}.` };
   }
   if (sig.type === 'deload_preventive') {
-    return { icon: '🔄', text: `${sig.weeksSince} Wochen ohne Deload — Regenerationswoche einplanen.` };
+    return {
+      icon: '🔄',
+      text: `${sig.weeksSince} Wochen ohne Deload — Regenerationswoche einplanen.`,
+      info: 'Ein Deload ist eine Woche mit reduziertem Volumen (weniger Sätze). Er hilft deinem Körper sich zu erholen und verhindert Übertraining. Dein Gewicht bleibt gleich.',
+    };
   }
   if (sig.type === 'consistency_quality') {
     return { icon: '📉', text: 'Häufiger trainieren hilft gerade nicht — Qualität sinkt.' };
@@ -3529,6 +3533,10 @@ function renderCoachTab(state) {
       return `<div class="coach-structural-item">
         <span class="coach-structural-icon">${item.icon}</span>
         <span class="coach-structural-text">${h(item.text)}</span>
+        ${item.info ? `<details class="deload-info">
+          <summary class="deload-info__badge" aria-label="Was ist ein Deload?">?</summary>
+          <p class="deload-info__body">${h(item.info)}</p>
+        </details>` : ''}
       </div>`;
     }).join('')}
   </div>` : '';
@@ -3565,6 +3573,7 @@ function renderCoachTab(state) {
     <div class="chart-card__title">📋 Fokus der Woche</div>
     <div class="coach-focus-status">${icon} ${h(focus.headline)}</div>
     <p class="coach-focus-directive">${h(directive)}</p>
+    ${focus.subtext ? `<p class="coach-focus-subtext">${h(focus.subtext)}</p>` : ''}
     ${confidenceHtml}
     ${decisionBtnsHtml}
     ${whyHtml}
@@ -4758,7 +4767,7 @@ function renderSettingsTab(state) {
   <div class="settings-section">
     <div class="settings-section__title">Info</div>
     <div class="settings-row">
-      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v210</div></div>
+      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v211</div></div>
     </div>
     <div class="settings-row">
       <div>
@@ -8357,17 +8366,16 @@ function _showOnboarding() {
     if (_obPhase === 'privacy') {
       el.innerHTML = `
         <div class="ob-screen">
-          <div style="font-size:48px;line-height:1">🔒</div>
+          <div style="font-size:48px;line-height:1">💾</div>
           <h2 class="ob-title ob-title--sm">Deine Daten bleiben bei dir</h2>
-          <p class="ob-sub">TRAIN hat kein Konto und keinen Server — alle deine Trainingsdaten (Sätze, Gewichte, Schlaf, Energie) bleiben ausschließlich auf diesem Gerät.</p>
+          <p class="ob-sub">TRAIN speichert alles ausschließlich auf diesem Gerät (Sätze, Gewichte, Schlaf, Energie) — kein Konto, kein Server, kein Login.</p>
           <div class="ob-backup-warn">
-            ⚠️ Löschst du den Browser-Cache/die Website-Daten oder setzt du
-            dein Gerät zurück, sind diese Daten <strong>unwiderruflich weg</strong>
-            — TRAIN hat keine Kopie und kann sie nicht wiederherstellen.
-            Sichere sie deshalb regelmäßig über
-            <strong>Einstellungen → Backup</strong> (JSON-Export).
+            💡 Weil alles nur lokal liegt, geht es beim Löschen des Browser-
+            Caches oder einem Geräte-Reset verloren — TRAIN hat keine Kopie.
+            Exportiere deine Daten deshalb regelmäßig über
+            <strong>Einstellungen → Backup</strong>, damit sie sicher sind.
           </div>
-          <button class="btn btn--accent ob-btn" data-ob="privacy-continue">Verstanden, weiter →</button>
+          <button class="btn btn--accent ob-btn" data-ob="privacy-continue">Verstanden</button>
         </div>`;
       return;
     }
@@ -8404,6 +8412,14 @@ function _showOnboarding() {
       ['fitness',      'Fitter werden'],
     ];
 
+    // Kurze Übungs-Vorschau je Vorlage — erste 3-5 eindeutige Übungsnamen
+    // über alle Tage hinweg, Reihenfolge wie in _ONBOARDING_TEMPLATES.
+    function _tplExercisePreview(t) {
+      const names = [...new Set((t.days ?? []).flatMap(d => (d.exercises ?? []).map(ex => ex.name)))];
+      if (names.length === 0) return 'Verschiedene Übungen';
+      return names.slice(0, 5).join(' · ');
+    }
+
     const cards = _ONBOARDING_TEMPLATES.map((t, i) => `
       <div class="ob-tpl-card${_selTpl === i ? ' is-selected' : ''}${_recommendedIdx === i ? ' ob-tpl-card--recommended' : ''}" data-ob="select" data-tpl="${i}">
         <span class="ob-tpl-icon">${t.icon}</span>
@@ -8411,6 +8427,7 @@ function _showOnboarding() {
           <div class="ob-tpl-title">${t.title}</div>
           <div class="ob-tpl-meta">${t.meta}</div>
           <div class="ob-tpl-sub">${t.sub}</div>
+          <div class="ob-tpl-exercises">${h(_tplExercisePreview(t))}</div>
           ${_recommendedIdx === i ? '<div class="ob-tpl-recommended">✓ Empfohlen für dich</div>' : ''}
         </div>
       </div>`).join('');

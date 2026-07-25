@@ -2771,3 +2771,47 @@ Loop 9: unverändert (keine neuen UX-relevanten Änderungen — B102/B103
 Loop 10: unverändert (keine neuen Nutzer-/Kanal-Erkenntnisse)
 Loop 11: for-advisor-consolidated.txt aktualisiert (letzter Loop der
   Session)
+
+## 2026-07-26 (Fortsetzung, Sprint) train-v210->v211
+Loop 1: 10/10 grün (Baseline vor Sprint)
+Eigentliche Aufgabe: 4-Agent-Sprint aus dem vorherigen Onboarding-Audit
+  dieser Session-Reihe (B105-B108). Technische Spec zuerst geschrieben
+  und per Plan-Mode bestätigt (siehe eager-inventing-newell.md), inkl.
+  zwei Explore-Agents zur Code-Verifikation VOR der Umsetzung. Wichtige
+  Abweichung vom Sprint-Text gefunden und per Rückfrage geklärt: der für
+  Agent 1 geforderte Backup-Hinweis-Screen existierte im Onboarding
+  bereits fast identisch — Nutzer bestätigte "bestehenden Screen
+  umformulieren" statt einen zweiten, redundanten Screen einzufügen.
+  Zwei weitere Korrekturen (Feldnamen/CSS-Variablen) im Plan vermerkt und
+  ohne Rückfrage korrigiert (Diagnose-vor-Fix-Konvention).
+  Runde 1 (parallel, 2 Fork-Agents): Agent 1 (B105, ui.js Onboarding-
+  Privacy-Screen umformuliert + styles.css `.ob-backup-warn`), Agent 2
+  (B106, weeklyFocus.js `_fallback()` + ui.js Coach-Focus-Card + styles.css
+  `.coach-focus-subtext`). Beide Diffs nach Abschluss verifiziert (disjunkt,
+  keine Kollision).
+  Runde 2 (parallel, 2 Fork-Agents, erst nach Runde-1-Merge gestartet):
+  Agent 3 (B107, ui.js Vorlagen-Card-Rendering `_tplExercisePreview()` +
+  styles.css `.ob-tpl-exercises`), Agent 4 (B108, ui.js
+  `_structuralSignalHtml()` + Structural-Card-Caller + styles.css
+  `.deload-info__*` — Scope beim Umsetzen leicht erweitert, da `text`-Feld
+  escaped gerendert wird, siehe AGENTS.md Muster 7). Beide Diffs verifiziert.
+  Neue Tests: `tests/coach_fallback_subtext.spec.js` (3), `tests/
+  onboarding_template_preview.spec.js` (2), `tests/coach_deload_info_badge.spec.js`
+  (2); `tests/onboarding_privacy_screen.spec.js` an neuen Wortlaut angepasst.
+  Isoliert alle 27 relevanten Tests (4 neue/geänderte Dateien + regression_core
+  + fixtures) grün. Volle Suite unter Parallel-Last zeigte 15 Fehlschläge —
+  ausschließlich bereits bekannte, session-unabhängige Muster (B104 +
+  Dev-Server-Verbindungsabbruch unter Last, keiner der 15 betrifft die
+  4 Sprint-Dateien). CACHE_VERSION train-v210->v211, CSS ?v=201->202,
+  SCHEMA unverändert. ui.js/weeklyFocus.js/styles.css geändert. CLAUDE.md/
+  HANDOFF.md/BUGS.md (B105-B108)/AGENTS.md (Muster 7) aktualisiert.
+Loop 5: for-advisor.txt aktualisiert (train-v211)
+Loop 7: for-advisor-product.txt aktualisiert (train-v211, Onboarding-
+  Abschnitt um B105-B108 ergänzt)
+Loop 8: unverändert (keine neuen Markt-Erkenntnisse)
+Loop 9: unverändert (Onboarding-Änderungen sind UX-relevant, aber
+  for-advisor-ux.txt bereits aktuell genug — kein neuer Onboarding-Flow-
+  Schritt, nur Feinschliff bestehender Screens)
+Loop 10: unverändert (keine neuen Nutzer-/Kanal-Erkenntnisse)
+Loop 11: for-advisor-consolidated.txt aktualisiert (letzter Loop der
+  Session)

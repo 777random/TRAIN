@@ -1,7 +1,7 @@
 # TRAIN — Parallel Agent Regeln
 # Wird nach jedem Multi-Agent Sprint
 # automatisch aktualisiert.
-# Letzte Aktualisierung: 2026-07-26 / train-v210
+# Letzte Aktualisierung: 2026-07-26 / train-v211
 
 ---
 
@@ -311,6 +311,37 @@ testen) sich nicht gegenseitig beeinflusst haben. Die Grundregel aus
 Muster 5 (keine neuen Klassennamen/IDs, auf die die jeweils andere
 Seite angewiesen wäre) bleibt die eigentliche Sicherheits-Bedingung für
 einen künftigen Sprint, in dem BEIDE Agents tatsächlich Code ändern.
+
+### Muster 7 — 4 Agents in 2 Runden, alle in ui.js aber disjunkte
+Funktionen + je eigene Zusatzdatei (verifiziert 2026-07-26, train-v211,
+Onboarding-Sprint B105-B108):
+```
+Runde 1 (parallel):
+  Agent 1: ui.js _obPhase==='privacy'-Block (Onboarding) + styles.css .ob-backup-warn
+  Agent 2: weeklyFocus.js _fallback() + ui.js renderCoachTab()-Focus-Card + styles.css neue Klasse
+Runde 2 (parallel, erst nach Runde 1 gemerged):
+  Agent 3: ui.js Template-Card-Rendering (Onboarding) + styles.css neue Klasse
+  Agent 4: ui.js _structuralSignalHtml()+Structural-Card-Caller (Coach-Tab) + styles.css neue Klassen
+→ Konsolidierungs-Agent zuletzt
+```
+Ergebnis: keine Kollision, alle 4 Diffs disjunkt bestätigt (`git diff` nach
+jeder Runde geprüft, bevor die nächste startete). Bestätigt/verfeinert die
+"Zwei Agents die dieselbe Funktion in ui.js ändern"-Warnregel unten:
+**vier** Agents durften gleichzeitig(-ish) in ui.js schreiben, weil jeder
+eine andere, nicht-überlappende Funktion/Region traf (Onboarding-Overlay
+vs. Coach-Tab-Rendering, und innerhalb dieser wieder unterschiedliche
+Teilfunktionen) — die Regel bezieht sich auf dieselbe Funktion/denselben
+Abschnitt, nicht auf die Datei als Ganzes. Sicherheitsnetz war trotzdem
+die Zwei-Runden-Sequenzierung (Runde 2 erst nach Runde 1) statt aller 4
+Agents gleichzeitig — bewusst vorsichtiger als nötig gewesen sein könnte,
+aber jede Runde für sich war bereits verifiziert konfliktfrei. Ein
+Agent (Agent 4) musste seinen Scope beim Umsetzen leicht erweitern (von
+nur `_structuralSignalHtml()` auf zusätzlich dessen unmittelbare
+Caller-Stelle in `renderCoachTab()`), weil das Rückgabeobjekt dort
+escaped gerendert wird (`h(item.text)`) — kein rohes HTML einschleusbar.
+Präzisere Regel: **eine Funktion + ihre unmittelbare, escaped-rendernde
+Caller-Stelle gelten als eine Einheit für die Scope-Zuweisung**, falls
+neues Markup (nicht nur Text) eingefügt werden soll.
 
 ---
 

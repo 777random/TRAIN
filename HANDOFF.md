@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-26 — B102+B103 diagnostiziert, kein Code-Fix nötig (beide nicht reproduzierbar gegen aktuelle Architektur), train-v210 UNVERÄNDERT, siehe unten. B101 (train-v210, "Automatische Steigerung") ist bereits gepusht (`332ebd6`) — die vorherige Notiz "Push steht noch aus" war ein Doku-Drift (Loop 2 hat das diese Session korrigiert). B100 (train-v209, "Letzte Einheit") ebenfalls bereits gepusht (`a55cc98`) und CI-grün.*
-*Nächster Schritt: Push dieser Session (BUGS.md/HANDOFF.md/SESSION_LOG.md/AGENTS.md-Updates + neuer Test `tests/set_feedback_spacing.spec.js`, kein CACHE_VERSION-Bump da kein produktiver Code geändert) braucht noch die reguläre Session-Bestätigung (Push-Policy LOOPS.md). Neu gefunden (B104, nicht im Scope dieser Session): zwei vorbestehende Tests (`streak_inprogress_week.spec.js`, `training_context_anchor.spec.js`) schlagen am heutigen Datum deterministisch fehl, vermutlich UTC-vs-lokal-Datumsdrift im Test-Fixture-Aufbau, nicht im Produktionscode — siehe BUGS.md B104 für eine spätere Diagnose-Session. Bekannter, nicht blockierender Restbefund aus B97: der fixe Pause-Timer-Pill überlappt in einem getesteten Fall noch die rechten ~30% des Übernehmen-Buttons. B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md). B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten. Möglicher Folge-Sprint (nicht angefordert): B79 (`_checkCompoundIsolationBalance`) auf die neue `isCompoundExercise()` umstellen, siehe DECISIONS.md. `_isTodayDay()` teilt bewusst (B82) dasselbe `getLatestWeek()`-Muster, das B99 im Header/Dropdown gefixt hat — kein Bug im selben Sinn, siehe BUGS.md B99. `_weekdayName()` (progressInsights.js, "erfolgreichster Wochentag") teilt dieselbe Index-als-Kalendertag-Annahme, die B100 gefixt hat — nicht Teil dieses Fixes, siehe BUGS.md B100. Loops 7-11 aktiv (diese Session: Loop 5+7+11 aktualisiert). Nicht committet: `Research/TRAIN_Parameter_Review.md` (Nutzer-Recherche, bewusst uncommitted gelassen).*
+*Letzte Aktualisierung: 2026-07-26 — B105-B108 (Onboarding-Verbesserungen: Backup-Hinweis-Retone, Coach-Tab-Fallback-Subtext, Vorlagen-Übungsvorschau, Deload-Erklärung), train-v211, siehe unten. B102+B103 (train-v210, diagnostiziert/kein Code-Fix) sowie B101/B100 bereits gepusht und CI-grün.*
+*Nächster Schritt: B3 Einstellungen restrukturieren, danach C3 Compound-Edit-Option, danach D2 "Heute anders" merken, danach E1 Transparenz Coach. Push dieser Session braucht noch die reguläre Session-Bestätigung (Push-Policy LOOPS.md). Weiterhin offen (B104, nicht in dieser Session bearbeitet): zwei vorbestehende Tests (`streak_inprogress_week.spec.js`, `training_context_anchor.spec.js`) mit vermutlicher UTC-vs-lokal-Datumsdrift im Test-Fixture-Aufbau — siehe BUGS.md B104 für eine spätere Diagnose-Session. Bekannter, nicht blockierender Restbefund aus B97: der fixe Pause-Timer-Pill überlappt in einem getesteten Fall noch die rechten ~30% des Übernehmen-Buttons. B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md). B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten. Möglicher Folge-Sprint (nicht angefordert): B79 (`_checkCompoundIsolationBalance`) auf die neue `isCompoundExercise()` umstellen, siehe DECISIONS.md. Loops 7-11 aktiv (diese Session: Loop 5+7+11 aktualisiert). Nicht committet: `Research/TRAIN_Parameter_Review.md` (Nutzer-Recherche, bewusst uncommitted gelassen).*
 
 ---
 
@@ -11,13 +11,36 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v210 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v211 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
-- CSS: ?v=201 (unverändert)
+- CSS: ?v=202
 - SCHEMA: 32 (unverändert)
+- **B105-B108 — Onboarding-Verbesserungen (train-v211, 2026-07-26):**
+  Vier-Agent-Sprint aus dem vorherigen Onboarding-Audit dieser Session-
+  Reihe. Zwei Explore-Agents haben den Code vor der Umsetzung verifiziert
+  (Diagnose-vor-Fix-Konvention) und dabei wichtige Abweichungen vom
+  Sprint-Text gefunden — alle unten korrigiert eingeplant statt blind
+  übernommen. **B105** (Backup-Hinweis): der geforderte Screen existierte
+  bereits fast identisch (`_obPhase === 'privacy'`, ui.js, exakt an der
+  richtigen Stelle) — nach Rückfrage (`AskUserQuestion`) bestätigt: statt
+  eines zweiten, redundanten Screens wurde der bestehende umformuliert
+  (🔒→💾, positiverer Ton, Kerninhalt zu Datenverlust bleibt erhalten).
+  **B106** (Coach-Tab-Fallback): `_fallback()` (weeklyFocus.js) zeigt in
+  der Frühphase jetzt zusätzlich einen `subtext`, der klarstellt, dass
+  Session Coach (Intra-Session-Feedback) schon ab dem ersten Satz
+  funktioniert, auch wenn der Coach-Tab selbst erst ab Woche 2 konkrete
+  Empfehlungen gibt — nur in diesem einen Kaskaden-Zweig gesetzt, daher
+  automatisch weg sobald ein reales Signal greift oder genug Historie
+  vorliegt. **B107** (Vorlagen-Vorschau): neue `.ob-tpl-exercises`-Zeile
+  zeigt die ersten 3-5 eindeutigen Übungsnamen je Onboarding-Vorlage.
+  **B108** (Deload-Erklärung): neues `?`-Info-Badge (natives `<details>`,
+  kein JS-State nötig) neben dem `deload_preventive`-Struktursignal im
+  Coach-Tab. Alle vier über 4 parallele Fork-Agents in 2 Runden umgesetzt
+  (Runde 1: Agent 1+2 disjunkt; Runde 2: Agent 3+4 disjunkt, erst nach
+  Runde 1 gestartet) — Details je Bug siehe BUGS.md B105-B108.
 - **B102+B103 — diagnostiziert, kein Code-Fix (2026-07-26, CACHE_VERSION
-  UNVERÄNDERT):** zwei gemeldete Bugs mit vorgegebenem Fix, beide über
+  UNVERÄNDERT damals):** zwei gemeldete Bugs mit vorgegebenem Fix, beide über
   einen dedizierten Diagnose-Agent pro Bug geprüft, BEVOR irgendetwas
   geändert wurde (Diagnose-vor-Fix-Konvention). B102 (Intra-Session-
   Feedback zu weit unten): `.set-feedback` padding-top bereits 2px,
