@@ -2727,3 +2727,47 @@ Eigentliche Aufgabe: B101 (Automatische Steigerung bei neuer Woche zeigte
   CACHE_VERSION train-v209->v210, CSS/SCHEMA unverändert. HANDOFF.md/
   BUGS.md (B101)/DECISIONS.md/CLAUDE.md aktualisiert. Lokal committet,
   Push steht noch aus.
+
+## 2026-07-26 train-v210 (unverändert)
+Loop 1: 10/10 grün (1 bekannter Dev-Server/Chromium-Kaltstart-Flake,
+  isoliert erneut grün, kein neues Problem)
+Loop 2: Doku-Drift gefunden und korrigiert — HANDOFF.md behauptete "Push
+  von B101 steht noch aus", `git status` zeigt aber "up to date with
+  origin/main" (B101/332ebd6 war bereits gepusht, nur die Notiz war
+  veraltet)
+Loop 3: übersprungen — 18 Fixtures ≥15, keine UX-Hoch-Bugs
+Loop 6: übersprungen (zuletzt geprüft: 2026-07-21, <90 Tage)
+Eigentliche Aufgabe: zwei parallele Bug-Reports mit vorgegebenem Fix
+  (B102: Intra-Session-Feedback zu weit unten, styles.css; B103:
+  Einstellungen-Modal schließt nicht bei Tap außerhalb, ui.js), je über
+  einen dedizierten Fork-Agenten diagnostiziert BEVOR irgendetwas
+  geändert wurde (Muster 6 in AGENTS.md). Beide Fix-Vorlagen passten
+  nicht zur tatsächlichen Architektur: B102 — `.set-feedback`
+  padding-top bereits 2px, gemessener Abstand (Playwright,
+  `getBoundingClientRect()`) über 3 Render-Pfade × 2 Viewports
+  (1280px/375px) ist überall 0px, reproduziert nicht. B103 —
+  "Einstellungen" ist gar kein Modal in diesem Code, sondern ein
+  normaler Nav-Tab; alle echten Overlays/⋮-Menüs im Code schließen
+  bereits bei Tap außerhalb. Kein Blindfix in beiden Fällen — styles.css
+  inhaltlich unverändert, ui.js unverändert. Einzige Änderung: neuer
+  Regressionstest `tests/set_feedback_spacing.spec.js` (2/2 grün, sperrt
+  Ist-Zustand fest). Volle Playwright-Suite als Pre-Push-Check: erster
+  Parallel-Lauf 31 failed (Dev-Server `ERR_CONNECTION_REFUSED` unter
+  Last, bekanntes Muster aus B97/B98/B100/B101), isolierter Neustart mit
+  gesundem Server reduzierte das auf 2 echte, aber vorbestehende und
+  nicht von dieser Session verursachte Fehlschläge (`streak_inprogress_
+  week.spec.js`, `training_context_anchor.spec.js` — deterministisch,
+  vermutlich UTC-vs-lokal-Datumsdrift im Test-Fixture-Aufbau, neu als
+  B104 getrackt, nicht im Scope dieser Session behoben). CACHE_VERSION/
+  CSS-Version bewusst NICHT erhöht — kein produktiver Code geändert.
+  HANDOFF.md/BUGS.md
+  (B102+B103)/AGENTS.md (Muster 6 + neue Parallel-Regel styles.css+ui.js)
+  aktualisiert. Lokal committet, Push nach Bestätigung.
+Loop 5: for-advisor.txt aktualisiert (train-v210)
+Loop 7: for-advisor-product.txt aktualisiert (train-v210)
+Loop 8: unverändert (keine neuen Markt-Erkenntnisse)
+Loop 9: unverändert (keine neuen UX-relevanten Änderungen — B102/B103
+  waren beide No-Ops)
+Loop 10: unverändert (keine neuen Nutzer-/Kanal-Erkenntnisse)
+Loop 11: for-advisor-consolidated.txt aktualisiert (letzter Loop der
+  Session)

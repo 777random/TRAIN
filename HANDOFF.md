@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-24 — B101 (Automatische Steigerung bei neuer Woche rundet jetzt korrekt auf ex.weightStep), train-v210, siehe unten. B100 (train-v209, "Letzte Einheit") ist bereits gepusht (`a55cc98`) und CI-grün.*
-*Nächster Schritt: Push von B101 steht noch aus (Bestätigung ausstehend, siehe Push-Policy LOOPS.md). Bekannter, nicht blockierender Restbefund aus B97: der fixe Pause-Timer-Pill überlappt in einem getesteten Fall noch die rechten ~30% des Übernehmen-Buttons. B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md). B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten. Möglicher Folge-Sprint (nicht angefordert): B79 (`_checkCompoundIsolationBalance`) auf die neue `isCompoundExercise()` umstellen, siehe DECISIONS.md. `_isTodayDay()` teilt bewusst (B82) dasselbe `getLatestWeek()`-Muster, das B99 im Header/Dropdown gefixt hat — kein Bug im selben Sinn, siehe BUGS.md B99. `_weekdayName()` (progressInsights.js, "erfolgreichster Wochentag") teilt dieselbe Index-als-Kalendertag-Annahme, die B100 gefixt hat — nicht Teil dieses Fixes, siehe BUGS.md B100. Loops 7-11 aktiv. Nicht committet: `Research/TRAIN_Parameter_Review.md` (Nutzer-Recherche, bewusst uncommitted gelassen).*
+*Letzte Aktualisierung: 2026-07-26 — B102+B103 diagnostiziert, kein Code-Fix nötig (beide nicht reproduzierbar gegen aktuelle Architektur), train-v210 UNVERÄNDERT, siehe unten. B101 (train-v210, "Automatische Steigerung") ist bereits gepusht (`332ebd6`) — die vorherige Notiz "Push steht noch aus" war ein Doku-Drift (Loop 2 hat das diese Session korrigiert). B100 (train-v209, "Letzte Einheit") ebenfalls bereits gepusht (`a55cc98`) und CI-grün.*
+*Nächster Schritt: Push dieser Session (BUGS.md/HANDOFF.md/SESSION_LOG.md/AGENTS.md-Updates + neuer Test `tests/set_feedback_spacing.spec.js`, kein CACHE_VERSION-Bump da kein produktiver Code geändert) braucht noch die reguläre Session-Bestätigung (Push-Policy LOOPS.md). Neu gefunden (B104, nicht im Scope dieser Session): zwei vorbestehende Tests (`streak_inprogress_week.spec.js`, `training_context_anchor.spec.js`) schlagen am heutigen Datum deterministisch fehl, vermutlich UTC-vs-lokal-Datumsdrift im Test-Fixture-Aufbau, nicht im Produktionscode — siehe BUGS.md B104 für eine spätere Diagnose-Session. Bekannter, nicht blockierender Restbefund aus B97: der fixe Pause-Timer-Pill überlappt in einem getesteten Fall noch die rechten ~30% des Übernehmen-Buttons. B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md). B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten. Möglicher Folge-Sprint (nicht angefordert): B79 (`_checkCompoundIsolationBalance`) auf die neue `isCompoundExercise()` umstellen, siehe DECISIONS.md. `_isTodayDay()` teilt bewusst (B82) dasselbe `getLatestWeek()`-Muster, das B99 im Header/Dropdown gefixt hat — kein Bug im selben Sinn, siehe BUGS.md B99. `_weekdayName()` (progressInsights.js, "erfolgreichster Wochentag") teilt dieselbe Index-als-Kalendertag-Annahme, die B100 gefixt hat — nicht Teil dieses Fixes, siehe BUGS.md B100. Loops 7-11 aktiv (diese Session: Loop 5+7+11 aktualisiert). Nicht committet: `Research/TRAIN_Parameter_Review.md` (Nutzer-Recherche, bewusst uncommitted gelassen).*
 
 ---
 
@@ -14,8 +14,27 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 - CACHE_VERSION: train-v210 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
-- CSS: ?v=201 (unverändert — B101 ist reines JS)
+- CSS: ?v=201 (unverändert)
 - SCHEMA: 32 (unverändert)
+- **B102+B103 — diagnostiziert, kein Code-Fix (2026-07-26, CACHE_VERSION
+  UNVERÄNDERT):** zwei gemeldete Bugs mit vorgegebenem Fix, beide über
+  einen dedizierten Diagnose-Agent pro Bug geprüft, BEVOR irgendetwas
+  geändert wurde (Diagnose-vor-Fix-Konvention). B102 (Intra-Session-
+  Feedback zu weit unten): `.set-feedback` padding-top bereits 2px,
+  `.set-row` padding-bottom 3px, kein Gap-Container dazwischen — per
+  Playwright real gemessen (`getBoundingClientRect()`) über alle 3
+  Render-Pfade × 2 Viewports (1280px/375px): Abstand ist überall 0px,
+  reproduziert nicht. B103 (Einstellungen-Modal schließt nicht bei Tap
+  außerhalb): "Einstellungen" ist gar kein Modal/Overlay in diesem Code,
+  sondern ein normaler, immer sichtbarer Nav-Tab — alle echten Overlays/
+  ⋮-Menüs im Code (7 `.modal-overlay`-Dialoge, Exercise-/Day-/Week-Menü,
+  Übungs-Settings-Panel, alle dynamisch erzeugten Overlays außer dem
+  bewusst nicht-dismissable Tagesabschluss-Check-in) schließen bereits
+  bei Tap außerhalb. Beide Fix-Vorlagen passten nicht zur tatsächlichen
+  Architektur — kein Blindfix, `styles.css`/`ui.js` inhaltlich
+  unverändert. Einzige Änderung: neuer Regressionstest
+  `tests/set_feedback_spacing.spec.js` (2/2 grün, sperrt den Ist-Zustand
+  fest). Details siehe BUGS.md B102/B103.
 - **B101 — Automatische Steigerung bei neuer Woche rundet jetzt auf ex.weightStep (train-v210):**
   Nutzer meldete "falsche kg-Zahl als Steigerung vorgeschlagen" mit
   vorgegebenem Fix (3 angenommene Root Causes). Vor der Umsetzung geprüft

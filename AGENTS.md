@@ -1,7 +1,7 @@
 # TRAIN — Parallel Agent Regeln
 # Wird nach jedem Multi-Agent Sprint
 # automatisch aktualisiert.
-# Letzte Aktualisierung: 2026-07-21 / train-v194
+# Letzte Aktualisierung: 2026-07-26 / train-v210
 
 ---
 
@@ -125,6 +125,15 @@ zueinander — basierend auf der Matrix oben:
 - **styles.css + jede JS-Datei außer ui.js**, sofern die CSS-Änderung
   keine neuen Klassennamen einführt, die ui.js erst noch rendern muss
   (reine Style-Anpassung an bestehenden Klassen ist unkritisch).
+- **styles.css + ui.js**, WENN keine gemeinsamen Klassen-Definitionen
+  betroffen sind — d.h. der ui.js-Agent führt keine neuen Klassennamen
+  ein, die der CSS-Agent gleichzeitig stylen müsste, und der CSS-Agent
+  ändert nur bestehende Klassen ohne Umbenennung/Entfernen. Siehe
+  Muster 6 unten (2026-07-26, train-v210) für den konkreten Beleg —
+  präziser als die reine Datei-Abhängigkeits-Matrix nahelegt (ui.js
+  importiert styles.css zwar nicht als ES-Modul, rendert aber Markup,
+  das auf CSS-Klassennamen angewiesen ist — die Matrix-Kante existiert
+  nur "durch Konvention", nicht durch `import`, ist aber real).
 
 Grundmuster: zwei Dateien sind sicher parallel, wenn keine der beiden
 in der Spalte "Importiert" der anderen auftaucht UND keine dritte
@@ -280,6 +289,28 @@ category-abhängige Logik für genau die geänderten Übungsnamen einführt
 oder ändert.** Reine Formel-/Aggregations-Änderungen (wie hier) sind
 unkritisch; eine ui.js-Änderung, die z.B. neue Kategorie-spezifische
 Schwellenwerte einführt, wäre es nicht.
+
+### Muster 6 — styles.css + ui.js, zwei Diagnose-Agents parallel
+(verifiziert 2026-07-26, train-v210):
+```
+Agent 1: styles.css (B102 — Feedback-Spacing-Diagnose + ggf. Fix)
+Agent 2: ui.js (B103 — Settings-Overlay-Diagnose + ggf. Fix)
+→ Konsolidierungs-Agent zuletzt (Version, Docs, Commit)
+```
+Ergebnis: keine Kollision — beide Agents kamen unabhängig zum Ergebnis
+"nicht reproduzierbar, kein Code-Fix nötig" (beide Fix-Vorlagen passten
+nicht zur tatsächlichen Architektur). Agent 1 hat einzig eine neue
+Testdatei ergänzt (`tests/set_feedback_spacing.spec.js`), Agent 2 hat
+`ui.js` inhaltlich unverändert gelassen. **Wichtige Einschränkung
+dieses Belegs:** da keiner der beiden Agents tatsächlich Code in seiner
+Datei geändert hat, ist dies KEIN Beleg für einen echten simultanen
+Schreibkonflikt-Test (anders als Muster 4/5, wo beide Agents wirklich
+gleichzeitig Code änderten) — nur ein Beleg dafür, dass disjunkte
+Diagnose-Scopes (styles.css lesen+minimal testen / ui.js lesen+minimal
+testen) sich nicht gegenseitig beeinflusst haben. Die Grundregel aus
+Muster 5 (keine neuen Klassennamen/IDs, auf die die jeweils andere
+Seite angewiesen wäre) bleibt die eigentliche Sicherheits-Bedingung für
+einen künftigen Sprint, in dem BEIDE Agents tatsächlich Code ändern.
 
 ---
 
