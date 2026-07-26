@@ -2848,3 +2848,24 @@ Loop 9: unverändert (kleine Feature-Ergänzung, kein neuer Onboarding-
 Loop 10: unverändert (keine neuen Nutzer-/Kanal-Erkenntnisse)
 Loop 11: for-advisor-consolidated.txt aktualisiert (letzter Loop der
   Session)
+
+## 2026-07-26 (Fortsetzung, CI-Fix) train-v212->v213
+Eigentliche Aufgabe: nach dem D2-Push (train-v212) schlug CI erstmals fehl
+  (`streak_inprogress_week.spec.js`, lief am Vortag noch grün). Diagnostiziert
+  statt ignoriert: `_calcCurrentStreak()` (state.js) behandelte das
+  7-Tage-Fenster der aktuellen, leeren Woche als abgelaufen sobald der
+  7. Kalendertag begann (`_weekEndMs()` = Start+6 Tage = Anfang statt Ende
+  des 7. Tages) — reproduziert deterministisch an jedem 7. Tag einer offenen
+  Woche (heute: Sonntag), echter Produktionsbug, nicht nur Test-Artefakt.
+  War zuvor als B104 getrackt (irrtümlich zusammen mit einem zweiten,
+  unabhängigen Fall — training_context_anchor.spec.js, der sich jetzt als
+  reiner Parallel-Last-Flake herausstellte, kein eigener Bug). Fix direkt an
+  der betroffenen Vergleichsstelle (Start+7×24h exklusiv), `_weekEndMs()`
+  selbst unverändert (andere Bedeutung für `_streakGapBreaks()`). 3 neue
+  Tests (`tests/streak_week_window_boundary.spec.js`), verifiziert unter
+  `TZ=UTC` (CI-Umgebung) und lokal — inkl. voller Suite. CACHE_VERSION
+  train-v212->v213 (state.js ist precached, Cache-Bump nötig), CSS/SCHEMA
+  unverändert. BUGS.md (B104 aufgelöst/entfernt, B110 neu)/HANDOFF.md/
+  CLAUDE.md aktualisiert. Separater Commit direkt nach D2, damit die
+  Historie sauber unterscheidet was zum Feature gehört und was ein
+  eigenständiger Bugfix war.

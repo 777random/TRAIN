@@ -439,7 +439,19 @@ function _calcCurrentStreak(weeks) {
       // Nutzer überhaupt die Chance hatte, darin zu trainieren (B69).
       // Eine bereits abgelaufene, leer gebliebene Woche bricht die Streak
       // weiterhin wie zuvor.
-      if (i === sorted.length - 1 && nowMs <= _weekEndMs(wk)) continue;
+      //
+      // B110: bewusst NICHT _weekEndMs(wk) wiederverwendet — dessen Wert
+      // (startDate + 6 Tage) ist der Anfang des 7. Tages, nicht dessen Ende,
+      // und wird von _streakGapBreaks() genau mit dieser Bedeutung für die
+      // Lücken-Arithmetik gebraucht (eine Änderung dort hätte "eine volle
+      // übersprungene Woche" fälschlich nicht mehr als Lücke erkannt). Das
+      // 7-Tage-Fenster selbst braucht hier den echten Tagesende-Zeitpunkt
+      // (startDate + 7 Tage, exklusiv) — sonst gilt das Fenster am 7.
+      // Kalendertag (z.B. Sonntag bei Montags-Start) schon ab Mitternacht
+      // UTC als abgelaufen, obwohl der Tag gerade erst begonnen hat, und die
+      // Streak bricht einen vollen Tag zu früh auf 0 ab.
+      const weekWindowEndMs = new Date(wk.startDate + 'T00:00:00').getTime() + 7 * 86_400_000;
+      if (i === sorted.length - 1 && nowMs < weekWindowEndMs) continue;
       break;
     }
     if (lastWk && _streakGapBreaks(lastWk, wk)) break;

@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-26 — B109/D2 ("Heute anders" merkt sich Ersatz-Übungen je Original und schlägt sie beim nächsten Mal vor), train-v212, siehe unten. B105-B108 (train-v211, Onboarding-Verbesserungen) sowie B102+B103/B101/B100 bereits gepusht und CI-grün.*
-*Nächster Schritt: B3 Einstellungen restrukturieren, danach C3 Compound-Edit-Option, danach E1 Transparenz Coach. Push dieser Session braucht noch die reguläre Session-Bestätigung (Push-Policy LOOPS.md). Weiterhin offen (B104, nicht in dieser Session bearbeitet): zwei vorbestehende Tests (`streak_inprogress_week.spec.js`, `training_context_anchor.spec.js`) mit vermutlicher UTC-vs-lokal-Datumsdrift im Test-Fixture-Aufbau — siehe BUGS.md B104 für eine spätere Diagnose-Session. Bekannter, nicht blockierender Restbefund aus B97: der fixe Pause-Timer-Pill überlappt in einem getesteten Fall noch die rechten ~30% des Übernehmen-Buttons. B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md). B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten. Möglicher Folge-Sprint (nicht angefordert): B79 (`_checkCompoundIsolationBalance`) auf die neue `isCompoundExercise()` umstellen, siehe DECISIONS.md. Loops 7-11 aktiv (diese Session: Loop 5+7+11 aktualisiert). Nicht committet: `Research/TRAIN_Parameter_Review.md` (Nutzer-Recherche, bewusst uncommitted gelassen).*
+*Letzte Aktualisierung: 2026-07-26 — B110 (Streak-Badge-Fenstergrenze korrigiert, brach bis zu einen Tag zu früh auf 0 ab), train-v213, siehe unten. B109/D2 ("Heute anders" merkt sich Ersatz-Übungen, train-v212) und B105-B108 (train-v211, Onboarding-Verbesserungen) sowie B102+B103/B101/B100 bereits gepusht und CI-grün.*
+*Nächster Schritt: B3 Einstellungen restrukturieren, danach C3 Compound-Edit-Option, danach E1 Transparenz Coach. Push dieser Session braucht noch die reguläre Session-Bestätigung (Push-Policy LOOPS.md). B104 vollständig aufgelöst (siehe B110 — war teils echter Bug, teils Parallel-Last-Flake, siehe dort). Bekannter, nicht blockierender Restbefund aus B97: der fixe Pause-Timer-Pill überlappt in einem getesteten Fall noch die rechten ~30% des Übernehmen-Buttons. B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md). B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten. Möglicher Folge-Sprint (nicht angefordert): B79 (`_checkCompoundIsolationBalance`) auf die neue `isCompoundExercise()` umstellen, siehe DECISIONS.md. Loops 7-11 aktiv (diese Session: Loop 5+7+11 aktualisiert). Nicht committet: `Research/TRAIN_Parameter_Review.md` (Nutzer-Recherche, bewusst uncommitted gelassen).*
 
 ---
 
@@ -11,11 +11,32 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v212 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v213 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
-- CSS: ?v=203
+- CSS: ?v=203 (unverändert seit B109)
 - SCHEMA: 32 (unverändert — additiver Default statt Versions-Bump, siehe B109)
+- **B110 — Streak-Badge-Fenstergrenze korrigiert (train-v213, 2026-07-26):**
+  Beiläufig gefunden, als CI nach dem B109-Push rot wurde
+  (`streak_inprogress_week.spec.js`, zuvor als B104 getrackt). Root Cause:
+  `_calcCurrentStreak()` (state.js) behandelte das 7-Tage-Fenster der
+  aktuellen, noch leeren Woche als abgelaufen, sobald der Kalendertag des
+  7. Tages begann (Vergleich nutzte `_weekEndMs()` = Start + 6 Tage, das
+  ist der ANFANG des 7. Tages, nicht dessen Ende) — reproduzierte
+  deterministisch an jedem 7. Kalendertag einer offenen Woche (z.B.
+  Sonntag bei Montags-Start), nicht nur "manchmal". Die Streak brach
+  dadurch bis zu einen vollen Tag zu früh auf 0 ab, für jeden Nutzer,
+  nicht nur in Tests — echter Produktionsbug. Fix direkt an der
+  betroffenen Stelle (Start + 7×24h, exklusiv verglichen), `_weekEndMs()`
+  selbst bewusst unverändert gelassen (wird von `_streakGapBreaks()` für
+  die Lücken-Erkennung mit einer anderen, dort korrekten Bedeutung
+  gebraucht). Dabei auch geklärt: der zweite ursprünglich unter B104
+  vermutete Fall (`training_context_anchor.spec.js`) war nur der bereits
+  bekannte Dev-Server-Verbindungsabbruch unter Parallel-Last, kein
+  eigener Bug — B104 damit vollständig aufgelöst. 3 neue Tests
+  (`tests/streak_week_window_boundary.spec.js`), verifiziert unter
+  `TZ=UTC` (CI-Umgebung) und lokal. Nur `state.js` geändert, CACHE_VERSION
+  train-v212→v213, CSS/SCHEMA unverändert. Details siehe BUGS.md B110.
 - **B109/D2 — "Heute anders" merkt sich Ersatz-Übungen (train-v212, 2026-07-26):**
   Vor der Umsetzung diagnostiziert (Plan-Mode + Explore-Agent): "Heute anders"
   ist ein Zwei-Schritt-Vorgang (Umbenennen im Namensfeld, dann separat
