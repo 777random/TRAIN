@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-26 — B112/E1 (Transparenz Coach-Tab: "▾ Basis dieser Einschätzung" mit Evidence-Liste je Karte), train-v215, siehe unten. B111 (movementMap.js erweitert, train-v214), B110 (Streak-Badge-Fenstergrenze, train-v213), B109/D2 ("Heute anders", train-v212) und B105-B108 (train-v211, Onboarding-Verbesserungen) sowie B102+B103/B101/B100 bereits gepusht und CI-grün.*
-*Nächster Schritt: B3 Einstellungen restrukturieren, danach C3 Compound-Edit-Option. Push dieser Session braucht noch die reguläre Session-Bestätigung (Push-Policy LOOPS.md). Weiterhin nur als Notiz (kein Bug): mehrere Test-Dateien konstruieren Datums-Fixtures über lokale `Date`-Methoden + `.toISOString()` — verschiebt `startDate` bei lokalem Ausführen in einer positiven-UTC-Offset-Zeitzone um einen Tag; betrifft nur lokale Testläufe außerhalb UTC, nicht CI/Produktionscode, bei Bedarf mit `TZ=UTC npx playwright test` gegentesten. Möglicher Folge-Sprint (nicht angefordert): B79 (`_checkCompoundIsolationBalance`) auf die neue `isCompoundExercise()` umstellen, siehe DECISIONS.md. Loops 7-11 aktiv (diese Session: Loop 5+7+11 aktualisiert). Nicht committet: `Research/TRAIN_Parameter_Review.md` (Nutzer-Recherche, bewusst uncommitted gelassen).*
+*Letzte Aktualisierung: 2026-07-26 — B113 (Einstellungen in 4 Zwischenüberschriften gegliedert), train-v216, siehe unten. B112/E1 (Transparenz Coach-Tab, train-v215), B111 (movementMap.js erweitert, train-v214), B110 (Streak-Badge-Fenstergrenze, train-v213), B109/D2 ("Heute anders", train-v212) und B105-B108 (train-v211, Onboarding-Verbesserungen) sowie B102+B103/B101/B100 bereits gepusht und CI-grün.*
+*Nächster Schritt: C3 Compound-Edit-Option. Push dieser Session braucht noch die reguläre Session-Bestätigung (Push-Policy LOOPS.md). Weiterhin nur als Notiz (kein Bug): mehrere Test-Dateien konstruieren Datums-Fixtures über lokale `Date`-Methoden + `.toISOString()` — verschiebt `startDate` bei lokalem Ausführen in einer positiven-UTC-Offset-Zeitzone um einen Tag; betrifft nur lokale Testläufe außerhalb UTC, nicht CI/Produktionscode, bei Bedarf mit `TZ=UTC npx playwright test` gegentesten. Möglicher Folge-Sprint (nicht angefordert): B79 (`_checkCompoundIsolationBalance`) auf die neue `isCompoundExercise()` umstellen, siehe DECISIONS.md. Loops 7-11 aktiv (diese Session: Loop 5+7+11 aktualisiert). Nicht committet: `Research/TRAIN_Parameter_Review.md` (Nutzer-Recherche, bewusst uncommitted gelassen).*
 
 ---
 
@@ -11,11 +11,26 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v215 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v216 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
-- CSS: ?v=204
+- CSS: ?v=205
 - SCHEMA: 32 (unverändert — additiver Default statt Versions-Bump, siehe B109)
+- **B113 — Einstellungen restrukturiert (train-v216, 2026-07-26):** die
+  bisherige einzelne "Training"-Überschrift (15 Elemente) ist jetzt in 4
+  Zwischenüberschriften gegliedert: TRAINING (6 ursprünglich vorgegebene +
+  Trainingsziel + Max. Sitzungsdauer, die im Sprint-Text fehlten),
+  FORTSCHRITT & ANZEIGE (Streak-Anzeige), GEWICHT & STEIGERUNG
+  (Kleinstmögliche Steigerung, Stangengewicht, + Deload-Faktor, ebenfalls
+  im Sprint-Text fehlend), AUTOMATISIERUNG (Automatische Wochenerstellung
+  + 2 Sub-Toggles). Alles bleibt EINE `.settings-section`-Karte (keine 4
+  separate Karten — eine Karten-Border wäre der Trennstrich, den die
+  Vorgabe "Whitespace reicht" ausschließt), neue leichtere Klasse
+  `.settings-group-title` gliedert den Karteninhalt. Reine
+  Positions-Umzüge bestehender Markup-Blöcke — kein `data-action`/Handler
+  geändert. Sub-Toggle-Ausgraufunktion (bereits vorhanden, `disabled`-
+  Attribut) unverändert. 5 neue Tests (`tests/settings_reorg.spec.js`).
+  Details siehe BUGS.md B113.
 - **B112/E1 — Transparenz Coach-Tab (train-v215, 2026-07-26):** jede
   Haupt- UND Strukturkarte im Coach-Tab hat jetzt eine "▾ Basis dieser
   Einschätzung"-Disclosure mit den konkreten Datenpunkten hinter der

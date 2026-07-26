@@ -1,7 +1,7 @@
 # TRAIN — CLAUDE.md
 # Vollständiger Projektkontext für Claude Code
-# Stand: train-v215 / SCHEMA 32 / Juli 2026
-# Letztes Update: nach train-v215 (E1: Transparenz Coach-Tab — "▾ Basis dieser Einschätzung" mit Evidence-Liste je Karte)
+# Stand: train-v216 / SCHEMA 32 / Juli 2026
+# Letztes Update: nach train-v216 (B3: Einstellungen in 4 Zwischenüberschriften gegliedert — Training / Fortschritt & Anzeige / Gewicht & Steigerung / Automatisierung)
 
 ---
 
@@ -49,7 +49,7 @@ TRAIN ist eine deutschsprachige PWA für Krafttraining. Pure Vanilla ES Modules 
   Sessions müssen aus diesem neuen Pfad heraus gestartet werden, sonst
   landet man am alten (jetzt leeren) OneDrive-Ort. Nutzer zieht den Ordner
   regelmäßig manuell auf eine externe Festplatte statt über Cloud-Sync.
-- Aktueller Stand: SCHEMA_VERSION 32 · CACHE_VERSION train-v215 · CSS ?v=204
+- Aktueller Stand: SCHEMA_VERSION 32 · CACHE_VERSION train-v216 · CSS ?v=205
 
 ---
 

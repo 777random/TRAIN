@@ -2123,6 +2123,19 @@ label > svg {
   color: var(--c-text-3);
   padding: var(--sp-2) var(--sp-4) var(--sp-1);
 }
+/* B3 (Einstellungen restrukturieren) — dezente Zwischenüberschrift INNERHALB
+   einer bestehenden .settings-section-Karte (im Unterschied zu
+   .settings-section__title oben, das den Titel EINER ganzen Karte trägt).
+   Bewusst kein Trennstrich/Border — Whitespace (margin) allein trennt die
+   Gruppen. */
+.settings-group-title {
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: var(--c-text-2);
+  text-transform: uppercase;
+  margin: 24px var(--sp-4) 8px;
+}
+.settings-group-title:first-child { margin-top: 0; }
 
 /* ── Deload details ──────────────────────────────────────── */
 .deload-details {

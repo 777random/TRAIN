@@ -4550,16 +4550,16 @@ function renderSettingsTab(state) {
   const curMaxMs  = s.maxSessionMs ?? 10800000;
 
   container.innerHTML = `
-  <!-- Training -->
+  <!-- Training (B3: in 4 Zwischenüberschriften gegliedert, siehe HANDOFF.md/BUGS.md B113 —
+       eine Karte bleibt erhalten, kein Trennstrich zwischen den Gruppen, nur Whitespace) -->
   <div class="settings-section">
-    <div class="settings-section__title">Training</div>
-    ${tog('swipe', 'Swipe-Navigation', 'Wischen zum Wochenwechsel')}
-    ${tog('vibrationEnabled', 'Vibration nach Pause', 'Funktioniert nur auf Android — iOS unterstützt Vibration in PWAs technisch nicht.')}
-    ${tog('autoStartPauseTimer', 'Pausentimer automatisch', 'Timer startet automatisch nach jedem bestätigten Satz (außer dem letzten)')}
+    <div class="settings-group-title">Training</div>
+    ${tog('sessionCoach', 'Session Coach', 'Echtzeit-Feedback während des Trainings (Pre-Session Check-in + Briefing)')}
     ${tog('rpeEnabled', 'RPE anzeigen', 'Rate of Perceived Exertion — Anstrengungsgrad pro Satz')}
     ${tog('autoEval', 'Automatische Satz-Bewertung', 'Satz wird bewertet sobald du die Wdh-Zahl einträgst und das Feld verlässt.')}
-    ${tog('hideStreakBadge', 'Streak-Anzeige ausblenden', '"X Wochen konsistentes Training" im Trainings-Tab verstecken')}
-    ${tog('sessionCoach', 'Session Coach', 'Echtzeit-Feedback während des Trainings (Pre-Session Check-in + Briefing)')}
+    ${tog('autoStartPauseTimer', 'Pausentimer automatisch', 'Timer startet automatisch nach jedem bestätigten Satz (außer dem letzten)')}
+    ${tog('vibrationEnabled', 'Vibration nach Pause', 'Funktioniert nur auf Android — iOS unterstützt Vibration in PWAs technisch nicht.')}
+    ${tog('swipe', 'Swipe-Navigation', 'Wischen zum Wochenwechsel')}
     <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:var(--sp-2)">
       <div>
         <div class="settings-row__label">Trainingsziel</div>
@@ -4576,6 +4576,25 @@ function renderSettingsTab(state) {
     </div>
     <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:var(--sp-2)">
       <div>
+        <div class="settings-row__label">Max. Sitzungsdauer</div>
+        <div class="settings-row__desc">Session-Timer stoppt bei Erreichen des Limits</div>
+      </div>
+      <div class="weight-step-opts">
+        ${msOpts.map(ms => `
+          <button type="button"
+            class="weight-step-btn${curMaxMs === ms ? ' is-selected' : ''}"
+            data-action="set-max-session" data-ms="${ms}"
+            aria-pressed="${curMaxMs === ms}"
+          >${msLabels[ms]}</button>`).join('')}
+      </div>
+    </div>
+
+    <div class="settings-group-title">Fortschritt &amp; Anzeige</div>
+    ${tog('hideStreakBadge', 'Streak-Anzeige ausblenden', '"X Wochen konsistentes Training" im Trainings-Tab verstecken')}
+
+    <div class="settings-group-title">Gewicht &amp; Steigerung</div>
+    <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:var(--sp-2)">
+      <div>
         <div class="settings-row__label">Kleinstmögliche Steigerung</div>
         <div class="settings-row__desc">Rundung für KI-Gewichtsempfehlungen</div>
       </div>
@@ -4588,47 +4607,6 @@ function renderSettingsTab(state) {
           >${String(ps).replace('.', ',')} kg</button>`).join('')}
       </div>
     </div>
-    ${(() => {
-      const autoWeek = s.autoWeek ?? { enabled: false, suggestProgress: true, showReview: true };
-      const subDisabled = !autoWeek.enabled;
-      return `
-    <div class="settings-row">
-      <div>
-        <div class="settings-row__label">Automatische Wochenerstellung</div>
-        <div class="settings-row__desc">Legt beim App-Öffnen automatisch eine neue Woche an, sobald die aktuelle Kalenderwoche noch fehlt</div>
-      </div>
-      <button
-        class="toggle${autoWeek.enabled ? ' is-on' : ''}"
-        data-action="toggle-autoweek-enabled"
-        role="switch" aria-checked="${!!autoWeek.enabled}"
-        aria-label="Automatische Wochenerstellung"
-      ></button>
-    </div>
-    <div class="settings-row autoweek-sub${subDisabled ? ' is-disabled' : ''}">
-      <div>
-        <div class="settings-row__label">Steigerungen vorschlagen</div>
-        <div class="settings-row__desc">Zeigt das Steigerungs-Modal beim ersten Öffnen der neuen Woche</div>
-      </div>
-      <button
-        class="toggle${autoWeek.suggestProgress ? ' is-on' : ''}"
-        data-action="toggle-autoweek-sub" data-key="suggestProgress"
-        role="switch" aria-checked="${!!autoWeek.suggestProgress}"
-        aria-label="Steigerungen vorschlagen" ${subDisabled ? 'disabled' : ''}
-      ></button>
-    </div>
-    <div class="settings-row autoweek-sub${subDisabled ? ' is-disabled' : ''}">
-      <div>
-        <div class="settings-row__label">Wochenrückblick zuerst zeigen</div>
-        <div class="settings-row__desc">Zeigt den Rückblick der Vorwoche, bevor das Steigerungs-Modal erscheint</div>
-      </div>
-      <button
-        class="toggle${autoWeek.showReview ? ' is-on' : ''}"
-        data-action="toggle-autoweek-sub" data-key="showReview"
-        role="switch" aria-checked="${!!autoWeek.showReview}"
-        aria-label="Wochenrückblick zuerst zeigen" ${subDisabled ? 'disabled' : ''}
-      ></button>
-    </div>`;
-    })()}
     <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:var(--sp-1)">
       <div class="settings-row__label">Stangengewicht (kg)</div>
       <input class="body-input" type="number" step="0.5" min="5" max="50" inputmode="decimal"
@@ -4672,20 +4650,49 @@ function renderSettingsTab(state) {
         </div>
       </details>
     </div>
-    <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:var(--sp-2)">
+
+    <div class="settings-group-title">Automatisierung</div>
+    ${(() => {
+      const autoWeek = s.autoWeek ?? { enabled: false, suggestProgress: true, showReview: true };
+      const subDisabled = !autoWeek.enabled;
+      return `
+    <div class="settings-row">
       <div>
-        <div class="settings-row__label">Max. Sitzungsdauer</div>
-        <div class="settings-row__desc">Session-Timer stoppt bei Erreichen des Limits</div>
+        <div class="settings-row__label">Automatische Wochenerstellung</div>
+        <div class="settings-row__desc">Legt beim App-Öffnen automatisch eine neue Woche an, sobald die aktuelle Kalenderwoche noch fehlt</div>
       </div>
-      <div class="weight-step-opts">
-        ${msOpts.map(ms => `
-          <button type="button"
-            class="weight-step-btn${curMaxMs === ms ? ' is-selected' : ''}"
-            data-action="set-max-session" data-ms="${ms}"
-            aria-pressed="${curMaxMs === ms}"
-          >${msLabels[ms]}</button>`).join('')}
-      </div>
+      <button
+        class="toggle${autoWeek.enabled ? ' is-on' : ''}"
+        data-action="toggle-autoweek-enabled"
+        role="switch" aria-checked="${!!autoWeek.enabled}"
+        aria-label="Automatische Wochenerstellung"
+      ></button>
     </div>
+    <div class="settings-row autoweek-sub${subDisabled ? ' is-disabled' : ''}">
+      <div>
+        <div class="settings-row__label">Steigerungen vorschlagen</div>
+        <div class="settings-row__desc">Zeigt das Steigerungs-Modal beim ersten Öffnen der neuen Woche</div>
+      </div>
+      <button
+        class="toggle${autoWeek.suggestProgress ? ' is-on' : ''}"
+        data-action="toggle-autoweek-sub" data-key="suggestProgress"
+        role="switch" aria-checked="${!!autoWeek.suggestProgress}"
+        aria-label="Steigerungen vorschlagen" ${subDisabled ? 'disabled' : ''}
+      ></button>
+    </div>
+    <div class="settings-row autoweek-sub${subDisabled ? ' is-disabled' : ''}">
+      <div>
+        <div class="settings-row__label">Wochenrückblick zuerst zeigen</div>
+        <div class="settings-row__desc">Zeigt den Rückblick der Vorwoche, bevor das Steigerungs-Modal erscheint</div>
+      </div>
+      <button
+        class="toggle${autoWeek.showReview ? ' is-on' : ''}"
+        data-action="toggle-autoweek-sub" data-key="showReview"
+        role="switch" aria-checked="${!!autoWeek.showReview}"
+        aria-label="Wochenrückblick zuerst zeigen" ${subDisabled ? 'disabled' : ''}
+      ></button>
+    </div>`;
+    })()}
   </div>
 
   <!-- Deine Daten -->
@@ -4811,7 +4818,7 @@ function renderSettingsTab(state) {
   <div class="settings-section">
     <div class="settings-section__title">Info</div>
     <div class="settings-row">
-      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v215</div></div>
+      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v216</div></div>
     </div>
     <div class="settings-row">
       <div>

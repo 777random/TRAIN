@@ -2929,3 +2929,29 @@ Eigentliche Aufgabe: B112/E1 — Transparenz Coach-Tab ("▾ Basis dieser
   isoliert erneut grün, keine Regression). weeklyFocus.js/ui.js/styles.css
   geändert, CACHE_VERSION train-v214->v215, CSS ?v=203->204, SCHEMA
   unverändert. CLAUDE.md/HANDOFF.md/BUGS.md (B112) aktualisiert.
+
+## 2026-07-26 (Fortsetzung, B3-Sprint) train-v215->v216
+Loop 1: 10/10 grün (Baseline vor Sprint)
+Eigentliche Aufgabe: B113 — Einstellungen restrukturiert. Technische Spec
+  zuerst geschrieben und per Plan-Mode bestätigt (eager-inventing-newell.md,
+  neu überschrieben), inkl. 1 Explore-Agent zur vollständigen Diagnose
+  aller 15 Elemente unter der bisherigen einzelnen "Training"-Überschrift
+  (Label/Beschreibung/data-action/Handler je Element). Wichtiger Fund: die
+  Sprint-Vorgabe (4 Sektionen, 12 Elemente) deckte nur 12 der 15 tatsächlich
+  vorhandenen Elemente ab — Trainingsziel, Deload-Faktor und Max.
+  Sitzungsdauer fehlten. Thematisch einsortiert statt gelöscht (Trainingsziel
+  + Max. Sitzungsdauer -> TRAINING, Deload-Faktor -> GEWICHT & STEIGERUNG).
+  Design-Entscheidung (eigenständig): 4 Zwischenüberschriften INNERHALB der
+  bestehenden einzelnen "Training"-Karte statt 4 separater Karten (eine
+  Karten-Border wäre der Trennstrich, den die Vorgabe "Whitespace reicht"
+  ausschließt) - neue Klasse .settings-group-title, unterscheidet sich von
+  der bestehenden schwereren .settings-section__title (bleibt für andere
+  Abschnitte unverändert). Alle 15 Elemente sind reine Positions-Umzüge
+  ihrer bereits bestehenden Markup-Blöcke - kein data-action/Handler
+  geändert. Bestehende Sub-Toggle-Ausgraufunktion unverändert übernommen
+  (schon strenger als Sprint-Vorschlag: natives disabled-Attribut statt
+  pointer-events:none). 5 neue Tests (tests/settings_reorg.spec.js), volle
+  Suite grün (bekannte Parallel-Last-Flakes isoliert erneut grün, keine
+  Regression). Nur ui.js/styles.css geändert, CACHE_VERSION
+  train-v215->v216, CSS ?v=204->205, SCHEMA unverändert. CLAUDE.md/
+  HANDOFF.md/BUGS.md (B113) aktualisiert.
