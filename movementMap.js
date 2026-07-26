@@ -67,6 +67,57 @@ export const MOVEMENT_MAP = {
   // Englische Synonyme/Schreibvarianten für bereits vorhandene Core-Übungen oben.
   'Sit-Up': 'Core', 'Sit-Ups': 'Core', 'Sit Ups': 'Core', 'Crunches': 'Core',
   'Leg Raise': 'Core', 'Leg Raises': 'Core', 'Hanging Leg Raise': 'Core',
+
+  // Sprint "movementMap.js erweitern" (2026-07, B111) — häufig verwendete
+  // Variationen + zusätzliche deutsche/englische Synonyme, damit mehr
+  // reale Trainingsprogramme korrekt erkannt werden statt auf den
+  // Compound-Fallback zu fallen. Keine Struktur-/Logik-Änderung, reine
+  // Datenergänzung — siehe AGENTS.md "movementMap.js: reine Datenergänzung".
+  'SSB Squat': 'Squat', 'Safety Bar Squat': 'Squat', 'Zercher Squat': 'Squat',
+  'Box Squat': 'Squat', 'Pause Squat': 'Squat', 'Tempo Squat': 'Squat',
+  'Goblet Squat': 'Squat', 'Pistol Squat': 'Squat', 'Sissy Squat': 'Squat',
+  'Barbell Back Squat': 'Squat', 'High Bar Squat': 'Squat', 'Low Bar Squat': 'Squat',
+
+  'Stiff Leg Deadlift': 'Hinge', 'Deficit Deadlift': 'Hinge',
+  'Rack Pull': 'Hinge', 'Block Pull': 'Hinge',
+  'Trap Bar Deadlift': 'Hinge', 'Hex Bar Deadlift': 'Hinge',
+  'Single Leg RDL': 'Hinge', 'Good Morning': 'Hinge', 'Glute Bridge': 'Hinge',
+  'Conventional Deadlift': 'Hinge', 'Straight Leg Deadlift': 'Hinge',
+
+  'Close Grip Bench Press': 'Push', 'Paused Bench Press': 'Push', 'Tempo Bench Press': 'Push',
+  'Floor Press': 'Push', 'Board Press': 'Push', 'Slingshot Bench': 'Push',
+  'Incline Dumbbell Press': 'Push', 'Decline Bench Press': 'Push',
+  'Bradford Press': 'Push', 'Z-Press': 'Push', 'OHP': 'Push', 'Strict Press': 'Push',
+
+  // 'Pendlay Row' bleibt bewusst 'Pull' (Zeile oben) statt zusätzlich hier
+  // 'Hinge' zugewiesen zu bekommen — ein Name kann in dieser Flat-Map nur
+  // eine Kategorie haben, Rudern ist primär eine Zug-/Pull-Bewegung.
+  'Yates Row': 'Pull', 'Chest Supported Row': 'Pull', 'Meadows Row': 'Pull',
+  'Single Arm Dumbbell Row': 'Pull', 'Face Pull': 'Pull',
+  'Seal Row': 'Pull', 'Helms Row': 'Pull',
+  'Kreuzheben mit Untergriff': 'Pull', 'Supinated Deadlift Row': 'Pull',
+  'Cable Pulldown': 'Pull',
+
+  // Neue Isolationsübungen — Bewegungsmuster-Kategorie hier, echte
+  // Compound/Isolation-Einstufung läuft über ISOLATION_EXERCISE_NAMES
+  // weiter unten (dort ergänzt).
+  'Preacher Curl': 'Pull', 'Scott Curl': 'Pull', 'Reverse Curl': 'Pull',
+  'Cable Curl': 'Pull', 'Concentration Curl': 'Pull', 'Spider Curl': 'Pull',
+  'Overhead Triceps Extension': 'Push', 'Skull Crusher': 'Push',
+  'Lying Triceps Extension': 'Push', 'Cable Triceps Pushdown': 'Push', 'Rope Pushdown': 'Push',
+  'Cable Lateral Raise': 'Pull', 'Lateral Raise Maschine': 'Pull',
+  'Reverse Fly': 'Pull', 'Rear Delt Fly': 'Pull',
+  'Pec Fly': 'Push', 'Cable Fly': 'Push',
+  'Schulterzucken': 'Pull', 'Shrug': 'Pull',
+  'Wrist Curl': 'Pull', 'Handgelenksbeuger': 'Pull',
+  'Band Pull Apart': 'Pull',
+
+  'Ab Wheel': 'Core', 'Ab Rollout': 'Core', 'Dragon Flag': 'Core',
+  'Toes to Bar': 'Core', 'L-Sit': 'Core', 'Hollow Body Hold': 'Core',
+  'Copenhagen Plank': 'Core',
+
+  "Farmer's Walk": 'Carry', 'Farmers Walk': 'Carry',
+  'Suitcase Carry': 'Carry', 'Yoke Walk': 'Carry', 'Overhead Carry': 'Carry',
 };
 
 /**
@@ -113,11 +164,24 @@ const ISOLATION_EXERCISE_NAMES = new Set([
   'KH Flys', 'Flys Kabel', 'Butterfly',
   'Frontheben', 'Seitheben', 'Front Raise', 'Front Raises',
   'Lateral Raise', 'Lateral Raises', 'Side Raise',
-  'Face Pulls', 'Reverse Flys',
+  'Reverse Flys',
   'KH Shrugs', 'Shrugs', 'Dumbbell Shrugs',
   'Beinstrecker', 'Leg Extension', 'Leg Extensions',
   'Wadenheben', 'Calf Raise', 'Calf Raises',
   'Beinbeuger', 'Leg Curl', 'Leg Curls', 'Hamstring Curl',
+  // Sprint "movementMap.js erweitern" (B111): 'Face Pulls' bewusst NICHT
+  // mehr hier gelistet (war zuvor fälschlich als Isolation eingestuft) —
+  // Face Pull ist Schulter-Außenrotation + Retraktion, zählt sportwissen-
+  // schaftlich als Compound (siehe Sprint-Vorgabe), Kategorie 'Pull' oben
+  // reicht dafür bereits aus.
+  'Preacher Curl', 'Scott Curl', 'Reverse Curl', 'Cable Curl',
+  'Concentration Curl', 'Spider Curl', 'Trizepsdips',
+  'Overhead Triceps Extension', 'Skull Crusher', 'Lying Triceps Extension',
+  'Cable Triceps Pushdown', 'Rope Pushdown',
+  'Cable Lateral Raise', 'Lateral Raise Maschine',
+  'Reverse Fly', 'Rear Delt Fly', 'Pec Fly', 'Cable Fly',
+  'Schulterzucken', 'Shrug', 'Wrist Curl', 'Handgelenksbeuger',
+  'Band Pull Apart',
 ]);
 
 /**

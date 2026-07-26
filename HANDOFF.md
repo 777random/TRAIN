@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-26 — B110 (Streak-Badge-Fenstergrenze korrigiert, brach bis zu einen Tag zu früh auf 0 ab), train-v213, siehe unten. B109/D2 ("Heute anders" merkt sich Ersatz-Übungen, train-v212) und B105-B108 (train-v211, Onboarding-Verbesserungen) sowie B102+B103/B101/B100 bereits gepusht und CI-grün.*
-*Nächster Schritt: B3 Einstellungen restrukturieren, danach C3 Compound-Edit-Option, danach E1 Transparenz Coach. Push dieser Session braucht noch die reguläre Session-Bestätigung (Push-Policy LOOPS.md). B104 vollständig aufgelöst (siehe B110 — war teils echter Bug, teils Parallel-Last-Flake, siehe dort). Bekannter, nicht blockierender Restbefund aus B97: der fixe Pause-Timer-Pill überlappt in einem getesteten Fall noch die rechten ~30% des Übernehmen-Buttons. B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md). B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten. Möglicher Folge-Sprint (nicht angefordert): B79 (`_checkCompoundIsolationBalance`) auf die neue `isCompoundExercise()` umstellen, siehe DECISIONS.md. Loops 7-11 aktiv (diese Session: Loop 5+7+11 aktualisiert). Nicht committet: `Research/TRAIN_Parameter_Review.md` (Nutzer-Recherche, bewusst uncommitted gelassen).*
+*Letzte Aktualisierung: 2026-07-26 — B111 (movementMap.js erweitert, +79 Übungsvariationen/Synonyme), train-v214, siehe unten. B110 (Streak-Badge-Fenstergrenze, train-v213), B109/D2 ("Heute anders" merkt sich Ersatz-Übungen, train-v212) und B105-B108 (train-v211, Onboarding-Verbesserungen) sowie B102+B103/B101/B100 bereits gepusht und CI-grün.*
+*Nächster Schritt: B3 Einstellungen restrukturieren, danach C3 Compound-Edit-Option, danach E1 Transparenz Coach. Push dieser Session braucht noch die reguläre Session-Bestätigung (Push-Policy LOOPS.md). Neu beobachtet (kein Bug, nur Notiz): mehrere Test-Dateien (`streak_inprogress_week.spec.js` u.a.) konstruieren Datums-Fixtures über lokale `Date`-Methoden + `.toISOString()` — das verschiebt `startDate` bei lokalem Ausführen in einer positiven-UTC-Offset-Zeitzone (z.B. UTC+2) um einen Tag; betrifft nur lokale Testläufe außerhalb UTC, nicht CI (läuft in UTC) und nicht Produktionscode. Bei Bedarf lokal mit `TZ=UTC npx playwright test` gegentesten. Möglicher Folge-Sprint (nicht angefordert): B79 (`_checkCompoundIsolationBalance`) auf die neue `isCompoundExercise()` umstellen, siehe DECISIONS.md. Loops 7-11 aktiv (diese Session: Loop 5+7+11 aktualisiert). Nicht committet: `Research/TRAIN_Parameter_Review.md` (Nutzer-Recherche, bewusst uncommitted gelassen).*
 
 ---
 
@@ -11,11 +11,28 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v213 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v214 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
 - CSS: ?v=203 (unverändert seit B109)
 - SCHEMA: 32 (unverändert — additiver Default statt Versions-Bump, siehe B109)
+- **B111 — movementMap.js erweitert (train-v214, 2026-07-26):** reine
+  Datenergänzung, +79 Übungsvariationen/Synonyme (`MOVEMENT_MAP` 139→218
+  Einträge) über Squat/Hinge/Push/Pull/Core/Carry, plus 23 neue Einträge
+  in `ISOLATION_EXERCISE_NAMES` (38→62). Korrektur dabei: `Face Pulls`
+  war fälschlich als Isolation gelistet — Face Pull ist Compound
+  (Schulter-Außenrotation + Retraktion), entfernt, neues Singular
+  `Face Pull` als Pull/Compound ergänzt. Bewusst NICHT geändert:
+  `Leg Curl`/`Beinbeuger` bleiben Bewegungsmuster-Kategorie `Hinge` (die
+  Compound/Isolation-Einstufung ist über `ISOLATION_EXERCISE_NAMES`
+  bereits korrekt — eine Kategorie-Änderung hätte Seiteneffekte auf
+  Push-Pull-Balance-Berechnungen in weeklyFocus.js, außerhalb des
+  "nur Daten"-Scopes). Keine Struktur-/Logik-Änderung an
+  `isCompoundExercise()`/`resolveCategory()`. 6 neue Unit-Tests
+  (`tests/movement_map_expansion.spec.js`), keine Duplikate (Key-Anzahl
+  programmatisch verifiziert). Nur `movementMap.js` geändert,
+  CACHE_VERSION train-v213→v214, CSS/SCHEMA unverändert. Details siehe
+  BUGS.md B111.
 - **B110 — Streak-Badge-Fenstergrenze korrigiert (train-v213, 2026-07-26):**
   Beiläufig gefunden, als CI nach dem B109-Push rot wurde
   (`streak_inprogress_week.spec.js`, zuvor als B104 getrackt). Root Cause:

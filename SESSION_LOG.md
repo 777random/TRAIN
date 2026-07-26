@@ -2869,3 +2869,28 @@ Eigentliche Aufgabe: nach dem D2-Push (train-v212) schlug CI erstmals fehl
   CLAUDE.md aktualisiert. Separater Commit direkt nach D2, damit die
   Historie sauber unterscheidet was zum Feature gehört und was ein
   eigenständiger Bugfix war.
+
+## 2026-07-26 (Fortsetzung, movementMap-Sprint) train-v213->v214
+Loop 1: 10/10 grün (Baseline vor Sprint)
+Eigentliche Aufgabe: B111 — movementMap.js erweitert. Diagnose zuerst
+  gezeigt (aktuelle Kategorien-Verteilung, Compound/Isolation-Grenze über
+  ISOLATION_EXERCISE_NAMES statt eigener MOVEMENT_MAP-Kategorie). +79
+  Übungsvariationen/Synonyme über Squat/Hinge/Push/Pull/Core/Carry ergänzt
+  (139->218 Einträge), +23 neue Einträge in ISOLATION_EXERCISE_NAMES
+  (38->62). Qualitätsprüfung: Face Pulls war fälschlich als Isolation
+  gelistet (sportwissenschaftlich Compound) - entfernt, neues Singular
+  Face Pull als Pull/Compound ergänzt. Leg Curl/Beinbeuger bewusst NICHT
+  von Hinge umkategorisiert (Compound/Isolation-Einstufung darüber bereits
+  korrekt, eine Kategorie-Änderung hätte Seiteneffekte auf weeklyFocus.js
+  Push-Pull-Balance gehabt, außerhalb des "nur Daten"-Scopes). Hip Thrust
+  (Hinge/Compound) bereits korrekt. Keine Duplikate (139+79=218 exakt
+  bestätigt). 6 neue Unit-Tests (tests/movement_map_expansion.spec.js),
+  volle Playwright-Suite grün (bekannte Parallel-Last-Flakes unter
+  Volllast, isoliert unter TZ=UTC alle grün - movementMap.js hat keinen
+  Bezug zu Datums-/Streak-Logik, keine Regression). Dabei nebenbei
+  festgestellt: mehrere Test-Dateien haben eine lokale-Zeitzone-only
+  UTC-Drift in ihren Datums-Helpern (betrifft nur lokale Läufe außerhalb
+  UTC, nicht CI, nicht Produktionscode) - in HANDOFF.md als Notiz
+  vermerkt, kein neuer Bug-Eintrag (kein User-Impact). Nur movementMap.js
+  geändert, CACHE_VERSION train-v213->v214, CSS/SCHEMA unverändert.
+  CLAUDE.md/HANDOFF.md/BUGS.md (B111) aktualisiert.
