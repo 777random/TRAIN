@@ -1249,6 +1249,7 @@ function _resortWeeksKeepingCurrent(state, refWeek) {
 
 function _appendDefaultWeek(startDate) {
   const days = clone(STATE.customTemplate ?? FACTORY_TEMPLATE);
+  days.forEach(day => (day.exercises ?? []).forEach(ex => _resetExerciseSubstitution(ex)));
   const newWk = {
     id:         Date.now(),
     startDate:  startDate ?? _nextMonday(),
@@ -1438,6 +1439,14 @@ function _reducePendingWeights(day, modifier, scope, compoundNames) {
   }
 }
 
+// B114: "Heute anders"-Substitution darf nie in einen geklonten/gespeicherten
+// Tag übernommen werden — jede Stelle, die Übungen kopiert (neue Woche, Tag
+// duplizieren/klonen, als Vorlage speichern), muss diese Funktion aufrufen.
+function _resetExerciseSubstitution(ex) {
+  if (ex.substituteFor) ex.name = ex.substituteFor;
+  ex.substituteFor = null;
+}
+
 function _resetClonedDays(days) {
   days.forEach(day => {
     day.locked          = false;
@@ -1455,8 +1464,7 @@ function _resetClonedDays(days) {
     day.sessionModifierScope = null; // Sprint C2 Teil A
     (day.exercises ?? []).forEach(ex => {
       if (ex._showCfg) ex._showCfg = false;
-      if (ex.substituteFor) ex.name = ex.substituteFor;
-      ex.substituteFor = null;
+      _resetExerciseSubstitution(ex);
       (ex.sets ?? []).forEach(s => {
         s.status = 'pending';
         s.done   = false;
@@ -1562,18 +1570,26 @@ function _applyPrTracking(state, ex, s, weight, reps) {
   // desselben Gewichts/derselben Wdh-Zahl in einer künftigen Woche nicht
   // erneut als "neuer PR" erscheint — nur der Satz, der den Rekord beim
   // Schreiben tatsächlich erhöht hat, behält das Badge dauerhaft.
+  // B115: pro Übung nur EIN Trophy-Badge pro Kalendertag — ohne diese Sperre
+  // würde z.B. ein Gewichts-PR auf Satz 1 und ein Wdh-PR auf Satz 3 beim
+  // selben Gewicht zwei Trophy-Icons in derselben Session zeigen. Echtes
+  // Kalenderdatum statt day.id, weil day.id beim Wochen-Klonen unverändert
+  // mitkopiert wird (siehe _resetClonedDays) und sich sonst über Wochen
+  // hinweg fälschlich "gleich" anfühlen würde.
+  const today = new Date().toISOString().split('T')[0];
+  const alreadyShownToday = ex._prBadgeShownOn === today;
   if (ex.prWeight === null || weight > ex.prWeight) {
-    s.prBadge = 'weight';
+    if (!alreadyShownToday) { s.prBadge = 'weight'; ex._prBadgeShownOn = today; }
     ex.prWeight = weight; ex.prRepsAtMaxWeight = reps;
   } else if (weight >= ex.prWeight && reps > (ex.prRepsAtMaxWeight ?? 0)) {
-    s.prBadge = 'reps';
+    if (!alreadyShownToday) { s.prBadge = 'reps'; ex._prBadgeShownOn = today; }
     ex.prRepsAtMaxWeight = reps;
   }
   if (!ex.prRepsHistory) ex.prRepsHistory = {};
   if (weight < ex.prWeight) {
     const w = String(weight);
     if (reps > (ex.prRepsHistory[w] ?? 0)) {
-      s.prBadge = 'reps';
+      if (!alreadyShownToday) { s.prBadge = 'reps'; ex._prBadgeShownOn = today; }
       ex.prRepsHistory[w] = reps;
     }
   }
@@ -1814,10 +1830,14 @@ function reduce(state, action) {
         sessionCheckIn:  null,
         sessionModifier: null,
         sessionModifierScope: null,
-        exercises:  srcDay ? srcDay.exercises.map(ex => ({
-          ...JSON.parse(JSON.stringify(ex)),
-          sets: ex.sets.map(s => ({ ...s, status: 'pending', done: false, deloadSkip: false })),
-        })) : [],
+        exercises:  srcDay ? srcDay.exercises.map(ex => {
+          const clonedEx = {
+            ...JSON.parse(JSON.stringify(ex)),
+            sets: ex.sets.map(s => ({ ...s, status: 'pending', done: false, deloadSkip: false })),
+          };
+          _resetExerciseSubstitution(clonedEx);
+          return clonedEx;
+        }) : [],
       };
       wk.days.push(newDay);
       break;
@@ -1848,6 +1868,7 @@ function reduce(state, action) {
       clone.sessionNote    = '';
       clone.sessionRating  = null;
       for (const ex of clone.exercises) {
+        _resetExerciseSubstitution(ex);
         for (const s of ex.sets) {
           s.status = 'pending';
           s.done   = false;
@@ -2443,6 +2464,7 @@ function reduce(state, action) {
           ex._showCfg = false;
           ex.nextWeekPlan = 0;
           ex.nextWeekPlanConfirmed = false;
+          _resetExerciseSubstitution(ex);
           (ex.sets ?? []).forEach(s => {
             s.status = 'pending';
             s.done = false;

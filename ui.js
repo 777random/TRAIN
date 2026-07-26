@@ -463,6 +463,13 @@ function _weekLabel(week, weeks) {
     const lastMonday = new Date(currentWeek.startDate + 'T00:00:00');
     lastMonday.setDate(lastMonday.getDate() - 7);
     if (week.startDate === _localISODate(lastMonday)) return 'Letzte Woche';
+
+    // B120: 2-8 Wochen zurück -> "Vor N Wochen", danach KW-Fallback (revidiert B99,
+    // das dieses Zwischenstufen-Schema entfernt hatte -- Nutzer-Entscheidung 2026-07-26).
+    const weekStart = new Date(week.startDate + 'T00:00:00');
+    const curStart = new Date(currentWeek.startDate + 'T00:00:00');
+    const weeksAgo = Math.round((curStart - weekStart) / (7 * 24 * 60 * 60 * 1000));
+    if (weeksAgo >= 2 && weeksAgo <= 8) return `Vor ${weeksAgo} Wochen`;
   }
   const d = new Date(week.startDate + 'T12:00:00');
   return `KW ${_isoWeek(d)} · ${d.getFullYear()}`;
@@ -1255,15 +1262,35 @@ function _buildSessionBriefing(day, state) {
   return { modifier: 'normal', modifierScope: 'all', message: 'Normales Training — Ziele wie geplant' };
 }
 
-/** Erste nicht-archivierte Compound-Übung des Tages (Squat/Hinge/Push) für das Briefing. */
-function _findFocusExercise(day, customExercises) {
+/**
+ * Fokus-Übung des Tages (Squat/Hinge/Push) für das Session-Briefing.
+ * B122: Priorität favorit+compound > favorit > compound > erste passende
+ * Übung in Tages-Reihenfolge (bisheriges Verhalten als Fallback) — vorher
+ * wurde ausschließlich nach Array-Reihenfolge gewählt, ohne Favoriten/
+ * Compound-Bevorzugung.
+ */
+function _findFocusExercise(day, customExercises, favoriteExercises) {
   const catMap = buildCategoryMap(customExercises ?? []);
+  const favs = favoriteExercises ?? [];
+  const candidates = [];
   for (const ex of day.exercises ?? []) {
     if (ex.archived) continue;
     const cat = resolveCategory(ex.name, catMap);
-    if (cat === 'Squat' || cat === 'Hinge' || cat === 'Push') return ex;
+    if (cat === 'Squat' || cat === 'Hinge' || cat === 'Push') candidates.push(ex);
   }
-  return null;
+  if (!candidates.length) return null;
+  const priority = ex => {
+    const isFav = favs.includes(ex.name);
+    const isCompound = isCompoundExercise(ex.name, catMap);
+    return isFav && isCompound ? 3 : isFav ? 2 : isCompound ? 1 : 0;
+  };
+  let best = candidates[0];
+  let bestPriority = priority(best);
+  for (let i = 1; i < candidates.length; i++) {
+    const p = priority(candidates[i]);
+    if (p > bestPriority) { best = candidates[i]; bestPriority = p; }
+  }
+  return best;
 }
 
 /**
@@ -1375,7 +1402,7 @@ function _renderSessionCheckIn(di) {
 
 function _renderSessionBriefing(di, day, wk, state) {
   const { message, modifier, modifierScope } = _buildSessionBriefing(day, state);
-  const focusEx = _findFocusExercise(day, state.customExercises);
+  const focusEx = _findFocusExercise(day, state.customExercises, state.favoriteExercises);
   let focusHtml = '';
   if (focusEx) {
     const lastRpe = _lastWeekAvgRpe(focusEx.name, wk, state);
@@ -1710,7 +1737,8 @@ function renderExercise(wk, di, ei, state) {
           .filter(w => w.days.some(d => d.exercises.some(e => e.name === ex.name && e.sets.some(s2 => s2.status === 'success'))));
         if (calcWeeks.length >= 2) {
           const recStep = ex.weightStep || state.settings?.plateStep || 2.5;
-          const rec = getWeightRecommendation(ex.name, calcWeeks, recStep, ex.progressionMode ?? 'weight_first', ex.targetRepsMax ?? null);
+          const _nwIsCompound = isCompoundExercise(ex.name, buildCategoryMap(state.customExercises));
+          const rec = getWeightRecommendation(ex.name, calcWeeks, recStep, ex.progressionMode ?? 'weight_first', ex.targetRepsMax ?? null, _nwIsCompound);
           _nextWeekWeight = rec?.recommendedWeight ?? null;
         }
       }
@@ -4818,7 +4846,7 @@ function renderSettingsTab(state) {
   <div class="settings-section">
     <div class="settings-section__title">Info</div>
     <div class="settings-row">
-      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v216</div></div>
+      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v217</div></div>
     </div>
     <div class="settings-row">
       <div>
@@ -5906,6 +5934,12 @@ function _handleClick(e) {
       const toEi = +ei - 1;
       if (toEi >= 0) {
         dispatch(A.EX_MOVE, { di: +di, fromEi: +ei, toEi });
+        // B116: Menü folgt der verschobenen Übung an ihren neuen Index. Die
+        // Buttons sind nur klickbar, wenn das Menü an ${di}-${ei} bereits
+        // offen war — der frühere Klick-Außerhalb-Check (oben in _handleClick)
+        // hat _exMenuOpenKey aber bereits auf null gesetzt (Klickziel ist der
+        // Pfeil-Button, nicht der ⋮-Toggle), daher unbedingt statt bedingt neu setzen.
+        _exMenuOpenKey = `${di}-${toEi}`;
         // Wartet kurz das Neuladen ab und scrollt den Pfeil dann in die Mitte
         setTimeout(() => {
           const newBtn = document.querySelector(`[data-action="move-ex-up"][data-di="${di}"][data-ei="${toEi}"]`);
@@ -6093,6 +6127,12 @@ function _handleClick(e) {
       const toEi = +ei + 1;
       if (toEi <= maxEi) {
         dispatch(A.EX_MOVE, { di: +di, fromEi: +ei, toEi });
+        // B116: Menü folgt der verschobenen Übung an ihren neuen Index. Die
+        // Buttons sind nur klickbar, wenn das Menü an ${di}-${ei} bereits
+        // offen war — der frühere Klick-Außerhalb-Check (oben in _handleClick)
+        // hat _exMenuOpenKey aber bereits auf null gesetzt (Klickziel ist der
+        // Pfeil-Button, nicht der ⋮-Toggle), daher unbedingt statt bedingt neu setzen.
+        _exMenuOpenKey = `${di}-${toEi}`;
         // Wartet kurz das Neuladen ab und scrollt den Pfeil dann in die Mitte
         setTimeout(() => {
           const newBtn = document.querySelector(`[data-action="move-ex-down"][data-di="${di}"][data-ei="${toEi}"]`);
@@ -7173,7 +7213,7 @@ function _prepNewWeekModal() {
             ? (ex.weightStep || state.settings?.plateStep || 2.5)
             : (ex.metricStep || (exMetric === 'm' ? 50 : 10));
           const rec = exMetric === 'reps'
-            ? getWeightRecommendation(ex.name, calcWeeks, step, exProgressionMode, exTargetRepsMax)
+            ? getWeightRecommendation(ex.name, calcWeeks, step, exProgressionMode, exTargetRepsMax, isCompoundExercise(ex.name, buildCategoryMap(state.customExercises)))
             : getMetricRecommendation(ex.name, calcWeeks, step, exProgressionMode, exTargetRepsMax);
           if (rec) {
             if (inRecoveryWindow && rec.delta > 0) {
@@ -7936,7 +7976,8 @@ function _buildSessionSummaryData(di) {
       .filter(w => w.days.some(d => d.exercises.some(e => e.name === focusEx.name && e.sets.some(s => s.status === 'success'))));
     if (calcWeeks.length >= 2) {
       const step = focusEx.weightStep || state.settings?.plateStep || 2.5;
-      const rec = getWeightRecommendation(focusEx.name, calcWeeks, step, focusEx.progressionMode ?? 'weight_first', focusEx.targetRepsMax ?? null);
+      const _fpIsCompound = isCompoundExercise(focusEx.name, buildCategoryMap(state.customExercises));
+      const rec = getWeightRecommendation(focusEx.name, calcWeeks, step, focusEx.progressionMode ?? 'weight_first', focusEx.targetRepsMax ?? null, _fpIsCompound);
       nextWeekWeight = rec?.recommendedWeight ?? null;
     }
   }

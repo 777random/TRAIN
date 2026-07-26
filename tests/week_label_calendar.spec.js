@@ -97,16 +97,34 @@ test('Diese Woche im Header, auch wenn curIdx auf eine im Voraus erstellte Zukun
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
 });
 
-test('Letzte Woche + KW-Fallback fuer ältere Wochen', async ({ page }) => {
+test('Letzte Woche + "Vor N Wochen" fuer 2-8 Wochen zurueck', async ({ page }) => {
   await page.goto('/');
   await page.waitForSelector('#app.is-ready', { timeout: 10000 });
 
-  const twoAgo  = makeWeek(1, isoMondayOffset(-2), { markedDone: true });
-  const lastWk  = makeWeek(2, isoMondayOffset(-1), { markedDone: true });
-  const current = makeWeek(3, isoMondayOffset(0));
-  await seedWeeks(page, [twoAgo, lastWk, current], 1);
+  const threeAgo = makeWeek(1, isoMondayOffset(-3), { markedDone: true });
+  const twoAgo   = makeWeek(2, isoMondayOffset(-2), { markedDone: true });
+  const lastWk   = makeWeek(3, isoMondayOffset(-1), { markedDone: true });
+  const current  = makeWeek(4, isoMondayOffset(0));
+  await seedWeeks(page, [threeAgo, twoAgo, lastWk, current], 2);
 
   await expect(page.locator('#wk-label')).toHaveText(/Letzte Woche/);
+
+  await page.click('[data-action="nav-prev"]');
+  await page.waitForTimeout(200);
+  await expect(page.locator('#wk-label')).toHaveText('Vor 2 Wochen');
+
+  await page.click('[data-action="nav-prev"]');
+  await page.waitForTimeout(200);
+  await expect(page.locator('#wk-label')).toHaveText('Vor 3 Wochen');
+});
+
+test('KW-Fallback ab 9 Wochen zurueck (jenseits des "Vor N Wochen"-Fensters)', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForSelector('#app.is-ready', { timeout: 10000 });
+
+  const nineAgo = makeWeek(1, isoMondayOffset(-9), { markedDone: true });
+  const current = makeWeek(2, isoMondayOffset(0));
+  await seedWeeks(page, [nineAgo, current], 1);
 
   await page.click('[data-action="nav-prev"]');
   await page.waitForTimeout(200);

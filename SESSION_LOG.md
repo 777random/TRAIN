@@ -2955,3 +2955,46 @@ Eigentliche Aufgabe: B113 — Einstellungen restrukturiert. Technische Spec
   Regression). Nur ui.js/styles.css geändert, CACHE_VERSION
   train-v215->v216, CSS ?v=204->205, SCHEMA unverändert. CLAUDE.md/
   HANDOFF.md/BUGS.md (B113) aktualisiert.
+
+## 2026-07-26 (Fortsetzung, 9-Bugs-vor-Launch-Sprint) train-v216->v217
+Loop 1: Baseline grün vor Sprint.
+Eigentliche Aufgabe: B114-B122 — 9 unabhängig gemeldete Bugs. Diagnose-vor-Fix
+  zuerst per Plan-Mode: 3 parallele Explore-Agents (Datenmechanik/
+  UI-Rendering/Coach-Logik), Spec geschrieben und per ExitPlanMode bestätigt
+  (eager-inventing-newell.md). Bei 4 der 9 Bugs war der Root Cause anders als
+  im Report vermutet:
+  - B114 ("Heute anders" bleibt bestehen): die beiden echten "neue Woche"-
+    Pfade (WEEK_CREATE/AUTO_WEEK_CREATE) waren bereits korrekt — Lücke lag in
+    DAY_ADD_CLONE/DAY_DUPLICATE/SAVE_WEEK_AS_TEMPLATE->_appendDefaultWeek.
+  - B115 (T-Bar Rudern doppeltes PR-Icon): kein doppelter Eintrag/
+    Namensinkonsistenz, sondern Gewichts-PR + Wdh-PR am selben Gewicht in
+    derselben Session, jeweils eigenes Icon. Max. 1 Trophy/Übung/Tag jetzt.
+  - B121 (Seitheben RPE 8 -> Steigern): weder movementMap.js noch
+    sessionCoach.js hatten einen Fehler — weightRecommendation.js (separate
+    Woche-über-Woche-Engine) hatte komplett kein isCompound-Bewusstsein.
+  - B122 (Fokus ignoriert Favoriten): zwei unabhängige Auswahl-Funktionen
+    (_findFocusExercise ui.js, _checkProgression weeklyFocus.js), keine kannte
+    state.favoriteExercises.
+  B120 ("Vor N Wochen"-Label) deckte einen echten Zielkonflikt mit B99
+  (train-v208) auf: B99 hatte dieses Zwischenstufen-Schema bewusst entfernt,
+  vom Nutzer damals bestätigt. Per Rückfrage (AskUserQuestion) revidiert der
+  Nutzer B99 in diesem Punkt jetzt explizit — DECISIONS.md B99 um
+  Revidiert-Vermerk ergänzt.
+  Implementierung über 4 parallele Fork-Agents nach disjunkten Dateien
+  (state.js: B114+B115 / styles.css: B117+B118 / timer.js: B119 /
+  ui.js+weeklyFocus.js+weightRecommendation.js: B116+B120+B121+B122 — B120
+  vom Fork-Agent wegen des B99-Konflikts zunächst korrekt zurückgestellt,
+  nach Nutzer-Entscheidung direkt nachimplementiert). 27 neue/erweiterte Tests
+  über 8 Spec-Dateien. Volle Suite: 156 direkt grün + 49 durch bekannten
+  Parallel-Last-Flake (ERR_CONNECTION_REFUSED, Dev-Server unter Dauerlast)
+  betroffen, isoliert nachverifiziert alle 49 grün — keine echte Regression,
+  205/205 im Ergebnis. state.js/ui.js/styles.css/timer.js/weeklyFocus.js/
+  weightRecommendation.js geändert, CACHE_VERSION train-v216->v217, CSS
+  ?v=205->206, SCHEMA unverändert. CLAUDE.md/HANDOFF.md/BUGS.md
+  (B114-B122)/DECISIONS.md (B99-Revision) aktualisiert.
+Loop 5: for-advisor.txt aktualisiert (35. Fassung, B114-B122)
+Loop 7/11: NICHT abgeschlossen — Advisor-Export-Agent traf während der
+  Ausführung das Anthropic-Session-Limit (Reset 18:40 Europe/Berlin), nur
+  Loop 5 fertig. for-advisor-product.txt/for-advisor-consolidated.txt bleiben
+  auf dem Stand von B113 (train-v216) und müssen in einer Folgesession
+  nachgezogen werden.

@@ -84,3 +84,48 @@ test('PR-Pokal: echte Gewichtssteigerung zeigt weiterhin den Pokal', async ({ pa
   await expect(page.locator('.pr-badge:not(.pr-badge--goal):not(.pr-badge--reps)')).toHaveCount(1);
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
 });
+
+// B115: T-Bar Rudern zeigte zwei Trophy-Icons fürs selbe Gewicht — Satz 1 löste
+// einen Gewichts-PR aus (ex.prWeight war null), Satz 3 beim GLEICHEN Gewicht
+// mit mehr Wdh. löste zusätzlich einen Wdh-PR aus (state.js _applyPrTracking
+// vergibt s.prBadge pro Satz). Fix: pro Übung/Tag nur der erste PR-würdige
+// Satz bekommt ein Trophy-Badge (ex._prBadgeShownOn), die Buchhaltung
+// (prWeight/prRepsAtMaxWeight) läuft unverändert weiter.
+test('PR-Pokal: zwei Sätze mit gleichem Gewicht am selben Tag zeigen nur EINEN Pokal', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', err => pageErrors.push(err.message));
+  await page.goto('/');
+  await page.waitForSelector('#app.is-ready', { timeout: 10000 });
+  await page.evaluate(() => {
+    localStorage.setItem('train_v6', JSON.stringify({
+      meta: { schemaVersion: 30, savedAt: Date.now(), createdAt: Date.now() }, curIdx: 0,
+      weeks: [{ id: 1, startDate: '2026-07-13', note: '', mode: 'standard',
+        days: [{ id: 11, title: 'Tag A', subtitle: '', warmup: '', cooldown: '', locked: false, markedDone: false, isVacation: false,
+          sleepHours: null, energyLevel: null, sessionRating: null,
+          exercises: [{
+            name: 'T-Bar Rudern', note: '', pauseSec: 90, metric: 'reps', weightStep: 5,
+            sets: [
+              { weight: 40, reps: 8, rpe: 8, status: 'pending', done: false, note: '' },
+              { weight: 40, reps: 9, rpe: 8, status: 'pending', done: false, note: '' },
+            ],
+            prWeight: null, prRepsAtMaxWeight: null, prRepsHistory: {},
+            nextWeekPlan: 0, nextWeekPlanConfirmed: false, targetSets: 2, targetReps: 5,
+            progressionType: 'weight', archived: false,
+          }] }],
+        sessionLog: [], bodyData: {}, restDays: [], isSeedWeek: false }],
+      customTemplate: [], settings: {},
+      prs: {},
+      coachPerformance: { suggestions: [] }, coachQuestion: null, coachQuestionHistory: [],
+      lastReentryHandled: null, plateauActions: {}, decisionLog: [], badges: [], onboardingDone: true,
+    }));
+  });
+  await page.reload();
+  await page.waitForSelector('#app.is-ready', { timeout: 10000 });
+
+  const doneButtons = page.locator('[data-action="toggle-done"]');
+  await doneButtons.nth(0).click();
+  await doneButtons.nth(1).click();
+
+  await expect(page.locator('.pr-badge:not(.pr-badge--goal)')).toHaveCount(1);
+  expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});

@@ -36,9 +36,15 @@ export function roundToPlate(weight, step = 2.5) {
  *   fullDelta/2, AUSSER die Schrittweite ist selbst schon ≤1.25 (kleinste
  *   gängige Hantelscheibe) — dann bleibt halfDelta = fullDelta (eine weitere
  *   Halbierung wäre nicht mehr sinnvoll auflegbar).
+ * @param {boolean} isCompound – B121: bei Isolationsübungen (false) endet die
+ *   "noch steigern"-RPE-Spanne bereits bei 7.5 statt 8.5, d.h. RPE 8 fällt in
+ *   die "Halten"-Zone (analog zur bereits korrekten Schwelle in
+ *   sessionCoach.js). Compound-Übungen behalten die bisherige 7.5–8.5-Spanne.
+ *   Default true, um bestehende Aufrufer nicht zu brechen, die den Parameter
+ *   (noch) nicht übergeben.
  * @returns {{ recommendedValue: number, reason: string, reasons: Array, delta: number, lastValue: number }}
  */
-function _recommendationCore(lastValue, weekSets, progressionMode, targetRepsMax, step, fullDelta, halfDelta) {
+function _recommendationCore(lastValue, weekSets, progressionMode, targetRepsMax, step, fullDelta, halfDelta, isCompound = true) {
   // Ø RPE der letzten Einheit (nur success-Sätze mit rpe !== null)
   let lastIdx = weekSets.length - 1;
   while (lastIdx >= 0 && weekSets[lastIdx].success.length === 0) lastIdx--;
@@ -118,7 +124,7 @@ function _recommendationCore(lastValue, weekSets, progressionMode, targetRepsMax
     reason = 'RPE war niedrig, Steigerung möglich';
     reasons.push({ icon: '✓', text: `Ø RPE ${avgRpe.toFixed(1)} — Luft nach oben`, isRpe: true });
     reasons.push({ icon: '✓', text: `Erfolgsquote ${srPct}%`, isRpe: false });
-  } else if (avgRpe !== null && avgRpe > 7.5 && avgRpe <= 8.5 && successRate >= 0.8) {
+  } else if (avgRpe !== null && avgRpe > 7.5 && avgRpe <= (isCompound ? 8.5 : 7.5) && successRate >= 0.8) {
     delta  = halfDelta;
     reason = 'Gute Form, kleine Steigerung';
     reasons.push({ icon: '✓', text: `Ø RPE ${avgRpe.toFixed(1)} — gute Form`, isRpe: true });
@@ -157,9 +163,10 @@ function _recommendationCore(lastValue, weekSets, progressionMode, targetRepsMax
  * @param {string} progressionMode – 'weight_first' (Standard) | 'double_progression' | 'reps_only'
  *   ANDERE ACHSE als ex.progressionType (steuert nur den manuellen Plan-Button) — nicht verwechseln.
  * @param {number|null} targetRepsMax – Wdh-Obergrenze, nur bei 'double_progression' relevant.
+ * @param {boolean} isCompound – B121: siehe _recommendationCore(). Default true.
  * @returns {{ recommendedWeight: number, reason: string, delta: number, lastWeight: number } | null}
  */
-export function getWeightRecommendation(exerciseName, weeks, plateStep = 2.5, progressionMode = 'weight_first', targetRepsMax = null) {
+export function getWeightRecommendation(exerciseName, weeks, plateStep = 2.5, progressionMode = 'weight_first', targetRepsMax = null, isCompound = true) {
   if (weeks.length < 2) return null;
 
   // Sätze pro Woche für diese Übung sammeln (success + fail getrennt).
@@ -201,7 +208,7 @@ export function getWeightRecommendation(exerciseName, weeks, plateStep = 2.5, pr
   // (Nutzer-Entscheidung, siehe BUGS.md).
   const fullDelta = plateStep;
   const halfDelta = plateStep <= 1.25 ? plateStep : plateStep / 2;
-  const core = _recommendationCore(lastWeight, weekSets, progressionMode, targetRepsMax, plateStep, fullDelta, halfDelta);
+  const core = _recommendationCore(lastWeight, weekSets, progressionMode, targetRepsMax, plateStep, fullDelta, halfDelta, isCompound);
   return {
     recommendedWeight: core.recommendedValue,
     reason: core.reason,

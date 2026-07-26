@@ -53,7 +53,7 @@ import { getWeightRecommendation, isReadyForAutoSelect, roundToPlate } from './w
 import { isFullSuccess } from './setUtils.js';
 import { _consistencyEligibleWeeks } from './consistencyUtils.js';
 import { computeVolumeTrend, computeConsistencyTrend, computeQualityTrend } from './overallPerformance.js';
-import { buildCategoryMap, resolveCategory } from './movementMap.js';
+import { buildCategoryMap, resolveCategory, isCompoundExercise } from './movementMap.js';
 
 const DAY_MS = 86_400_000;
 
@@ -652,6 +652,8 @@ function _checkProgression(state) {
 
   const seen = new Set();
   const readyCandidates = [];
+  const catMap = buildCategoryMap(state.customExercises);
+  const favs   = state.favoriteExercises ?? [];
 
   curWk.days.forEach(day => {
     (day.exercises ?? []).forEach(ex => {
@@ -663,14 +665,19 @@ function _checkProgression(state) {
       const exTargetRepsMax   = ex.targetRepsMax ?? null;
       const plateStep = ex.weightStep ?? state.settings?.plateStep ?? 2.5;
       if (!isReadyForAutoSelect(ex.name, calcWeeks, exProgressionMode, exTargetRepsMax)) return;
-      const rec = getWeightRecommendation(ex.name, calcWeeks, plateStep, exProgressionMode, exTargetRepsMax);
+      const isCompound = isCompoundExercise(ex.name, catMap);
+      const rec = getWeightRecommendation(ex.name, calcWeeks, plateStep, exProgressionMode, exTargetRepsMax, isCompound);
       if (!rec) return;
-      readyCandidates.push({ name: ex.name, rec, ex });
+      // B122: Priorität favorit+compound > favorit > compound > (Fallback:
+      // höchstes rec.delta) statt reiner Steigerungs-Höhe.
+      const isFav = favs.includes(ex.name);
+      const priority = isFav && isCompound ? 3 : isFav ? 2 : isCompound ? 1 : 0;
+      readyCandidates.push({ name: ex.name, rec, ex, priority });
     });
   });
 
   if (!readyCandidates.length) return null;
-  readyCandidates.sort((a, b) => b.rec.delta - a.rec.delta);
+  readyCandidates.sort((a, b) => b.priority - a.priority || b.rec.delta - a.rec.delta);
   const best   = readyCandidates[0];
   const second = readyCandidates[1] ?? null;
 

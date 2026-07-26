@@ -59,9 +59,17 @@ function _releaseWakeLock() {
   _wakeLock = null;
 }
 
-// Re-acquire after tab becomes visible (wake lock drops on visibility change)
+// Re-acquire after tab becomes visible (wake lock drops on visibility change).
+// B119: rAF is suspended while backgrounded, so the pause display freezes on
+// its last-painted value; force an immediate resync (instead of waiting for
+// the next natural frame) so the countdown — or the "done" transition, if the
+// pause already elapsed while hidden — catches up right away.
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && _pauseEnd) _acquireWakeLock();
+  if (document.visibilityState === 'visible' && _pauseEnd) {
+    _acquireWakeLock();
+    cancelAnimationFrame(_pauseRAF);
+    _tickPause();
+  }
 });
 
 // ─── Module state ─────────────────────────────────────────────────────────────

@@ -1,5 +1,5 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-26 — B113 (Einstellungen in 4 Zwischenüberschriften gegliedert), train-v216, siehe unten. B112/E1 (Transparenz Coach-Tab, train-v215), B111 (movementMap.js erweitert, train-v214), B110 (Streak-Badge-Fenstergrenze, train-v213), B109/D2 ("Heute anders", train-v212) und B105-B108 (train-v211, Onboarding-Verbesserungen) sowie B102+B103/B101/B100 bereits gepusht und CI-grün.*
+*Letzte Aktualisierung: 2026-07-26 — B114-B122 (9 Bugs vor Launch), train-v217, siehe unten. B113 (Einstellungen in 4 Zwischenüberschriften gegliedert, train-v216), B112/E1 (Transparenz Coach-Tab, train-v215), B111 (movementMap.js erweitert, train-v214), B110 (Streak-Badge-Fenstergrenze, train-v213), B109/D2 ("Heute anders", train-v212) und B105-B108 (train-v211, Onboarding-Verbesserungen) sowie B102+B103/B101/B100 bereits gepusht und CI-grün.*
 *Nächster Schritt: C3 Compound-Edit-Option. Push dieser Session braucht noch die reguläre Session-Bestätigung (Push-Policy LOOPS.md). Weiterhin nur als Notiz (kein Bug): mehrere Test-Dateien konstruieren Datums-Fixtures über lokale `Date`-Methoden + `.toISOString()` — verschiebt `startDate` bei lokalem Ausführen in einer positiven-UTC-Offset-Zeitzone um einen Tag; betrifft nur lokale Testläufe außerhalb UTC, nicht CI/Produktionscode, bei Bedarf mit `TZ=UTC npx playwright test` gegentesten. Möglicher Folge-Sprint (nicht angefordert): B79 (`_checkCompoundIsolationBalance`) auf die neue `isCompoundExercise()` umstellen, siehe DECISIONS.md. Loops 7-11 aktiv (diese Session: Loop 5+7+11 aktualisiert). Nicht committet: `Research/TRAIN_Parameter_Review.md` (Nutzer-Recherche, bewusst uncommitted gelassen).*
 
 ---
@@ -11,11 +11,36 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v216 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v217 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
-- CSS: ?v=205
+- CSS: ?v=206
 - SCHEMA: 32 (unverändert — additiver Default statt Versions-Bump, siehe B109)
+- **B114-B122 — 9 Bugs vor Launch (train-v217, 2026-07-26):** Diagnose-vor-Fix
+  über 4 parallele Fork-Agents (state.js / styles.css / timer.js /
+  ui.js+weeklyFocus.js+weightRecommendation.js). Bei 4 der 9 Bugs war der
+  echte Root Cause anders als vermutet — Details je Bug in BUGS.md:
+  - B114: "Heute anders"-Reset lief bereits korrekt bei neuer Woche, Lücke
+    lag in `DAY_ADD_CLONE`/`DAY_DUPLICATE`/Save-as-Template.
+  - B115: kein doppelter PR-Eintrag, sondern Gewichts-PR + Wdh-PR am
+    selben Gewicht in derselben Session — jetzt max. 1 Trophy/Übung/Tag.
+  - B116: `_exMenuOpenKey` folgt jetzt der verschobenen Übung, nicht der
+    Zeilenposition.
+  - B117: Haken-Farbe vereinheitlicht (PR bleibt über Trophy-Badge sichtbar).
+  - B118: `.rpe-nudge` blockiert keine Klicks mehr außerhalb seiner Buttons.
+  - B119: Pausen-Anzeige synct sofort beim Rückkehr aus dem Hintergrund.
+  - B120: "Vor N Wochen" (2-8 Wochen) zurück — **revidiert B99** nach
+    expliziter Rückfrage (Zielkonflikt: B99 hatte dieses Schema 2026-07
+    bewusst entfernt).
+  - B121: kein movementMap.js-/sessionCoach.js-Bug — `weightRecommendation.js`
+    hatte kein `isCompound`-Bewusstsein, jetzt nachgerüstet.
+  - B122: zwei unabhängige Fokus-Auswahl-Funktionen (Session-Briefing +
+    Coach-Tab), beide bekommen Priorität favorit+compound > favorit >
+    compound > bisheriger Fallback.
+  27 neue/erweiterte Tests über 8 Spec-Dateien, volle Suite grün (bekannte
+  Parallel-Last-Flakes unter Volllast, isoliert nachverifiziert). Nur
+  state.js/ui.js/styles.css/timer.js/weeklyFocus.js/weightRecommendation.js
+  geändert, CACHE_VERSION train-v216→v217, CSS ?v=205→206, SCHEMA unverändert.
 - **B113 — Einstellungen restrukturiert (train-v216, 2026-07-26):** die
   bisherige einzelne "Training"-Überschrift (15 Elemente) ist jetzt in 4
   Zwischenüberschriften gegliedert: TRAINING (6 ursprünglich vorgegebene +

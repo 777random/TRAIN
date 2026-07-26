@@ -238,6 +238,45 @@ test('B78: toggle-done startet den Pause-Timer weiterhin korrekt wenn autoStartP
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
 });
 
+// B119: requestAnimationFrame wird vom Browser pausiert, solange die Seite im
+// Hintergrund ist (App-Wechsel, z.B. WhatsApp) -- die Pausenanzeige friert dadurch
+// auf dem letzten gemalten Wert ein. Der visibilitychange-Listener (timer.js) hat
+// bisher nur den Wake Lock reaktiviert, aber nie einen sofortigen Resync angestoßen.
+// Dieser Test simuliert das Einfrieren, indem er requestAnimationFrame direkt nach
+// dem einen bereits verplanten Tick durch ein No-op ersetzt (genau das Verhalten,
+// das echtes Backgrounding erzeugt), lässt echte Zeit vergehen und prüft, dass
+// ein visibilitychange-Event die Anzeige sofort (synchron) korrigiert.
+test('B119: Pausenanzeige synct sofort nach Rückkehr aus dem Hintergrund, statt eingefroren zu bleiben', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', err => pageErrors.push(err.message));
+  await page.goto('/');
+  await page.waitForSelector('#app.is-ready', { timeout: 10000 });
+  await seed(page, { exercises: [mkEx({ nSets: 2, targetReps: 5 })], autoStartPauseTimer: true });
+
+  await setRpe(page, 0, 0, 0, 8); // -> pauseSec 120
+
+  await page.evaluate(() => {
+    document.querySelector('[data-action="confirm-set"][data-di="0"][data-ei="0"]').click();
+    // Simuliert Backgrounding: nach dem einen bereits von _startPause() verplanten
+    // rAF-Tick werden keine weiteren Ticks mehr geplant -- die Anzeige friert ein.
+    window.requestAnimationFrame = () => 0;
+  });
+
+  await expect(page.locator('#pause-overlay')).toHaveClass(/pause-overlay--visible/);
+
+  await page.waitForTimeout(3000); // echte Zeit vergeht, während rAF eingefroren ist
+  const frozenNum = Number(await page.locator('#pause-ring-num').textContent());
+
+  const resyncedNum = await page.evaluate(() => {
+    document.dispatchEvent(new Event('visibilitychange'));
+    return Number(document.getElementById('pause-ring-num').textContent);
+  });
+
+  expect(resyncedNum).toBeLessThanOrEqual(117); // 120s - mind. 3s echte Wartezeit
+  expect(resyncedNum).toBeLessThan(frozenNum);
+  expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});
+
 test('Favoriten-Übung ohne RPE: erweiterte Nudge einmalig pro Sitzung, "Nie für diese Übung" wirkt dauerhaft', async ({ page }) => {
   const pageErrors = [];
   page.on('pageerror', err => pageErrors.push(err.message));
