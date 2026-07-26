@@ -2815,3 +2815,36 @@ Loop 9: unverändert (Onboarding-Änderungen sind UX-relevant, aber
 Loop 10: unverändert (keine neuen Nutzer-/Kanal-Erkenntnisse)
 Loop 11: for-advisor-consolidated.txt aktualisiert (letzter Loop der
   Session)
+
+## 2026-07-26 (Fortsetzung, D2-Sprint) train-v211->v212
+Loop 1: 10/10 grün (Baseline vor Sprint)
+Eigentliche Aufgabe: B109/D2 — "Heute anders" merkt sich Ersatz-Übungen je
+  Original und schlägt sie beim nächsten Mal vor. Technische Spec zuerst
+  geschrieben und per Plan-Mode bestätigt (eager-inventing-newell.md, neu
+  überschrieben — anderes Thema als der vorherige Onboarding-Plan), inkl.
+  1 Explore-Agent zur Code-Verifikation VOR der Umsetzung. Wichtiger Fund:
+  "Heute anders" ist ein Zwei-Schritt-Vorgang (Umbenennen im Namensfeld +
+  separate Original-Deklaration), kein Ein-Feld-Dialog wie im Sprint-Text
+  angenommen — per Rückfrage (AskUserQuestion) geklärt: Flow bleibt
+  unverändert, Lösung auf UI-Ebene (zwei bestehende Dispatches
+  hintereinander aus einem Klick) statt Reducer-Redesign. Umsetzung direkt
+  (kein Multi-Agent-Sprint diesmal, ein zusammenhängendes Feature über
+  state.js+ui.js+styles.css): additiver State-Default `substituteHistory`
+  (kein SCHEMA-Bump, `goal`-Präzedenzfall), `_recordSubstitution()`-Helper
+  mit 5er/50er-Limit im bestehenden `EX_SET_SUBSTITUTE`-Reducer, neue
+  Vorschlagsliste im "Heute anders"-Formular + `apply-sub-suggestion`-
+  Click-Handler (ui.js), neue CSS-Klassen. 6 neue Tests
+  (`tests/heute_anders_history.spec.js`, alle grün), bestehende Fixture
+  `TRAIN_Test_HeuteAnders.v1.json` weiterhin grün, regression_core+fixtures
+  grün. CACHE_VERSION train-v211->v212, CSS ?v=202->203, SCHEMA
+  unverändert. state.js/ui.js/styles.css geändert. CLAUDE.md/HANDOFF.md/
+  BUGS.md (B109) aktualisiert.
+Loop 5: for-advisor.txt aktualisiert (train-v212)
+Loop 7: for-advisor-product.txt aktualisiert (train-v212, "Heute anders"
+  Abschnitt ergänzt)
+Loop 8: unverändert (keine neuen Markt-Erkenntnisse)
+Loop 9: unverändert (kleine Feature-Ergänzung, kein neuer Onboarding-
+  Flow-Schritt)
+Loop 10: unverändert (keine neuen Nutzer-/Kanal-Erkenntnisse)
+Loop 11: for-advisor-consolidated.txt aktualisiert (letzter Loop der
+  Session)

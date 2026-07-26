@@ -1773,8 +1773,25 @@ function renderExercise(wk, di, ei, state) {
     : '';
 
   const _subKey = `${di}-${ei}`;
+  // D2: Vorschläge aus früheren "Heute anders"-Ersetzungen für GENAU diese
+  // Übung (Schlüssel = ex.name im Moment des Öffnens — der vom Nutzer selbst
+  // beschriebene Normalfall, in dem "Heute anders" für die noch original
+  // benannte Übung geöffnet wird, siehe Sprint-Plan-Diagnose).
+  const _subSuggestions = (state.substituteHistory?.[ex.name] ?? [])
+    .slice().sort((a, b) => b.count - a.count).slice(0, 3);
+  const subSuggestionsHtml = _subSuggestions.length > 0
+    ? `<div class="sub-suggestions">
+      ${_subSuggestions.map(entry => `
+      <button type="button" class="sub-suggestion" data-action="apply-sub-suggestion"
+        data-di="${di}" data-ei="${ei}" data-original="${h(ex.name)}" data-suggested="${h(entry.name)}">
+        <span class="sub-suggestion__icon">🔄</span>
+        <span class="sub-suggestion__name">${h(entry.name)}</span>
+        <span class="sub-suggestion__count">${entry.count}×</span>
+      </button>`).join('')}
+    </div>` : '';
   const subFormHtml = _subFormOpenKey === _subKey
     ? `<div class="sub-form">
+    ${subSuggestionsHtml}
     <span class="sub-form__label">Ursprüngliche Übung:</span>
     <input
       class="sub-name-input"
@@ -4767,7 +4784,7 @@ function renderSettingsTab(state) {
   <div class="settings-section">
     <div class="settings-section__title">Info</div>
     <div class="settings-row">
-      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v211</div></div>
+      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v212</div></div>
     </div>
     <div class="settings-row">
       <div>
@@ -5837,6 +5854,19 @@ function _handleClick(e) {
     case 'reset-sub':
       dispatch(A.EX_SET_SUBSTITUTE, { di: +di, ei: +ei, substituteFor: null });
       break;
+
+    // D2: Vorschlag antippen — feuert dieselben zwei bestehenden Actions,
+    // die ein Nutzer sonst manuell in zwei Schritten auslöst (Namensfeld
+    // umbenennen, dann "Heute anders" bestätigen), hintereinander in einem
+    // Tap. Reducer/Bedeutung der Felder bleiben dabei unverändert.
+    case 'apply-sub-suggestion': {
+      const original  = el.dataset.original;
+      const suggested = el.dataset.suggested;
+      dispatch(A.EX_UPDATE, { di: +di, ei: +ei, field: 'name', value: suggested });
+      dispatch(A.EX_SET_SUBSTITUTE, { di: +di, ei: +ei, substituteFor: original });
+      _subFormOpenKey = null;
+      break;
+    }
 
         case 'move-ex-up': {
       const toEi = +ei - 1;

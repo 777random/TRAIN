@@ -1,7 +1,7 @@
 # TRAIN — CLAUDE.md
 # Vollständiger Projektkontext für Claude Code
-# Stand: train-v211 / SCHEMA 32 / Juli 2026
-# Letztes Update: nach train-v211 (B105-B108: Onboarding-Verbesserungen — Backup-Hinweis, Coach-Tab-Fallback-Subtext, Vorlagen-Übungsvorschau, Deload-Erklärung)
+# Stand: train-v212 / SCHEMA 32 / Juli 2026
+# Letztes Update: nach train-v212 (D2: "Heute anders" merkt sich Ersatz-Übungen je Original und schlägt sie beim nächsten Mal vor)
 
 ---
 
@@ -49,7 +49,7 @@ TRAIN ist eine deutschsprachige PWA für Krafttraining. Pure Vanilla ES Modules 
   Sessions müssen aus diesem neuen Pfad heraus gestartet werden, sonst
   landet man am alten (jetzt leeren) OneDrive-Ort. Nutzer zieht den Ordner
   regelmäßig manuell auf eine externe Festplatte statt über Cloud-Sync.
-- Aktueller Stand: SCHEMA_VERSION 32 · CACHE_VERSION train-v211 · CSS ?v=202
+- Aktueller Stand: SCHEMA_VERSION 32 · CACHE_VERSION train-v212 · CSS ?v=203
 
 ---
 
@@ -232,6 +232,7 @@ Flux-Pattern: `dispatch(A.ACTION_TYPE, payload)` → `reduce()` → `persistStat
   },
   prs: {},
   coachPerformance: { suggestions: [] },
+  substituteHistory: {},   // { [originalExerciseName]: { name, count, lastUsed }[] } — D2, additiver Default, kein SCHEMA-Bump
   coachQuestion: { weekStart, questionId, answer, outcome, measuredWeekStart },
   coachQuestionHistory: [],
   lastReentryHandled: null | timestamp,

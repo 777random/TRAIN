@@ -195,6 +195,7 @@ function buildDefaultState() {
     coachQuestion: { weekStart: null, questionId: null, answer: null, outcome: null, measuredWeekStart: null }, // adaptive Nachfrage — eine Frage pro Woche
     coachQuestionHistory: [], // abgeschlossene Fragen mit Outcome: [{ weekStart, questionId, answer, outcome, measuredWeekStart }]
     coachPerformance: { suggestions: [] }, // Logging + Messung von Progressions-Empfehlungen
+    substituteHistory: {}, // { [originalExerciseName]: { name, count, lastUsed }[] } — D2, siehe _recordSubstitution()
     settings: {
       swipe:              true,
       drag:               true,
@@ -955,6 +956,9 @@ function migrate(raw) {
   if (!Array.isArray(raw.coachPerformance.suggestions)) {
     raw.coachPerformance.suggestions = [];
   }
+  if (!raw.substituteHistory || typeof raw.substituteHistory !== 'object') {
+    raw.substituteHistory = {};
+  }
 
   // Always-apply: week label (optional user-set name, no schema bump needed)
   (raw.weeks ?? []).forEach(wk => { if (!('label' in wk)) wk.label = ''; });
@@ -1078,6 +1082,51 @@ export function clearAutoWeekPending() {
 
 function _currentWeek() {
   return STATE.weeks[STATE.curIdx] ?? null;
+}
+
+const SUBSTITUTE_HISTORY_MAX_PER_EXERCISE = 5;
+const SUBSTITUTE_HISTORY_MAX_TOTAL        = 50;
+
+/**
+ * D2: merkt sich, dass `originalName` heute durch `substituteName` ersetzt
+ * wurde — aufgerufen aus dem EX_SET_SUBSTITUTE-Reducer, NUR wenn beide
+ * Namen bekannt und unterschiedlich sind (ein Selbstverweis entsteht, wenn
+ * "Heute anders" bestätigt wird BEVOR die Übung im Namensfeld umbenannt
+ * wurde — siehe Diagnose im Sprint-Plan, kein Fehler, nur kein sinnvoller
+ * Eintrag). Pro Original max. 5 Einträge (älteste nach lastUsed zuerst
+ * entfernt), global max. 50 Einträge über alle Originale hinweg.
+ */
+function _recordSubstitution(state, originalName, substituteName) {
+  if (!originalName || !substituteName || originalName === substituteName) return;
+  if (!state.substituteHistory || typeof state.substituteHistory !== 'object') state.substituteHistory = {};
+  const hist = state.substituteHistory;
+  const list = hist[originalName] ?? (hist[originalName] = []);
+  const today = new Date().toISOString().slice(0, 10);
+  const existing = list.find(e => e.name === substituteName);
+  if (existing) {
+    existing.count += 1;
+    existing.lastUsed = today;
+  } else {
+    list.push({ name: substituteName, count: 1, lastUsed: today });
+  }
+  if (list.length > SUBSTITUTE_HISTORY_MAX_PER_EXERCISE) {
+    list.sort((a, b) => a.lastUsed < b.lastUsed ? 1 : -1);
+    list.length = SUBSTITUTE_HISTORY_MAX_PER_EXERCISE;
+  }
+  const totalEntries = Object.values(hist).reduce((sum, l) => sum + l.length, 0);
+  if (totalEntries > SUBSTITUTE_HISTORY_MAX_TOTAL) {
+    const flat = [];
+    for (const [origName, entries] of Object.entries(hist)) {
+      entries.forEach(e => flat.push({ origName, entry: e }));
+    }
+    flat.sort((a, b) => a.entry.lastUsed < b.entry.lastUsed ? 1 : -1);
+    flat.slice(SUBSTITUTE_HISTORY_MAX_TOTAL).forEach(({ origName, entry }) => {
+      const arr = hist[origName];
+      const idx = arr.indexOf(entry);
+      if (idx !== -1) arr.splice(idx, 1);
+      if (arr.length === 0) delete hist[origName];
+    });
+  }
 }
 
 /**
@@ -2101,6 +2150,7 @@ function reduce(state, action) {
     case A.EX_SET_SUBSTITUTE: {
       const ex = _currentWeek()?.days[p.di]?.exercises[p.ei]; if (!ex) break;
       ex.substituteFor = p.substituteFor ?? null;
+      if (ex.substituteFor) _recordSubstitution(STATE, ex.substituteFor, ex.name);
       break;
     }
 

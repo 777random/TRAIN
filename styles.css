@@ -1101,6 +1101,19 @@ exercise { position: unset; }
   margin: var(--sp-1) 0 var(--sp-2);
 }
 .sub-form__label { font-size: 12px; color: var(--c-text-2); }
+/* D2: Vorschlagsliste aus früheren "Heute anders"-Ersetzungen */
+.sub-suggestions { display: flex; flex-direction: column; gap: var(--sp-1); }
+.sub-suggestion {
+  display: flex; align-items: center; gap: var(--sp-2); width: 100%;
+  background: var(--c-surface); border: none; border-radius: var(--r-md);
+  color: var(--c-text); font-size: 13px; text-align: left; cursor: pointer;
+  padding: var(--sp-2) var(--sp-3); min-height: var(--touch);
+  font-family: var(--font-body);
+}
+.sub-suggestion:hover, .sub-suggestion:focus-visible { background: var(--c-border); }
+.sub-suggestion__icon { flex-shrink: 0; }
+.sub-suggestion__name { flex: 1; }
+.sub-suggestion__count { color: var(--c-text-2); font-size: 12px; flex-shrink: 0; }
 .sub-name-input {
   background: var(--c-surface); border: 1px solid var(--c-border);
   border-radius: var(--r-sm); color: var(--c-text);

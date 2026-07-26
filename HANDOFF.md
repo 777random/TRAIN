@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-26 — B105-B108 (Onboarding-Verbesserungen: Backup-Hinweis-Retone, Coach-Tab-Fallback-Subtext, Vorlagen-Übungsvorschau, Deload-Erklärung), train-v211, siehe unten. B102+B103 (train-v210, diagnostiziert/kein Code-Fix) sowie B101/B100 bereits gepusht und CI-grün.*
-*Nächster Schritt: B3 Einstellungen restrukturieren, danach C3 Compound-Edit-Option, danach D2 "Heute anders" merken, danach E1 Transparenz Coach. Push dieser Session braucht noch die reguläre Session-Bestätigung (Push-Policy LOOPS.md). Weiterhin offen (B104, nicht in dieser Session bearbeitet): zwei vorbestehende Tests (`streak_inprogress_week.spec.js`, `training_context_anchor.spec.js`) mit vermutlicher UTC-vs-lokal-Datumsdrift im Test-Fixture-Aufbau — siehe BUGS.md B104 für eine spätere Diagnose-Session. Bekannter, nicht blockierender Restbefund aus B97: der fixe Pause-Timer-Pill überlappt in einem getesteten Fall noch die rechten ~30% des Übernehmen-Buttons. B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md). B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten. Möglicher Folge-Sprint (nicht angefordert): B79 (`_checkCompoundIsolationBalance`) auf die neue `isCompoundExercise()` umstellen, siehe DECISIONS.md. Loops 7-11 aktiv (diese Session: Loop 5+7+11 aktualisiert). Nicht committet: `Research/TRAIN_Parameter_Review.md` (Nutzer-Recherche, bewusst uncommitted gelassen).*
+*Letzte Aktualisierung: 2026-07-26 — B109/D2 ("Heute anders" merkt sich Ersatz-Übungen je Original und schlägt sie beim nächsten Mal vor), train-v212, siehe unten. B105-B108 (train-v211, Onboarding-Verbesserungen) sowie B102+B103/B101/B100 bereits gepusht und CI-grün.*
+*Nächster Schritt: B3 Einstellungen restrukturieren, danach C3 Compound-Edit-Option, danach E1 Transparenz Coach. Push dieser Session braucht noch die reguläre Session-Bestätigung (Push-Policy LOOPS.md). Weiterhin offen (B104, nicht in dieser Session bearbeitet): zwei vorbestehende Tests (`streak_inprogress_week.spec.js`, `training_context_anchor.spec.js`) mit vermutlicher UTC-vs-lokal-Datumsdrift im Test-Fixture-Aufbau — siehe BUGS.md B104 für eine spätere Diagnose-Session. Bekannter, nicht blockierender Restbefund aus B97: der fixe Pause-Timer-Pill überlappt in einem getesteten Fall noch die rechten ~30% des Übernehmen-Buttons. B55 bleibt der letzte echte Launch-Blocker (Impressum-Platzhalter, siehe LEGAL.md). B66 (Fehler-Toast) bleibt offen bis zum nächsten Auftreten. Möglicher Folge-Sprint (nicht angefordert): B79 (`_checkCompoundIsolationBalance`) auf die neue `isCompoundExercise()` umstellen, siehe DECISIONS.md. Loops 7-11 aktiv (diese Session: Loop 5+7+11 aktualisiert). Nicht committet: `Research/TRAIN_Parameter_Review.md` (Nutzer-Recherche, bewusst uncommitted gelassen).*
 
 ---
 
@@ -11,11 +11,25 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v211 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v212 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
-- CSS: ?v=202
-- SCHEMA: 32 (unverändert)
+- CSS: ?v=203
+- SCHEMA: 32 (unverändert — additiver Default statt Versions-Bump, siehe B109)
+- **B109/D2 — "Heute anders" merkt sich Ersatz-Übungen (train-v212, 2026-07-26):**
+  Vor der Umsetzung diagnostiziert (Plan-Mode + Explore-Agent): "Heute anders"
+  ist ein Zwei-Schritt-Vorgang (Umbenennen im Namensfeld, dann separat
+  Original in "Heute anders" deklarieren, `EX_SET_SUBSTITUTE`-Reducer setzt
+  nur `ex.substituteFor`). Nach Rückfrage bestätigt: Flow bleibt unverändert.
+  Neues additives State-Feld `state.substituteHistory` (kein SCHEMA-Bump,
+  gleiches Muster wie `settings.goal`) zählt `{original, substitute}`-Paare
+  direkt im bestehenden Reducer (max. 5 Einträge/Übung, max. 50 global).
+  "Heute anders"-Formular zeigt bis zu 3 Vorschläge (sortiert nach
+  Häufigkeit) aus der History — Tap feuert die zwei bestehenden,
+  unveränderten Actions (Rename + Substitute-Deklaration) hintereinander
+  aus einem Klick-Handler, echter Ein-Tap-Vorgang ohne Reducer-Änderung.
+  Manueller Eingabepfad unverändert. 6 neue Tests
+  (`tests/heute_anders_history.spec.js`). Details siehe BUGS.md B109.
 - **B105-B108 — Onboarding-Verbesserungen (train-v211, 2026-07-26):**
   Vier-Agent-Sprint aus dem vorherigen Onboarding-Audit dieser Session-
   Reihe. Zwei Explore-Agents haben den Code vor der Umsetzung verifiziert
