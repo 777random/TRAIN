@@ -3109,31 +3109,47 @@ function _buildDeloadPlanRows(state) {
 }
 
 function _structuralSignalHtml(sig) {
+  // E1 (Transparenz Coach-Tab): evidence reicht unverändert vom weeklyFocus.js-
+  // Signal durch, jeder Zweig unten fügt sie seinem Ergebnis hinzu.
   if (sig.type === 'multi_exercise_failure') {
     const names = sig.worst
       .map(w => w.suggestedWeight != null ? `${w.name} (~${w.suggestedWeight}kg)` : w.name)
       .join(', ');
-    return { icon: '🛑', text: `Erfolgsquote insgesamt nur ${sig.rate}% — am stärksten betroffen: ${names}.` };
+    return { icon: '🛑', text: `Erfolgsquote insgesamt nur ${sig.rate}% — am stärksten betroffen: ${names}.`, evidence: sig.evidence };
   }
   if (sig.type === 'deload_preventive') {
     return {
       icon: '🔄',
       text: `${sig.weeksSince} Wochen ohne Deload — Regenerationswoche einplanen.`,
       info: 'Ein Deload ist eine Woche mit reduziertem Volumen (weniger Sätze). Er hilft deinem Körper sich zu erholen und verhindert Übertraining. Dein Gewicht bleibt gleich.',
+      evidence: sig.evidence,
     };
   }
   if (sig.type === 'consistency_quality') {
-    return { icon: '📉', text: 'Häufiger trainieren hilft gerade nicht — Qualität sinkt.' };
+    return { icon: '📉', text: 'Häufiger trainieren hilft gerade nicht — Qualität sinkt.', evidence: sig.evidence };
   }
   if (sig.type === 'push_pull') {
     return sig.dominant === 'Push'
-      ? { icon: '⚖️', text: 'Push-lastig — mehr Pull-Übungen für Schultergesundheit.' }
-      : { icon: '⚖️', text: 'Pull-lastig — mehr Push-Übungen für Balance.' };
+      ? { icon: '⚖️', text: 'Push-lastig — mehr Pull-Übungen für Schultergesundheit.', evidence: sig.evidence }
+      : { icon: '⚖️', text: 'Pull-lastig — mehr Push-Übungen für Balance.', evidence: sig.evidence };
   }
   if (sig.type === 'compound_isolation') {
-    return { icon: '🏋️', text: `Du trainierst ${sig.compoundPct}% Compound — für Kraftaufbau empfiehlt sich >70%.` };
+    return { icon: '🏋️', text: `Du trainierst ${sig.compoundPct}% Compound — für Kraftaufbau empfiehlt sich >70%.`, evidence: sig.evidence };
   }
   return null;
+}
+
+/**
+ * E1 (Transparenz Coach-Tab): generischer Renderer für `evidence: [{label,
+ * value}]` — identisch für die Hauptkarte UND jede Strukturkarte, da
+ * weeklyFocus.js die Daten bereits einheitlich aufbereitet. Gibt '' zurück
+ * wenn evidence fehlt/leer (AC8 — kein Sonderfall im Aufrufer nötig).
+ */
+function _evidenceHtml(evidence) {
+  if (!Array.isArray(evidence) || evidence.length === 0) return '';
+  return `<ul class="coach-evidence-list">
+    ${evidence.map(e => `<li><span class="coach-evidence-label">${h(e.label)}:</span> <span class="coach-evidence-value">${h(e.value)}</span></li>`).join('')}
+  </ul>`;
 }
 
 // ─── Decision outcome check ───────────────────────────────────────────────────
@@ -3501,10 +3517,15 @@ function renderCoachTab(state) {
   </div>
   ${hintHtml}` : '';
 
-  // "Warum?"-Collapse — bei onTrack nur wenn reasoning zusätzliche Info über
-  // die bereits als directive angezeigte hinaus enthält (sonst wäre der
-  // Collapse eine reine Wiederholung der Directive ohne Mehrwert).
-  const whyHtml = (focus.status !== 'onTrack' || (focus.reasoning != null && focus.reasoning !== directive)) ? (() => {
+  // "▾ Basis dieser Einschätzung"-Collapse (E1, vormals "Warum?" — Label
+  // umbenannt, bestehender Inhalt bleibt erhalten, neue strukturierte
+  // Evidence-Liste ergänzt statt eines zweiten, redundanten Toggles).
+  // Bei onTrack ohne evidence weiterhin nur zeigen wenn reasoning zusätzliche
+  // Info über die bereits als directive angezeigte hinaus enthält (sonst
+  // wäre der Collapse eine reine Wiederholung der Directive ohne Mehrwert) —
+  // MIT evidence lohnt sich das Aufklappen aber immer (AC1/AC6).
+  const hasEvidence = Array.isArray(focus.evidence) && focus.evidence.length > 0;
+  const whyHtml = (focus.status !== 'onTrack' || hasEvidence || (focus.reasoning != null && focus.reasoning !== directive)) ? (() => {
     const relevantHistory = (state.decisionLog ?? [])
       .filter(e => e.type === focus.status && e.outcome !== null);
     const historyText = _decisionHistoryConclusion(relevantHistory);
@@ -3516,11 +3537,12 @@ function renderCoachTab(state) {
       <p class="coach-balance-closing">${h(balance.closing)}</p>` : '';
     return `
     <details class="coach-why-collapse">
-      <summary class="pr-collapse__summary">Warum? ▾</summary>
+      <summary class="pr-collapse__summary">▾ Basis dieser Einschätzung</summary>
       <div class="pr-collapse__body">
         <p class="coach-focus-reasoning">${h(focus.reasoning)}</p>
         ${historyHtml}
         ${balanceBodyHtml}
+        ${_evidenceHtml(focus.evidence)}
       </div>
     </details>`;
   })() : '';
@@ -3539,8 +3561,9 @@ function renderCoachTab(state) {
   // Strukturkarte: unabhängig von focus/Hauptkarte — computeStructuralSignals()
   // liefert 0-2 Signale, die parallel zur Hauptkarte relevant sind (kein
   // "erstes gewinnt" wie bei computeWeeklyFocus(), siehe weeklyFocus.js).
-  // Dezent, kein "Warum?"-Collapse, kein Aktions-Button — strukturelle
-  // Hinweise brauchen keine wöchentliche Entscheidung.
+  // Dezent, kein Aktions-Button — strukturelle Hinweise brauchen keine
+  // wöchentliche Entscheidung. Seit E1 (Transparenz Coach-Tab) aber ebenfalls
+  // mit "▾ Basis dieser Einschätzung"-Disclosure (reine Info, kein Button).
   const structuralSignals = computeStructuralSignals(state);
   const structuralCardHtml = structuralSignals.length ? `
   <div class="coach-structural-card">
@@ -3553,6 +3576,10 @@ function renderCoachTab(state) {
         ${item.info ? `<details class="deload-info">
           <summary class="deload-info__badge" aria-label="Was ist ein Deload?">?</summary>
           <p class="deload-info__body">${h(item.info)}</p>
+        </details>` : ''}
+        ${Array.isArray(item.evidence) && item.evidence.length > 0 ? `<details class="coach-structural-why">
+          <summary class="pr-collapse__summary">▾ Basis dieser Einschätzung</summary>
+          <div class="pr-collapse__body">${_evidenceHtml(item.evidence)}</div>
         </details>` : ''}
       </div>`;
     }).join('')}
@@ -4784,7 +4811,7 @@ function renderSettingsTab(state) {
   <div class="settings-section">
     <div class="settings-section__title">Info</div>
     <div class="settings-row">
-      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v214</div></div>
+      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v215</div></div>
     </div>
     <div class="settings-row">
       <div>

@@ -1,7 +1,7 @@
 # TRAIN — CLAUDE.md
 # Vollständiger Projektkontext für Claude Code
-# Stand: train-v214 / SCHEMA 32 / Juli 2026
-# Letztes Update: nach train-v214 (B111: movementMap.js erweitert — +79 Übungsvariationen/Synonyme)
+# Stand: train-v215 / SCHEMA 32 / Juli 2026
+# Letztes Update: nach train-v215 (E1: Transparenz Coach-Tab — "▾ Basis dieser Einschätzung" mit Evidence-Liste je Karte)
 
 ---
 
@@ -49,7 +49,7 @@ TRAIN ist eine deutschsprachige PWA für Krafttraining. Pure Vanilla ES Modules 
   Sessions müssen aus diesem neuen Pfad heraus gestartet werden, sonst
   landet man am alten (jetzt leeren) OneDrive-Ort. Nutzer zieht den Ordner
   regelmäßig manuell auf eine externe Festplatte statt über Cloud-Sync.
-- Aktueller Stand: SCHEMA_VERSION 32 · CACHE_VERSION train-v214 · CSS ?v=203
+- Aktueller Stand: SCHEMA_VERSION 32 · CACHE_VERSION train-v215 · CSS ?v=204
 
 ---
 
@@ -352,7 +352,7 @@ manuellen Wochenwechsel).
 
 **Wochenrückblick-Modal:** Zusammenfassung/Highlights/Lowlights/Empfehlungen (weekReview.js/weekReviewModal.js), Share-Bild-Button (v186, B68; Sparkline-Redesign v187, B71; Favoriten-Kaskade v189, B73) — auch im manuellen Wochenrückblick-Dropdown im Fortschritt-Tab (v188, B72).
 
-**Coach-Tab:** Hauptkarte (8 akute Signale, seit v160 inkl. Konsistente Fehlschläge) + Strukturkarte (5 strukturelle Signale, seit v163 inkl. Mehr-Übungen-Aggregation, seit v194/B79 inkl. Compound/Isolation-Balance), Adaptive Nachfrage-Karte, Coach-Bilanz Mini, Plateau-Konsequenz (EX_SET_NEXT_WEEK_PLAN), Deload-Plan-Tabelle mit "Plan übernehmen" bei aktiver präventiver Deload-Karte (v194, B79).
+**Coach-Tab:** Hauptkarte (8 akute Signale, seit v160 inkl. Konsistente Fehlschläge) + Strukturkarte (5 strukturelle Signale, seit v163 inkl. Mehr-Übungen-Aggregation, seit v194/B79 inkl. Compound/Isolation-Balance), Adaptive Nachfrage-Karte, Coach-Bilanz Mini, Plateau-Konsequenz (EX_SET_NEXT_WEEK_PLAN), Deload-Plan-Tabelle mit "Plan übernehmen" bei aktiver präventiver Deload-Karte (v194, B79). Seit v215 (E1): jede Haupt- UND Strukturkarte hat eine "▾ Basis dieser Einschätzung"-Disclosure (bestehende `.coach-why-collapse`-Komponente umbenannt/erweitert statt eines zweiten Toggles) mit strukturierter Evidence-Liste (`focus.evidence`/`sig.evidence`, `{label, value}[]`) — die konkreten Datenpunkte, die zur jeweiligen Einschätzung geführt haben.
 
 **Fortschritt-Tab:** Erkenntnisse (geclampt), Gesamtperformance, Push/Pull-Ratio, Übungsfortschritt-Chart mit Prognose, Streak (neutral), Abzeichen-Galerie, Körpergewicht-Chart, Bewegungsschaubild, Coach-Bilanz, Relative Stärke / Pound-for-Pound (`renderRelativeStrengthChart()`, progressChart.js + `_weeklyP4PSeries()`, ui.js — war fälschlich noch unter "Offen/Konzept" gelistet, Doku-Drift im Deep-Check-Audit v169 gefunden).
 

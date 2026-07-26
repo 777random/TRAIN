@@ -134,6 +134,16 @@ function _checkReentry(state) {
     recommendation: inRecovery
       ? 'Du erholst dich schnell — eine größere Steigerung wird vorgeschlagen.'
       : 'Gewichte bleiben vorerst reduziert, bis du wieder im Rhythmus bist.',
+    // E1 (Transparenz Coach-Tab): lastReentryHandled ist der Zeitpunkt, an
+    // dem der Wiedereinstiegs-Popup bestätigt wurde (state.js REENTRY_HANDLED),
+    // nicht das Datum der letzten abgeschlossenen Einheit — Evidence-Text
+    // entsprechend an die echte Bedeutung angepasst statt den ungenauen
+    // Sprint-Vorlage-Wortlaut zu übernehmen.
+    evidence: [
+      { label: 'Wiedereinstieg erkannt', value: `vor ${daysSince} ${daysSince === 1 ? 'Tag' : 'Tagen'}` },
+      { label: 'Fenster', value: `${REENTRY_WINDOW_DAYS} Tage` },
+      { label: 'Erholung', value: inRecovery ? 'schnell — hohe Erfolgsquote, niedriger RPE' : 'noch nicht bestätigt' },
+    ],
   };
 }
 
@@ -255,7 +265,15 @@ function _checkPreventiveDeload(state) {
   const rpeHigh = avgRpe != null && avgRpe > 7.5;
 
   if (!volumeUp && !rpeHigh) return null;
-  return { signal: 'deload_preventive', weeksSince, volumeUp, avgRpe };
+  return {
+    signal: 'deload_preventive', weeksSince, volumeUp, avgRpe,
+    // E1 (Transparenz Coach-Tab)
+    evidence: [
+      { label: 'Wochen ohne Deload', value: `${weeksSince}` },
+      { label: 'Volumen-Trend', value: volumeUp ? 'steigend' : 'stabil/fallend' },
+      { label: 'Ø RPE letzte 3 Wochen', value: avgRpe != null ? avgRpe.toFixed(1) : '–' },
+    ],
+  };
 }
 
 // Eigene headline/directive pro Signal-Typ (Fix Problem 7) — vorher teilten
@@ -282,6 +300,13 @@ function _buildOverloadResult(signal, energySignal = null) {
       reasoning,
       recommendation: 'Diese Woche keine Gewichtssteigerungen — dein Schlaf kostet Kraft.',
       signalType: signal.signal,
+      // E1 (Transparenz Coach-Tab): signal.value/energySignal.value waren
+      // bisher nur in reasoning-Prosa verbaut, hier zusätzlich strukturiert.
+      evidence: [
+        { label: 'Schlaf diese Woche', value: `Ø ${signal.value.toFixed(1)}h` },
+        { label: 'Schwelle', value: '< 7h' },
+        ...(hasLowEnergy ? [{ label: 'Energielevel', value: `Ø ${energySignal.value.toFixed(1)}/5` }] : []),
+      ],
     };
   }
 
@@ -292,6 +317,12 @@ function _buildOverloadResult(signal, energySignal = null) {
       reasoning: `${signal.exerciseName}: die Anstrengung (RPE) steigt seit 3 Wochen bei gleichem Gewicht — ${signal.values.map(v => v.toFixed(1)).join(' → ')}.${energySuffix}`,
       recommendation: `${signal.exerciseName} wird anstrengender ohne mehr Gewicht — diese Woche halten.`,
       signalType: signal.signal,
+      evidence: [
+        { label: 'Übung', value: signal.exerciseName },
+        { label: 'RPE-Trend', value: signal.values.map(v => v.toFixed(1)).join(' → ') },
+        { label: 'Gewicht', value: 'konstant (keine Änderung über 3 Wochen)' },
+        ...(hasLowEnergy ? [{ label: 'Energielevel', value: `Ø ${energySignal.value.toFixed(1)}/5` }] : []),
+      ],
     };
   }
 
@@ -305,6 +336,12 @@ function _buildOverloadResult(signal, energySignal = null) {
     // Logik) — für die Decisional-Balance, die wissen muss WELCHES der 3
     // Signale zutraf, ohne die reasoning-Prosa zu parsen.
     signalType: signal.signal,
+    evidence: [
+      { label: 'Erfolgsquote diese Woche', value: `${Math.round(signal.avg3 * 100)}%` },
+      { label: 'Vorwoche(n)', value: `${Math.round(signal.avg8 * 100)}%` },
+      { label: 'Rückgang', value: `${Math.round((signal.avg8 - signal.avg3) * 100)} Prozentpunkte` },
+      ...(hasLowEnergy ? [{ label: 'Energielevel', value: `Ø ${energySignal.value.toFixed(1)}/5` }] : []),
+    ],
   };
 }
 
@@ -390,6 +427,15 @@ function _checkPrePlateau(state) {
         ? 'Erhöhe die Wdh statt das Gewicht — der RPE-Trend könnte technischer Natur sein.'
         : 'Jetzt Strategie überdenken: Wdh erhöhen statt Gewicht, oder Deload einplanen bevor die Steigerung stoppt.',
       exerciseName: name,
+      // E1 (Transparenz Coach-Tab): maxWeights/rpeCostPerKg/Erfolgsquote
+      // wurden bereits oben berechnet (gaten das Signal), bisher aber
+      // verworfen statt zurückgegeben.
+      evidence: [
+        { label: 'Übung', value: name },
+        { label: 'Gewicht letzte 3 Wochen', value: maxWeights.map(w => `${w}kg`).join(' → ') },
+        { label: 'RPE-Kosten pro kg', value: rpeCostPerKg.map(r => r.toFixed(2)).join(' → ') },
+        { label: 'Erfolgsquote', value: `${Math.round((succ / tot) * 100)}%` },
+      ],
     };
   }
   return null;
@@ -456,6 +502,11 @@ function _checkConsistencyQuality(state) {
     headline: 'Qualität vor Quantität',
     reasoning: `Deine Konsistenz ist ${consistencyWord}, aber deine Satz-Erfolgsquote ist in den letzten ${quality.halfN} Wochen von ${quality.prevPct}% auf ${quality.curPct}% gesunken. Mehr Frequenz erzeugt gerade keinen Mehrwert.`,
     recommendation: 'Du trainierst regelmäßig, aber deine Erfolgsquote sinkt — weniger Einheiten, besser ausgeführt.',
+    // E1 (Transparenz Coach-Tab)
+    evidence: [
+      { label: 'Konsistenz', value: consistencyWord },
+      { label: 'Erfolgsquote', value: `${quality.prevPct}% → ${quality.curPct}% (${quality.halfN} Wochen)` },
+    ],
   };
 }
 
@@ -502,6 +553,12 @@ function _checkConsistencyGap(state) {
     // avgPct bereits oben berechnet, hier zusätzlich offengelegt für die
     // Decisional-Balance (keine neue Logik, nur Wiederverwendung).
     avgPct,
+    // E1 (Transparenz Coach-Tab)
+    evidence: [
+      { label: 'Absolvierte Trainingstage', value: `${avgPct}%` },
+      { label: 'Zeitraum', value: 'letzte 6 Wochen' },
+      { label: 'Trend', value: wasActiveBefore ? 'hält an (auch im Fenster davor)' : 'neu erkannt' },
+    ],
   };
 }
 
@@ -562,6 +619,15 @@ function _checkPlateau(state) {
     reasoning: finalReasoning,
     recommendation: finalRec,
     plateau: longest,
+    // E1 (Transparenz Coach-Tab): plateau-Objekt (aus detectPlateaus(),
+    // plateauDetector.js) trägt bereits alle nötigen Rohwerte.
+    evidence: [
+      { label: 'Übung', value: longest.exerciseName },
+      { label: 'Gewicht', value: `${longest.currentWeight}kg · ${longest.plateauWeeks} Wochen konstant` },
+      { label: 'Erfolgsquote', value: `${Math.round(longest.avgSuccessRate * 100)}%` },
+      { label: 'RPE-Trend', value: `Ø ${longest.avgRpe?.toFixed(1) ?? '–'} · stabil` },
+      { label: 'Schlussfolgerung', value: 'Kapazität vorhanden, aber kein Fortschritt' },
+    ],
   };
 }
 
@@ -656,6 +722,14 @@ function _checkProgression(state) {
     exerciseName: best.name,
     suggestedDelta: best.rec.delta,
     fromWeight: best.rec.lastWeight,
+    // E1 (Transparenz Coach-Tab): confSuccessRate/confAvgRpe (die Rohwerte
+    // hinter dem confidence-Bucket) waren bisher nur intern verwendet.
+    evidence: [
+      { label: 'Übung', value: best.name },
+      { label: 'Empfehlung', value: `${best.rec.lastWeight + best.rec.delta}kg (+${best.rec.delta}kg)` },
+      { label: 'Konfidenz', value: `${finalConfidence.toUpperCase()} · ${Math.round(confSuccessRate * 100)}% Erfolgsquote${confAvgRpe != null ? `, Ø RPE ${confAvgRpe.toFixed(1)}` : ''}` },
+      { label: 'Basis', value: `${calcWeeks.length} Wochen Daten` },
+    ],
   };
 }
 
@@ -713,6 +787,12 @@ function _checkPushPullBalance(state) {
     // Logik) — für die Strukturkarte in ui.js, die den Kurztext ohne Parsen
     // von reasoning/recommendation auswählen muss.
     dominant,
+    // E1 (Transparenz Coach-Tab)
+    evidence: [
+      { label: 'Push-Sätze', value: `${pushSets}` },
+      { label: 'Pull-Sätze', value: `${pullSets}` },
+      { label: 'Verhältnis', value: `${ratio.toFixed(1)}:1 (${lastN.length} Wochen)` },
+    ],
   };
 }
 
@@ -758,6 +838,11 @@ function _checkCompoundIsolationBalance(state) {
     reasoning: `Verhältnis der letzten ${lastN.length} Wochen: ${compoundPct}% Compound-Sätze (Squat/Hinge/Push/Pull) von ${totalSets} bewerteten Sätzen insgesamt.`,
     recommendation: `Du trainierst ${compoundPct}% Compound — für Kraftaufbau empfiehlt sich >70%.`,
     compoundPct,
+    // E1 (Transparenz Coach-Tab)
+    evidence: [
+      { label: 'Compound-Anteil', value: `${compoundPct}%` },
+      { label: 'Bewertete Sätze', value: `${totalSets} (${lastN.length} Wochen)` },
+    ],
   };
 }
 
@@ -796,7 +881,28 @@ function _fallback(state) {
     'Alles im grünen Bereich — mach weiter wie bisher.',
   ];
   const reasoning = variants[state.weeks.length % variants.length];
-  return { status: 'onTrack', headline: 'Auf Kurs', reasoning, recommendation: null };
+  // E1 (Transparenz Coach-Tab): für den steady-state-Fallback existierte
+  // bisher keine Zahlengrundlage (kein Signal, das erklärt werden müsste) —
+  // hier minimal ergänzt, damit AC6 ("on_track: Einheiten + Erfolgsquote")
+  // erfüllbar ist. Nutzt bestehende _scoreWeek() (bereits oben in dieser
+  // Datei für _checkConsistencyQuality verwendet), keine neue Berechnungsart.
+  const recentReal = _realWeeks.slice(-4);
+  const latestWk = recentReal[recentReal.length - 1] ?? null;
+  const daysDone  = latestWk ? latestWk.days.filter(d => d.markedDone).length : 0;
+  const daysTotal = latestWk ? latestWk.days.length : 0;
+  const scored = recentReal.map(_scoreWeek).filter(s => s.total > 0);
+  const avgPct = scored.length ? Math.round(scored.reduce((s, w) => s + w.pct, 0) / scored.length) : null;
+  return {
+    status: 'onTrack',
+    headline: 'Auf Kurs',
+    reasoning,
+    recommendation: null,
+    evidence: [
+      { label: 'Absolvierte Einheiten', value: daysTotal > 0 ? `${daysDone}/${daysTotal} (letzte Woche)` : 'noch keine Daten' },
+      { label: 'Ø Erfolgsquote', value: avgPct != null ? `${avgPct}% (letzte ${scored.length} Wochen)` : '–' },
+      { label: 'Trend', value: 'stabil' },
+    ],
+  };
 }
 
 /**
@@ -885,6 +991,13 @@ function _checkPersistentFailure(state) {
         // müssen — beide sind bereits hier vorhanden.
         currentWeight: lastFailWeight,
         suggestedWeight,
+        // E1 (Transparenz Coach-Tab)
+        evidence: [
+          { label: 'Übung', value: name },
+          { label: 'Erfolgsquote letzte 3 Wochen', value: '0%' },
+          { label: 'Bewertete Sätze', value: `${fail} von ${fail}` },
+          { label: 'Schlussfolgerung', value: suggestedWeight != null ? `Gewicht auf ~${suggestedWeight}kg reduzieren` : 'Gewicht reduzieren' },
+        ],
       };
     }
   }
@@ -967,7 +1080,15 @@ function _checkMultiExerciseFailure(state) {
 
   const worst = affected.sort((a, b) => a.rate - b.rate).slice(0, 3);
 
-  return { rate: Math.round(rate * 100), totalEvaluated, worst };
+  return {
+    rate: Math.round(rate * 100), totalEvaluated, worst,
+    // E1 (Transparenz Coach-Tab)
+    evidence: [
+      { label: 'Erfolgsquote insgesamt', value: `${Math.round(rate * 100)}%` },
+      { label: 'Bewertete Sätze', value: `${totalEvaluated}` },
+      { label: 'Betroffene Übungen', value: worst.map(w => w.name).join(', ') },
+    ],
+  };
 }
 
 /**

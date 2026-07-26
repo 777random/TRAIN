@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-26 — B111 (movementMap.js erweitert, +79 Übungsvariationen/Synonyme), train-v214, siehe unten. B110 (Streak-Badge-Fenstergrenze, train-v213), B109/D2 ("Heute anders" merkt sich Ersatz-Übungen, train-v212) und B105-B108 (train-v211, Onboarding-Verbesserungen) sowie B102+B103/B101/B100 bereits gepusht und CI-grün.*
-*Nächster Schritt: B3 Einstellungen restrukturieren, danach C3 Compound-Edit-Option, danach E1 Transparenz Coach. Push dieser Session braucht noch die reguläre Session-Bestätigung (Push-Policy LOOPS.md). Neu beobachtet (kein Bug, nur Notiz): mehrere Test-Dateien (`streak_inprogress_week.spec.js` u.a.) konstruieren Datums-Fixtures über lokale `Date`-Methoden + `.toISOString()` — das verschiebt `startDate` bei lokalem Ausführen in einer positiven-UTC-Offset-Zeitzone (z.B. UTC+2) um einen Tag; betrifft nur lokale Testläufe außerhalb UTC, nicht CI (läuft in UTC) und nicht Produktionscode. Bei Bedarf lokal mit `TZ=UTC npx playwright test` gegentesten. Möglicher Folge-Sprint (nicht angefordert): B79 (`_checkCompoundIsolationBalance`) auf die neue `isCompoundExercise()` umstellen, siehe DECISIONS.md. Loops 7-11 aktiv (diese Session: Loop 5+7+11 aktualisiert). Nicht committet: `Research/TRAIN_Parameter_Review.md` (Nutzer-Recherche, bewusst uncommitted gelassen).*
+*Letzte Aktualisierung: 2026-07-26 — B112/E1 (Transparenz Coach-Tab: "▾ Basis dieser Einschätzung" mit Evidence-Liste je Karte), train-v215, siehe unten. B111 (movementMap.js erweitert, train-v214), B110 (Streak-Badge-Fenstergrenze, train-v213), B109/D2 ("Heute anders", train-v212) und B105-B108 (train-v211, Onboarding-Verbesserungen) sowie B102+B103/B101/B100 bereits gepusht und CI-grün.*
+*Nächster Schritt: B3 Einstellungen restrukturieren, danach C3 Compound-Edit-Option. Push dieser Session braucht noch die reguläre Session-Bestätigung (Push-Policy LOOPS.md). Weiterhin nur als Notiz (kein Bug): mehrere Test-Dateien konstruieren Datums-Fixtures über lokale `Date`-Methoden + `.toISOString()` — verschiebt `startDate` bei lokalem Ausführen in einer positiven-UTC-Offset-Zeitzone um einen Tag; betrifft nur lokale Testläufe außerhalb UTC, nicht CI/Produktionscode, bei Bedarf mit `TZ=UTC npx playwright test` gegentesten. Möglicher Folge-Sprint (nicht angefordert): B79 (`_checkCompoundIsolationBalance`) auf die neue `isCompoundExercise()` umstellen, siehe DECISIONS.md. Loops 7-11 aktiv (diese Session: Loop 5+7+11 aktualisiert). Nicht committet: `Research/TRAIN_Parameter_Review.md` (Nutzer-Recherche, bewusst uncommitted gelassen).*
 
 ---
 
@@ -11,11 +11,25 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v214 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v215 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
-- CSS: ?v=203 (unverändert seit B109)
+- CSS: ?v=204
 - SCHEMA: 32 (unverändert — additiver Default statt Versions-Bump, siehe B109)
+- **B112/E1 — Transparenz Coach-Tab (train-v215, 2026-07-26):** jede
+  Haupt- UND Strukturkarte im Coach-Tab hat jetzt eine "▾ Basis dieser
+  Einschätzung"-Disclosure mit den konkreten Datenpunkten hinter der
+  Einschätzung (Vorbild: Quellenangaben bei KI-Antworten). Bestehende
+  `.coach-why-collapse`-Komponente wiederverwendet/umbenannt statt eines
+  zweiten, redundanten Toggles — natives `<details>`, kein neuer
+  JS-Toggle-State nötig. Alle 8 Kaskaden-Signale + 5 Struktursignale in
+  `weeklyFocus.js` bekommen ein neues `evidence: [{label, value}]`-Feld
+  (meist bereits berechnete, bisher nur in Prosa verbaute Werte
+  strukturiert freigelegt — größte Lücke war `_buildOverloadResult()`,
+  alle 3 Zweige verwarfen ihre Rohwerte). Neuer generischer
+  `_evidenceHtml()`-Helper (ui.js) rendert Haupt- und Strukturkarten
+  identisch. 6 neue Tests (`tests/coach_evidence.spec.js`). Details siehe
+  BUGS.md B112.
 - **B111 — movementMap.js erweitert (train-v214, 2026-07-26):** reine
   Datenergänzung, +79 Übungsvariationen/Synonyme (`MOVEMENT_MAP` 139→218
   Einträge) über Squat/Hinge/Push/Pull/Core/Carry, plus 23 neue Einträge

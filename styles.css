@@ -1368,6 +1368,17 @@ exercise { position: unset; }
   margin-top: var(--sp-2); background: var(--c-surface2); color: var(--c-text-2);
   font-size: 12px; line-height: 1.5; border-radius: var(--r-md); padding: var(--sp-2) var(--sp-3);
 }
+/* E1 (Transparenz Coach-Tab) — "▾ Basis dieser Einschätzung" auf Strukturkarten,
+   analog zu .deload-info: flex-basis:100% lässt die Disclosure unter
+   Icon+Text umbrechen statt das Layout zu quetschen. */
+.coach-structural-why { flex-basis: 100%; }
+.coach-evidence-list {
+  list-style: none; margin: var(--sp-2) 0 0; padding: 0;
+  font-size: 12px; line-height: 1.6;
+}
+.coach-evidence-list li { margin-top: 2px; }
+.coach-evidence-label { color: var(--c-text-2); font-weight: 600; }
+.coach-evidence-value { color: var(--c-text); }
 .chart-wrap { position: relative; min-height: 60px; }
 .chart-wrap canvas { width: 100% !important; }
 #chart-ex-wrap svg { display: block; }

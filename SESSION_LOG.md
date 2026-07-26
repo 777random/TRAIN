@@ -2894,3 +2894,38 @@ Eigentliche Aufgabe: B111 — movementMap.js erweitert. Diagnose zuerst
   vermerkt, kein neuer Bug-Eintrag (kein User-Impact). Nur movementMap.js
   geändert, CACHE_VERSION train-v213->v214, CSS/SCHEMA unverändert.
   CLAUDE.md/HANDOFF.md/BUGS.md (B111) aktualisiert.
+
+## 2026-07-26 (Fortsetzung, E1-Sprint) train-v214->v215
+Loop 1: 10/10 grün (Baseline vor Sprint)
+Eigentliche Aufgabe: B112/E1 — Transparenz Coach-Tab ("▾ Basis dieser
+  Einschätzung"). Technische Spec zuerst geschrieben und per Plan-Mode
+  bestätigt (eager-inventing-newell.md, neu überschrieben), inkl. 2
+  parallelen Explore-Agents zur vollständigen Diagnose von
+  computeWeeklyFocus() (8 Kaskaden-Signale) + computeStructuralSignals()
+  (5 Struktursignale) + bestehendem "▾ Warum?"-Pattern. Wichtiger Fund:
+  der Coach-Tab hat bereits eine "▾ Warum?"-Disclosure (.coach-why-collapse,
+  natives <details>) — die im Sprint-Kontext referenzierte Inspiration
+  war eine ANDERE, ältere Implementierung (Intra-Session-Feedback).
+  Entscheidung (eigenständig, konsistent mit Sprint-Mockup das nur EINE
+  Disclosure pro Karte zeigt): bestehende Disclosure wiederverwendet/
+  umbenannt statt eines zweiten, redundanten Toggles; natives <details>
+  statt der vorgeschlagenen neuen _evidenceOpen-Modul-Variable (kein
+  JS-Toggle-State nötig). Alle 8 Kaskaden- + 5 Struktursignale in
+  weeklyFocus.js bekommen ein evidence:[{label,value}]-Feld — meist
+  bereits berechnete, bisher nur in Prosa verbaute Werte strukturiert
+  freigelegt (größte Lücke: _buildOverloadResult() verwarf alle 3 Zweige
+  komplett; _checkPrePlateau verwarf maxWeights/rpeCostPerKg/Erfolgsquote).
+  Einzige echte Neuberechnung: _fallback()s steady-state-Zweig hatte keine
+  Zahlengrundlage, minimal ergänzt (Einheiten+Erfolgsquote, per
+  bestehendem _scoreWeek()-Helper). REENTRY_WINDOW_DAYS vor Verwendung
+  verifiziert (7 Tage, Sprint-Text-Annahme korrekt). Neuer generischer
+  _evidenceHtml()-Helper (ui.js), identisch für Haupt- und Strukturkarten.
+  Strukturkarten bekommen die Disclosure neu (vorher bewusst keine, jetzt
+  als reine Zusatz-Info ergänzt). 6 neue Tests (tests/coach_evidence.spec.js:
+  Plateau, Persistenter Fehlschlag, onTrack-Steady-State, Progression,
+  Strukturkarte, Toggle-Verhalten) — alle grün, mussten teils per
+  Debug-Iteration die tatsächlich auslösenden Fixture-Bedingungen finden
+  statt sie zu erraten. Volle Suite grün (bekannte Parallel-Last-Flakes
+  isoliert erneut grün, keine Regression). weeklyFocus.js/ui.js/styles.css
+  geändert, CACHE_VERSION train-v214->v215, CSS ?v=203->204, SCHEMA
+  unverändert. CLAUDE.md/HANDOFF.md/BUGS.md (B112) aktualisiert.
