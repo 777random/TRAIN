@@ -1,5 +1,5 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-27 — B128/B129 (Auto-Steigerung Opt-out + Skip-Grund-Abfrage), train-v219, siehe unten. B123-B127 (5 Features vor Launch, train-v218), B114-B122 (9 Bugs vor Launch, train-v217), B113 (Einstellungen in 4 Zwischenüberschriften gegliedert, train-v216), B112/E1 (Transparenz Coach-Tab, train-v215), B111 (movementMap.js erweitert, train-v214), B110 (Streak-Badge-Fenstergrenze, train-v213), B109/D2 ("Heute anders", train-v212) und B105-B108 (train-v211, Onboarding-Verbesserungen) sowie B102+B103/B101/B100 bereits gepusht und CI-grün.*
+*Letzte Aktualisierung: 2026-07-27 — B130/B131/B132 (Plate Calculator neu + Coach Signal Unterdrückung), train-v220, siehe unten. B128/B129 (Auto-Steigerung Opt-out + Skip-Grund-Abfrage, train-v219), B123-B127 (5 Features vor Launch, train-v218), B114-B122 (9 Bugs vor Launch, train-v217), B113 (Einstellungen in 4 Zwischenüberschriften gegliedert, train-v216), B112/E1 (Transparenz Coach-Tab, train-v215), B111 (movementMap.js erweitert, train-v214), B110 (Streak-Badge-Fenstergrenze, train-v213), B109/D2 ("Heute anders", train-v212) und B105-B108 (train-v211, Onboarding-Verbesserungen) sowie B102+B103/B101/B100 bereits gepusht und CI-grün.*
 *Nächster Schritt: C3 Compound-Edit-Option. Push dieser Session braucht noch die reguläre Session-Bestätigung (Push-Policy LOOPS.md). Weiterhin nur als Notiz (kein Bug): mehrere Test-Dateien konstruieren Datums-Fixtures über lokale `Date`-Methoden + `.toISOString()` — verschiebt `startDate` bei lokalem Ausführen in einer positiven-UTC-Offset-Zeitzone um einen Tag; betrifft nur lokale Testläufe außerhalb UTC, nicht CI/Produktionscode, bei Bedarf mit `TZ=UTC npx playwright test` gegentesten. Möglicher Folge-Sprint (nicht angefordert): B79 (`_checkCompoundIsolationBalance`) auf die neue `isCompoundExercise()` umstellen, siehe DECISIONS.md. Loops 7-11 aktiv (diese Session: Loop 5+7+11 aktualisiert). Nicht committet: `Research/TRAIN_Parameter_Review.md` (Nutzer-Recherche, bewusst uncommitted gelassen).*
 
 ---
@@ -11,12 +11,34 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v219 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v220 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
-- CSS: ?v=208
-- SCHEMA: 33 (echter Bump — neue Felder `skipReason`/`skipDate`/
-  `nextWeekPlanAutoReviewed` je Übung, siehe B129)
+- CSS: ?v=209
+- SCHEMA: 33 (unverändert — dieser Sprint brauchte keine neuen Felder)
+- **B130/B131/B132 — Plate Calculator neu + Coach Signal Unterdrückung
+  (train-v220, 2026-07-27):** baute direkt auf der vorherigen Diagnose-
+  Session auf (kein neuer Explore-Agent nötig). Bei allen drei ein wichtiger
+  Fund während/vor der Umsetzung:
+  - B130: der Plate Calculator (B126, v218) wurde falsch herum gebaut. Die
+    Umkehr-Berechnung (Gewicht→Scheiben) existierte längst in `calcPlates()`
+    — B126 komplett entfernt, `calcPlates()` liefert jetzt strukturierte
+    Einzel-Platten statt eines Strings, neue prominente Chip-Anzeige +
+    Fallback für nicht exakt auflegbare Gewichte (auf nächstes erreichbares
+    1.25kg-Vielfaches abgerundet).
+  - B131: die Deload-Strukturkarte hatte gar keinen eigenen Dismiss-Button
+    — das sichtbare "Weiter wie bisher" gehörte zur unabhängigen Hauptkarte
+    und loggte einen anderen `type`. Neuer eigener Button + 4-Wochen-
+    Unterdrückungs-Prüfung in `_checkPreventiveDeload()` gegen den bereits
+    bestehenden `decisionLog`.
+  - B132: Coach-Tab- und Fortschritt-Tab-Plateau-Erkennung nutzen denselben
+    `detectPlateaus()` mit identischen Schwellenwerten — keine Diskrepanz
+    zum Anpassen. Divergenz liegt im Gating (akute Kaskade + `plateauActions`
+    vs. keine Gates), bewusst dokumentiert statt strukturell vereinheitlicht
+    (Status ⏳ in BUGS.md).
+  19+ neue/erweiterte Tests, volle Suite grün (bekannte Parallel-Last-Flakes
+  isoliert nachverifiziert). Nur ui.js/styles.css/weeklyFocus.js geändert,
+  CACHE_VERSION train-v219→v220, CSS ?v=208→209, SCHEMA unverändert.
 - **B128/B129 — Auto-Steigerung Opt-out + Skip-Grund-Abfrage (train-v219,
   2026-07-27):** Diagnose-vor-Fix über 2 sequenzielle Runden (beide berühren
   state.js, laut AGENTS.md nicht parallelisierbar). Bei beiden Aufgaben ein

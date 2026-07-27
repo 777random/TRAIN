@@ -416,3 +416,45 @@ Erkennung läuft daher zwingend auf einem Tages-Snapshot VOR dem Dispatch
 **Gilt:** Permanent bis gegenteilige Entscheidung. Jede künftige
 "Zustand vor Tagesabschluss auswerten"-Logik muss den Snapshot vor
 `DAY_TOGGLE_COMPLETE` nehmen, nie danach.
+
+### 2026-07 — Signal-Unterdrückung: decisionLog ist die einzige Quelle der Wahrheit
+**Entscheidung:** Wenn der Nutzer bei einem Coach-Signal "Weiter wie bisher"
+wählt, wird das Signal 4 Wochen unterdrückt. `decisionLog` (bestehende
+Struktur `{id, type, signal, choice, decidedWeekStart, outcome}`) ist die
+einzige Quelle der Wahrheit dafür — kein separates Unterdrückungs-Feld pro
+Signal-Typ. Jedes strukturelle Signal, das dismissable sein soll, braucht
+(a) einen eigenen Dismiss-Button, der `DECISION_LOG_ADD` mit seinem eigenen
+`type`-Wert dispatcht, und (b) eine eigene Prüfung am Anfang seiner
+`_check*()`-Funktion (weeklyFocus.js) gegen `decisionLog`, gefiltert auf
+diesen `type` + `choice==='stay'` + `decidedWeekStart` innerhalb der letzten
+4 Wochen.
+**Befund vor der Umsetzung:** Für `deload_preventive` (B131) existierte
+bislang gar kein Dismiss-Button auf der Karte selbst — das sichtbare
+"Weiter wie bisher" gehörte zur unabhängigen Hauptkarte und loggte
+`type: focus.status`, nie `'preventive_deload'`. Ohne einen eigenen Button
+kann eine `_check*()`-Funktion niemals unterdrückt werden, unabhängig davon
+wie ihre `decisionLog`-Prüfung aussieht.
+**Gilt:** Permanent bis gegenteilige Entscheidung. Neue strukturelle Coach-
+Signale, die dismissable sein sollen, folgen demselben Muster (eigener
+Button + eigener `type`-Wert + eigene 4-Wochen-Prüfung gegen `decisionLog`),
+statt eine neue, signal-spezifische State-Struktur zu erfinden.
+
+### 2026-07 — B132: Coach-Tab-Plateau vs. Fortschritt-Tab-Plateau — Gating, nicht Schwellenwerte
+**Entscheidung:** `_checkPlateau()` (weeklyFocus.js) und die Fortschritt-Tab-
+Regel `S-06` (insightEngine.js) rufen denselben `detectPlateaus()` mit
+identischen Schwellenwerten auf — keine Anpassung der Zahlenwerte
+vorgenommen, da keine Diskrepanz dort besteht. Die Divergenz liegt
+ausschließlich im Gating: `_checkPlateau()` sitzt in der akuten
+First-Match-Wins-Kaskade hinter `_checkReentry`/`_checkPersistentFailure`/
+`_checkOverload` und respektiert zusätzlich `state.plateauActions`-
+Unterdrückung; `S-06` hat keines von beidem.
+**Bewusst NICHT vereinheitlicht:** eine echte Angleichung würde entweder die
+akute Kaskade oder die Insight-Engine-Suppression strukturell ändern —
+hohes Regressions-Risiko für bereits produktive, getestete Coach-Karten.
+Kandidat für einen späteren, eigenen Sprint (ähnlich dem dokumentierten
+B79-Präzedenzfall für bewusst nebeneinander existierende Compound/Isolation-
+Konzepte).
+**Gilt:** Bis eine explizite Entscheidung für eine strukturelle Vereinheit­
+lichung getroffen wird. B131s Deload-Unterdrückung kann dazu führen, dass
+ein Plateau-Signal in der akuten Kaskade sichtbar wird, sofern
+Reentry/PersistentFailure/Overload für die Woche nicht bereits greifen.

@@ -3080,3 +3080,48 @@ Eigentliche Aufgabe: B128/B129 — 2 Aufgaben, sequenziell (beide state.js,
   train-v218->v219, CSS ?v=207->208, SCHEMA 32->33 (mit Migration). CLAUDE.md/
   HANDOFF.md/BUGS.md (B128/B129)/DECISIONS.md aktualisiert. Screenshots
   genommen: Banner, Skip-Abfrage, injury_reminder im Coach-Tab.
+Loop 5: for-advisor.txt aktualisiert (37. Fassung, B128/B129)
+Loop 7: for-advisor-product.txt aktualisiert (neue Update-Sektion +
+  Abschnitte 2/3/4 ergaenzt: neuer Tagesabschluss-Zwischenschritt,
+  Verletzungs-Erinnerung-Signal, Feature-Status)
+Loop 8/9/10: for-advisor-market.txt/for-advisor-ux.txt/for-advisor-growth.txt
+  - nur Header aufgefrischt (keine neuen Markt-/UX-/Growth-Erkenntnisse)
+Loop 11: for-advisor-consolidated.txt aktualisiert (neuer Update-Log-Eintrag,
+  Header auf v219/SCHEMA 33)
+
+## 2026-07-27 (Sprint — Plate Calculator neu + Coach Signal Unterdrückung) train-v219->v220
+Loop 1: Baseline grün vor Sprint.
+Eigentliche Aufgabe: B130/B131/B132. Baute direkt auf der vorherigen
+  Diagnose-Session auf (kein neuer Explore-Agent nötig, alle Fakten bereits
+  mit Datei:Zeile belegt). Spec geschrieben und per ExitPlanMode bestätigt.
+  - B130: Plate Calculator (B126, v218) war falsch herum gebaut. Root Cause
+    (Umkehr-Berechnung existiert bereits in calcPlates()) schon in der
+    Diagnose gefunden. B126 komplett entfernt, calcPlates() liefert jetzt
+    strukturierte Einzel-Platten, neue prominente Chip-UI + Fallback fuer
+    nicht exakt auflegbare Gewichte (auf naechstes 1.25kg-Vielfaches
+    abgerundet, da 1.25kg selbst im Plattensatz ist). Mehrere Sprint-Text-
+    Fehlbenennungen korrigiert (_plateString existiert nicht, heisst
+    calcPlates; ex.settings?.showPlates existiert nicht; metric==='kg' ist
+    kein gueltiger Wert; --c-surface-2 existiert nicht als CSS-Variable).
+  - B131: Deload-Strukturkarte hatte gar keinen eigenen Dismiss-Button - das
+    sichtbare "Weiter wie bisher" gehoerte zur unabhaengigen Hauptkarte und
+    loggte einen anderen type. Neuer eigener Button + 4-Wochen-Unter-
+    drueckungs-Pruefung in _checkPreventiveDeload() gegen den bereits
+    bestehenden decisionLog (kein neues Feld, kein SCHEMA-Bump noetig).
+  - B132: _checkPlateau() und die Fortschritt-Tab-Regel S-06 rufen denselben
+    detectPlateaus() mit identischen Schwellenwerten auf - keine Diskrepanz
+    zum Anpassen vorhanden. Divergenz liegt im Gating (akute Kaskade +
+    plateauActions vs. keine Gates) - dokumentiert statt strukturell
+    vereinheitlicht (Status ⏳ in BUGS.md, wie von den Akzeptanzkriterien
+    explizit erlaubt).
+  Implementierung ueber 2 parallele Fork-Agents (Aufgabe A: ui.js Set-Row-
+  Region + styles.css; Aufgabe B: weeklyFocus.js + ui.js Coach-Tab-Region) -
+  disjunkte ui.js-Bereiche, kein gleichzeitiges state.js, sauber gemergt
+  ohne Konflikt trotz gleichzeitiger ui.js-Bearbeitung. 19+ neue/erweiterte
+  Tests. Volle Suite: bekannter Parallel-Last-Flake (dieselbe alphabetische
+  Cluster wie in frueheren Sprints), isoliert alle 28 betroffenen Tests
+  nachverifiziert gruen - keine echte Regression. Nur ui.js/styles.css/
+  weeklyFocus.js geaendert, CACHE_VERSION train-v219->v220, CSS ?v=208->209,
+  SCHEMA unveraendert (33). CLAUDE.md/HANDOFF.md/BUGS.md (B130/B131/B132)/
+  DECISIONS.md aktualisiert. Screenshots genommen: Scheiben-Chips (90kg),
+  Coach-Tab nach Deload-Dismiss.

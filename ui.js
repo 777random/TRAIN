@@ -64,11 +64,6 @@ let _showCustomDeload = false;
 /** Key of currently open RPE popover: `${di}-${ei}-${si}` or null. */
 let _rpePopoverKey = null;
 
-/** B126: Key of currently open Plate Calculator panel: `${di}-${ei}-${si}` or null. */
-let _plateCalcOpenKey = null;
-/** B126: Per-key running plate counts while a Plate Calculator is open: `${di}-${ei}-${si}` -> { [plateWeight]: count }. */
-let _plateCalcCounts = {};
-
 /** Id of the currently open Kennzahlen-Erklärungstooltip (Fortschritt-Tab) or null. */
 let _metricTooltipKey = null;
 
@@ -490,79 +485,72 @@ function _weekLabel(week, weeks) {
   return `KW ${_isoWeek(d)} · ${d.getFullYear()}`;
 }
 
+/** Available plate sizes (kg), largest first — single source of truth for calcPlates()/_renderPlateChips(). */
+const PLATE_SIZES = [25, 20, 15, 10, 5, 2.5, 1.25];
+
 /**
- * Calculates plates per side for an Olympic bar (20 kg default).
- * Returns a compact string like "10+5+2.5" or null if not achievable.
+ * Greedy largest-plate-first breakdown of a per-side weight into individual
+ * plates. Returns { used: number[], rem: number } — `used` is the ordered
+ * list of individual plates (e.g. [25, 10], not grouped), `rem` is the
+ * leftover weight that couldn't be represented (0 if exact).
  */
-function calcPlates(totalKg, barKg = 20) {
-  const perSide = Math.round((totalKg - barKg) * 100) / 100 / 2;
-  if (perSide <= 0) return null;
-  const available = [25, 20, 15, 10, 5, 2.5, 1.25];
+function _greedyPlateBreakdown(perSide) {
   const used = [];
   let rem = perSide;
-  for (const p of available) {
+  for (const p of PLATE_SIZES) {
     while (rem >= p - 0.001) {
       used.push(p);
       rem = Math.round((rem - p) * 100) / 100;
     }
   }
-  if (rem > 0.01) return null;
-  // Compact: group duplicates → "2×10+2.5"
-  const groups = [];
-  let i = 0;
-  while (i < used.length) {
-    let count = 1;
-    while (i + count < used.length && used[i + count] === used[i]) count++;
-    groups.push(count > 1 ? `${count}×${used[i]}` : `${used[i]}`);
-    i += count;
+  return { used, rem };
+}
+
+/**
+ * B130: Calculates plates per side for a target total weight. Every multiple
+ * of 1.25kg per side is achievable (1.25 itself is the smallest plate), so
+ * when the exact target isn't reachable (odd fractional weight), perSide is
+ * rounded DOWN to the nearest 1.25kg multiple and that adjusted combination
+ * is returned instead, with `exact:false` and `adjustedTotal` set.
+ * Returns null if totalKg <= barKg (no plates needed/possible).
+ * @returns {{ weights: number[], exact: boolean, adjustedTotal: number }|null}
+ */
+function calcPlates(totalKg, barKg = 20) {
+  const perSide = Math.round((totalKg - barKg) * 100) / 100 / 2;
+  if (perSide <= 0) return null;
+  let { used, rem } = _greedyPlateBreakdown(perSide);
+  let exact = rem <= 0.01;
+  let effectivePerSide = perSide;
+  if (!exact) {
+    effectivePerSide = Math.floor(perSide / 1.25) * 1.25;
+    ({ used } = _greedyPlateBreakdown(effectivePerSide));
   }
-  return groups.join('+');
+  const adjustedTotal = Math.round((barKg + 2 * effectivePerSide) * 100) / 100;
+  return { weights: used, exact, adjustedTotal };
 }
 
-/** B126: same plate set / math convention as calcPlates() (bar + 2x one-side sum), forward direction (chip taps -> total). */
-const PLATE_CALC_WEIGHTS = [25, 20, 15, 10, 5, 2.5, 1.25];
-
-/** B126: total kg from a running per-plate count object, given the current bar weight. */
-function _plateCalcTotal(barKg, counts) {
-  let perSide = 0;
-  for (const w of PLATE_CALC_WEIGHTS) perSide += w * (counts[w] ?? 0);
-  return Math.round((barKg + 2 * perSide) * 100) / 100;
-}
-
-/** B126: breakdown text like "+ 2× 20kg + 2× 5kg" from a running per-plate count object. */
-function _plateCalcBreakdown(counts) {
-  const parts = [];
-  for (const w of PLATE_CALC_WEIGHTS) {
-    const c = counts[w] ?? 0;
-    if (c > 0) parts.push(`2× ${w}kg`);
-  }
-  return parts.length ? `+ ${parts.join(' + ')}` : '';
-}
-
-/** B126: inline Hantelscheiben-Rechner panel, rendered directly under a set-row when _plateCalcOpenKey matches. */
-function _renderPlateCalcPanel(di, ei, si) {
-  const key    = `${di}-${ei}-${si}`;
-  const barKg  = getState().settings.barbellWeight ?? 20;
-  const counts = _plateCalcCounts[key] ?? {};
-  const total  = _plateCalcTotal(barKg, counts);
+/**
+ * B130: prominent plate-chip block, rendered directly under a set's weight
+ * input (replaces the old passive blue plate-hint span + the B126
+ * chip-tap-to-total calculator). One chip per individual plate needed per
+ * side; "≈ Xkg möglich" hint when the exact weight isn't achievable.
+ * Visible only when ex.showPlates, weight > barbellWeight, and the exercise
+ * is weight-tracked (metric !== 'm'/'sec').
+ */
+function _renderPlateChips(ex, dispW) {
+  if (!ex.showPlates) return '';
+  if (ex.metric === 'm' || ex.metric === 'sec') return '';
+  const barKg = getState().settings.barbellWeight ?? 20;
+  if (!(dispW > barKg)) return '';
+  const pl = calcPlates(dispW, barKg);
+  if (!pl || !pl.weights.length) return '';
+  const chips = pl.weights.map(w => `<span class="plate-chip">${w}kg</span>`).join('');
   return `
-<div class="plate-calc-panel" data-di="${di}" data-ei="${ei}" data-si="${si}">
-  <div class="plate-calc-bar">Stangengewicht: ${barKg} kg</div>
-  <div class="plate-calc-chips">
-    ${PLATE_CALC_WEIGHTS.map(w => {
-      const c = counts[w] ?? 0;
-      return `<button type="button" class="plate-calc-chip${c > 0 ? ' is-selected' : ''}" data-action="plate-calc-add" data-di="${di}" data-ei="${ei}" data-si="${si}" data-weight="${w}" aria-label="${w} kg Scheibe hinzufügen">${w}kg${c > 0 ? ` ×${c}` : ''}</button>`;
-    }).join('')}
-  </div>
-  <div class="plate-calc-total">Gesamt: ${total} kg</div>
-  <div class="plate-calc-breakdown">${_plateCalcBreakdown(counts)}</div>
-  <div class="plate-calc-perside">
-    <label for="plate-calc-perside-${key}">oder pro Seite eingeben:</label>
-    <input id="plate-calc-perside-${key}" class="plate-calc-perside-input" type="number" inputmode="decimal" min="0" step="0.5"
-      data-action="plate-calc-perside" data-di="${di}" data-ei="${ei}" data-si="${si}"
-      aria-label="Gewicht pro Seite in kg" />
-  </div>
-  <button type="button" class="plate-calc-apply" data-action="plate-calc-apply" data-di="${di}" data-ei="${ei}" data-si="${si}" data-value="${total}">Übernehmen</button>
+<div class="plate-chips-row" aria-hidden="true">
+  <div class="plate-chips">${chips}</div>
+  <div class="plate-chips__label">pro Seite</div>
+  <div class="plate-chips__bar">Stange ${barKg}kg</div>
+  ${!pl.exact ? `<div class="plate-chips__approx">≈ ${pl.adjustedTotal}kg möglich</div>` : ''}
 </div>`;
 }
 
@@ -2656,8 +2644,6 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
     ${isWeightPR ? `<span class="pr-badge"           aria-label="Gewichts-PR! ${s.weight} kg">🏆 ${s.weight} kg</span>` : ''}
     ${isEffortGoal ? `<span class="pr-badge pr-badge--goal" aria-label="${effortScore}% Zielerfüllung">✓ ${effortScore}% Ziel</span>` : ''}
     ${_prevWeightHint}
-    ${ex.showPlates && dispW > 0 ? (() => { const pl = calcPlates(dispW, getState().settings.barbellWeight ?? 20); return pl ? `<span class="plate-hint" aria-hidden="true" title="Scheiben je Seite">▪ ${pl}</span>` : ''; })() : ''}
-    ${!rowLocked ? `<button type="button" class="plate-calc-btn" data-action="toggle-plate-calc" data-di="${di}" data-ei="${ei}" data-si="${si}" aria-label="Hantelscheiben-Rechner für Satz ${si + 1}" aria-expanded="${_plateCalcOpenKey === `${di}-${ei}-${si}`}">⚖</button>` : ''}
   </div>
 
   <div class="set-cell">
@@ -2746,7 +2732,7 @@ ${s._showNote ? `
     aria-label="Notiz zu Satz ${si + 1}"
     maxlength="120"
   />
-</div>` : ''}${_plateCalcOpenKey === `${di}-${ei}-${si}` ? _renderPlateCalcPanel(di, ei, si) : ''}${intraCoachHtml}`;
+</div>` : ''}${_renderPlateChips(ex, dispW)}${intraCoachHtml}`;
 }
 
 // ─── Body tab ────────────────────────────────────────────────────────────────
@@ -3819,6 +3805,9 @@ function renderCoachTab(state) {
           <summary class="pr-collapse__summary">▾ Basis dieser Einschätzung</summary>
           <div class="pr-collapse__body">${_evidenceHtml(item.evidence)}</div>
         </details>` : ''}
+        ${sig.type === 'deload_preventive' ? `
+        <button type="button" class="btn btn--ghost btn--sm coach-structural-dismiss"
+          data-action="decision-log-deload-stay" data-signal="${h(item.text)}">Weiter wie bisher</button>` : ''}
       </div>`;
     }).join('')}
   </div>` : '';
@@ -5056,7 +5045,7 @@ function renderSettingsTab(state) {
   <div class="settings-section">
     <div class="settings-section__title">Info</div>
     <div class="settings-row">
-      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v219</div></div>
+      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v220</div></div>
     </div>
     <div class="settings-row">
       <div>
@@ -5262,14 +5251,6 @@ function _handleClick(e) {
       && !e.target.closest('.rpe-popover')
       && !e.target.closest('[data-action="open-rpe-popover"]')) {
     _rpePopoverKey = null;
-    scheduleRender();
-  }
-
-  // Close Plate Calculator panel when clicking outside it (B126)
-  if (_plateCalcOpenKey !== null
-      && !e.target.closest('.plate-calc-panel')
-      && !e.target.closest('[data-action="toggle-plate-calc"]')) {
-    _plateCalcOpenKey = null;
     scheduleRender();
   }
 
@@ -5829,6 +5810,26 @@ function _handleClick(e) {
         showToast('Entscheidung gespeichert', 'ok');
       }
       _checkDecisionOutcomes(getState());
+      break;
+    }
+
+    // B131: eigener Dismiss-Button auf der Deload-Strukturkarte — unabhängig
+    // vom "Weiter wie bisher" der Hauptkarte oben (die loggt type:focus.status,
+    // z.B. 'overload', nie 'preventive_deload'). _checkPreventiveDeload()
+    // (weeklyFocus.js) liest genau diesen type+choice und unterdrückt die
+    // Karte 4 Wochen.
+    case 'decision-log-deload-stay': {
+      const _d = new Date();
+      const _dow = _d.getDay();
+      _d.setDate(_d.getDate() + (_dow === 0 ? -6 : 1 - _dow));
+      const decidedWeekStart = _d.toISOString().slice(0, 10);
+      dispatch(A.DECISION_LOG_ADD, {
+        type: 'preventive_deload',
+        signal: el.dataset.signal ?? '',
+        choice: 'stay',
+        decidedWeekStart,
+      });
+      showToast('Entscheidung notiert — Hinweis für 4 Wochen ausgeblendet.', 'ok');
       break;
     }
 
@@ -6635,36 +6636,6 @@ function _handleClick(e) {
       break;
     }
 
-    // Plate Calculator (B126)
-    case 'toggle-plate-calc': {
-      const key = `${di}-${ei}-${si}`;
-      if (_plateCalcOpenKey === key) {
-        _plateCalcOpenKey = null;
-      } else {
-        _plateCalcOpenKey = key;
-        _plateCalcCounts[key] = {};
-      }
-      scheduleRender();
-      break;
-    }
-
-    case 'plate-calc-add': {
-      const key = `${di}-${ei}-${si}`;
-      const w = +el.dataset.weight;
-      if (!_plateCalcCounts[key]) _plateCalcCounts[key] = {};
-      _plateCalcCounts[key][w] = (_plateCalcCounts[key][w] ?? 0) + 1;
-      scheduleRender();
-      break;
-    }
-
-    case 'plate-calc-apply': {
-      const value = +el.dataset.value;
-      dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'weight', value });
-      _plateCalcOpenKey = null;
-      scheduleRender();
-      break;
-    }
-
     case 'set-rpe-val': {
       const rpeVal = el.dataset.val === '' ? null : +el.dataset.val;
       dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'rpe', value: rpeVal });
@@ -7127,15 +7098,6 @@ function _handleChange(e) {
       dispatch(A.DAY_SET_FIELD, { di: +di, field, value: el.value }); break;
     case 'set-weight':
       dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'weight', value: el.value }); break;
-    case 'plate-calc-perside': {
-      const perSide = parseFloat(el.value);
-      if (Number.isFinite(perSide) && perSide >= 0) {
-        const barKg = getState().settings.barbellWeight ?? 20;
-        const total = Math.round((barKg + 2 * perSide) * 100) / 100;
-        dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'weight', value: total });
-      }
-      break;
-    }
     case 'set-reps':
       dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'reps',   value: el.value }); break;
     case 'set-rpe':

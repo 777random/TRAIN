@@ -254,6 +254,19 @@ function _avgRpeWeek(wk) {
 // verdrängten zuvor akute/spezifischere Signale durch ihre Platzierung in
 // der akuten Kaskade).
 function _checkPreventiveDeload(state) {
+  // B131: 4-Wochen-Unterdrückung nach explizitem "Weiter wie bisher" auf der
+  // Strukturkarte selbst (dispatcht DECISION_LOG_ADD mit
+  // type:'preventive_deload', choice:'stay' — eigener Button auf der
+  // Deload-Karte, siehe ui.js _handleClick 'decision-log-deload-stay'. Die
+  // Buttons der Hauptkarte ("Weiter wie bisher"/"Empfehlung folgen") loggen
+  // dagegen type:focus.status, nie 'preventive_deload' — vor B131 hatte
+  // diese Karte daher gar keinen Mechanismus, der sie unterdrücken konnte).
+  const fourWeeksAgoISO = new Date(Date.now() - 28 * 86_400_000).toISOString().slice(0, 10);
+  const recentRejection = (state.decisionLog ?? []).some(d =>
+    d.type === 'preventive_deload' && d.choice === 'stay' && d.decidedWeekStart >= fourWeeksAgoISO
+  );
+  if (recentRejection) return null;
+
   const weeksSince = _weeksSinceLastDeload(state);
   if (weeksSince < 8) return null;
 
@@ -588,6 +601,16 @@ function _isPlateauSuppressed(p, action, curWeekStart) {
   return false;
 }
 
+// B132 (Diagnose, 2026-07): _checkPlateau() und die Fortschritt-Tab-Regel
+// S-06 (insightEngine.js) rufen denselben detectPlateaus() mit identischen
+// Schwellenwerten auf — keine Diskrepanz in den Zahlenwerten. Der Grund, warum
+// ein im Fortschritt-Tab erkanntes Plateau (z.B. Deadlift) im Coach-Tab
+// trotzdem nicht erscheinen kann, liegt ausschließlich am Gating: diese
+// Funktion sitzt in der akuten ??-Kaskade (computeWeeklyFocus()) hinter
+// _checkReentry/_checkPersistentFailure/_checkOverload — jedes davon
+// verdrängt Plateau komplett für diese Woche — und respektiert zusätzlich
+// state.plateauActions (_isPlateauSuppressed, oben). S-06 hat keine der
+// beiden Gates. Siehe DECISIONS.md für die vollständige Diagnose.
 function _checkPlateau(state) {
   const plateaus = detectPlateaus(state.weeks, state.favoriteExercises ?? [], state.settings?.rpeEnabled ?? true);
   if (!plateaus.length) return null;
