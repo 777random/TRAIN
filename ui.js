@@ -64,6 +64,29 @@ let _showCustomDeload = false;
 /** Key of currently open RPE popover: `${di}-${ei}-${si}` or null. */
 let _rpePopoverKey = null;
 
+/**
+ * B133: `${di}-${ei}-${si}` -> raw (uncommitted) weight-input string, while
+ * the user is mid-typing. Read by _renderPlateHint() to keep the Scheiben-
+ * Hinweis correct through a full re-render that can happen for reasons
+ * completely unrelated to this input (e.g. timer.js' _ensureSessionStart()
+ * dispatches on the very first 'input' event of a not-yet-started session,
+ * which schedules a full render — a one-shot `.textContent`-Patch in
+ * _handleInput() alone would get silently overwritten by that render, since
+ * it recomputes purely from committed state). Cleared once the value is
+ * actually committed via 'change' (_handleChange) or the row unmounts.
+ */
+const _liveWeightPreview = new Map();
+
+/** B133: includes the current week id (not just di/ei/si indices) in the
+ * _liveWeightPreview key — indices are reused across weeks/days, week id
+ * isn't, same convention as _acceptedFeedback's key. Avoids a stray
+ * uncommitted preview leaking onto an unrelated set after navigating away. */
+function _liveWeightKey(di, ei, si) {
+  const st = getState();
+  const wkId = st.weeks[st.curIdx]?.id;
+  return `${wkId}-${di}-${ei}-${si}`;
+}
+
 /** Id of the currently open Kennzahlen-Erklärungstooltip (Fortschritt-Tab) or null. */
 let _metricTooltipKey = null;
 
@@ -530,28 +553,56 @@ function calcPlates(totalKg, barKg = 20) {
 }
 
 /**
- * B130: prominent plate-chip block, rendered directly under a set's weight
- * input (replaces the old passive blue plate-hint span + the B126
- * chip-tap-to-total calculator). One chip per individual plate needed per
- * side; "≈ Xkg möglich" hint when the exact weight isn't achievable.
- * Visible only when ex.showPlates, weight > barbellWeight, and the exercise
- * is weight-tracked (metric !== 'm'/'sec').
+ * B133: compact grouped plate string, e.g. [25,10,10] -> "25+2×10" — same
+ * convention as the pre-B130 passive plate-hint. Single source of truth for
+ * both the full render (_renderPlateHint) and the live keystroke preview
+ * (_handleInput).
  */
-function _renderPlateChips(ex, dispW) {
-  if (!ex.showPlates) return '';
+function _compactPlateGroups(weights) {
+  const groups = [];
+  let i = 0;
+  while (i < weights.length) {
+    let count = 1;
+    while (i + count < weights.length && weights[i + count] === weights[i]) count++;
+    groups.push(count > 1 ? `${count}×${weights[i]}` : `${weights[i]}`);
+    i += count;
+  }
+  return groups.join('+');
+}
+
+/**
+ * B133: dezenter Ein-Zeilen-Text ("+ 25+10  pro Seite · Stange 20kg"),
+ * ersetzt B130s Chip-Badges (siehe DECISIONS.md — Design zu klobig).
+ * Visible only when ex.showPlates, weight > barbellWeight, and the exercise
+ * is weight-tracked (metric !== 'm'/'sec'). Returns '' (nothing shown) if any
+ * gate fails or dispW isn't a usable number (e.g. mid-typing "-"/empty).
+ */
+function _plateHintText(ex, dispW) {
+  if (!ex?.showPlates) return '';
   if (ex.metric === 'm' || ex.metric === 'sec') return '';
   const barKg = getState().settings.barbellWeight ?? 20;
   if (!(dispW > barKg)) return '';
   const pl = calcPlates(dispW, barKg);
   if (!pl || !pl.weights.length) return '';
-  const chips = pl.weights.map(w => `<span class="plate-chip">${w}kg</span>`).join('');
-  return `
-<div class="plate-chips-row" aria-hidden="true">
-  <div class="plate-chips">${chips}</div>
-  <div class="plate-chips__label">pro Seite</div>
-  <div class="plate-chips__bar">Stange ${barKg}kg</div>
-  ${!pl.exact ? `<div class="plate-chips__approx">≈ ${pl.adjustedTotal}kg möglich</div>` : ''}
-</div>`;
+  const compact = _compactPlateGroups(pl.weights);
+  const approx  = !pl.exact ? ` · ≈ ${pl.adjustedTotal}kg möglich` : '';
+  return `+ ${compact}  pro Seite · Stange ${barKg}kg${approx}`;
+}
+
+/**
+ * B133: always renders the `.plate-hint` slot (even when empty) so
+ * _handleInput() can locate it via data-di/ei/si and patch its text on every
+ * keystroke without a full re-render — see _handleInput() for why a full
+ * render is deliberately avoided here (closes the on-screen keyboard).
+ * `.plate-hint:empty` collapses to zero height in CSS. Prefers an uncommitted
+ * live-typed value from _liveWeightPreview over the committed `dispW`, so a
+ * full render triggered by something unrelated (see _liveWeightPreview above)
+ * still shows what's actually in the input right now.
+ */
+function _renderPlateHint(ex, dispW, di, ei, si) {
+  const preview = _liveWeightPreview.get(_liveWeightKey(di, ei, si));
+  const w       = preview !== undefined ? parseFloat(preview) : dispW;
+  return `<div class="plate-hint" data-di="${di}" data-ei="${ei}" data-si="${si}">${_plateHintText(ex, w)}</div>`;
 }
 
 /** Show a toast. type: 'ok' | 'info' | 'warn'. Optional durationMs overrides default 2600ms. */
@@ -2732,7 +2783,7 @@ ${s._showNote ? `
     aria-label="Notiz zu Satz ${si + 1}"
     maxlength="120"
   />
-</div>` : ''}${_renderPlateChips(ex, dispW)}${intraCoachHtml}`;
+</div>` : ''}${_renderPlateHint(ex, dispW, di, ei, si)}${intraCoachHtml}`;
 }
 
 // ─── Body tab ────────────────────────────────────────────────────────────────
@@ -5045,7 +5096,7 @@ function renderSettingsTab(state) {
   <div class="settings-section">
     <div class="settings-section__title">Info</div>
     <div class="settings-row">
-      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v220</div></div>
+      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v221</div></div>
     </div>
     <div class="settings-row">
       <div>
@@ -7097,6 +7148,7 @@ function _handleChange(e) {
     case 'day-field':
       dispatch(A.DAY_SET_FIELD, { di: +di, field, value: el.value }); break;
     case 'set-weight':
+      _liveWeightPreview.delete(_liveWeightKey(di, ei, si)); // B133: committed now, state is authoritative again
       dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'weight', value: el.value }); break;
     case 'set-reps':
       dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'reps',   value: el.value }); break;
@@ -7173,9 +7225,32 @@ function _handleChange(e) {
 }
 
 function _handleInput(e) {
-  // Absichtlich komplett leer gelassen!
+  // Absichtlich (bis auf die B133-Ausnahme unten) komplett leer gelassen!
   // Das verhindert, dass bei jedem einzelnen Tastendruck das Layout neu lädt
   // und dir die Tastatur vor der Nase zuschlägt.
+
+  // B133: Scheiben-Hinweis muss trotzdem live mitlaufen, während getippt wird
+  // (vorher blieb er bis zur Bestätigung/zum Blur auf dem alten Gewicht
+  // stehen — siehe DECISIONS.md). Bewusst ein gezielter `.textContent`-Patch
+  // auf den bereits gerenderten `.plate-hint`-Slot statt scheduleRender()/
+  // dispatch() — genau das würde hier den o.g. Tastatur-Bug reproduzieren.
+  // Kein State-Write hier: der Satz wird weiterhin erst bei "change"
+  // persistiert (siehe case 'set-weight' in _handleChange(), das dort auch
+  // den _liveWeightPreview-Eintrag wieder löscht). Der Wert landet zusätzlich
+  // in _liveWeightPreview, weil ein komplett unabhängiger, gleichzeitiger
+  // State-Dispatch (`timer.js` startet die Session beim allerersten Tastendruck
+  // eines Tages via `_ensureSessionStart()`) einen vollen Re-Render auslösen
+  // kann, der diesen Patch sonst sofort wieder überschreiben würde — siehe
+  // _renderPlateHint()/_liveWeightPreview für die Gegenmaßnahme.
+  if (e.target.matches?.('[data-action="set-weight"]')) {
+    const { di, ei, si } = e.target.dataset;
+    _liveWeightPreview.set(_liveWeightKey(di, ei, si), e.target.value);
+    const slot = document.querySelector(`.plate-hint[data-di="${di}"][data-ei="${ei}"][data-si="${si}"]`);
+    if (!slot) return;
+    const st = getState();
+    const ex = st.weeks[st.curIdx]?.days?.[+di]?.exercises?.[+ei];
+    slot.textContent = _plateHintText(ex, parseFloat(e.target.value));
+  }
 }
 
 function _handleBlur(e) {

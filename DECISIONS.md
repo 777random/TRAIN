@@ -458,3 +458,42 @@ Konzepte).
 lichung getroffen wird. B131s Deload-Unterdrückung kann dazu führen, dass
 ein Plateau-Signal in der akuten Kaskade sichtbar wird, sofern
 Reentry/PersistentFailure/Overload für die Woche nicht bereits greifen.
+
+### 2026-07 — B133: Scheiben-Anzeige bleibt dezenter Text, kein Chip/Badge-Design
+**Entscheidung:** Der Scheiben-Hinweis unter dem Gewichts-Feld ist ein
+einzeiliger, dezenter Text (`.plate-hint`, 11px, `--c-text-2`, `opacity:.7`,
+kein Hintergrund/Rahmen) — nicht die prominenten Chip-Badges aus B130
+(train-v220). B130s Design wurde nach Nutzer-Feedback ("zu klobig") wieder
+zurückgebaut, exakt eine Woche nach der Einführung.
+**Begründung:** Der Scheiben-Hinweis ist Kontext-Information zum Satz, kein
+primärer Interaktionspunkt — visuell schwerer als der eigentliche Gewichts-
+Input zu sein, lenkt vom Wesentlichen ab. Deckt sich mit dem bestehenden
+Design-Prinzip "Hauptinfo sofort sichtbar, Details/Kontext visuell
+schwächer" (CLAUDE.md, UI-Patterns).
+**Gilt:** Permanent bis gegenteilige Entscheidung. Falls künftig doch wieder
+eine prominentere Darstellung gewünscht wird: explizit neu entscheiden, nicht
+stillschweigend zu B130s Chip-Design zurückkehren.
+
+### 2026-07 — B133: Live-Vorschau-State (`_liveWeightPreview`) statt reinem DOM-Patch
+**Entscheidung:** UI-Elemente, die während des Tippens (vor "change"/Commit)
+live mitlaufen sollen, aber NICHT über einen vollen `scheduleRender()`
+aktualisiert werden dürfen (das würde auf Mobile die Tastatur schließen —
+siehe `_handleInput()`s bestehender Kommentar dazu), halten ihren
+Zwischenwert in einer eigenen Modul-Map (`_liveWeightPreview`, Muster:
+`${weekId}-${di}-${ei}-${si}` → Rohwert) und lesen sie bevorzugt gegenüber
+dem committeten State — statt sich auf einen einmaligen `.textContent`-Patch
+zu verlassen.
+**Befund vor der Entscheidung:** ein reiner, einmaliger DOM-Patch in
+`_handleInput()` reicht nicht aus. `timer.js` hat einen eigenen, von ui.js
+komplett unabhängigen `input`-Listener auf `#app` (`_ensureSessionStart()`),
+der beim allerersten Tastendruck einer noch nicht gestarteten Session einen
+echten `dispatch()` auslöst — dessen State-Notify triggert einen vollen
+Re-Render, der jeden reinen DOM-Patch sofort wieder mit dem (noch
+unveränderten) State-Wert überschreibt. Das ist kein Einzelfall von
+`timer.js`: JEDE gleichzeitige, unabhängige Ursache für einen Re-Render
+(heute oder künftig) hätte denselben Effekt auf einen reinen DOM-Patch.
+**Gilt:** Als Muster für künftige ähnliche Fälle (Live-Vorschau eines noch
+nicht committeten Eingabefelds, während ein voller Re-Render bei jedem
+Tastendruck bewusst vermieden wird). `timer.js` selbst bewusst NICHT
+angefasst — die Robustheit wird auf der lesenden (ui.js-)Seite hergestellt,
+nicht durch Koordination mit dem auslösenden Modul.

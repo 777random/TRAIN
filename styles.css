@@ -889,28 +889,15 @@ exercise { position: unset; }
   height: 13px; line-height: 13px; white-space: nowrap;
   overflow: hidden; text-overflow: ellipsis;
 }
-/* ── B130: Scheiben-Chips (prominent, ersetzt den alten .plate-hint) ──── */
-.plate-chips-row {
-  padding: var(--sp-2) 0 var(--sp-1);
-  border-bottom: 1px solid rgba(46,46,53,.5);
+/* ── B133: Scheiben-Hinweis, dezenter Text (B130s Chip-Design zurückgebaut,
+   siehe DECISIONS.md) — eine Zeile, kein Badge/Hintergrund. Leerer Slot
+   (kein Satz braucht Scheiben) nimmt keinen Platz ein. ──────────────── */
+.plate-hint {
+  font-size: 11px; color: var(--c-text-2); opacity: .7;
+  line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  padding: 2px 0 0;
 }
-.plate-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.plate-chip {
-  display: inline-flex; align-items: center; justify-content: center;
-  min-height: 26px; padding: 0 var(--sp-2);
-  background: var(--c-accent); border: 1px solid var(--c-accent);
-  border-radius: var(--r-md); color: #000;
-  font-size: 12px; font-weight: 700;
-}
-.plate-chips__label {
-  font-size: 11px; color: var(--c-text-2); margin-top: 4px;
-}
-.plate-chips__bar {
-  font-size: 10px; color: var(--c-text-2); opacity: .8; margin-top: 2px;
-}
-.plate-chips__approx {
-  font-size: 10px; color: var(--c-text-3); font-style: italic; margin-top: 4px;
-}
+.plate-hint:empty { display: none; padding: 0; }
 
 .set-cell__footer {
   display: flex;

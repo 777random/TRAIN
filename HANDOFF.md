@@ -1,5 +1,5 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-27 — B130/B131/B132 (Plate Calculator neu + Coach Signal Unterdrückung), train-v220, siehe unten. B128/B129 (Auto-Steigerung Opt-out + Skip-Grund-Abfrage, train-v219), B123-B127 (5 Features vor Launch, train-v218), B114-B122 (9 Bugs vor Launch, train-v217), B113 (Einstellungen in 4 Zwischenüberschriften gegliedert, train-v216), B112/E1 (Transparenz Coach-Tab, train-v215), B111 (movementMap.js erweitert, train-v214), B110 (Streak-Badge-Fenstergrenze, train-v213), B109/D2 ("Heute anders", train-v212) und B105-B108 (train-v211, Onboarding-Verbesserungen) sowie B102+B103/B101/B100 bereits gepusht und CI-grün.*
+*Letzte Aktualisierung: 2026-07-27 — B133 (Scheiben-Anzeige dezent + Live-Update), train-v221, siehe unten. B130/B131/B132 (Plate Calculator neu + Coach Signal Unterdrückung, train-v220), B128/B129 (Auto-Steigerung Opt-out + Skip-Grund-Abfrage, train-v219), B123-B127 (5 Features vor Launch, train-v218), B114-B122 (9 Bugs vor Launch, train-v217), B113 (Einstellungen in 4 Zwischenüberschriften gegliedert, train-v216), B112/E1 (Transparenz Coach-Tab, train-v215), B111 (movementMap.js erweitert, train-v214), B110 (Streak-Badge-Fenstergrenze, train-v213), B109/D2 ("Heute anders", train-v212) und B105-B108 (train-v211, Onboarding-Verbesserungen) sowie B102+B103/B101/B100 bereits gepusht und CI-grün.*
 *Nächster Schritt: C3 Compound-Edit-Option. Push dieser Session braucht noch die reguläre Session-Bestätigung (Push-Policy LOOPS.md). Weiterhin nur als Notiz (kein Bug): mehrere Test-Dateien konstruieren Datums-Fixtures über lokale `Date`-Methoden + `.toISOString()` — verschiebt `startDate` bei lokalem Ausführen in einer positiven-UTC-Offset-Zeitzone um einen Tag; betrifft nur lokale Testläufe außerhalb UTC, nicht CI/Produktionscode, bei Bedarf mit `TZ=UTC npx playwright test` gegentesten. Möglicher Folge-Sprint (nicht angefordert): B79 (`_checkCompoundIsolationBalance`) auf die neue `isCompoundExercise()` umstellen, siehe DECISIONS.md. Loops 7-11 aktiv (diese Session: Loop 5+7+11 aktualisiert). Nicht committet: `Research/TRAIN_Parameter_Review.md` (Nutzer-Recherche, bewusst uncommitted gelassen).*
 
 ---
@@ -11,11 +11,34 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v220 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v221 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
-- CSS: ?v=209
+- CSS: ?v=210
 - SCHEMA: 33 (unverändert — dieser Sprint brauchte keine neuen Felder)
+- **B133 — Scheiben-Anzeige dezent zurückgebaut + Live-Update (train-v221,
+  2026-07-27):** Nutzer-Feedback nach train-v220: B130s Chip/Badge-Design
+  ("[25kg] [10kg]") zu klobig, zurück zu einzeiligem dezentem Text
+  (`.plate-hint`, gleicher Klassenname/gleiche Optik wie die vor B130
+  entfernte Komponente) — reiner CSS-Rückbau, keine Diagnose nötig. Das
+  zweite Problem (kein Live-Update beim Tippen/nach "Übernehmen") brauchte
+  echte Diagnose: der "Übernehmen ↗"-Button funktionierte bereits korrekt
+  (voller Re-Render liest `s.weight` immer frisch aus dem State) — der
+  tatsächliche Bug war reines Tippen vor Bestätigung/Blur, weil `_handleInput()`
+  absichtlich leer ist (verhindert Tastatur-Schließen auf Mobile). **Unerwarteter
+  Fund während der Umsetzung:** ein einfacher `.textContent`-Patch reicht nicht
+  — `timer.js` hat einen eigenen, unabhängigen `input`-Listener auf `#app`
+  (`_ensureSessionStart()`), der beim allerersten Tastendruck einer noch nicht
+  gestarteten Session einen echten `dispatch()` auslöst und damit einen vollen
+  Re-Render erzwingt, der den Patch sofort wieder überschreibt (nur beim
+  ersten Tastendruck des Tages reproduzierbar). Fix: neue `_liveWeightPreview`-
+  Map (`${weekId}-${di}-${ei}-${si}` → getippter Rohwert), von der
+  Render-Funktion bevorzugt gegenüber dem committeten State gelesen — übersteht
+  dadurch jeden Re-Render unabhängig von seiner Ursache, ohne `timer.js`
+  anzufassen (außerhalb des Sprint-Scopes). `calcPlates()` selbst unverändert.
+  12 Tests in `tests/plate_calculator.spec.js` (erweitert), volle Suite grün.
+  Nur `ui.js`/`styles.css` geändert, CACHE_VERSION train-v220→v221, CSS
+  ?v=209→210, SCHEMA unverändert. Details siehe BUGS.md B133, DECISIONS.md.
 - **B130/B131/B132 — Plate Calculator neu + Coach Signal Unterdrückung
   (train-v220, 2026-07-27):** baute direkt auf der vorherigen Diagnose-
   Session auf (kein neuer Explore-Agent nötig). Bei allen drei ein wichtiger
