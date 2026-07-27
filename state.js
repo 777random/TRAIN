@@ -196,6 +196,7 @@ function buildDefaultState() {
     coachQuestionHistory: [], // abgeschlossene Fragen mit Outcome: [{ weekStart, questionId, answer, outcome, measuredWeekStart }]
     coachPerformance: { suggestions: [] }, // Logging + Messung von Progressions-Empfehlungen
     substituteHistory: {}, // { [originalExerciseName]: { name, count, lastUsed }[] } — D2, siehe _recordSubstitution()
+    exerciseNotes: {}, // { [exerciseName]: string } — B127: permanente, übungsweite Notiz (Rack-Höhe, Griffbreite etc.), überlebt Wochen-Klone; NICHT zu verwechseln mit ex.note (tagesspezifisch) oder s.note (pro Satz)
     settings: {
       swipe:              true,
       drag:               true,
@@ -971,6 +972,9 @@ function migrate(raw) {
   if (!raw.substituteHistory || typeof raw.substituteHistory !== 'object') {
     raw.substituteHistory = {};
   }
+  if (!raw.exerciseNotes || typeof raw.exerciseNotes !== 'object') {
+    raw.exerciseNotes = {}; // B127: additiver Default, kein SCHEMA_VERSION-Bump (Präzedenzfall substituteHistory)
+  }
 
   // Always-apply: week label (optional user-set name, no schema bump needed)
   (raw.weeks ?? []).forEach(wk => { if (!('label' in wk)) wk.label = ''; });
@@ -1094,6 +1098,54 @@ export function clearAutoWeekPending() {
 
 function _currentWeek() {
   return STATE.weeks[STATE.curIdx] ?? null;
+}
+
+const _exNameKey = name => String(name ?? '').trim().toLowerCase();
+
+/**
+ * B124: sucht Einstellungen (weightStep/targetReps/pauseSec/progressionType/
+ * metric/tags) einer bereits existierenden Übung mit demselben Namen
+ * (case-insensitive), damit EX_ADD sie statt Default-Werten übernehmen kann.
+ * Suchreihenfolge, erster Treffer gewinnt:
+ *   1. aktueller Tag, andere Position
+ *   2. andere Tage dieser Woche
+ *   3. letzte Woche (curIdx-1)
+ *   4. ältere Wochen, neueste zuerst (curIdx-2 abwärts)
+ * `weight`/`sets` sind bewusst NICHT Teil des Rückgabewerts — die bleiben
+ * immer frisch (siehe EX_ADD).
+ */
+function _findExerciseSettingsHistory(state, name, di) {
+  const key = _exNameKey(name);
+  if (!key) return null;
+  const pick = ex => ({
+    weightStep: ex.weightStep, targetReps: ex.targetReps, pauseSec: ex.pauseSec,
+    progressionType: ex.progressionType, metric: ex.metric,
+    tags: Array.isArray(ex.tags) ? [...ex.tags] : [],
+  });
+  const wk = state.weeks[state.curIdx];
+  if (!wk) return null;
+
+  // 1. aktueller Tag, andere Position
+  const curDay = wk.days[di];
+  if (curDay) {
+    const hit = curDay.exercises.find(ex => _exNameKey(ex.name) === key);
+    if (hit) return pick(hit);
+  }
+  // 2. andere Tage dieser Woche
+  for (let i = 0; i < wk.days.length; i++) {
+    if (i === di) continue;
+    const hit = wk.days[i].exercises.find(ex => _exNameKey(ex.name) === key);
+    if (hit) return pick(hit);
+  }
+  // 3. letzte Woche, 4. ältere Wochen (neueste zuerst)
+  for (let wi = state.curIdx - 1; wi >= 0; wi--) {
+    const w = state.weeks[wi]; if (!w) continue;
+    for (const day of w.days) {
+      const hit = day.exercises.find(ex => _exNameKey(ex.name) === key);
+      if (hit) return pick(hit);
+    }
+  }
+  return null;
 }
 
 const SUBSTITUTE_HISTORY_MAX_PER_EXERCISE = 5;
@@ -1342,6 +1394,7 @@ export const A = Object.freeze({
   EX_UNARCHIVE:        'EX_UNARCHIVE',        // { name: string } — reaktiviert in allen Wochen
   EX_UPDATE:           'EX_UPDATE',           // { di, ei, field, value }
   EX_MOVE:             'EX_MOVE',             // { di, fromEi, toEi }
+  EXERCISE_MOVE_TO_DAY: 'EXERCISE_MOVE_TO_DAY', // { fromDi, toDi, ei } — B125: Übung in einen anderen Tag derselben Woche verschieben, atomar (Settings bleiben, Sätze werden frisch/pending)
   EX_TOGGLE_CFG:       'EX_TOGGLE_CFG',       // { di, ei }
   EX_INC_WEIGHT:       'EX_INC_WEIGHT',       // { di, ei, amount } – erhöht alle Sätze sofort
   EX_SET_NEXT_WEEK_PLAN:'EX_SET_NEXT_WEEK_PLAN',// { di, ei, value, weekIdx?, progressionType? } – setzt nextWeekPlan + confirmed=true (+ optional progressionType, atomar); weekIdx default = curIdx
@@ -1362,6 +1415,7 @@ export const A = Object.freeze({
   AUTO_EVAL_SET:       'AUTO_EVAL_SET',        // { di, ei, si, reps } — auto-evaluation on blur (autoEval setting)
   SET_RPE:             'SET_RPE',             // { di, ei, si, rpe: number }
   EX_SET_SUBSTITUTE:   'EX_SET_SUBSTITUTE',   // { di, ei, substituteFor: string|null }
+  EXERCISE_NOTE_SET:   'EXERCISE_NOTE_SET',   // { name, value } — B127: schreibt state.exerciseNotes[name], permanent, keyed by exaktem Übungsnamen (wie state.prs/state.substituteHistory)
   // Session log
   SESSION_START:       'SESSION_START',       // { di, ts }  – persists day.sessionStartTs
   SESSION_RESET:       'SESSION_RESET',       // { di }  – clears sessionStartTs so timer can restart
@@ -1442,9 +1496,14 @@ function _reducePendingWeights(day, modifier, scope, compoundNames) {
 // B114: "Heute anders"-Substitution darf nie in einen geklonten/gespeicherten
 // Tag übernommen werden — jede Stelle, die Übungen kopiert (neue Woche, Tag
 // duplizieren/klonen, als Vorlage speichern), muss diese Funktion aufrufen.
+// B127: ex.note (die neue, tagesspezifische "Heute"-Notiz) läuft aus demselben
+// Grund über dieselbe Funktion mit — sonst wäre sie trotz "tagesspezifisch"
+// nicht wirklich tagesspezifisch. state.exerciseNotes (permanent) bleibt
+// bewusst unberührt, das ist ja der Sinn der zweiten Notiz-Art.
 function _resetExerciseSubstitution(ex) {
   if (ex.substituteFor) ex.name = ex.substituteFor;
   ex.substituteFor = null;
+  ex.note = '';
 }
 
 function _resetClonedDays(days) {
@@ -2063,7 +2122,10 @@ function reduce(state, action) {
       // was bei diesen Metriken die Ziel-Distanz/-Zeit ist — der sinnvolle
       // Default. metricStep analog zu weightStep, je Metrik unterschiedlich
       // sinnvoll (50m-Schritte vs. 10s-Schritte).
-      day.exercises.push({
+      // B124: bekannte Einstellungen derselben Übung (case-insensitive)
+      // übernehmen statt Default-Werten — Gewicht/Sätze bleiben immer frisch.
+      const history = _findExerciseSettingsHistory(state, p.name, p.di);
+      const newEx = {
         name: p.name, note: '', pauseSec: 90, metric: m,
         progressionType: m === 'reps' ? 'weight' : 'reps',
         weightStep: defaultWeightStepForExercise(p.name, state.customExercises),
@@ -2071,7 +2133,16 @@ function reduce(state, action) {
         progressionMode: 'weight_first', targetRepsMax: null, prRepsHistory: {},
         prWeight: null, prRepsAtMaxWeight: null,
         sets: [mkSet(), mkSet(), mkSet()],
-      });
+      };
+      if (history) {
+        newEx.weightStep       = history.weightStep;
+        newEx.targetReps       = history.targetReps;
+        newEx.pauseSec         = history.pauseSec;
+        newEx.progressionType  = history.progressionType;
+        newEx.metric           = history.metric;
+        newEx.tags             = history.tags;
+      }
+      day.exercises.push(newEx);
       break;
     }
     case A.EX_REMOVE: {
@@ -2105,6 +2176,21 @@ function reduce(state, action) {
       if (p.toEi   < 0 || p.toEi   >= exs.length) break;
       const [moved] = exs.splice(p.fromEi, 1);
       exs.splice(p.toEi, 0, moved);
+      break;
+    }
+    case A.EXERCISE_MOVE_TO_DAY: {
+      // B125: Übung atomar in einen anderen Tag derselben Woche verschieben —
+      // Einstellungen bleiben, Sätze werden frisch/pending (gleiche Anzahl
+      // wie zuvor). Duplikat-Check (Ziel-Tag hat die Übung schon) läuft
+      // bewusst VORHER in der UI, nicht hier — der Reducer geht von einem
+      // bereits geprüften, gültigen Aufruf aus.
+      const wk = _currentWeek(); if (!wk) break;
+      const fromDay = wk.days[p.fromDi]; const toDay = wk.days[p.toDi];
+      if (!fromDay || !toDay) break;
+      if (p.ei < 0 || p.ei >= fromDay.exercises.length) break;
+      const [moved] = fromDay.exercises.splice(p.ei, 1);
+      moved.sets = moved.sets.map(() => mkSet());
+      toDay.exercises.push(moved);
       break;
     }
     case A.EX_TOGGLE_CFG: {
@@ -2184,6 +2270,13 @@ function reduce(state, action) {
       const ex = _currentWeek()?.days[p.di]?.exercises[p.ei]; if (!ex) break;
       ex.substituteFor = p.substituteFor ?? null;
       if (ex.substituteFor) _recordSubstitution(STATE, ex.substituteFor, ex.name);
+      break;
+    }
+    case A.EXERCISE_NOTE_SET: {
+      // B127: permanente, übungsweite Notiz — exakter Name als Key (wie
+      // state.prs/state.substituteHistory), NICHT case-insensitive.
+      if (!state.exerciseNotes || typeof state.exerciseNotes !== 'object') state.exerciseNotes = {};
+      state.exerciseNotes[p.name] = p.value;
       break;
     }
 

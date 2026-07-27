@@ -34,7 +34,7 @@ import { computeWeeklyFocus, computeStructuralSignals, isInRecoveryWindow, build
 import { findExactDuplicates, findSimilarCandidates } from './exerciseNameCleanup.js';
 import { computeErkenntnisLines, getProgressCorridorCalibration } from './progressInsights.js';
 import { buildPrShareCanvas, shareCanvas } from './shareImage.js';
-import { buildCategoryMap, resolveCategory, isCompoundExercise } from './movementMap.js';
+import { buildCategoryMap, resolveCategory, isCompoundExercise, MOVEMENT_MAP } from './movementMap.js';
 import { computeQualityTrend, computeConsistencyTrend, computeVolumeTrend, computeBreadthProgress } from './overallPerformance.js';
 import { weekSuccessCounts } from './setUtils.js';
 import { getSortedWeeks, exWeightHistory, exMetricHistory, detectRecurringStep } from './insightEngine.js';
@@ -64,6 +64,11 @@ let _showCustomDeload = false;
 /** Key of currently open RPE popover: `${di}-${ei}-${si}` or null. */
 let _rpePopoverKey = null;
 
+/** B126: Key of currently open Plate Calculator panel: `${di}-${ei}-${si}` or null. */
+let _plateCalcOpenKey = null;
+/** B126: Per-key running plate counts while a Plate Calculator is open: `${di}-${ei}-${si}` -> { [plateWeight]: count }. */
+let _plateCalcCounts = {};
+
 /** Id of the currently open Kennzahlen-Erklärungstooltip (Fortschritt-Tab) or null. */
 let _metricTooltipKey = null;
 
@@ -81,6 +86,14 @@ let _pendingAutoEval = null;
 
 /** Key of the exercise whose ⋮ context menu is open: `${di}-${ei}` or null. */
 let _exMenuOpenKey = null;
+
+/** B127: Key der Übung, deren Notiz-Panel offen ist: `${di}-${ei}` oder null. */
+let _exNoteOpenKey = null;
+/** B127: aktiver Tab im offenen Notiz-Panel — 'heute' | 'immer'. */
+let _exNoteActiveTab = 'heute';
+
+/** B125: Key der Übung, für die der "Zu anderem Tag verschieben"-Dialog vorbereitet wird: `${di}-${ei}` oder null. */
+let _moveExDayKey = null;
 
 /** Index of the day whose ⋮ context menu is open: String(di) or null. */
 let _dayMenuOpenKey = null;
@@ -502,6 +515,53 @@ function calcPlates(totalKg, barKg = 20) {
     i += count;
   }
   return groups.join('+');
+}
+
+/** B126: same plate set / math convention as calcPlates() (bar + 2x one-side sum), forward direction (chip taps -> total). */
+const PLATE_CALC_WEIGHTS = [25, 20, 15, 10, 5, 2.5, 1.25];
+
+/** B126: total kg from a running per-plate count object, given the current bar weight. */
+function _plateCalcTotal(barKg, counts) {
+  let perSide = 0;
+  for (const w of PLATE_CALC_WEIGHTS) perSide += w * (counts[w] ?? 0);
+  return Math.round((barKg + 2 * perSide) * 100) / 100;
+}
+
+/** B126: breakdown text like "+ 2× 20kg + 2× 5kg" from a running per-plate count object. */
+function _plateCalcBreakdown(counts) {
+  const parts = [];
+  for (const w of PLATE_CALC_WEIGHTS) {
+    const c = counts[w] ?? 0;
+    if (c > 0) parts.push(`2× ${w}kg`);
+  }
+  return parts.length ? `+ ${parts.join(' + ')}` : '';
+}
+
+/** B126: inline Hantelscheiben-Rechner panel, rendered directly under a set-row when _plateCalcOpenKey matches. */
+function _renderPlateCalcPanel(di, ei, si) {
+  const key    = `${di}-${ei}-${si}`;
+  const barKg  = getState().settings.barbellWeight ?? 20;
+  const counts = _plateCalcCounts[key] ?? {};
+  const total  = _plateCalcTotal(barKg, counts);
+  return `
+<div class="plate-calc-panel" data-di="${di}" data-ei="${ei}" data-si="${si}">
+  <div class="plate-calc-bar">Stangengewicht: ${barKg} kg</div>
+  <div class="plate-calc-chips">
+    ${PLATE_CALC_WEIGHTS.map(w => {
+      const c = counts[w] ?? 0;
+      return `<button type="button" class="plate-calc-chip${c > 0 ? ' is-selected' : ''}" data-action="plate-calc-add" data-di="${di}" data-ei="${ei}" data-si="${si}" data-weight="${w}" aria-label="${w} kg Scheibe hinzufügen">${w}kg${c > 0 ? ` ×${c}` : ''}</button>`;
+    }).join('')}
+  </div>
+  <div class="plate-calc-total">Gesamt: ${total} kg</div>
+  <div class="plate-calc-breakdown">${_plateCalcBreakdown(counts)}</div>
+  <div class="plate-calc-perside">
+    <label for="plate-calc-perside-${key}">oder pro Seite eingeben:</label>
+    <input id="plate-calc-perside-${key}" class="plate-calc-perside-input" type="number" inputmode="decimal" min="0" step="0.5"
+      data-action="plate-calc-perside" data-di="${di}" data-ei="${ei}" data-si="${si}"
+      aria-label="Gewicht pro Seite in kg" />
+  </div>
+  <button type="button" class="plate-calc-apply" data-action="plate-calc-apply" data-di="${di}" data-ei="${ei}" data-si="${si}" data-value="${total}">Übernehmen</button>
+</div>`;
 }
 
 /** Show a toast. type: 'ok' | 'info' | 'warn'. Optional durationMs overrides default 2600ms. */
@@ -1800,6 +1860,28 @@ function renderExercise(wk, di, ei, state) {
     ? `<div class="sub-banner" role="status" aria-label="Substitution aktiv">↔ Heute: ${h(ex.name)} (statt ${h(ex.substituteFor)})</div>`
     : '';
 
+  // ── B127: Notiz-Panel (Heute/Immer) + dezenter Hinweis ─────────────────────
+  const _exNoteKey = `${di}-${ei}`;
+  const _permanentNote = state.exerciseNotes?.[ex.name] ?? '';
+  const exNoteHintHtml = (_permanentNote && _exNoteOpenKey !== _exNoteKey)
+    ? `<div class="ex-note-hint">📌 ${h(_permanentNote)}</div>`
+    : '';
+  const exNotePanelHtml = _exNoteOpenKey === _exNoteKey
+    ? `<div class="ex-note-panel">
+      <div class="ex-note-tabs">
+        <button type="button" class="ex-note-tab${_exNoteActiveTab === 'heute' ? ' is-active' : ''}" data-action="ex-note-tab" data-tab="heute" data-di="${di}" data-ei="${ei}">Heute</button>
+        <button type="button" class="ex-note-tab${_exNoteActiveTab === 'immer' ? ' is-active' : ''}" data-action="ex-note-tab" data-tab="immer" data-di="${di}" data-ei="${ei}">Immer</button>
+      </div>
+      ${_exNoteActiveTab === 'heute' ? `
+      <textarea class="ex-note-textarea" data-action="ex-note-heute" data-di="${di}" data-ei="${ei}"
+        placeholder="Notiz für heute (Befinden, Beobachtungen)...">${h(ex.note ?? '')}</textarea>
+      ` : `
+      <textarea class="ex-note-textarea" data-action="ex-note-immer" data-di="${di}" data-ei="${ei}" data-name="${h(ex.name)}"
+        placeholder="Permanente Notiz (Rack-Höhe, Griffbreite, Technik-Cues)...">${h(_permanentNote)}</textarea>
+      `}
+    </div>`
+    : '';
+
   const _subKey = `${di}-${ei}`;
   // D2: Vorschläge aus früheren "Heute anders"-Ersetzungen für GENAU diese
   // Übung (Schlüssel = ex.name im Moment des Öffnens — der vom Nutzer selbst
@@ -2104,6 +2186,12 @@ function renderExercise(wk, di, ei, state) {
     })() : ''}
 
     <button
+      class="btn-ex-note${ex.note || state.exerciseNotes?.[ex.name] ? ' has-note' : ''}"
+      data-action="toggle-ex-note" data-di="${di}" data-ei="${ei}"
+      aria-label="Notiz zur Übung"
+    >📝</button>
+
+    <button
       class="btn-fav${isFav ? ' is-fav' : ''}"
       data-action="toggle-fav"
       data-name="${h(ex.name)}"
@@ -2129,6 +2217,9 @@ function renderExercise(wk, di, ei, state) {
         ${ex.substituteFor
           ? `<button class="ex-menu-item" role="menuitem" data-action="reset-sub" data-di="${di}" data-ei="${ei}">↩ Substitution zurücksetzen</button>`
           : `<button class="ex-menu-item" role="menuitem" data-action="open-sub-form" data-di="${di}" data-ei="${ei}">↔ Heute anders</button>`}
+        ${wk.days.filter((d, i) => i !== di && !d.markedDone).length > 0 ? `
+        <button class="ex-menu-item" role="menuitem" data-action="open-move-day" data-di="${di}" data-ei="${ei}">↪ Zu anderem Tag verschieben</button>
+        ` : ''}
         <button class="ex-menu-item" role="menuitem" data-action="open-archive-confirm" data-di="${di}" data-ei="${ei}">📦 Übung archivieren</button>
         <button class="ex-menu-item ex-menu-item--danger" role="menuitem" data-action="remove-ex" data-di="${di}" data-ei="${ei}">🗑️ Übung löschen</button>
         ` : ''}
@@ -2138,6 +2229,8 @@ function renderExercise(wk, di, ei, state) {
 
   ${subBannerHtml}
   ${subFormHtml}
+  ${exNoteHintHtml}
+  ${exNotePanelHtml}
 
   ${_archiveConfirmKey === `${di}-${ei}` ? `
   <div class="sub-form" style="text-align:center;padding:var(--sp-4)">
@@ -2454,7 +2547,8 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
     ${isWeightPR ? `<span class="pr-badge"           aria-label="Gewichts-PR! ${s.weight} kg">🏆 ${s.weight} kg</span>` : ''}
     ${isEffortGoal ? `<span class="pr-badge pr-badge--goal" aria-label="${effortScore}% Zielerfüllung">✓ ${effortScore}% Ziel</span>` : ''}
     ${_prevWeightHint}
-    ${ex.showPlates && dispW > 0 ? (() => { const pl = calcPlates(dispW); return pl ? `<span class="plate-hint" aria-hidden="true" title="Scheiben je Seite">▪ ${pl}</span>` : ''; })() : ''}
+    ${ex.showPlates && dispW > 0 ? (() => { const pl = calcPlates(dispW, getState().settings.barbellWeight ?? 20); return pl ? `<span class="plate-hint" aria-hidden="true" title="Scheiben je Seite">▪ ${pl}</span>` : ''; })() : ''}
+    ${!rowLocked ? `<button type="button" class="plate-calc-btn" data-action="toggle-plate-calc" data-di="${di}" data-ei="${ei}" data-si="${si}" aria-label="Hantelscheiben-Rechner für Satz ${si + 1}" aria-expanded="${_plateCalcOpenKey === `${di}-${ei}-${si}`}">⚖</button>` : ''}
   </div>
 
   <div class="set-cell">
@@ -2543,7 +2637,7 @@ ${s._showNote ? `
     aria-label="Notiz zu Satz ${si + 1}"
     maxlength="120"
   />
-</div>` : ''}${intraCoachHtml}`;
+</div>` : ''}${_plateCalcOpenKey === `${di}-${ei}-${si}` ? _renderPlateCalcPanel(di, ei, si) : ''}${intraCoachHtml}`;
 }
 
 // ─── Body tab ────────────────────────────────────────────────────────────────
@@ -4846,7 +4940,7 @@ function renderSettingsTab(state) {
   <div class="settings-section">
     <div class="settings-section__title">Info</div>
     <div class="settings-row">
-      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v217</div></div>
+      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v218</div></div>
     </div>
     <div class="settings-row">
       <div>
@@ -5055,9 +5149,25 @@ function _handleClick(e) {
     scheduleRender();
   }
 
+  // Close Plate Calculator panel when clicking outside it (B126)
+  if (_plateCalcOpenKey !== null
+      && !e.target.closest('.plate-calc-panel')
+      && !e.target.closest('[data-action="toggle-plate-calc"]')) {
+    _plateCalcOpenKey = null;
+    scheduleRender();
+  }
+
   // Close exercise ⋮ menu when clicking outside the toggle button
   if (_exMenuOpenKey !== null && !e.target.closest('[data-action="toggle-ex-menu"]')) {
     _exMenuOpenKey = null;
+    scheduleRender();
+  }
+
+  // Close exercise note panel (B127) when clicking outside it
+  if (_exNoteOpenKey !== null
+      && !e.target.closest('.ex-note-panel')
+      && !e.target.closest('[data-action="toggle-ex-note"]')) {
+    _exNoteOpenKey = null;
     scheduleRender();
   }
 
@@ -5746,24 +5856,45 @@ function _handleClick(e) {
         break;
       }
       const lcName = name.toLowerCase();
-      const isDup = _STANDARD_EXERCISES.some(n => n.trim().toLowerCase() === lcName) ||
-        (getState().customExercises ?? []).some(c =>
-          c.name.trim().toLowerCase() === lcName &&
-          c.name.trim().toLowerCase() !== (_exFormOriginalName ?? '').trim().toLowerCase()
-        );
-      if (isDup) {
-        if (errEl) errEl.textContent = 'Diese Übung existiert bereits.';
-        break;
-      }
       if (_exFormMode === 'edit') {
+        // Umbenennen muss global eindeutig bleiben -- unverändert.
+        const isDup = _STANDARD_EXERCISES.some(n => n.trim().toLowerCase() === lcName) ||
+          (getState().customExercises ?? []).some(c =>
+            c.name.trim().toLowerCase() === lcName &&
+            c.name.trim().toLowerCase() !== (_exFormOriginalName ?? '').trim().toLowerCase()
+          );
+        if (isDup) {
+          if (errEl) errEl.textContent = 'Diese Übung existiert bereits.';
+          break;
+        }
         dispatch(A.CUSTOM_EX_UPDATE, {
           oldName: _exFormOriginalName, name, metric: _exFormMetric, category: _exFormCategory,
         });
         showToast('Übung aktualisiert ✓', 'ok');
       } else {
-        dispatch(A.CUSTOM_EX_ADD, { name, metric: _exFormMetric, category: _exFormCategory });
+        // B123: "existiert bereits" darf nur greifen, wenn die Übung schon
+        // am ZIEL-TAG vorhanden ist -- nicht mehr global gegen
+        // _STANDARD_EXERCISES/customExercises. Existiert der Name bereits
+        // global (Standard- oder eigene Übung), aber nicht am Ziel-Tag: kein
+        // Fehler, stattdessen wird der bestehende Eintrag verwendet (kein
+        // zweiter customExercises-Registry-Eintrag mit gleichem Namen).
+        const wk = getState().weeks[getState().curIdx];
+        const targetDay = (_exFormTargetDi !== null) ? wk?.days[_exFormTargetDi] : null;
+        const alreadyInDay = targetDay
+          ? (targetDay.exercises ?? []).some(ex => ex.name.trim().toLowerCase() === lcName)
+          : false;
+        if (alreadyInDay) {
+          if (errEl) errEl.textContent = 'Diese Übung ist an diesem Tag bereits vorhanden.';
+          break;
+        }
+        const customMatch = (getState().customExercises ?? [])
+          .find(c => c.name.trim().toLowerCase() === lcName);
+        const stdMatch = _STANDARD_EXERCISES.some(n => n.trim().toLowerCase() === lcName);
+        if (!customMatch && !stdMatch) {
+          dispatch(A.CUSTOM_EX_ADD, { name, metric: _exFormMetric, category: _exFormCategory });
+        }
         if (_exFormTargetDi !== null) {
-          dispatch(A.EX_ADD, { di: _exFormTargetDi, name, metric: _exFormMetric });
+          dispatch(A.EX_ADD, { di: _exFormTargetDi, name, metric: customMatch?.metric ?? _exFormMetric });
         }
         showToast(`"${name}" hinzugefügt`, 'ok');
       }
@@ -5841,6 +5972,57 @@ function _handleClick(e) {
       const _menuKey = `${di}-${ei}`;
       _exMenuOpenKey = _exMenuOpenKey === _menuKey ? null : _menuKey;
       scheduleRender();
+      break;
+    }
+
+    case 'toggle-ex-note': {
+      const _noteKey = `${di}-${ei}`;
+      const wasOpen = _exNoteOpenKey === _noteKey;
+      _exNoteOpenKey = wasOpen ? null : _noteKey;
+      if (!wasOpen) _exNoteActiveTab = 'heute';
+      scheduleRender();
+      break;
+    }
+
+    case 'ex-note-tab': {
+      _exNoteActiveTab = el.dataset.tab === 'immer' ? 'immer' : 'heute';
+      scheduleRender();
+      break;
+    }
+
+    case 'open-move-day': {
+      const wk = getState().weeks[getState().curIdx];
+      const fromDi = +di;
+      const targets = (wk?.days ?? [])
+        .map((d, i) => ({ d, i }))
+        .filter(({ d, i }) => i !== fromDi && !d.markedDone);
+      const container = document.getElementById('move-ex-day-options');
+      if (container) {
+        container.innerHTML = targets.map(({ d, i }) => `
+          <button type="button" class="nw-source" style="width:100%;text-align:left" data-action="confirm-move-ex-day"
+            data-from-di="${fromDi}" data-to-di="${i}" data-ei="${ei}"><span class="nw-source__ttl">${h(d.title)}${d.subtitle ? ` – ${h(d.subtitle)}` : ''}</span></button>
+        `).join('');
+      }
+      _exMenuOpenKey = null;
+      openModal('modal-move-ex-day');
+      break;
+    }
+
+    case 'confirm-move-ex-day': {
+      const fromDi = +el.dataset.fromDi, toDi = +el.dataset.toDi, moveEi = +el.dataset.ei;
+      const wk = getState().weeks[getState().curIdx];
+      const fromDay = wk?.days[fromDi], toDay = wk?.days[toDi];
+      const exName = fromDay?.exercises[moveEi]?.name ?? '';
+      const lcName = exName.trim().toLowerCase();
+      const alreadyThere = (toDay?.exercises ?? []).some(e => e.name.trim().toLowerCase() === lcName);
+      if (alreadyThere) {
+        showToast(`Übung bereits an ${toDay?.title ?? 'Tag'} vorhanden`, 'warn');
+        closeModal('modal-move-ex-day');
+        break;
+      }
+      dispatch(A.EXERCISE_MOVE_TO_DAY, { fromDi, toDi, ei: moveEi });
+      closeModal('modal-move-ex-day');
+      showToast(`${exName} nach ${toDay?.title ?? 'Tag'} verschoben`, 'ok');
       break;
     }
 
@@ -6330,6 +6512,36 @@ function _handleClick(e) {
       break;
     }
 
+    // Plate Calculator (B126)
+    case 'toggle-plate-calc': {
+      const key = `${di}-${ei}-${si}`;
+      if (_plateCalcOpenKey === key) {
+        _plateCalcOpenKey = null;
+      } else {
+        _plateCalcOpenKey = key;
+        _plateCalcCounts[key] = {};
+      }
+      scheduleRender();
+      break;
+    }
+
+    case 'plate-calc-add': {
+      const key = `${di}-${ei}-${si}`;
+      const w = +el.dataset.weight;
+      if (!_plateCalcCounts[key]) _plateCalcCounts[key] = {};
+      _plateCalcCounts[key][w] = (_plateCalcCounts[key][w] ?? 0) + 1;
+      scheduleRender();
+      break;
+    }
+
+    case 'plate-calc-apply': {
+      const value = +el.dataset.value;
+      dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'weight', value });
+      _plateCalcOpenKey = null;
+      scheduleRender();
+      break;
+    }
+
     case 'set-rpe-val': {
       const rpeVal = el.dataset.val === '' ? null : +el.dataset.val;
       dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'rpe', value: rpeVal });
@@ -6756,11 +6968,24 @@ function _handleChange(e) {
       dispatch(A.DAY_SET_FIELD, { di: +di, field, value: el.value }); break;
     case 'set-weight':
       dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'weight', value: el.value }); break;
+    case 'plate-calc-perside': {
+      const perSide = parseFloat(el.value);
+      if (Number.isFinite(perSide) && perSide >= 0) {
+        const barKg = getState().settings.barbellWeight ?? 20;
+        const total = Math.round((barKg + 2 * perSide) * 100) / 100;
+        dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'weight', value: total });
+      }
+      break;
+    }
     case 'set-reps':
       dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'reps',   value: el.value }); break;
     case 'set-rpe':
       dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'rpe',    value: el.value }); break;
     case 'set-note':   dispatch(A.SET_UPDATE, { di:+di, ei:+ei, si:+si, field:'note',   value: el.value }); break;
+    case 'ex-note-heute':
+      dispatch(A.EX_UPDATE, { di: +di, ei: +ei, field: 'note', value: el.value }); break;
+    case 'ex-note-immer':
+      dispatch(A.EXERCISE_NOTE_SET, { name: el.dataset.name, value: el.value }); break;
     case 'set-targets': {
       const tField = el.dataset.field;
       dispatch(A.EX_SET_TARGETS, {
@@ -6970,8 +7195,12 @@ function _renderExSearchResults() {
   const std = _STANDARD_EXERCISES
     .filter(n => !q || n.toLowerCase().includes(q))
     .slice(0, 8);
+  // B123: kein metric!=null-Filter mehr -- reine Kategorie-Override-Einträge
+  // (EX_SET_CATEGORY_OVERRIDE, state.js) haben kein `metric`-Feld, waren aber
+  // vorher trotzdem im Duplikat-Check (ex-form-submit) global gesperrt --
+  // ohne diesen Filter sind sie jetzt direkt in der Suche wähl-/hinzufügbar
+  // statt unsichtbar-aber-blockierend.
   const custom = (getState().customExercises ?? [])
-    .filter(c => c.metric != null)
     .map(c => c.name)
     .filter(n => !q || n.toLowerCase().includes(q))
     .slice(0, 8);
@@ -6984,15 +7213,26 @@ function _renderExSearchResults() {
   const stdHtml = std.length ? `<div class="ex-search-group-title">Standardübungen</div>${std.map(renderItem).join('')}` : '';
   const customHtml = custom.length ? `<div class="ex-search-group-title">Meine Übungen</div>${custom.map(renderItem).join('')}` : '';
 
-  const allNames = new Set([..._STANDARD_EXERCISES, ...(getState().customExercises ?? []).map(c => c.name)].map(n => n.toLowerCase()));
+  // B123: MOVEMENT_MAP (movementMap.js) als dritte Namensquelle -- die Suche
+  // kannte bisher nur _STANDARD_EXERCISES + customExercises, nie die dort
+  // gepflegten Synonyme/Varianten (z.B. "Walking Lunges"). Dedupliziert
+  // gegen std/custom, damit ein Name nicht doppelt erscheint.
+  const knownLc = new Set([...std, ...custom].map(n => n.toLowerCase()));
+  const mapNames = Object.keys(MOVEMENT_MAP)
+    .filter(n => !knownLc.has(n.toLowerCase()))
+    .filter(n => !q || n.toLowerCase().includes(q))
+    .slice(0, 8);
+  const mapHtml = mapNames.length ? `<div class="ex-search-group-title">Weitere Übungen</div>${mapNames.map(renderItem).join('')}` : '';
+
+  const allNames = new Set([..._STANDARD_EXERCISES, ...(getState().customExercises ?? []).map(c => c.name), ...Object.keys(MOVEMENT_MAP)].map(n => n.toLowerCase()));
   const createHtml = query && !allNames.has(q)
     ? `<button type="button" class="ex-search-item ex-search-item--create" data-action="ex-search-create">+ "${h(query)}" anlegen →</button>`
     : '';
 
-  const emptyHtml = (!std.length && !custom.length && !query)
+  const emptyHtml = (!std.length && !custom.length && !mapNames.length && !query)
     ? `<p class="ex-search-empty">Tippe um Übungen zu durchsuchen.</p>` : '';
 
-  container.innerHTML = stdHtml + customHtml + emptyHtml + createHtml;
+  container.innerHTML = stdHtml + customHtml + mapHtml + emptyHtml + createHtml;
 }
 
 // ─── Exercise create/edit modal ──────────────────────────────────────────────
@@ -7722,6 +7962,18 @@ function _buildScaffold(root) {
     <div class="modal__actions">
       <button class="btn btn--ghost" data-action="close-modal" data-target="modal-add-day">Abbrechen</button>
       <button class="btn btn--accent" data-action="confirm-add-day">Hinzufügen</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Übung zu anderem Tag verschieben (B125) -->
+<div class="modal-overlay" id="modal-move-ex-day" role="dialog"
+  aria-modal="true" aria-labelledby="modal-move-ex-day-title">
+  <div class="modal">
+    <h2 class="modal__title" id="modal-move-ex-day-title">Übung verschieben nach:</h2>
+    <div id="move-ex-day-options" style="display:flex;flex-direction:column;gap:var(--sp-2);margin-bottom:var(--sp-4)"></div>
+    <div class="modal__actions">
+      <button class="btn btn--ghost" data-action="close-modal" data-target="modal-move-ex-day">Abbrechen</button>
     </div>
   </div>
 </div>

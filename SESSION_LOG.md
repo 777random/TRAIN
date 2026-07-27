@@ -2998,3 +2998,37 @@ Loop 7/11: NICHT abgeschlossen — Advisor-Export-Agent traf während der
   Loop 5 fertig. for-advisor-product.txt/for-advisor-consolidated.txt bleiben
   auf dem Stand von B113 (train-v216) und müssen in einer Folgesession
   nachgezogen werden.
+
+## 2026-07-27 (5-Features-vor-Launch-Sprint) train-v217->v218
+Loop 1: Baseline grün vor Sprint.
+Eigentliche Aufgabe: B123-B127 — 5 Features/Bugs. Diagnose-vor-Fix zuerst
+  per Plan-Mode: 3 parallele Explore-Agents. Spec geschrieben und per
+  ExitPlanMode bestätigt (eager-inventing-newell.md, neu überschrieben).
+  Bei 2 der 5 Aufgaben war der Root Cause anders als im Report vermutet:
+  - B123 (Walking Lunges Such-Bug): kein Case-Sensitivity-Problem — die
+    Suche kannte MOVEMENT_MAP nie, plus eine Metric-Filter-Asymmetrie
+    zwischen Suchergebnis-Liste und globalem Duplikat-Check.
+  - B127 (Persistente Notizen): Sprint-Vorgabe nahm an, ex.note sei bereits
+    live editierbar im Tages-View — war es nicht, nur der Vorlagen-Editor
+    konnte es schreiben. s.note (pro Satz) ist die tatsaechlich existierende
+    Live-Notiz, andere Granularitaet. Drei statt zwei unabhaengige Notiz-Felder.
+  Implementierung über 2 Runden nach AGENTS.md-Regel ("state.js + jede
+  importierende Datei ist NIE parallel"): Runde 1 parallel (Agent A:
+  ui.js Such-Dialog / Agent B: ui.js Set-Row-Region + styles.css
+  Plate-Calculator), Runde 2 sequenziell (ein Agent fuer B124+B125+B127,
+  alle drei beruehren state.js+ui.js gleichzeitig). Nach Runde 2 fehlte
+  CSS fuer die neuen Notiz-UI-Elemente (Agent blieb bewusst aus styles.css
+  raus, da Runde 1 das noch besass) - direkt nachgezogen (.btn-ex-note/
+  .ex-note-panel/.ex-note-tabs/.ex-note-hint) sowie ein Styling-Fix am
+  Verschieben-Dialog (Zielt-Tag-Buttons nutzten faelschlich .nw-source--check,
+  das fuer eine Checkbox-Variante gedacht ist und ohne Input-Element
+  unstyled wirkt - auf reines .nw-source umgestellt). Ein transienter
+  Doppel-Eintrag in DECISIONS.md (B127, paralleles Schreiben durch den
+  Runde-2-Agent waehrend eigener Bearbeitung) entdeckt und bereinigt.
+  27 neue Tests ueber 5 Spec-Dateien. Volle Suite: 15 Ausfaelle im Vollauf
+  (bekannter Parallel-Last-Flake, ERR_CONNECTION_REFUSED unter Dauerlast),
+  isoliert alle 42 betroffenen Tests nachverifiziert gruen - keine echte
+  Regression. state.js/ui.js/styles.css geaendert, CACHE_VERSION
+  train-v217->v218, CSS ?v=206->207, SCHEMA unveraendert. CLAUDE.md/
+  HANDOFF.md/BUGS.md (B123-B127)/DECISIONS.md (B127) aktualisiert.
+  Screenshots genommen: Plate Calculator, Notiz-Tabs, Verschieben-Dialog.

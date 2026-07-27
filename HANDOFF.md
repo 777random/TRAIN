@@ -1,5 +1,5 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-26 — B114-B122 (9 Bugs vor Launch), train-v217, siehe unten. B113 (Einstellungen in 4 Zwischenüberschriften gegliedert, train-v216), B112/E1 (Transparenz Coach-Tab, train-v215), B111 (movementMap.js erweitert, train-v214), B110 (Streak-Badge-Fenstergrenze, train-v213), B109/D2 ("Heute anders", train-v212) und B105-B108 (train-v211, Onboarding-Verbesserungen) sowie B102+B103/B101/B100 bereits gepusht und CI-grün.*
+*Letzte Aktualisierung: 2026-07-27 — B123-B127 (5 Features vor Launch), train-v218, siehe unten. B114-B122 (9 Bugs vor Launch, train-v217), B113 (Einstellungen in 4 Zwischenüberschriften gegliedert, train-v216), B112/E1 (Transparenz Coach-Tab, train-v215), B111 (movementMap.js erweitert, train-v214), B110 (Streak-Badge-Fenstergrenze, train-v213), B109/D2 ("Heute anders", train-v212) und B105-B108 (train-v211, Onboarding-Verbesserungen) sowie B102+B103/B101/B100 bereits gepusht und CI-grün.*
 *Nächster Schritt: C3 Compound-Edit-Option. Push dieser Session braucht noch die reguläre Session-Bestätigung (Push-Policy LOOPS.md). Weiterhin nur als Notiz (kein Bug): mehrere Test-Dateien konstruieren Datums-Fixtures über lokale `Date`-Methoden + `.toISOString()` — verschiebt `startDate` bei lokalem Ausführen in einer positiven-UTC-Offset-Zeitzone um einen Tag; betrifft nur lokale Testläufe außerhalb UTC, nicht CI/Produktionscode, bei Bedarf mit `TZ=UTC npx playwright test` gegentesten. Möglicher Folge-Sprint (nicht angefordert): B79 (`_checkCompoundIsolationBalance`) auf die neue `isCompoundExercise()` umstellen, siehe DECISIONS.md. Loops 7-11 aktiv (diese Session: Loop 5+7+11 aktualisiert). Nicht committet: `Research/TRAIN_Parameter_Review.md` (Nutzer-Recherche, bewusst uncommitted gelassen).*
 
 ---
@@ -11,11 +11,37 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v217 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v218 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
-- CSS: ?v=206
+- CSS: ?v=207
 - SCHEMA: 32 (unverändert — additiver Default statt Versions-Bump, siehe B109)
+- **B123-B127 — 5 Features vor Launch (train-v218, 2026-07-27):** Diagnose-vor-
+  Fix über 2 Runden (Runde 1 parallel: ui.js-Such-Dialog + ui.js/styles.css
+  Plate-Calculator; Runde 2 sequenziell: ein Agent für 3 state.js-berührende
+  Features). Bei 2 der 5 Aufgaben war der echte Root Cause anders als
+  vermutet — Details je Bug in BUGS.md:
+  - B123: Such-Bug lag nicht an Case-Sensitivity, sondern daran, dass die
+    Suche `MOVEMENT_MAP` nie kannte + einer Metric-Filter-Asymmetrie
+    zwischen Suche und Duplikat-Check. `MOVEMENT_MAP` als dritte
+    Suchquelle ergänzt, Duplikat-Check auf "bereits im Ziel-Tag" umgestellt.
+  - B124: neuer Helper `_findExerciseSettingsHistory()` übernimmt
+    weightStep/targetReps/pauseSec/progressionType/metric/tags beim
+    Hinzufügen einer bekannten Übung (Gewicht/Sätze bleiben immer frisch).
+  - B125: neue atomare Action `EXERCISE_MOVE_TO_DAY` + ⋮-Menüpunkt + Dialog
+    zum Verschieben einer Übung zwischen Tagen.
+  - B126: inline Hantelscheiben-Rechner (⚖-Button je Satz), wiederverwendet
+    die bestehende `calcPlates()`-Konvention; Nebenfund korrigiert (der
+    passive Plate-Hint nutzte nie `state.settings.barbellWeight`).
+  - B127: `ex.note` war entgegen der Sprint-Annahme bisher NICHT live im
+    Tages-View editierbar (nur Vorlagen-Editor) — bekommt jetzt eine echte
+    Live-UI ("Heute"-Tab). Neues `state.exerciseNotes` ("Immer", permanent).
+    `s.note` (pro Satz) bleibt drittes, unabhängiges Feld. Kein
+    SCHEMA_VERSION-Bump (additiver Default, Präzedenzfall `substituteHistory`).
+  27 neue Tests über 5 Spec-Dateien, volle Suite grün (bekannte
+  Parallel-Last-Flakes isoliert nachverifiziert — 15 Tests im Vollauf,
+  alle 42 isoliert grün). Nur state.js/ui.js/styles.css geändert,
+  CACHE_VERSION train-v217→v218, CSS ?v=206→207, SCHEMA unverändert.
 - **B114-B122 — 9 Bugs vor Launch (train-v217, 2026-07-26):** Diagnose-vor-Fix
   über 4 parallele Fork-Agents (state.js / styles.css / timer.js /
   ui.js+weeklyFocus.js+weightRecommendation.js). Bei 4 der 9 Bugs war der

@@ -1027,6 +1027,49 @@ exercise { position: unset; }
 .set-note-input::placeholder { color: var(--c-text-3); }
 .set-note-input:disabled { opacity: .6; }
 
+/* ── Hantelscheiben-Rechner (B126) ────────────────────────────── */
+.plate-calc-btn {
+  width: 24px; height: 24px; background: none; border: none;
+  color: var(--c-text-3); cursor: pointer; font-size: 13px; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: var(--r-sm); transition: color var(--t-fast);
+}
+.plate-calc-btn:hover { color: var(--c-accent); }
+.plate-calc-panel {
+  background: var(--c-surface2); border-radius: 12px;
+  padding: var(--sp-2); margin: 4px 0 6px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.plate-calc-bar { font-size: 12px; color: var(--c-text-3); }
+.plate-calc-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.plate-calc-chip {
+  height: 28px; padding: 0 var(--sp-2);
+  background: var(--c-surface); border: 1px solid var(--c-border);
+  border-radius: var(--r-sm); color: var(--c-text-3);
+  font-family: var(--font-sans); font-size: 11px; cursor: pointer;
+  transition: all var(--t-fast);
+}
+.plate-calc-chip:hover { border-color: var(--c-accent); color: var(--c-accent); }
+.plate-calc-chip.is-selected {
+  background: var(--c-accent); border-color: var(--c-accent);
+  color: #000; font-weight: 700;
+}
+.plate-calc-total { font-size: 14px; font-weight: 700; color: var(--c-text); }
+.plate-calc-breakdown { font-size: 12px; color: var(--c-text-3); min-height: 16px; }
+.plate-calc-perside { display: flex; align-items: center; gap: var(--sp-2); font-size: 12px; color: var(--c-text-3); }
+.plate-calc-perside-input {
+  width: 64px; height: 28px; background: var(--c-surface);
+  border: 1px solid var(--c-border); border-radius: var(--r-sm);
+  color: var(--c-text); font-size: 13px; padding: 0 var(--sp-2); outline: none;
+}
+.plate-calc-apply {
+  align-self: flex-start; height: 30px; padding: 0 var(--sp-3);
+  background: var(--c-accent); color: #000; border: none;
+  border-radius: var(--r-sm); font-family: var(--font-sans);
+  font-weight: 700; font-size: 12px; cursor: pointer;
+}
+.plate-calc-apply:hover { background: var(--c-accent-dk); }
+
 
 /* ── Soll-Ist (2.5) ─────────────────────────────────────────── */
 .soll-ist-badge {
@@ -1123,6 +1166,51 @@ exercise { position: unset; }
 }
 .sub-name-input:focus { outline: none; border-color: var(--c-accent); }
 .sub-form__btns { display: flex; gap: var(--sp-2); }
+
+/* ── B127: Übungsweite Notizen (Heute/Immer) ─────────────────────────── */
+.btn-ex-note {
+  background: none; border: none; padding: 2px 4px; margin: 0;
+  font-size: 14px; line-height: 1; cursor: pointer;
+  color: var(--c-text-3); opacity: 0.55;
+  transition: opacity var(--t-fast);
+  flex-shrink: 0;
+}
+.btn-ex-note:hover { opacity: 1; }
+.btn-ex-note.has-note { opacity: 1; color: var(--c-accent); }
+.ex-note-hint {
+  font-size: 12px; color: var(--c-text-3);
+  background: var(--c-surface2);
+  padding: 4px var(--sp-3);
+  border-radius: var(--r-sm);
+  margin: var(--sp-1) 0 var(--sp-2);
+}
+.ex-note-panel {
+  display: flex; flex-direction: column; gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--c-surface2); border-radius: var(--r-sm);
+  margin: var(--sp-1) 0 var(--sp-2);
+}
+.ex-note-tabs { display: flex; gap: var(--sp-1); }
+.ex-note-tab {
+  flex: 1; height: 30px;
+  background: var(--c-surface); border: 1px solid var(--c-border);
+  border-radius: var(--r-sm); color: var(--c-text-3);
+  font-family: var(--font-sans); font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: all var(--t-fast);
+}
+.ex-note-tab:hover { border-color: var(--c-accent); color: var(--c-accent); }
+.ex-note-tab.is-active {
+  background: var(--c-accent); border-color: var(--c-accent);
+  color: #000; font-weight: 700;
+}
+.ex-note-textarea {
+  background: var(--c-surface); border: 1px solid var(--c-border);
+  border-radius: var(--r-sm); color: var(--c-text);
+  font-size: 13px; font-family: var(--font-body);
+  padding: var(--sp-2); width: 100%; min-height: 60px;
+  resize: vertical;
+}
+.ex-note-textarea:focus { outline: none; border-color: var(--c-accent); }
 
 /* ── Exercise ⋮ context menu ─────────────────────────────────────────── */
 .ex-menu-wrap { position: relative; flex-shrink: 0; }
