@@ -190,6 +190,8 @@ let _editingCheckIn = new Set();
 let _optionalSetDismissed = new Set();
 /** Auf-/Zuklappen der Aufwärm-Empfehlung pro Tag (di), Default zu. */
 let _warmupExpanded = new Set();
+/** B128: Auf-/Zuklappen des Auto-Steigerung-Banners ("Anpassen"), pro Woche (wk.id). */
+let _autoPlanBannerExpanded = new Set();
 // B87 Fix 4+5, seit B94 dauerhaft statt 2s-Ausblendung (siehe DECISIONS.md
 // "B89-Verhalten ersetzt durch B94"): Sätze (Keys `${di}-${ei}-${si}` ->
 // Snapshot des zum Adoptions-Zeitpunkt berechneten Feedbacks), deren
@@ -958,7 +960,7 @@ function renderDayList(state) {
     </div>`;
   }
 
-  container.innerHTML = tabsHtml + contentHtml;
+  container.innerHTML = tabsHtml + _renderAutoPlanBanner(wk) + contentHtml;
 
   requestAnimationFrame(() => {
     const tabsRow = container.querySelector('.day-tab-bar');
@@ -1428,6 +1430,36 @@ function _lastWeekAvgRpe(exName, wk, state) {
   return rpes.length ? rpes.reduce((a, b) => a + b, 0) / rpes.length : null;
 }
 
+/**
+ * B129: findet eine Übung im Tag `di`, die innerhalb der letzten 14 Tage
+ * wegen 'injury' übersprungen wurde (gleicher Lookback wie
+ * _checkInjuryReminder() in weeklyFocus.js) -- Name oder null. Nur für die
+ * bedingte Check-in-Zusatzfrage, keine weitere Konsequenz.
+ */
+function _findRecentInjurySkipExercise(di) {
+  const state = getState();
+  const wk = state.weeks[state.curIdx]; if (!wk) return null;
+  const day = wk.days[di]; if (!day) return null;
+  const names = new Set((day.exercises ?? []).map(ex => ex.name));
+  if (!names.size) return null;
+
+  const lookbackWeeks = state.weeks
+    .filter(w => w.startDate <= wk.startDate)
+    .sort((a, b) => b.startDate.localeCompare(a.startDate))
+    .slice(0, 2);
+  const today = new Date();
+  for (const lwk of lookbackWeeks) {
+    for (const d of lwk.days ?? []) {
+      for (const ex of d.exercises ?? []) {
+        if (ex.skipReason !== 'injury' || !ex.skipDate || !names.has(ex.name)) continue;
+        const daysSince = Math.round((today - new Date(ex.skipDate + 'T00:00:00')) / 86400000);
+        if (daysSince >= 0 && daysSince <= 14) return ex.name;
+      }
+    }
+  }
+  return null;
+}
+
 function _renderSessionCheckIn(di) {
   const draft = _checkInDraft.get(di) ?? { sleep: null, energyPre: null };
   const sleepOpts  = [
@@ -1440,6 +1472,14 @@ function _renderSessionCheckIn(di) {
     { val: 'low',    icon: '🔋', label: 'Niedrig' },
     { val: 'medium', icon: '⚡', label: 'Okay' },
     { val: 'high',   icon: '🚀', label: 'Hoch' },
+  ];
+  // B129: bedingte Zusatzfrage, nur wenn dieser Tag eine Übung enthält, die
+  // kürzlich (<=14 Tage) wegen Verletzung übersprungen wurde.
+  const injuryEx = _findRecentInjurySkipExercise(di);
+  const injuryOpts = [
+    { val: 'good', icon: '🙂', label: 'Gut' },
+    { val: 'okay', icon: '😐', label: 'Okay' },
+    { val: 'bad',  icon: '😣', label: 'Schlecht' },
   ];
   const _btn = (o, field) => `
     <button type="button" class="session-checkin-btn${draft[field] === o.val ? ' is-selected' : ''}"
@@ -1456,7 +1496,76 @@ function _renderSessionCheckIn(di) {
     <div class="session-checkin-card__row" role="group" aria-label="Energie">
       ${energyOpts.map(o => _btn(o, 'energyPre')).join('')}
     </div>
+    ${injuryEx ? `
+    <div class="session-checkin-card__label">Wie fühlt sich ${h(injuryEx)} heute an?</div>
+    <div class="session-checkin-card__row" role="group" aria-label="Verletzungs-Nachfrage">
+      ${injuryOpts.map(o => _btn(o, 'injuryFollowUp')).join('')}
+    </div>` : ''}
     <button type="button" class="session-checkin-skip" data-action="session-checkin-skip" data-di="${di}">Überspringen →</button>
+  </div>`;
+}
+
+/**
+ * B128: Banner "📈 Steigerungen vorgeschlagen" — zeigt alle Übungen der
+ * aktuellen Woche, deren nextWeekPlan gerade automatisch bei Tagesabschluss
+ * gesetzt wurde (_autoSetNextWeekPlanForDay()) und noch nicht vom Nutzer
+ * geprüft ist (ex.nextWeekPlanAutoReviewed === false). Rein informativ/
+ * blockiert nichts — Sätze bleiben normal eintragbar (kein Modal).
+ */
+function _renderAutoPlanBanner(wk) {
+  const pending = [];
+  (wk.days ?? []).forEach((day, di) => {
+    (day.exercises ?? []).forEach((ex, ei) => {
+      if (ex.nextWeekPlan && ex.nextWeekPlanConfirmed && (ex.nextWeekPlanAutoReviewed ?? true) === false) {
+        pending.push({ di, ei, ex });
+      }
+    });
+  });
+  if (pending.length === 0) return '';
+
+  const isExpanded = _autoPlanBannerExpanded.has(String(wk.id));
+
+  const lineFor = ({ ex }) => {
+    const pt = ex.progressionType ?? 'weight';
+    const sign = ex.nextWeekPlan >= 0 ? '+' : '';
+    if (pt === 'reps') {
+      const unit = ex.metric === 'sec' ? 'Sek' : ex.metric === 'm' ? 'm' : 'Wdh';
+      return `${h(ex.name)}: ${sign}${ex.nextWeekPlan} ${unit}`;
+    }
+    if (pt === 'sets') {
+      return `${h(ex.name)}: ${sign}${ex.nextWeekPlan} Satz`;
+    }
+    const curWeight = Math.max(...ex.sets.map(s => s.weight ?? 0));
+    return `${h(ex.name)}: ${curWeight}kg → ${curWeight + ex.nextWeekPlan}kg`;
+  };
+
+  if (!isExpanded) {
+    return `
+  <div class="auto-plan-banner" data-wk-id="${wk.id}">
+    <div class="auto-plan-banner__header">📈 Steigerungen vorgeschlagen</div>
+    <div class="auto-plan-banner__list">
+      ${pending.map(p => `<div class="auto-plan-banner__row">${lineFor(p)}</div>`).join('')}
+    </div>
+    <div class="auto-plan-banner__actions">
+      <button type="button" class="btn btn--accent" data-action="autoplan-accept-all" data-wk-id="${wk.id}">Alle übernehmen</button>
+      <button type="button" class="btn btn--ghost" data-action="autoplan-expand" data-wk-id="${wk.id}">Anpassen</button>
+    </div>
+  </div>`;
+  }
+
+  return `
+  <div class="auto-plan-banner auto-plan-banner--expanded" data-wk-id="${wk.id}">
+    <div class="auto-plan-banner__header">📈 Steigerungen vorgeschlagen</div>
+    <div class="auto-plan-banner__list">
+      ${pending.map(p => `
+      <div class="auto-plan-banner__row auto-plan-banner__row--item">
+        <span>${lineFor(p)}</span>
+        <span class="auto-plan-banner__row-actions">
+          <button type="button" class="btn-icon" data-action="autoplan-accept-one" data-di="${p.di}" data-ei="${p.ei}" aria-label="Übernehmen">✓</button>
+          <button type="button" class="btn-icon" data-action="autoplan-reject-one" data-di="${p.di}" data-ei="${p.ei}" aria-label="Ablehnen">✗</button>
+        </span>
+      </div>`).join('')}
+    </div>
   </div>`;
 }
 
@@ -3239,6 +3348,13 @@ function _structuralSignalHtml(sig) {
       .join(', ');
     return { icon: '🛑', text: `Erfolgsquote insgesamt nur ${sig.rate}% — am stärksten betroffen: ${names}.`, evidence: sig.evidence };
   }
+  if (sig.type === 'injury_reminder') {
+    return {
+      icon: '⚠️',
+      text: `${h(sig.exerciseName)}: Letzte Woche wegen Schmerzen übersprungen. Mit Vorsicht starten.`,
+      evidence: sig.evidence,
+    };
+  }
   if (sig.type === 'deload_preventive') {
     return {
       icon: '🔄',
@@ -4940,7 +5056,7 @@ function renderSettingsTab(state) {
   <div class="settings-section">
     <div class="settings-section__title">Info</div>
     <div class="settings-row">
-      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v218</div></div>
+      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v219</div></div>
     </div>
     <div class="settings-row">
       <div>
@@ -5777,7 +5893,14 @@ function _handleClick(e) {
       } else if (dayBefore?.vacationPlan === 'rest') {
         dispatch(A.DAY_TOGGLE_COMPLETE, { di: +di });
       } else {
-        _showDayCompletionModal(+di);
+        // B129: Skip-Grund-Abfrage zuerst (Snapshot VOR DAY_TOGGLE_COMPLETE --
+        // der Reducer setzt jeden noch 'pending' Satz synchron auf 'fail',
+        // danach wäre "komplett übersprungen" nicht mehr erkennbar).
+        const skipped = (dayBefore?.exercises ?? [])
+          .map((ex, ei) => ({ ex, ei }))
+          .filter(({ ex }) => (ex.sets ?? []).every(s => s.status === 'pending'))
+          .map(({ ex, ei }) => ({ name: ex.name, di: +di, ei }));
+        _showSkipReasonQueue(+di, skipped, () => _showDayCompletionModal(+di));
       }
       break;
     }
@@ -6781,11 +6904,14 @@ function _handleClick(e) {
     // B76: Pre-Session Check-in
     case 'session-checkin-select': {
       const _ciDi    = +di;
-      const _ciField = el.dataset.field; // 'sleep' | 'energyPre'
+      const _ciField = el.dataset.field; // 'sleep' | 'energyPre' | 'injuryFollowUp'
       const _ciVal   = el.dataset.val;
       const _draft   = { ..._checkInDraft.get(_ciDi) ?? { sleep: null, energyPre: null }, [_ciField]: _ciVal };
       _checkInDraft.set(_ciDi, _draft);
-      if (_draft.sleep && _draft.energyPre) {
+      // B129: die Verletzungs-Nachfrage ist bedingt -- der Check-in darf erst
+      // committen, wenn sie entweder nicht gestellt wird ODER beantwortet ist.
+      const _ciInjuryEx = _findRecentInjurySkipExercise(_ciDi);
+      if (_draft.sleep && _draft.energyPre && (!_ciInjuryEx || _draft.injuryFollowUp)) {
         // Zwei Taps (ein Feld pro Kategorie) reichen — Entscheidungslogik
         // lebt allein in _buildSessionBriefing(), der Reducer wendet den
         // gelieferten modifier nur noch mechanisch an.
@@ -6797,7 +6923,7 @@ function _handleClick(e) {
         const _ciCompoundNames = (_ciDay.exercises ?? [])
           .filter(ex => isCompoundExercise(ex.name, _ciCatMap))
           .map(ex => ex.name);
-        dispatch(A.SESSION_CHECKIN_SET, { di: _ciDi, sleep: _draft.sleep, energyPre: _draft.energyPre, modifier, modifierScope, compoundExerciseNames: _ciCompoundNames });
+        dispatch(A.SESSION_CHECKIN_SET, { di: _ciDi, sleep: _draft.sleep, energyPre: _draft.energyPre, injuryFollowUp: _draft.injuryFollowUp ?? null, modifier, modifierScope, compoundExerciseNames: _ciCompoundNames });
         _checkInDraft.delete(_ciDi);
         // B87 Fix 2: Korrektur abgeschlossen (falls dies ein edit-checkin-
         // Neustart war) -- Briefing zeigt sich ab jetzt wieder statt der
@@ -6866,6 +6992,39 @@ function _handleClick(e) {
       const _bCurrent = _briefingExpandedOverride.has(_bDi) ? _briefingExpandedOverride.get(_bDi) : _bDefault;
       _briefingExpandedOverride.set(_bDi, !_bCurrent);
       scheduleRender();
+      break;
+    }
+
+    // B128: Automatische Steigerung Opt-out — Banner-Aktionen
+    case 'autoplan-expand': {
+      const _wkId = el.dataset.wkId;
+      if (_autoPlanBannerExpanded.has(_wkId)) _autoPlanBannerExpanded.delete(_wkId);
+      else _autoPlanBannerExpanded.add(_wkId);
+      scheduleRender();
+      break;
+    }
+    case 'autoplan-accept-all': {
+      const _wk = getState().weeks[getState().curIdx]; if (!_wk) break;
+      const selections = [];
+      _wk.days.forEach((d, dDi) => (d.exercises ?? []).forEach((ex, dEi) => {
+        if (ex.nextWeekPlan && ex.nextWeekPlanConfirmed && (ex.nextWeekPlanAutoReviewed ?? true) === false) {
+          selections.push({ di: dDi, ei: dEi });
+        }
+      }));
+      if (selections.length > 0) {
+        dispatch(A.EX_MARK_AUTOPLAN_REVIEWED, { selections, weekIdx: getState().curIdx });
+        showToast('Steigerungen übernommen ✓', 'ok');
+      }
+      _autoPlanBannerExpanded.delete(String(_wk.id));
+      break;
+    }
+    case 'autoplan-accept-one': {
+      dispatch(A.EX_MARK_AUTOPLAN_REVIEWED, { selections: [{ di: +di, ei: +ei }], weekIdx: getState().curIdx });
+      break;
+    }
+    case 'autoplan-reject-one': {
+      dispatch(A.EX_MARK_AUTOPLAN_REVIEWED, { selections: [{ di: +di, ei: +ei }], reject: true, weekIdx: getState().curIdx });
+      showToast('Steigerung abgelehnt', 'info');
       break;
     }
 
@@ -8288,13 +8447,77 @@ function _showSessionSummary(di, completionStats) {
   el.querySelector('#session-summary-continue')?.addEventListener('click', proceed, { once: true });
 }
 
+/**
+ * B128: Automatische Steigerung Opt-out — beim Tagesabschluss (statt nur im
+ * "Neue Woche"-Dialog) wird nextWeekPlan automatisch vorausgewählt, wenn
+ * getWeightRecommendation()/getMetricRecommendation() eine Steigerung liefert.
+ * Mirrort exakt die _autoSelections-Logik aus _prepNewWeekModal() (ui.js),
+ * beschränkt auf die Übungen des GERADE abgeschlossenen Tages. Reine
+ * Ergänzung zum bestehenden EX_AUTO_PRESELECT_NEXT_WEEK_PLAN-Reducer (state.js,
+ * unverändert) — plus EX_MARK_AUTOPLAN_UNREVIEWED, damit das neue Banner
+ * (renderAutoPlanBanner()) genau diese frisch automatisch gesetzten Pläne
+ * unterscheiden kann von bereits länger bestätigten/manuell gesetzten.
+ *
+ * @param {number} di - Index des gerade abgeschlossenen Tages
+ * @param {Set<string>} skippedNames - Namen der Übungen, die HEUTE komplett
+ *   übersprungen wurden (kein einziger bewerteter Satz) — bekommen bewusst
+ *   keinen Auto-Plan (kein sinnvoller Steigerungs-Kontext ohne Leistung heute).
+ */
+function _autoSetNextWeekPlanForDay(di, skippedNames) {
+  const state = getState();
+  const wk    = state.weeks[state.curIdx]; if (!wk) return;
+  const day   = wk.days[di]; if (!day) return;
+
+  const calcWeeks = state.weeks
+    .filter(w => w.mode !== 'deload' && w.mode !== 'vacation')
+    .filter(w => w.days.some(d => d.exercises.some(ex => ex.sets.some(s => s.status === 'success'))));
+  if (calcWeeks.length < 2) return;
+
+  const selections = [];
+  (day.exercises ?? []).forEach((ex, ei) => {
+    if (skippedNames.has(ex.name)) return;
+    if (ex.substituteFor) return;
+    if (ex.nextWeekPlanConfirmed) return; // manuell gesetzt oder bereits aktiver Plan — nicht überschreiben
+    const exMetric = ex.metric === 'sec' || ex.metric === 'm' ? ex.metric : 'reps';
+    if (exMetric === 'reps' && (ex.progressionType ?? 'weight') === 'reps') return;
+    const exProgressionMode = ex.progressionMode ?? 'weight_first';
+    const exTargetRepsMax   = ex.targetRepsMax ?? null;
+    const step = exMetric === 'reps'
+      ? (ex.weightStep || state.settings?.plateStep || 2.5)
+      : (ex.metricStep || (exMetric === 'm' ? 50 : 10));
+    const rec = exMetric === 'reps'
+      ? getWeightRecommendation(ex.name, calcWeeks, step, exProgressionMode, exTargetRepsMax, isCompoundExercise(ex.name, buildCategoryMap(state.customExercises)))
+      : getMetricRecommendation(ex.name, calcWeeks, step, exProgressionMode, exTargetRepsMax);
+    if (!rec || !(rec.delta > 0)) return; // kein Plan bei X->X bzw. keiner Steigerung
+    if (!isReadyForAutoSelect(ex.name, calcWeeks, exProgressionMode, exTargetRepsMax)) return;
+    selections.push({ di, ei, value: rec.delta });
+  });
+
+  if (selections.length > 0) {
+    dispatch(A.EX_AUTO_PRESELECT_NEXT_WEEK_PLAN, { selections, weekIdx: state.curIdx });
+    dispatch(A.EX_MARK_AUTOPLAN_UNREVIEWED, { selections, weekIdx: state.curIdx });
+  }
+}
+
 function _finishCompletion(di, rating, sleepHours, energyLevel) {
   document.getElementById('day-completion-modal')?.remove();
   _completionModalDi = null;
 
   const stats = _getDayCompletionStats(di);
 
+  // B128: Snapshot VOR dem Dispatch — DAY_TOGGLE_COMPLETE setzt jeden noch
+  // 'pending' Satz synchron auf 'fail' (state.js), danach wäre "komplett
+  // übersprungen" nicht mehr erkennbar (identisches Prinzip wie bei
+  // case 'toggle-complete' weiter oben in dieser Datei).
+  const dayBefore = getState().weeks[getState().curIdx]?.days[di];
+  const skippedNames = new Set(
+    (dayBefore?.exercises ?? [])
+      .filter(ex => (ex.sets ?? []).every(s => s.status === 'pending'))
+      .map(ex => ex.name)
+  );
+
   dispatch(A.DAY_TOGGLE_COMPLETE, { di });
+  _autoSetNextWeekPlanForDay(di, skippedNames);
   if (rating      != null) dispatch(A.DAY_SET_FIELD, { di, field: 'sessionRating', value: rating });
   if (sleepHours  != null) dispatch(A.DAY_SET_FIELD, { di, field: 'sleepHours',    value: sleepHours });
   if (energyLevel != null) dispatch(A.DAY_SET_FIELD, { di, field: 'energyLevel',   value: energyLevel });
@@ -8439,6 +8662,59 @@ function _showVacationPlanModal(di) {
       overlay.remove();
     }
   });
+}
+
+/**
+ * B129: fragt nacheinander (eine Übung pro Bildschirm) nach dem Grund für
+ * jede komplett übersprungene Übung (kein einziger bewerteter Satz -- siehe
+ * Aufruf-Stelle für die Snapshot-vor-Dispatch-Begründung). Mirrort das
+ * "ein Overlay-Div, .innerHTML pro Schritt ersetzen"-Muster von
+ * _showDayCompletionModal() direkt darunter. Ruft `onDone()` auf, sobald die
+ * Warteschlange leer ist (danach öffnet der Aufrufer wie gewohnt
+ * _showDayCompletionModal(di)).
+ */
+function _showSkipReasonQueue(di, skippedExercises, onDone) {
+  if (!skippedExercises.length) { onDone(); return; }
+  document.getElementById('day-completion-modal')?.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id        = 'day-completion-modal';
+  overlay.className = 'completion-modal-overlay';
+  document.body.appendChild(overlay);
+
+  const options = [
+    { val: 'injury',      icon: '😤', label: 'Verletzung/Schmerzen' },
+    { val: 'time',        icon: '⏰', label: 'Keine Zeit' },
+    { val: 'fatigue',     icon: '💪', label: 'Zu müde' },
+    { val: 'substituted', icon: '🔄', label: 'Durch andere ersetzt' },
+    { val: null,          icon: '➡',  label: 'Überspringen / Kein Grund' },
+  ];
+
+  let idx = 0;
+  const renderStep = () => {
+    const ex = skippedExercises[idx];
+    overlay.innerHTML = `
+    <div class="completion-modal">
+      <h3 class="completion-modal__title">${h(ex.name)} wurde nicht durchgeführt.</h3>
+      <p class="completion-modal__label" style="text-align:center;margin-bottom:var(--sp-2)">Warum?</p>
+      <div class="completion-modal__ratings" style="flex-direction:column;gap:var(--sp-2)">
+        ${options.map(o => `
+        <button type="button" class="session-checkin-btn" data-skip-val="${o.val ?? ''}" style="width:100%;justify-content:flex-start">
+          <span class="session-checkin-btn__icon" aria-hidden="true">${o.icon}</span><span class="session-checkin-btn__label">${o.label}</span>
+        </button>`).join('')}
+      </div>
+    </div>`;
+    overlay.querySelectorAll('[data-skip-val]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const reason = btn.dataset.skipVal || null;
+        dispatch(A.EX_SET_SKIP_REASON, { di: ex.di, ei: ex.ei, reason });
+        idx++;
+        if (idx < skippedExercises.length) renderStep();
+        else { overlay.remove(); onDone(); }
+      }, { once: true });
+    });
+  };
+  renderStep();
 }
 
 function _showDayCompletionModal(di) {

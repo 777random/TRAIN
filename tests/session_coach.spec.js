@@ -77,7 +77,7 @@ test('Check-in erscheint beim heutigen offenen Tag, Migration hebt SCHEMA auf 32
   await expect(page.locator('.session-briefing-card')).toHaveCount(0);
 
   const schemaVersion = await page.evaluate(() => JSON.parse(localStorage.getItem('train_v6')).meta.schemaVersion);
-  expect(schemaVersion).toBe(32);
+  expect(schemaVersion).toBe(33); // B129: SCHEMA_VERSION 32->33, Migration läuft bis zur aktuellsten Version durch
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
 });
 
@@ -220,4 +220,82 @@ test('Toggle "Session Coach" in den Einstellungen ist vorhanden und schaltbar', 
   await expect(page.locator('.session-checkin-card')).toHaveCount(0);
 
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});
+
+// B129: bedingte Check-in-Zusatzfrage bei kürzlichem Verletzungs-Skip
+function todayISO2() { return new Date().toISOString().split('T')[0]; }
+function daysAgoISO(n) {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return d.toISOString().split('T')[0];
+}
+
+async function seedWithInjurySkip(page, { skipDaysAgo = 5, skipReason = 'injury' } = {}) {
+  const today = openDay(11);
+  const prevDay = {
+    id: 5, title: 'Tag A', subtitle: '', warmup: '', cooldown: '',
+    locked: true, markedDone: true, isVacation: false,
+    sleepHours: null, energyLevel: null, sessionStartTs: null, sessionEndTs: null,
+    sessionCheckIn: null, sessionModifier: null,
+    exercises: [{
+      name: 'Kniebeuge', note: '', pauseSec: 90, metric: 'reps', weightStep: 5,
+      sets: [{ weight: 0, reps: 0, rpe: null, status: 'pending', done: false, note: '' }],
+      prWeight: null, prRepsAtMaxWeight: null, prRepsHistory: {},
+      nextWeekPlan: 0, nextWeekPlanConfirmed: false, nextWeekPlanAutoReviewed: true,
+      skipReason, skipDate: skipReason === 'injury' ? daysAgoISO(skipDaysAgo) : null,
+      targetSets: 1, targetReps: 5, progressionType: 'weight', archived: false,
+    }],
+    sessionLog: [], bodyData: {}, restDays: [], isSeedWeek: false,
+  };
+  const weeks = [
+    { id: 0, startDate: daysAgoISO(7), note: '', mode: 'standard', days: [prevDay], sessionLog: [], bodyData: {}, restDays: [], isSeedWeek: false },
+    { id: 1, startDate: todayISO2(), note: '', mode: 'standard', days: [today], sessionLog: [], bodyData: {}, restDays: [], isSeedWeek: false },
+  ];
+  await page.evaluate(({ weeksArg }) => {
+    localStorage.setItem('train_v6', JSON.stringify({
+      meta: { schemaVersion: 33, savedAt: Date.now(), createdAt: Date.now() },
+      curIdx: weeksArg.length - 1, weeks: weeksArg,
+      customTemplate: [], settings: { sessionCoach: true },
+      prs: {}, coachPerformance: { suggestions: [] }, coachQuestion: null, coachQuestionHistory: [],
+      lastReentryHandled: null, plateauActions: {}, decisionLog: [], badges: [], onboardingDone: true,
+      longestStreakEver: 0, favoriteExercises: [],
+    }));
+  }, { weeksArg: weeks });
+  await page.reload();
+  await page.waitForSelector('#app.is-ready', { timeout: 10000 });
+}
+
+test('B129: Check-in zeigt Zusatzfrage bei kürzlichem Verletzungs-Skip derselben Übung', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', err => pageErrors.push(err.message));
+  await page.goto('/');
+  await page.waitForSelector('#app.is-ready', { timeout: 10000 });
+  await seedWithInjurySkip(page, { skipDaysAgo: 5 });
+
+  await expect(page.locator('.session-checkin-card')).toContainText('Wie fühlt sich Kniebeuge heute an?');
+  expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});
+
+test('B129: Check-in zeigt KEINE Zusatzfrage ohne kürzlichen Verletzungs-Skip', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForSelector('#app.is-ready', { timeout: 10000 });
+  await seedWithInjurySkip(page, { skipReason: 'time' });
+
+  await expect(page.locator('.session-checkin-card')).not.toContainText('Wie fühlt sich');
+});
+
+test('B129: Antwort auf die Zusatzfrage wird in sessionCheckIn.injuryFollowUp gespeichert', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForSelector('#app.is-ready', { timeout: 10000 });
+  await seedWithInjurySkip(page, { skipDaysAgo: 3 });
+
+  await page.click('[data-action="session-checkin-select"][data-field="sleep"][data-val="great"]');
+  await page.click('[data-action="session-checkin-select"][data-field="energyPre"][data-val="high"]');
+  // Check-in darf noch NICHT committet sein -- Zusatzfrage steht noch aus
+  await expect(page.locator('.session-checkin-card')).toBeVisible();
+  await page.click('[data-action="session-checkin-select"][data-field="injuryFollowUp"][data-val="okay"]');
+
+  await expect(page.locator('.session-checkin-card')).toHaveCount(0);
+  const checkIn = await page.evaluate(() => JSON.parse(localStorage.getItem('train_v6')).weeks.at(-1).days[0].sessionCheckIn);
+  expect(checkIn.injuryFollowUp).toBe('okay');
 });

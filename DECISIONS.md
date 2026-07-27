@@ -374,3 +374,45 @@ Priorität innerhalb der Strukturkarte: Mehr-Übungen-Aggregation > Präventiver
 **Abweichung von der Sprint-Vorgabe:** kein SCHEMA_VERSION-Bump für `state.exerciseNotes`. Rein additive State-Felder bekommen in diesem Projekt einen sicheren Default in `migrate()` statt eines Versions-Bumps (Präzedenzfall: `state.substituteHistory`, B109/D2) — SCHEMA_VERSION bleibt bei 32.
 **Gilt:** Permanent bis gegenteilige Entscheidung. Tagesspezifische und permanente Übungsdaten bleiben zwei getrennte State-Felder, keine gemeinsame Struktur mit einem "scope"-Flag.
 
+
+### 2026-07 — B128: Automatische Steigerung — Opt-out statt Opt-in
+**Entscheidung:** `nextWeekPlan` wird nach Tagesabschluss automatisch gesetzt,
+wenn `getWeightRecommendation()`/`getMetricRecommendation()` eine Steigerung
+liefert. Konsistent mit dem bereits bestehenden Verhalten im "Neue Woche"-
+Dialog (`EX_AUTO_PRESELECT_NEXT_WEEK_PLAN`, unverändert wiederverwendet).
+Nutzer muss aktiv abwählen — Opt-out statt Opt-in. Progressive Overload =
+immer Nutzer-Entscheidung bleibt korrekt: die Entscheidung passiert beim
+aktiven Abwählen (Banner → "Anpassen" → "Ablehnen"), nicht beim Zustimmen.
+**Korrektur während der Umsetzung:** die Sprint-Vorlage wollte
+`nextWeekPlanConfirmed` beim automatischen Setzen bewusst `false` lassen
+("Nutzer kann noch ändern"), zeigte das Review-Banner aber erst beim
+Öffnen der nächsten Woche — das widerspricht sich technisch: die
+bestehende `_applyPlannedProgression()` (state.js) wendet einen Plan nur
+bei `confirmed===true` an und setzt beide Felder auf der neuen Woche
+unconditional zurück, ein unconfirmed gesetzter Plan wäre beim nächsten
+`WEEK_CREATE` also lautlos verworfen worden, bevor das Banner ihn je hätte
+zeigen können. Aufgelöst zugunsten der expliziten "Opt-out"-Entscheidung
+oben: der Plan wird sofort `confirmed=true` (aktiv), das neue Feld
+`ex.nextWeekPlanAutoReviewed` (Default `true` für bestehende/manuell
+gesetzte Pläne, `false` nur direkt nach dem neuen Tagesabschluss-Trigger)
+steuert ausschließlich, ob das Banner ihn noch als "ungeprüft" zeigt.
+**Gilt:** Permanent bis gegenteilige Entscheidung. Auto-Vorauswahl-Logik
+für `nextWeekPlan` lebt an genau einer Stelle (`EX_AUTO_PRESELECT_NEXT_WEEK_PLAN`),
+neue Trigger-Punkte rufen sie auf, statt eine zweite Variante zu bauen.
+
+### 2026-07 — B129: Skip-Grund-Abfrage — nur bei komplett übersprungenen Übungen, Erkennung vor dem Dispatch
+**Entscheidung:** Beim Tagesabschluss wird nach dem Grund gefragt, wenn eine
+Übung KEINEN einzigen bewerteten Satz hat (alle `pending`) — nicht bei
+weniger Sätzen als geplant (das ist normal). Fünf Gründe (Verletzung/Keine
+Zeit/Zu müde/Ersetzt/Kein Grund), nur "Verletzung" hat eine Coach-Tab-
+Konsequenz (`_checkInjuryReminder()`, 2-Wochen-Lookback) + eine bedingte
+Check-in-Zusatzfrage.
+**Technischer Befund:** `DAY_TOGGLE_COMPLETE` (state.js) setzt jeden noch
+`pending`-Satz synchron auf `'fail'`, im selben Dispatch — eine
+Skip-Erkennung NACH diesem Dispatch liefert deshalb immer `false`. Die
+Erkennung läuft daher zwingend auf einem Tages-Snapshot VOR dem Dispatch
+(gleiches Prinzip wie der bereits bestehende Lock/Unlock-Handler in
+`case 'toggle-complete'`).
+**Gilt:** Permanent bis gegenteilige Entscheidung. Jede künftige
+"Zustand vor Tagesabschluss auswerten"-Logik muss den Snapshot vor
+`DAY_TOGGLE_COMPLETE` nehmen, nie danach.

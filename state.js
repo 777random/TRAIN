@@ -26,7 +26,7 @@ import { buildCategoryMap, resolveCategory } from './movementMap.js';
 
 export const STORAGE_KEY        = 'train_v6';
 export const STORAGE_KEY_SHADOW = 'train_v6_shadow';
-export const SCHEMA_VERSION     = 32;
+export const SCHEMA_VERSION     = 33;
 
 // B65: Squat/Hinge sind die schweren Grundübungs-Kategorien (Kniebeuge/
 // Kreuzheben-Varianten), bei denen 2.5kg-Schritte in der Praxis zu klein
@@ -946,6 +946,21 @@ function migrate(raw) {
     raw.meta = { ...raw.meta, schemaVersion: 32 };
   }
 
+  // v32 → v33 (B129): skipReason/skipDate (Skip-Grund-Abfrage bei komplett
+  // übersprungenen Übungen) + nextWeekPlanAutoReviewed (B128, war seit der
+  // vorherigen Runde nur als In-Memory-Default an Erstellungsstellen gesetzt,
+  // bestehende gespeicherte Übungen brauchen einen echten Backfill).
+  if ((raw.meta?.schemaVersion ?? 0) < 33) {
+    const _normExSkip = ex => {
+      if (ex.skipReason === undefined) ex.skipReason = null;
+      if (ex.skipDate === undefined) ex.skipDate = null;
+      if (ex.nextWeekPlanAutoReviewed === undefined) ex.nextWeekPlanAutoReviewed = true;
+    };
+    (raw.weeks ?? []).forEach(wk => (wk.days ?? []).forEach(day => (day.exercises ?? []).forEach(_normExSkip)));
+    (raw.customTemplate ?? []).forEach(day => (day.exercises ?? []).forEach(_normExSkip));
+    raw.meta = { ...raw.meta, schemaVersion: 33 };
+  }
+
   // Always-apply defaults for settings added in later versions
   if (raw.settings.vibrationEnabled               === undefined) raw.settings.vibrationEnabled               = true;
   if (raw.settings.rpeEnabled                     === undefined) raw.settings.rpeEnabled                     = true;
@@ -1376,7 +1391,7 @@ export const A = Object.freeze({
   DAY_LOAD_VACATION_PLAN:    'DAY_LOAD_VACATION_PLAN',    // { di, plan: 'bodyweight'|'light_kb'|'heavy_kb'|'hotel_gym'|'custom'|'rest' }
   WEEK_LOAD_VACATION_PLAN:   'WEEK_LOAD_VACATION_PLAN',   // { plan: 'bodyweight'|'light_kb'|'heavy_kb'|'hotel_gym'|'custom'|'rest' }
   DAY_SET_FIELD:             'DAY_SET_FIELD',             // { di, field, value }
-  SESSION_CHECKIN_SET:       'SESSION_CHECKIN_SET',       // { di, sleep, energyPre, modifier } — B76 Pre-Session Check-in
+  SESSION_CHECKIN_SET:       'SESSION_CHECKIN_SET',       // { di, sleep, energyPre, modifier, injuryFollowUp? } — B76 Pre-Session Check-in (injuryFollowUp seit B129)
   DAY_REDUCE_PENDING_WEIGHTS: 'DAY_REDUCE_PENDING_WEIGHTS', // { di } — B87 Fix 3: manueller Catch-up für die -10%-Reduktion (ein Dispatch für den ganzen Tag, nicht pro Satz, damit Undo den ganzen Klick in einem Schritt rückgängig macht)
   // Exercise
   EX_ADD:              'EX_ADD',              // { di, name, metric? }
@@ -1400,6 +1415,9 @@ export const A = Object.freeze({
   EX_SET_NEXT_WEEK_PLAN:'EX_SET_NEXT_WEEK_PLAN',// { di, ei, value, weekIdx?, progressionType? } – setzt nextWeekPlan + confirmed=true (+ optional progressionType, atomar); weekIdx default = curIdx
   EX_TOGGLE_NEXT_WEEK_CONFIRMED: 'EX_TOGGLE_NEXT_WEEK_CONFIRMED', // { di, ei, weekIdx? } – toggelt confirmed; weekIdx default = curIdx
   EX_AUTO_PRESELECT_NEXT_WEEK_PLAN: 'EX_AUTO_PRESELECT_NEXT_WEEK_PLAN', // { selections: [{di, ei, value}], weekIdx? } – Coach-Chip Vorauswahl, kein User-Tap; weekIdx default = curIdx
+  EX_MARK_AUTOPLAN_UNREVIEWED: 'EX_MARK_AUTOPLAN_UNREVIEWED', // { selections: [{di, ei}], weekIdx? } – B128: markiert einen bei Tagesabschluss automatisch gesetzten Plan als "noch nicht vom Nutzer gesehen" (Banner-Trigger); weekIdx default = curIdx
+  EX_MARK_AUTOPLAN_REVIEWED: 'EX_MARK_AUTOPLAN_REVIEWED', // { selections: [{di, ei}], reject?: boolean, weekIdx? } – B128: Banner-Aktion "Übernehmen"/"Alle übernehmen" (reject=false, Plan bleibt) oder "Ablehnen" (reject=true, Plan wird zurückgesetzt); weekIdx default = curIdx
+  EX_SET_SKIP_REASON:  'EX_SET_SKIP_REASON',  // { di, ei, reason: null|'injury'|'time'|'fatigue'|'substituted' } – B129: Grund für eine komplett übersprungene Übung (kein einziger bewerteter Satz)
   EX_SET_STEP:         'EX_SET_STEP',         // { di, ei, step }  – speichert Steigerungsrate (Gewicht, kg)
   EX_SET_METRIC_STEP:  'EX_SET_METRIC_STEP',  // { di, ei, step }  – speichert Steigerungsrate für Distanz/Zeit (metric 'm'/'sec', B18)
   EX_SET_TARGETS:      'EX_SET_TARGETS',      // { di, ei, targetReps?, progressionMode?, targetRepsMax? }
@@ -2014,6 +2032,9 @@ function reduce(state, action) {
           targetReps:            t.reps,
           nextWeekPlan:          0,
           nextWeekPlanConfirmed: false,
+          nextWeekPlanAutoReviewed: true,
+          skipReason:            null,
+          skipDate:              null,
           tags:                  [],
           supersetId:            null,
           sets: Array.from({ length: t.sets }, () => ({
@@ -2049,6 +2070,9 @@ function reduce(state, action) {
               targetReps:            t.reps,
               nextWeekPlan:          0,
               nextWeekPlanConfirmed: false,
+              nextWeekPlanAutoReviewed: true,
+              skipReason:            null,
+              skipDate:              null,
               tags:                  [],
               supersetId:            null,
               sets: Array.from({ length: t.sets }, () => ({
@@ -2086,6 +2110,7 @@ function reduce(state, action) {
       day.sessionCheckIn = {
         sleep: p.sleep ?? null,
         energyPre: p.energyPre ?? null,
+        injuryFollowUp: p.injuryFollowUp ?? null, // B129: nur gestellt wenn eine Übung im Tag kürzlich wegen Verletzung übersprungen wurde
         timestamp: Date.now(),
       };
       day.sessionModifier = p.modifier ?? 'normal';
@@ -2132,6 +2157,8 @@ function reduce(state, action) {
         metricStep: m === 'm' ? 50 : m === 'sec' ? 10 : undefined,
         progressionMode: 'weight_first', targetRepsMax: null, prRepsHistory: {},
         prWeight: null, prRepsAtMaxWeight: null,
+        nextWeekPlan: 0, nextWeekPlanConfirmed: false, nextWeekPlanAutoReviewed: true,
+        skipReason: null, skipDate: null,
         sets: [mkSet(), mkSet(), mkSet()],
       };
       if (history) {
@@ -2232,6 +2259,38 @@ function reduce(state, action) {
         ex.nextWeekPlan = sel.value;
         ex.nextWeekPlanConfirmed = true;
       }
+      break;
+    }
+    case A.EX_MARK_AUTOPLAN_UNREVIEWED: {
+      // B128: Tagesabschluss-Trigger — Plan ist bereits aktiv (EX_AUTO_PRESELECT_
+      // NEXT_WEEK_PLAN lief unmittelbar davor), dieses Flag steuert nur, ob das
+      // Banner ihn noch als "ungeprüft" zeigt.
+      const wk = p.weekIdx != null ? state.weeks[p.weekIdx] : _currentWeek(); if (!wk) break;
+      for (const sel of p.selections ?? []) {
+        const ex = wk.days[sel.di]?.exercises[sel.ei]; if (!ex) continue;
+        ex.nextWeekPlanAutoReviewed = false;
+      }
+      break;
+    }
+    case A.EX_MARK_AUTOPLAN_REVIEWED: {
+      const wk = p.weekIdx != null ? state.weeks[p.weekIdx] : _currentWeek(); if (!wk) break;
+      for (const sel of p.selections ?? []) {
+        const ex = wk.days[sel.di]?.exercises[sel.ei]; if (!ex) continue;
+        ex.nextWeekPlanAutoReviewed = true;
+        if (p.reject) {
+          ex.nextWeekPlan = 0;
+          ex.nextWeekPlanConfirmed = false;
+        }
+      }
+      break;
+    }
+    case A.EX_SET_SKIP_REASON: {
+      // B129: nur 'injury' hat einen datumsbezogenen Coach-Folgeeffekt
+      // (_checkInjuryReminder(), weeklyFocus.js) — die anderen Gründe werden
+      // nur zur Erfassung gespeichert, ohne skipDate.
+      const ex = _currentWeek()?.days[p.di]?.exercises[p.ei]; if (!ex) break;
+      ex.skipReason = p.reason ?? null;
+      ex.skipDate = p.reason === 'injury' ? new Date().toISOString().split('T')[0] : null;
       break;
     }
     case A.EX_SET_TARGETS: {
@@ -2777,7 +2836,8 @@ function reduce(state, action) {
         id: Date.now() - 1000 + i,
         name: sw.name, note: '', pauseSec: 90, metric: 'reps',
         sets: [{ weight: sw.weight, reps: sw.reps ?? 5, rpe: sw.rpe ?? null, status: 'success', done: true }],
-        weightStep: defaultWeightStepForExercise(sw.name, state.customExercises), nextWeekPlan: 0, nextWeekPlanConfirmed: false,
+        weightStep: defaultWeightStepForExercise(sw.name, state.customExercises), nextWeekPlan: 0, nextWeekPlanConfirmed: false, nextWeekPlanAutoReviewed: true,
+        skipReason: null, skipDate: null,
         targetSets: 1, targetReps: sw.reps ?? 5,
         _showCfg: false, setType: 'standard', tags: [], showPlates: false,
         progressionType: 'weight', substituteFor: null,

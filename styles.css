@@ -534,6 +534,32 @@ button, input, select, textarea { font: inherit; }
 .session-briefing-card.is-collapsed .session-briefing-card__reduce-done,
 .session-briefing-card.is-collapsed .session-briefing-card__edit-link { display: none; }
 
+/* ── B128: Auto-Steigerung-Banner (Opt-out) ──────────────────── */
+.auto-plan-banner {
+  background: var(--c-surface); border: 1px solid var(--c-border);
+  border-radius: var(--r-lg);
+  padding: var(--sp-3) var(--sp-4); margin-bottom: var(--sp-3);
+}
+.auto-plan-banner__header {
+  font-size: 13px; font-weight: 700; color: var(--c-text);
+  margin-bottom: var(--sp-2);
+}
+.auto-plan-banner__list { display: flex; flex-direction: column; gap: var(--sp-1); }
+.auto-plan-banner__row {
+  font-size: 12px; color: var(--c-text-2); line-height: 1.5;
+}
+.auto-plan-banner__row--item {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--sp-2); padding: var(--sp-1) 0;
+  border-bottom: 1px solid var(--c-border);
+}
+.auto-plan-banner__row--item:last-child { border-bottom: none; }
+.auto-plan-banner__row-actions { display: flex; gap: var(--sp-1); flex-shrink: 0; }
+.auto-plan-banner__actions {
+  display: flex; gap: var(--sp-2); margin-top: var(--sp-3);
+}
+.auto-plan-banner__actions .btn { flex: 1; min-height: var(--touch); font-size: 13px; }
+
 /* ── Intra-Session Coach (B77) ──────────────────────────────── */
 .set-feedback {
   display: flex; flex-direction: column; gap: 2px;

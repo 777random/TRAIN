@@ -1098,15 +1098,55 @@ function _checkMultiExerciseFailure(state) {
   };
 }
 
+// B129: Verletzungs-Erinnerung — wenn eine Übung innerhalb der letzten 2
+// Wochen wegen Schmerzen/Verletzung übersprungen wurde (ex.skipReason ===
+// 'injury', gesetzt von EX_SET_SKIP_REASON, state.js) und dieselbe Übung in
+// der aktuellen (chronologisch letzten) Woche wieder auftaucht, macht dieses
+// Signal darauf aufmerksam. Reine Sicherheits-Erinnerung, keine Berechnung
+// einer Empfehlung.
+function _checkInjuryReminder(state) {
+  const weeks = _sortedWeeks(state);
+  if (!weeks.length) return null;
+  const currentWeek = weeks[weeks.length - 1];
+
+  const lookback = weeks.slice(-2); // aktuelle + vorherige Woche
+  const today = new Date();
+  let found = null;
+  for (const wk of lookback) {
+    for (const day of wk.days) {
+      for (const ex of day.exercises) {
+        if (ex.skipReason !== 'injury' || !ex.skipDate) continue;
+        const daysSince = Math.round((today - new Date(ex.skipDate + 'T00:00:00')) / DAY_MS);
+        if (daysSince < 0 || daysSince > 14) continue;
+        const stillPresent = currentWeek.days.some(d => d.exercises.some(e => e.name === ex.name));
+        if (!stillPresent) continue;
+        if (!found || daysSince < found.daysSince) {
+          found = { exerciseName: ex.name, skipDate: ex.skipDate, daysSince };
+        }
+      }
+    }
+  }
+  if (!found) return null;
+
+  return {
+    exerciseName: found.exerciseName,
+    skipDate: found.skipDate,
+    evidence: [
+      { label: 'Übersprungen', value: `${found.daysSince} Tage her wegen Schmerzen` },
+    ],
+  };
+}
+
 /**
  * @param {Object} state
  * @returns {Array<Object>} 0-2 strukturelle Signale, höchstens 2 gleichzeitig
- *   (Priorität Mehr-Übungen-Aggregation > Präventiver Deload >
- *   Konsistenz-Qualität > Push/Pull bei Überzahl — die Aggregation steht
- *   zuoberst, da ein datenbasierter breiter Totalausfall der konkreteste
+ *   (Priorität Mehr-Übungen-Aggregation > Verletzungs-Erinnerung > Präventiver
+ *   Deload > Konsistenz-Qualität > Push/Pull bei Überzahl — die Aggregation
+ *   steht zuoberst, da ein datenbasierter breiter Totalausfall der konkreteste
  *   Befund unter den strukturellen Signalen ist, analog zur Top-Priorität von
- *   _checkPersistentFailure in der akuten Kaskade). Jedes Objekt trägt ein
- *   `type`-Feld ('multi_exercise_failure'|'deload_preventive'|
+ *   _checkPersistentFailure in der akuten Kaskade; die Verletzungs-Erinnerung
+ *   direkt danach, da sicherheitsrelevant). Jedes Objekt trägt ein
+ *   `type`-Feld ('multi_exercise_failure'|'injury_reminder'|'deload_preventive'|
  *   'consistency_quality'|'push_pull') als Diskriminator fürs Rendering in
  *   ui.js, zusätzlich zu den jeweiligen Rohdaten (weeksSince/dominant/etc.)
  *   für die dortigen Kurztexte.
@@ -1116,6 +1156,9 @@ export function computeStructuralSignals(state) {
 
   const multiFail = _checkMultiExerciseFailure(state);
   if (multiFail) signals.push({ type: 'multi_exercise_failure', ...multiFail });
+
+  const injury = _checkInjuryReminder(state);
+  if (injury) signals.push({ type: 'injury_reminder', ...injury });
 
   const deload = _checkPreventiveDeload(state);
   if (deload) signals.push({ type: 'deload_preventive', ...deload });

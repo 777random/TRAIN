@@ -1,7 +1,7 @@
 # TRAIN — CLAUDE.md
 # Vollständiger Projektkontext für Claude Code
-# Stand: train-v218 / SCHEMA 32 / Juli 2026
-# Letztes Update: nach train-v218 (B123-B127: 5 Features vor Launch — Such-Bug-Fix (MOVEMENT_MAP als Suchquelle), automatische Übungseinstellungs-Übernahme, Übung-zwischen-Tagen-verschieben, Hantelscheiben-Rechner, permanente übungsweite Notizen)
+# Stand: train-v219 / SCHEMA 33 / Juli 2026
+# Letztes Update: nach train-v219 (B128/B129: Auto-Steigerung Opt-out beim Tagesabschluss + Skip-Grund-Abfrage für komplett übersprungene Übungen + Verletzungs-Reminder im Coach-Tab)
 
 ---
 
@@ -49,7 +49,7 @@ TRAIN ist eine deutschsprachige PWA für Krafttraining. Pure Vanilla ES Modules 
   Sessions müssen aus diesem neuen Pfad heraus gestartet werden, sonst
   landet man am alten (jetzt leeren) OneDrive-Ort. Nutzer zieht den Ordner
   regelmäßig manuell auf eine externe Festplatte statt über Cloud-Sync.
-- Aktueller Stand: SCHEMA_VERSION 32 · CACHE_VERSION train-v218 · CSS ?v=207
+- Aktueller Stand: SCHEMA_VERSION 33 · CACHE_VERSION train-v219 · CSS ?v=208
 
 ---
 
@@ -202,12 +202,12 @@ Flux-Pattern: `dispatch(A.ACTION_TYPE, payload)` → `reduce()` → `persistStat
 
 **Undo:** 20-Entry Stack mit Deep-Cloned Snapshots. Navigation Actions (`WEEK_NAVIGATE`, `SESSION_START` etc.) sind von Undo ausgeschlossen (`_NO_UNDO`).
 
-**Schema Migration:** `migrate()` läuft bei jedem `loadState()`. Neuen `case` Block hinzufügen wenn `SCHEMA_VERSION` erhöht wird. Aktuelle Version: **32**.
+**Schema Migration:** `migrate()` läuft bei jedem `loadState()`. Neuen `case` Block hinzufügen wenn `SCHEMA_VERSION` erhöht wird. Aktuelle Version: **33**.
 
-**State Shape (SCHEMA 32):**
+**State Shape (SCHEMA 33):**
 ```javascript
 {
-  meta: { schemaVersion: 32, savedAt, createdAt },
+  meta: { schemaVersion: 33, savedAt, createdAt },
   curIdx: number,           // Index in weeks[]
   weeks: [{
     id, startDate, note, mode,
@@ -215,12 +215,14 @@ Flux-Pattern: `dispatch(A.ACTION_TYPE, payload)` → `reduce()` → `persistStat
       id, title, subtitle, warmup, cooldown,
       locked, markedDone, isVacation,
       sleepHours, energyLevel, sessionRating,
-      sessionCheckIn, sessionModifier,  // seit SCHEMA 32 (B76)
+      sessionCheckIn, sessionModifier,  // seit SCHEMA 32 (B76); sessionCheckIn.injuryFollowUp seit B129
       exercises: [{
         name, note, pauseSec, metric, sets,
         weightStep, metricStep, nextWeekPlan, nextWeekPlanConfirmed,
+        nextWeekPlanAutoReviewed,  // seit SCHEMA 33 (B128) — steuert nur die Auto-Steigerung-Banner-Sichtbarkeit
         targetReps, progressionType, archived,
-        substituteFor
+        substituteFor,
+        skipReason, skipDate,  // seit SCHEMA 33 (B129) — Grund für komplett übersprungene Übung
       }]
     }],
     sessionLog, bodyData, restDays, isSeedWeek
@@ -233,6 +235,7 @@ Flux-Pattern: `dispatch(A.ACTION_TYPE, payload)` → `reduce()` → `persistStat
   prs: {},
   coachPerformance: { suggestions: [] },
   substituteHistory: {},   // { [originalExerciseName]: { name, count, lastUsed }[] } — D2, additiver Default, kein SCHEMA-Bump
+  exerciseNotes: {},       // { [exerciseName]: string } — B127, permanent, additiver Default, kein SCHEMA-Bump
   coachQuestion: { weekStart, questionId, answer, outcome, measuredWeekStart },
   coachQuestionHistory: [],
   lastReentryHandled: null | timestamp,

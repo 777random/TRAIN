@@ -3032,3 +3032,51 @@ Eigentliche Aufgabe: B123-B127 — 5 Features/Bugs. Diagnose-vor-Fix zuerst
   train-v217->v218, CSS ?v=206->207, SCHEMA unveraendert. CLAUDE.md/
   HANDOFF.md/BUGS.md (B123-B127)/DECISIONS.md (B127) aktualisiert.
   Screenshots genommen: Plate Calculator, Notiz-Tabs, Verschieben-Dialog.
+Loop 5: for-advisor.txt aktualisiert (36. Fassung, B123-B127)
+Loop 7/11: nachgeholt (waren seit dem vorherigen Sprint auf B113/v216
+  stehengeblieben, Session-Limit hatte den Export-Agent damals gestoppt) -
+  for-advisor-product.txt und for-advisor-consolidated.txt jetzt mit
+  B114-B122 (v217) UND B123-B127 (v218) aktuell. for-advisor-market.txt/
+  for-advisor-ux.txt/for-advisor-growth.txt: nur Header aufgefrischt
+  (keine neuen Markt-/UX-/Growth-Erkenntnisse in diesem oder dem
+  vorherigen Sprint).
+
+## 2026-07-27 (Sprint 2 — Auto-Steigerung Opt-out + Skip-Grund-Abfrage) train-v218->v219
+Loop 1: Baseline grün vor Sprint.
+Eigentliche Aufgabe: B128/B129 — 2 Aufgaben, sequenziell (beide state.js,
+  laut AGENTS.md nicht parallelisierbar). Diagnose-vor-Fix per Plan-Mode,
+  2 parallele Explore-Agents, Spec geschrieben und per ExitPlanMode bestätigt.
+  - B128 (Konsistenz-Check zuerst, wie gefordert): die Auto-Vorauswahl-Logik
+    für nextWeekPlan existierte bereits vollständig
+    (EX_AUTO_PRESELECT_NEXT_WEEK_PLAN, bisher nur vom "Neue Woche"-Dialog
+    genutzt) - musste nur an einen neuen Trigger (Tagesabschluss) angeschlossen
+    werden, kein neuer Reducer noetig. Wichtiger Fund: die Sprint-Vorlage
+    widersprach sich selbst (Schritt A liess nextWeekPlanConfirmed bewusst
+    false, Schritt B zeigte das Banner aber erst "wenn neue Woche geoeffnet
+    wird" - das haette den Plan lautlos verworfen, da _applyPlannedProgression()
+    nur bei confirmed===true anwendet und beide Felder auf der neuen Woche
+    unconditional zuruecksetzt). Aufgeloest zugunsten der expliziten
+    Opt-out-Entscheidung: Plan wird sofort confirmed=true, neues Feld
+    ex.nextWeekPlanAutoReviewed steuert nur die Banner-Sichtbarkeit.
+  - B129: kritischer technischer Befund - DAY_TOGGLE_COMPLETE setzt jeden
+    pending-Satz synchron auf 'fail', im selben Dispatch. Skip-Erkennung
+    muss daher auf einem Snapshot VOR dem Dispatch laufen (wie der
+    bestehende Lock/Unlock-Handler es schon macht), sonst ist "komplett
+    uebersprungen" nie erkennbar. Neuer Warteschlangen-Dialog (eine Uebung
+    nach der anderen, mirrort das bestehende Tagesabschluss-Modal-Muster),
+    neues Coach-Tab-Signal _checkInjuryReminder() (2. Prioritaet in
+    computeStructuralSignals(), konkurriert um die bestehenden 2 sichtbaren
+    Slots), bedingte Check-in-Zusatzfrage bei kuerzlichem Verletzungs-Skip.
+  Implementierung ueber 2 sequenzielle Fork-Agent-Runden (Aufgabe 1 zuerst,
+  verifiziert, dann Aufgabe 2 - genau wie in der Vorlage vorgegeben).
+  SCHEMA_VERSION 32->33 (echter Bump - skipReason/skipDate/
+  nextWeekPlanAutoReviewed je Uebung, dual-pass Migration ueber
+  raw.weeks UND raw.customTemplate). 52+ neue/erweiterte Tests. Volle Suite:
+  1 Test (share_image.spec.js, PR-Teilen-Button/Download-Event) fiel im
+  Vollauf aus, isoliert 2x grün nachverifiziert (Download-Event-Timing-Flake,
+  keine echte Regression - Analyse zeigte, dass weder der neue Skip-Dialog
+  noch die Auto-Progression fuer dieses Test-Setup ueberhaupt greifen).
+  state.js/ui.js/styles.css/weeklyFocus.js geaendert, CACHE_VERSION
+  train-v218->v219, CSS ?v=207->208, SCHEMA 32->33 (mit Migration). CLAUDE.md/
+  HANDOFF.md/BUGS.md (B128/B129)/DECISIONS.md aktualisiert. Screenshots
+  genommen: Banner, Skip-Abfrage, injury_reminder im Coach-Tab.

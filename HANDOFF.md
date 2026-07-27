@@ -1,5 +1,5 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-27 — B123-B127 (5 Features vor Launch), train-v218, siehe unten. B114-B122 (9 Bugs vor Launch, train-v217), B113 (Einstellungen in 4 Zwischenüberschriften gegliedert, train-v216), B112/E1 (Transparenz Coach-Tab, train-v215), B111 (movementMap.js erweitert, train-v214), B110 (Streak-Badge-Fenstergrenze, train-v213), B109/D2 ("Heute anders", train-v212) und B105-B108 (train-v211, Onboarding-Verbesserungen) sowie B102+B103/B101/B100 bereits gepusht und CI-grün.*
+*Letzte Aktualisierung: 2026-07-27 — B128/B129 (Auto-Steigerung Opt-out + Skip-Grund-Abfrage), train-v219, siehe unten. B123-B127 (5 Features vor Launch, train-v218), B114-B122 (9 Bugs vor Launch, train-v217), B113 (Einstellungen in 4 Zwischenüberschriften gegliedert, train-v216), B112/E1 (Transparenz Coach-Tab, train-v215), B111 (movementMap.js erweitert, train-v214), B110 (Streak-Badge-Fenstergrenze, train-v213), B109/D2 ("Heute anders", train-v212) und B105-B108 (train-v211, Onboarding-Verbesserungen) sowie B102+B103/B101/B100 bereits gepusht und CI-grün.*
 *Nächster Schritt: C3 Compound-Edit-Option. Push dieser Session braucht noch die reguläre Session-Bestätigung (Push-Policy LOOPS.md). Weiterhin nur als Notiz (kein Bug): mehrere Test-Dateien konstruieren Datums-Fixtures über lokale `Date`-Methoden + `.toISOString()` — verschiebt `startDate` bei lokalem Ausführen in einer positiven-UTC-Offset-Zeitzone um einen Tag; betrifft nur lokale Testläufe außerhalb UTC, nicht CI/Produktionscode, bei Bedarf mit `TZ=UTC npx playwright test` gegentesten. Möglicher Folge-Sprint (nicht angefordert): B79 (`_checkCompoundIsolationBalance`) auf die neue `isCompoundExercise()` umstellen, siehe DECISIONS.md. Loops 7-11 aktiv (diese Session: Loop 5+7+11 aktualisiert). Nicht committet: `Research/TRAIN_Parameter_Review.md` (Nutzer-Recherche, bewusst uncommitted gelassen).*
 
 ---
@@ -11,11 +11,33 @@ Aktuelle Priorität: UX-Bugs beheben → Edge-Case-Audit → 20 echte Nutzer rek
 ---
 
 ## STAND
-- CACHE_VERSION: train-v218 (v155 wurde nie vergeben, siehe vorherige
+- CACHE_VERSION: train-v219 (v155 wurde nie vergeben, siehe vorherige
   Sprint-Notiz — Nummerierung folgt echten Code-Sprints, nicht der
   Sprint-Text-Nummerierung)
-- CSS: ?v=207
-- SCHEMA: 32 (unverändert — additiver Default statt Versions-Bump, siehe B109)
+- CSS: ?v=208
+- SCHEMA: 33 (echter Bump — neue Felder `skipReason`/`skipDate`/
+  `nextWeekPlanAutoReviewed` je Übung, siehe B129)
+- **B128/B129 — Auto-Steigerung Opt-out + Skip-Grund-Abfrage (train-v219,
+  2026-07-27):** Diagnose-vor-Fix über 2 sequenzielle Runden (beide berühren
+  state.js, laut AGENTS.md nicht parallelisierbar). Bei beiden Aufgaben ein
+  wichtiger Befund während der Diagnose/Umsetzung:
+  - B128: `nextWeekPlan`-Auto-Vorauswahl existierte bereits vollständig
+    (`EX_AUTO_PRESELECT_NEXT_WEEK_PLAN`, bisher nur vom "Neue Woche"-Dialog
+    genutzt) — nur ein neuer Trigger (Tagesabschluss) nötig, kein neuer
+    Reducer. Sprint-Vorlagen-Widerspruch gefunden (unconfirmed setzen vs.
+    Banner erst bei neuer Woche — hätte den Plan lautlos verworfen) und
+    zugunsten der expliziten Opt-out-Entscheidung aufgelöst: Plan wird
+    sofort `confirmed=true`, neues Feld `ex.nextWeekPlanAutoReviewed`
+    steuert nur die Banner-Sichtbarkeit.
+  - B129: `DAY_TOGGLE_COMPLETE` setzt jeden `pending`-Satz synchron auf
+    `'fail'` — Skip-Erkennung muss auf einem Snapshot VOR diesem Dispatch
+    laufen, sonst ist "komplett übersprungen" nie erkennbar. Neuer
+    Warteschlangen-Dialog (eine Übung nach der anderen), neues Coach-Tab-
+    Signal `_checkInjuryReminder()`, bedingte Check-in-Zusatzfrage.
+  52+ neue/erweiterte Tests, volle Suite grün (1 bekannter Download-Event-
+  Flake in `share_image.spec.js` isoliert 2× grün nachverifiziert — keine
+  Regression). state.js/ui.js/styles.css/weeklyFocus.js geändert,
+  CACHE_VERSION train-v218→v219, CSS ?v=207→208, SCHEMA 32→33 (mit Migration).
 - **B123-B127 — 5 Features vor Launch (train-v218, 2026-07-27):** Diagnose-vor-
   Fix über 2 Runden (Runde 1 parallel: ui.js-Such-Dialog + ui.js/styles.css
   Plate-Calculator; Runde 2 sequenziell: ein Agent für 3 state.js-berührende
