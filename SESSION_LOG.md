@@ -3125,3 +3125,13 @@ Eigentliche Aufgabe: B130/B131/B132. Baute direkt auf der vorherigen
   SCHEMA unveraendert (33). CLAUDE.md/HANDOFF.md/BUGS.md (B130/B131/B132)/
   DECISIONS.md aktualisiert. Screenshots genommen: Scheiben-Chips (90kg),
   Coach-Tab nach Deload-Dismiss.
+Loop 5: for-advisor.txt aktualisiert (38. Fassung, B130/B131/B132) -
+  Abschnitt 1 (Aktueller Code-Stand) war seit v217 stehengeblieben
+  (Header/Bug-Tabelle), im Zuge dieser Aktualisierung mit nachgezogen.
+Loop 7: for-advisor-product.txt aktualisiert (v220) - neuer Update-Block,
+  veraltete B126-Beschreibung (falsch-herum-Rechner) durch Verweis auf die
+  v220-Korrektur ersetzt, Deload-/Plateau-Abschnitte ergaenzt.
+Loop 8/9/10: for-advisor-market.txt/for-advisor-ux.txt/for-advisor-growth.txt
+  - nur Header aufgefrischt (keine neuen Markt-/UX-/Growth-Erkenntnisse).
+Loop 11: for-advisor-consolidated.txt aktualisiert (neuer Update-Log-Eintrag,
+  Header auf v220/SCHEMA 33).
