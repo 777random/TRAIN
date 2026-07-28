@@ -197,6 +197,7 @@ function buildDefaultState() {
     coachPerformance: { suggestions: [] }, // Logging + Messung von Progressions-Empfehlungen
     substituteHistory: {}, // { [originalExerciseName]: { name, count, lastUsed }[] } — D2, siehe _recordSubstitution()
     exerciseNotes: {}, // { [exerciseName]: string } — B127: permanente, übungsweite Notiz (Rack-Höhe, Griffbreite etc.), überlebt Wochen-Klone; NICHT zu verwechseln mit ex.note (tagesspezifisch) oder s.note (pro Satz)
+    customAlternatives: {}, // { [exerciseName]: string[] } — B138: nutzerdefinierte Alternativübungen, siehe exerciseAlternatives.js getAlternatives()
     settings: {
       swipe:              true,
       drag:               true,
@@ -217,6 +218,7 @@ function buildDefaultState() {
       hideStreakBadge:                false, // B60: Streak-Badge im Trainings-Tab optional ausblendbar
       sessionCoach:                   true,  // B76: Pre-Session Check-in + Briefing
       goal:                           null,  // Sprint C1: 'kraftaufbau'|'muskelaufbau'|'fitness'|null — für Pausenzeiten-Empfehlung
+      nutritionPhase:                 'maintenance', // B139: 'bulk'|'maintenance'|'cut' — beeinflusst Steigerungs-Empfehlung + Coach-Signale
       dismissedNamePairs:             [], // [nameA, nameB][] – sortiert, getrimmt, lowercase
       autoWeek: {
         enabled:          false, // Hauptschalter automatische Wochenerstellung
@@ -971,6 +973,7 @@ function migrate(raw) {
   if (raw.settings.hideStreakBadge                === undefined) raw.settings.hideStreakBadge                = false;
   if (raw.settings.sessionCoach                   === undefined) raw.settings.sessionCoach                   = true;
   if (raw.settings.goal                           === undefined) raw.settings.goal                           = null;
+  if (raw.settings.nutritionPhase                 === undefined) raw.settings.nutritionPhase                 = 'maintenance';
   if (!Array.isArray(raw.settings.dismissedNamePairs)) raw.settings.dismissedNamePairs = [];
   if (!raw.coachQuestion || typeof raw.coachQuestion !== 'object') {
     raw.coachQuestion = { weekStart: null, questionId: null, answer: null, outcome: null, measuredWeekStart: null };
@@ -989,6 +992,9 @@ function migrate(raw) {
   }
   if (!raw.exerciseNotes || typeof raw.exerciseNotes !== 'object') {
     raw.exerciseNotes = {}; // B127: additiver Default, kein SCHEMA_VERSION-Bump (Präzedenzfall substituteHistory)
+  }
+  if (!raw.customAlternatives || typeof raw.customAlternatives !== 'object') {
+    raw.customAlternatives = {}; // B138: additiver Default, kein SCHEMA_VERSION-Bump (Präzedenzfall substituteHistory/exerciseNotes)
   }
 
   // Always-apply: week label (optional user-set name, no schema bump needed)
@@ -1434,6 +1440,7 @@ export const A = Object.freeze({
   SET_RPE:             'SET_RPE',             // { di, ei, si, rpe: number }
   EX_SET_SUBSTITUTE:   'EX_SET_SUBSTITUTE',   // { di, ei, substituteFor: string|null }
   EXERCISE_NOTE_SET:   'EXERCISE_NOTE_SET',   // { name, value } — B127: schreibt state.exerciseNotes[name], permanent, keyed by exaktem Übungsnamen (wie state.prs/state.substituteHistory)
+  CUSTOM_ALTERNATIVE_ADD: 'CUSTOM_ALTERNATIVE_ADD', // { exerciseName, alternative } — B138: schreibt state.customAlternatives[exerciseName], permanent, keyed wie exerciseNotes
   // Session log
   SESSION_START:       'SESSION_START',       // { di, ts }  – persists day.sessionStartTs
   SESSION_RESET:       'SESSION_RESET',       // { di }  – clears sessionStartTs so timer can restart
@@ -2336,6 +2343,19 @@ function reduce(state, action) {
       // state.prs/state.substituteHistory), NICHT case-insensitive.
       if (!state.exerciseNotes || typeof state.exerciseNotes !== 'object') state.exerciseNotes = {};
       state.exerciseNotes[p.name] = p.value;
+      break;
+    }
+    case A.CUSTOM_ALTERNATIVE_ADD: {
+      // B138: exakter Name als Key (wie exerciseNotes/substituteHistory), NICHT
+      // case-insensitive. Kein Duplikat-Eintrag bei erneutem Speichern derselben
+      // Alternative.
+      const name = (p.alternative ?? '').trim();
+      if (!p.exerciseName || !name) break;
+      if (!state.customAlternatives || typeof state.customAlternatives !== 'object') state.customAlternatives = {};
+      if (!Array.isArray(state.customAlternatives[p.exerciseName])) state.customAlternatives[p.exerciseName] = [];
+      if (!state.customAlternatives[p.exerciseName].includes(name)) {
+        state.customAlternatives[p.exerciseName].push(name);
+      }
       break;
     }
 

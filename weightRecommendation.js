@@ -42,9 +42,28 @@ export function roundToPlate(weight, step = 2.5) {
  *   sessionCoach.js). Compound-Übungen behalten die bisherige 7.5–8.5-Spanne.
  *   Default true, um bestehende Aufrufer nicht zu brechen, die den Parameter
  *   (noch) nicht übergeben.
+ * @param {string} nutritionPhase – B139: 'bulk'|'maintenance'|'cut', verschiebt
+ *   nur den Vollsteigerung-Schwellenwert (7.5 default). 'cut' ist bewusst
+ *   strikt: volle Steigerung nur bis RPE 6.0, KEINE Halbzone danach (jede
+ *   Steigerung im Defizit — auch eine kleine — gilt als physiologisch
+ *   unwahrscheinlich/Übertrainings-Risiko, siehe DECISIONS.md). 'bulk' hebt
+ *   die Vollsteigerung-Schwelle auf 8.0 an, Halbzone bleibt bis 8.5
+ *   (compound) bzw. entfällt bei Isolation (8.0 > bisherige 7.5-Grenze).
+ *   Default 'maintenance' = exaktes bisheriges Verhalten (7.5/8.5-7.5).
  * @returns {{ recommendedValue: number, reason: string, reasons: Array, delta: number, lastValue: number }}
  */
-function _recommendationCore(lastValue, weekSets, progressionMode, targetRepsMax, step, fullDelta, halfDelta, isCompound = true) {
+function _recommendationCore(lastValue, weekSets, progressionMode, targetRepsMax, step, fullDelta, halfDelta, isCompound = true, nutritionPhase = 'maintenance') {
+  // B139: Phase-abhängige Schwellen. 'cut': halfCeiling === fullThreshold
+  // macht die Halbzonen-Bedingung unten strukturell unerreichbar (avgRpe >
+  // fullThreshold && avgRpe <= halfCeiling kann nie beides gleichzeitig
+  // erfüllen) — bewusst so gelöst statt eines dritten if-Zweigs, damit die
+  // bestehende Kaskade unverändert bleibt.
+  const fullThreshold = nutritionPhase === 'cut' ? 6.0 : nutritionPhase === 'bulk' ? 8.0 : 7.5;
+  const halfCeiling = nutritionPhase === 'cut'
+    ? fullThreshold
+    : nutritionPhase === 'bulk'
+      ? (isCompound ? 8.5 : 8.0)
+      : (isCompound ? 8.5 : 7.5);
   // Ø RPE der letzten Einheit (nur success-Sätze mit rpe !== null)
   let lastIdx = weekSets.length - 1;
   while (lastIdx >= 0 && weekSets[lastIdx].success.length === 0) lastIdx--;
@@ -119,12 +138,12 @@ function _recommendationCore(lastValue, weekSets, progressionMode, targetRepsMax
     reason = 'Letzte Einheit war intensiv, Wert halten';
     reasons.push({ icon: '⚠', text: `Erfolgsquote ${srPct}%`, isRpe: false });
     if (avgRpe !== null) reasons.push({ icon: 'ℹ', text: `Ø RPE ${avgRpe.toFixed(1)}`, isRpe: true });
-  } else if (avgRpe !== null && avgRpe <= 7.5 && successRate >= 0.8) {
+  } else if (avgRpe !== null && avgRpe <= fullThreshold && successRate >= 0.8) {
     delta  = fullDelta;
     reason = 'RPE war niedrig, Steigerung möglich';
     reasons.push({ icon: '✓', text: `Ø RPE ${avgRpe.toFixed(1)} — Luft nach oben`, isRpe: true });
     reasons.push({ icon: '✓', text: `Erfolgsquote ${srPct}%`, isRpe: false });
-  } else if (avgRpe !== null && avgRpe > 7.5 && avgRpe <= (isCompound ? 8.5 : 7.5) && successRate >= 0.8) {
+  } else if (avgRpe !== null && avgRpe > fullThreshold && avgRpe <= halfCeiling && successRate >= 0.8) {
     delta  = halfDelta;
     reason = 'Gute Form, kleine Steigerung';
     reasons.push({ icon: '✓', text: `Ø RPE ${avgRpe.toFixed(1)} — gute Form`, isRpe: true });
@@ -164,9 +183,10 @@ function _recommendationCore(lastValue, weekSets, progressionMode, targetRepsMax
  *   ANDERE ACHSE als ex.progressionType (steuert nur den manuellen Plan-Button) — nicht verwechseln.
  * @param {number|null} targetRepsMax – Wdh-Obergrenze, nur bei 'double_progression' relevant.
  * @param {boolean} isCompound – B121: siehe _recommendationCore(). Default true.
+ * @param {string} nutritionPhase – B139: siehe _recommendationCore(). Default 'maintenance'.
  * @returns {{ recommendedWeight: number, reason: string, delta: number, lastWeight: number } | null}
  */
-export function getWeightRecommendation(exerciseName, weeks, plateStep = 2.5, progressionMode = 'weight_first', targetRepsMax = null, isCompound = true) {
+export function getWeightRecommendation(exerciseName, weeks, plateStep = 2.5, progressionMode = 'weight_first', targetRepsMax = null, isCompound = true, nutritionPhase = 'maintenance') {
   if (weeks.length < 2) return null;
 
   // Sätze pro Woche für diese Übung sammeln (success + fail getrennt).
@@ -208,7 +228,7 @@ export function getWeightRecommendation(exerciseName, weeks, plateStep = 2.5, pr
   // (Nutzer-Entscheidung, siehe BUGS.md).
   const fullDelta = plateStep;
   const halfDelta = plateStep <= 1.25 ? plateStep : plateStep / 2;
-  const core = _recommendationCore(lastWeight, weekSets, progressionMode, targetRepsMax, plateStep, fullDelta, halfDelta, isCompound);
+  const core = _recommendationCore(lastWeight, weekSets, progressionMode, targetRepsMax, plateStep, fullDelta, halfDelta, isCompound, nutritionPhase);
   return {
     recommendedWeight: core.recommendedValue,
     reason: core.reason,

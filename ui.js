@@ -39,7 +39,8 @@ import { computeQualityTrend, computeConsistencyTrend, computeVolumeTrend, compu
 import { weekSuccessCounts } from './setUtils.js';
 import { getSortedWeeks, exWeightHistory, exMetricHistory, detectRecurringStep } from './insightEngine.js';
 import { buildSetFeedback, buildLastSetMessage, buildWarmupSets, _pauseSecForRpe } from './sessionCoach.js';
-import { buildSessionHighlights, buildSessionEinordnung, buildNextSessionPreview, calcSleepCorrelation } from './sessionSummary.js';
+import { buildSessionHighlights, buildSessionEinordnung, buildNextSessionPreview, calcSleepCorrelation, detectSessionFatigue } from './sessionSummary.js';
+import { getAlternatives } from './exerciseAlternatives.js';
 
 // ─── Module-level UI state (transient, never persisted) ──────────────────────
 
@@ -1348,19 +1349,25 @@ function _buildSessionBriefing(day, state) {
   }
   if (energy === 'low') { modifier = 'reduced'; modifierScope = 'compound'; }
 
+  let result;
   if (modifier === 'reduced_mild') {
-    return { modifier, modifierScope, message: 'Leicht reduzieren heute — Gewichte -5%' };
+    result = { modifier, modifierScope, message: 'Leicht reduzieren heute — Gewichte -5%' };
+  } else if (modifier === 'reduced' && modifierScope === 'compound') {
+    result = { modifier, modifierScope, message: 'Compound-Übungen heute reduzieren — Gewichte -10%, Isolation unverändert' };
+  } else if ((sleep === 'good' || sleep === 'great') && energy === 'high') {
+    result = { modifier: 'optimal', modifierScope: 'all', message: 'Optimale Voraussetzungen — heute Steigerung versuchen' };
+  } else if ((sleep === 'good' || sleep === 'great') && energy === 'medium') {
+    result = { modifier: 'normal', modifierScope: 'all', message: 'Gute Basis — Training wie geplant' };
+  } else {
+    result = { modifier: 'normal', modifierScope: 'all', message: 'Normales Training — Ziele wie geplant' };
   }
-  if (modifier === 'reduced' && modifierScope === 'compound') {
-    return { modifier, modifierScope, message: 'Compound-Übungen heute reduzieren — Gewichte -10%, Isolation unverändert' };
+
+  // B139: Defizit-Hinweis unabhängig davon, welcher Schlaf/Energie-Zweig
+  // oben greift — kein PR-Druck im Kaloriendefizit.
+  if (state.settings?.nutritionPhase === 'cut') {
+    result.message += ' Defizit-Phase: Intensität halten, kein PR-Druck.';
   }
-  if ((sleep === 'good' || sleep === 'great') && energy === 'high') {
-    return { modifier: 'optimal', modifierScope: 'all', message: 'Optimale Voraussetzungen — heute Steigerung versuchen' };
-  }
-  if ((sleep === 'good' || sleep === 'great') && energy === 'medium') {
-    return { modifier: 'normal', modifierScope: 'all', message: 'Gute Basis — Training wie geplant' };
-  }
-  return { modifier: 'normal', modifierScope: 'all', message: 'Normales Training — Ziele wie geplant' };
+  return result;
 }
 
 /**
@@ -1946,7 +1953,7 @@ function renderExercise(wk, di, ei, state) {
         if (calcWeeks.length >= 2) {
           const recStep = ex.weightStep || state.settings?.plateStep || 2.5;
           const _nwIsCompound = isCompoundExercise(ex.name, buildCategoryMap(state.customExercises));
-          const rec = getWeightRecommendation(ex.name, calcWeeks, recStep, ex.progressionMode ?? 'weight_first', ex.targetRepsMax ?? null, _nwIsCompound);
+          const rec = getWeightRecommendation(ex.name, calcWeeks, recStep, ex.progressionMode ?? 'weight_first', ex.targetRepsMax ?? null, _nwIsCompound, state.settings?.nutritionPhase ?? 'maintenance');
           _nextWeekWeight = rec?.recommendedWeight ?? null;
         }
       }
@@ -2047,10 +2054,26 @@ function renderExercise(wk, di, ei, state) {
         <span class="sub-suggestion__count">${entry.count}×</span>
       </button>`).join('')}
     </div>` : '';
+  // B138: kuratierte Alternativ-Vorschläge (exerciseAlternatives.js) — eigene,
+  // neutral gestylte Chip-Reihe UNTER den bestehenden historienbasierten
+  // sub-suggestions (D2), nicht ersetzend. getAlternatives() kombiniert
+  // state.customAlternatives[ex.name] (zuerst) mit EXERCISE_ALTERNATIVES
+  // (vordefiniert), dedupliziert.
+  const _altSuggestions = getAlternatives(ex.name, state);
+  const altChipsHtml = _altSuggestions.length > 0
+    ? `<div class="alt-chips-block">
+      <span class="sub-form__label">Vorschläge:</span>
+      <div class="alt-chips">
+        ${_altSuggestions.map(name => `
+        <button type="button" class="alt-chip" data-action="apply-alt-chip"
+          data-di="${di}" data-ei="${ei}" data-original="${h(ex.name)}" data-suggested="${h(name)}">${h(name)}</button>`).join('')}
+      </div>
+    </div>` : '';
   const subFormHtml = _subFormOpenKey === _subKey
     ? `<div class="sub-form">
     ${subSuggestionsHtml}
-    <span class="sub-form__label">Ursprüngliche Übung:</span>
+    ${altChipsHtml}
+    <span class="sub-form__label">Andere Übung:</span>
     <input
       class="sub-name-input"
       type="text"
@@ -2063,6 +2086,11 @@ function renderExercise(wk, di, ei, state) {
     <datalist id="sub-list-${di}-${ei}">
       ${_STANDARD_EXERCISES.map(n => `<option value="${h(n)}">`).join('')}
     </datalist>
+    <button
+      type="button"
+      class="btn btn--ghost btn--sm save-alt-btn is-hidden"
+      data-action="save-custom-alternative" data-di="${di}" data-ei="${ei}" data-original="${h(ex.name)}"
+    >+ Als Alternative für ${h(ex.name)} speichern</button>
     <div class="sub-form__btns">
       <button class="btn btn--accent btn--sm" data-action="confirm-sub" data-di="${di}" data-ei="${ei}">Bestätigen</button>
       <button class="btn btn--ghost btn--sm" data-action="close-sub-form" data-di="${di}" data-ei="${ei}">Abbrechen</button>
@@ -4854,6 +4882,20 @@ function renderSettingsTab(state) {
     </div>
     <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:var(--sp-2)">
       <div>
+        <div class="settings-row__label">Ernährungsphase</div>
+        <div class="settings-row__desc">Beeinflusst Steigerungs-Empfehlungen und Coaching</div>
+      </div>
+      <div class="weight-step-opts">
+        ${[['bulk', '🔼 Aufbau'], ['maintenance', '↔ Erhalt'], ['cut', '🔽 Diät']].map(([val, label]) => `
+          <button type="button"
+            class="weight-step-btn${(s.nutritionPhase ?? 'maintenance') === val ? ' is-selected' : ''}"
+            data-action="set-nutrition-phase" data-phase="${val}"
+            aria-pressed="${(s.nutritionPhase ?? 'maintenance') === val}"
+          >${label}</button>`).join('')}
+      </div>
+    </div>
+    <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:var(--sp-2)">
+      <div>
         <div class="settings-row__label">Max. Sitzungsdauer</div>
         <div class="settings-row__desc">Session-Timer stoppt bei Erreichen des Limits</div>
       </div>
@@ -5096,7 +5138,7 @@ function renderSettingsTab(state) {
   <div class="settings-section">
     <div class="settings-section__title">Info</div>
     <div class="settings-row">
-      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v221</div></div>
+      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v222</div></div>
     </div>
     <div class="settings-row">
       <div>
@@ -6287,6 +6329,28 @@ function _handleClick(e) {
       break;
     }
 
+    // B138: kuratierte Alternativ-Chips (exerciseAlternatives.js) — identisches
+    // Zwei-Dispatch-Muster wie 'apply-sub-suggestion' direkt darüber, damit
+    // "sofort übernommen" (AC2) konsistent funktioniert.
+    case 'apply-alt-chip': {
+      const original  = el.dataset.original;
+      const suggested = el.dataset.suggested;
+      dispatch(A.EX_UPDATE, { di: +di, ei: +ei, field: 'name', value: suggested });
+      dispatch(A.EX_SET_SUBSTITUTE, { di: +di, ei: +ei, substituteFor: original });
+      _subFormOpenKey = null;
+      break;
+    }
+
+    case 'save-custom-alternative': {
+      const original = el.dataset.original;
+      const _altInp  = document.querySelector(`.sub-name-input[data-di="${di}"][data-ei="${ei}"]`);
+      const _altName = _altInp?.value.trim();
+      if (!_altName) break;
+      dispatch(A.CUSTOM_ALTERNATIVE_ADD, { exerciseName: original, alternative: _altName });
+      showToast(`"${_altName}" als Alternative gespeichert`, 'ok');
+      break;
+    }
+
         case 'move-ex-up': {
       const toEi = +ei - 1;
       if (toEi >= 0) {
@@ -6907,6 +6971,11 @@ function _handleClick(e) {
       break;
     }
 
+    case 'set-nutrition-phase': {
+      dispatch(A.SETTING_SET, { key: 'nutritionPhase', value: el.dataset.phase });
+      break;
+    }
+
     case 'set-max-session': {
       const ms = parseInt(el.dataset.ms, 10);
       dispatch(A.SETTING_SET, { key: 'maxSessionMs', value: Number.isFinite(ms) && ms > 0 ? ms : 10800000 });
@@ -7250,6 +7319,16 @@ function _handleInput(e) {
     const st = getState();
     const ex = st.weeks[st.curIdx]?.days?.[+di]?.exercises?.[+ei];
     slot.textContent = _plateHintText(ex, parseFloat(e.target.value));
+  }
+
+  // B138: "+ Als Alternative speichern"-Button erscheint erst nach freier
+  // Eingabe — direkter Klassen-Toggle statt scheduleRender()/dispatch()
+  // (gleiches Muster wie oben, verhindert den Tastatur-Bug).
+  if (e.target.matches?.('.sub-name-input')) {
+    const { di, ei } = e.target.dataset;
+    const btn = document.querySelector(`.save-alt-btn[data-di="${di}"][data-ei="${ei}"]`);
+    if (!btn) return;
+    btn.classList.toggle('is-hidden', e.target.value.trim().length === 0);
   }
 }
 
@@ -7649,7 +7728,7 @@ function _prepNewWeekModal() {
             ? (ex.weightStep || state.settings?.plateStep || 2.5)
             : (ex.metricStep || (exMetric === 'm' ? 50 : 10));
           const rec = exMetric === 'reps'
-            ? getWeightRecommendation(ex.name, calcWeeks, step, exProgressionMode, exTargetRepsMax, isCompoundExercise(ex.name, buildCategoryMap(state.customExercises)))
+            ? getWeightRecommendation(ex.name, calcWeeks, step, exProgressionMode, exTargetRepsMax, isCompoundExercise(ex.name, buildCategoryMap(state.customExercises)), state.settings?.nutritionPhase ?? 'maintenance')
             : getMetricRecommendation(ex.name, calcWeeks, step, exProgressionMode, exTargetRepsMax);
           if (rec) {
             if (inRecoveryWindow && rec.delta > 0) {
@@ -8425,7 +8504,7 @@ function _buildSessionSummaryData(di) {
     if (calcWeeks.length >= 2) {
       const step = focusEx.weightStep || state.settings?.plateStep || 2.5;
       const _fpIsCompound = isCompoundExercise(focusEx.name, buildCategoryMap(state.customExercises));
-      const rec = getWeightRecommendation(focusEx.name, calcWeeks, step, focusEx.progressionMode ?? 'weight_first', focusEx.targetRepsMax ?? null, _fpIsCompound);
+      const rec = getWeightRecommendation(focusEx.name, calcWeeks, step, focusEx.progressionMode ?? 'weight_first', focusEx.targetRepsMax ?? null, _fpIsCompound, state.settings?.nutritionPhase ?? 'maintenance');
       nextWeekWeight = rec?.recommendedWeight ?? null;
     }
   }
@@ -8446,7 +8525,11 @@ function _buildSessionSummaryData(di) {
     }
   }
 
-  return { highlights, einordnung, nextPreview, sleepInsight, isVacation: !!day.isVacation };
+  // B140: Intra-Session-Erschöpfung — tagesskaliert, nicht wochenskaliert
+  // (siehe DECISIONS.md), daher hier und nicht im Coach-Tab.
+  const fatigue = detectSessionFatigue(day);
+
+  return { highlights, einordnung, nextPreview, sleepInsight, fatigue, isVacation: !!day.isVacation };
 }
 
 function _showSessionSummary(di, completionStats) {
@@ -8471,6 +8554,17 @@ function _showSessionSummary(di, completionStats) {
         <div class="sleep-insight-card__title">💡 ERKENNTNIS</div>
         <p class="sleep-insight-card__body">Deine Trainings nach &lt;7h Schlaf: ø ${data.sleepInsight.poorAvg}% Erfolgsquote<br>Nach &gt;7h Schlaf: ø ${data.sleepInsight.goodAvg}%</p>
         <p class="sleep-insight-card__conclusion">Schlaf ist dein größter Hebel für bessere Trainings.</p>
+      </div>` : ''}
+      ${data.fatigue ? `
+      <div class="session-fatigue-card">
+        <div class="session-fatigue-card__title">⚡ Erschöpfungs-Muster erkannt</div>
+        <p class="session-fatigue-card__body">Erste Übungen: Ø RPE ${data.fatigue.firstAvg}<br>Letzte Übungen: Ø RPE ${data.fatigue.secondAvg} (+${data.fatigue.rpeDiff} Anstieg)</p>
+        <p class="session-fatigue-card__body">${h(data.fatigue.mostFatiguedExercise)} zeigt Ermüdungszeichen.</p>
+        <ul class="session-fatigue-card__options">
+          <li>Früher im Training platzieren</li>
+          <li>Satzanzahl reduzieren</li>
+          <li>Als eigene Session trainieren</li>
+        </ul>
       </div>` : ''}
       <button type="button" class="btn btn--accent session-summary-screen__btn" id="session-summary-continue">Weiter</button>
     </div>`;
@@ -8523,7 +8617,7 @@ function _autoSetNextWeekPlanForDay(di, skippedNames) {
       ? (ex.weightStep || state.settings?.plateStep || 2.5)
       : (ex.metricStep || (exMetric === 'm' ? 50 : 10));
     const rec = exMetric === 'reps'
-      ? getWeightRecommendation(ex.name, calcWeeks, step, exProgressionMode, exTargetRepsMax, isCompoundExercise(ex.name, buildCategoryMap(state.customExercises)))
+      ? getWeightRecommendation(ex.name, calcWeeks, step, exProgressionMode, exTargetRepsMax, isCompoundExercise(ex.name, buildCategoryMap(state.customExercises)), state.settings?.nutritionPhase ?? 'maintenance')
       : getMetricRecommendation(ex.name, calcWeeks, step, exProgressionMode, exTargetRepsMax);
     if (!rec || !(rec.delta > 0)) return; // kein Plan bei X->X bzw. keiner Steigerung
     if (!isReadyForAutoSelect(ex.name, calcWeeks, exProgressionMode, exTargetRepsMax)) return;

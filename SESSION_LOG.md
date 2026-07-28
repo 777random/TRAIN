@@ -3135,3 +3135,152 @@ Loop 8/9/10: for-advisor-market.txt/for-advisor-ux.txt/for-advisor-growth.txt
   - nur Header aufgefrischt (keine neuen Markt-/UX-/Growth-Erkenntnisse).
 Loop 11: for-advisor-consolidated.txt aktualisiert (neuer Update-Log-Eintrag,
   Header auf v220/SCHEMA 33).
+
+## 2026-07-27 (Re-Diagnose-Sprint — B134-B137, kein Code-Fix) train-v221
+Loop 1: volle Suite 156 passed, 3 flaky (bekannte Parallel-Last-Flakes,
+  beim Retry gruen), 0 failed.
+Loop 2: aktuell (CACHE_VERSION train-v221/CSS ?v=210 stimmen in sw.js/
+  index.html/HANDOFF.md/CLAUDE.md ueberein, nichts zu tun).
+Loop 3: uebersprungen (16 Edge-Case-Fixtures vorhanden, Stop-Bedingung >=15
+  bereits erfuellt, keine UX-Hoch-Bugs offen).
+Loop 6: uebersprungen (zuletzt geprueft 2026-07-21, < 90 Tage).
+Eigentliche Aufgabe: Nutzer brachte 4 vermeintliche Bugs mit expliziter
+  Vorgabe "Diagnose zuerst, Root Cause bestaetigen, dann Fix, Spec zeigen
+  und auf Bestaetigung warten". Diagnose (Code lesen + gezielte Playwright-
+  Laeufe) ergab: alle 4 bereits behoben, keine Vermutung/kein Raten noetig,
+  da explizite Code-Kommentare + bestehende Tests den jeweiligen Bug-Report
+  woertlich als historischen Fund dokumentieren.
+  - B134 (PR-Badge jedes Mal): bereits train-v184 gefixt (state.js
+    _applyPrTracking, s.prBadge wird am ausloesenden Satz markiert statt
+    live gegen ex.prWeight verglichen) + train-v217/B115 (max 1 Badge/Tag).
+    tests/pr_badge.spec.js:15 deckt exakt das Szenario ab, gruen.
+  - B135 (Reorder-Pfeil verschwindet): = B116 (train-v217), _exMenuOpenKey
+    folgt nach move-ex-up/-down explizit dem neuen Index. Gruen.
+  - B136 (erster Haken gold): = B117 (train-v217), .is-pr-Farbregel fuer
+    den Haken entfernt, kein si===0-Sonderfall im Code.
+  - B137 (RPE-Hint blockiert UI): = B118 (train-v217), .rpe-nudge hat
+    pointer-events:none, nur die Buttons darin pointer-events:auto.
+  Spec mit allen 4 Befunden dem Nutzer gezeigt (AskUserQuestion), auf
+  Bestaetigung gewartet statt zu implementieren. Nutzer entschied sich
+  gegen Version-Bump/Commit/Push (keine funktionale Aenderung) - nur
+  BUGS.md (B134-B137)/HANDOFF.md-Notiz, bewusst nicht committet.
+  CACHE_VERSION unveraendert (train-v221), kein Push.
+Loop 5: for-advisor.txt aktualisiert (Re-Diagnose-Ergebnis nachgezogen).
+Loop 7: for-advisor-product.txt aktualisiert (Header/Datum aufgefrischt,
+  kein inhaltlicher Produkt-Change).
+Loop 8/9/10: unveraendert (keine neuen Markt-/UX-/Growth-Erkenntnisse).
+Loop 11: for-advisor-consolidated.txt aktualisiert (neuer Update-Log-Eintrag).
+
+## 2026-07-27 (Nachtrag — Loop 5/7-11 vollstaendig ausgefuehrt, kein Code-Fix) train-v221
+Auf Nutzerwunsch: Loop 5/7/8/9/10/11 nochmal vollstaendig durchlaufen
+  (vorheriger Durchlauf hatte bei 7/8/9/10/11 nur Header aufgefrischt).
+Loop 5: for-advisor.txt komplett neu gegen den echten Code verifiziert
+  (per Fork-Agent, 39.->41. Fassung) - nicht nur aus Doku fortgeschrieben.
+  Dabei 3 echte Zaehl-Drifts gefunden und korrigiert: tests/fixtures/*.json
+  18->17, MOVEMENT_MAP 218->217 Eintraege, ISOLATION_EXERCISE_NAMES 62->60
+  Eintraege (movementMap.js, praezise nachgezaehlt). Coach-Kaskade/
+  Prozentzahlen/State-Shape/CI-Infrastruktur verifiziert unveraendert seit
+  v220. Header war zuvor bei v220 stehengeblieben (B133/v221 fehlte
+  komplett) - jetzt auf train-v221 gebracht, inkl. B133 und B134-B137.
+Loop 7: for-advisor-product.txt komplett gelesen, gegen CLAUDE.md/BUGS.md
+  gegengeprueft - kein Drift gefunden, Inhalt bereits akkurat.
+Loop 8/9/10: for-advisor-market.txt/ux.txt/growth.txt Header auf
+  train-v221/CSS ?v=210 gebracht, Re-Diagnose-Sprint-Notiz ergaenzt -
+  weiterhin keine neuen Markt-/UX-/Growth-Erkenntnisse.
+Loop 11: for-advisor-consolidated.txt vollstaendig gegen alle 4
+  Quelldateien gegengeprueft: Teil 1-4 inhaltlich konsistent, Teil 5 (alle
+  offenen Fragen) rechnerisch bestaetigt - 17 Rohfragen aus den 4 Dateien
+  (5+5+3+4) korrekt auf 15 dedupliziert (3 Fragen zu Aha-Moment/
+  Session-Coach-Selbsterklaerung zu einer zusammengefasst), keine fehlt,
+  keine doppelt. Re-Verifikations-Vermerke in Teil-2/3/4-Headern ergaenzt.
+  Nichts committet (Nutzerwunsch), context-exports/ ohnehin gitignored.
+
+## 2026-07-28 (B132 Re-Diagnose — Deadlift-Plateau vs. Coach-Tab, kein Code-Fix) train-v221
+Loop 1: volle Suite 161 passed, 2 flaky (bekannte Parallel-Last-Flakes,
+  beim Retry gruen), 0 failed.
+Loop 2: aktuell (train-v221/CSS ?v=210 unveraendert, nichts zu tun).
+Eigentliche Aufgabe: Nutzer bat um Re-Diagnose von B132 mit 3 gezielten
+  Nachfragen zur bereits dokumentierten Root Cause (Gating in der akuten
+  Kaskade, urspruenglich train-v220 diagnostiziert). Diagnose zuerst,
+  kein Raten:
+  1. B131 (Deload-"Weiter wie bisher") hat KEINE Wirkung auf
+     _checkPlateau() - komplett getrennte Kaskaden bestaetigt
+     (_checkPreventiveDeload in computeStructuralSignals/decisionLog,
+     _checkPlateau in computeWeeklyFocus/state.plateauActions, keine
+     Code-Verbindung).
+  2. plateauActions-Lifecycle per Code-Lesen nachvollzogen: 'ignored'
+     hebt sich spaetestens nach 1 weiteren Woche automatisch auf,
+     'implemented' laeuft nach exakt 14 Tagen aus (_isPlateauSuppressed,
+     weeklyFocus.js) - beides weit unter der im Sprint vermuteten
+     ">4 Wochen"-Bug-Schwelle. Ein Reset-Fix waere wirkungslos, da diese
+     Bedingung praktisch nie eintritt. Kein Bug im PLATEAU_ACTION-Reducer
+     (state.js).
+  3. Konkret demonstriert per Playwright-Ad-hoc-Reproduktion (Kreuzheben,
+     4 Wochen konstantes Gewicht, Testdatei danach wieder geloescht -
+     nicht Teil der permanenten Suite): ohne weiteres Signal zeigt der
+     Coach-Tab korrekt "Plateau ueberwinden"; mit zusaetzlich schlechtem
+     Schlaf (5h) in der aktuellen Woche zeigt er stattdessen "Schlaf
+     priorisieren" - Overload (Prio 3) verdraengt Plateau (Prio 4) exakt
+     wie in weeklyFocus.js dokumentiert.
+  Ergebnis: bestaetigt korrektes, gewolltes Verhalten - kein Bug, kein
+  Code-Fix. weeklyFocus.js/state.js unangetastet, kein CACHE_VERSION-Bump
+  (Sprint-Vorgabe: nur bei Code-Aenderung), nicht committet. Details:
+  BUGS.md B132 (Re-Diagnose-Addendum), HANDOFF.md.
+
+## 2026-07-28 (Sprint - Alternativuebungen + Ernaehrungsphase + Intra-Session-Erschoepfung) train-v221->v222
+Loop 1: Baseline gruen vor Sprint (161 passed, 0 failed).
+Eigentliche Aufgabe: 3 Features sequenziell (auf Nutzerwunsch, kein
+  Multi-Agent-Sprint - AGENTS.md-Grundregel: Aufgabe 1+2 schreiben beide
+  additiv in state.js, Kollisionsrisiko bei Parallelisierung). Technische
+  Spec vor Implementierung geschrieben, 2 Rueckfragen gestellt und vom
+  Nutzer beantwortet, bevor Code geschrieben wurde:
+  1. Chip-Ueberlappung (Aufgabe 1): neue EXERCISE_ALTERNATIVES-Chips
+     stapeln sich NEBEN der bestehenden historienbasierten
+     sub-suggestions-Liste (B109/D2), ersetzen sie nicht - Nutzerwahl.
+  2. RPE-Schwellen-Modell (Aufgabe 2): User korrigierte die erste Antwort
+     nachtraeglich - cut ist strikt (Volldelta nur bis RPE 6.0, danach
+     IMMER halten, KEINE Halbzone), nicht nur eine reine
+     Schwellenwert-Verschiebung. Physiologische Begruendung: Uebertrainings-
+     Risiko im Defizit.
+  - Aufgabe 1 (B138): neue Datei exerciseAlternatives.js
+    (EXERCISE_ALTERNATIVES, 24 Uebungen + getAlternatives()). Neue
+    Chip-Reihe im "Heute anders"-Dialog, neues additives Feld
+    state.customAlternatives, neue Action CUSTOM_ALTERNATIVE_ADD.
+  - Aufgabe 2 (B139): neues additives Feld settings.nutritionPhase.
+    weightRecommendation.js _recommendationCore() um phasenabhaengige
+    Schwellen erweitert (fullThreshold/halfCeiling), alle 8 echten
+    getWeightRecommendation()-Call-Sites aktualisiert (ui.js x4,
+    weeklyFocus.js x1, insightEngine.js x3). weeklyFocus.js
+    _checkPlateau() unterdrueckt sich bei cut, _fallback() bekommt
+    Phasen-Subtext. ui.js _buildSessionBriefing() Defizit-Hinweis bei cut.
+  - Aufgabe 3 (B140): neue Funktion detectSessionFatigue(day) in
+    sessionSummary.js (architektonische Entscheidung waehrend Spec-Phase:
+    tagesskaliert, NICHT weeklyFocus.js, NICHT neue Datei). Neuer Block im
+    Session-Summary-Screen, nicht Coach-Tab.
+  Unerwarteter Fund waehrend der Umsetzung: detectSessionFatigue-Import in
+  ui.js wurde vor der Funktion in sessionSummary.js geschrieben (Aufgabe-3-
+  Vorgriff waehrend Aufgabe 1) - fehlender Named-Export bricht bei
+  ES-Modulen den kompletten App-Boot, alle Aufgabe-1-Tests schlugen dadurch
+  kollateral fehl, bis per Diagnose-Test (pageerror mitgeloggt) sichtbar.
+  Sofort behoben (Funktion vorgezogen implementiert).
+  Echte Regression gefunden + gefixt: mein Label-Wechsel "Ursprüngliche
+  Übung:"->"Andere Übung:" (Aufgabe 1, laut bestaetigtem Sprint-Mockup) hat
+  einen bestehenden Test (heute_anders_history.spec.js) gebrochen, dessen
+  .sub-form__label-Selektor durch die neue "Vorschläge:"-Beschriftung
+  zusaetzlich nicht mehr eindeutig war. Test korrigiert (exakter Text-
+  Locator statt Klassen-Selektor).
+  Neuer Fund (Test-Infrastruktur, kein App-Bug): ein einzelner
+  `npx playwright test`-Lauf ueber alle 273 Tests laesst den lokalen
+  npx-serve-Devserver mit EMFILE abstuerzen, kaskadiert in ~130
+  ERR_CONNECTION_REFUSED-Fehler - reproduzierbar unabhaengig von
+  --workers und nach Prozess-Cleanup. Workaround gefunden und in
+  CLAUDE.md dokumentiert: Suite in 3 Datei-Batches ausfuehren (je frischer
+  Serverprozess). Alle 273 Tests so verifiziert: 0 echte Fehler.
+  16 neue Tests + 1 korrigierter Bestandstest. state.js/ui.js/
+  weightRecommendation.js/weeklyFocus.js/insightEngine.js/
+  sessionSummary.js/styles.css/sw.js/index.html geaendert + neue Datei
+  exerciseAlternatives.js. CACHE_VERSION train-v221->v222, CSS
+  ?v=210->211, SCHEMA unveraendert (33, alle neuen Felder additiv).
+  CLAUDE.md/BUGS.md/DECISIONS.md/AGENTS.md/HANDOFF.md aktualisiert.
+  3 Screenshots erstellt (Alternativ-Chips, kcal-Toggle, Erschoepfungs-
+  Block).

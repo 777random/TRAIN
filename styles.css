@@ -678,6 +678,22 @@ button, input, select, textarea { font: inherit; }
   font-size: 13px; color: var(--c-text-2); font-style: italic; margin: 0;
 }
 
+/* B140: Intra-Session-Erschöpfung — bewusst neutral/informativ, kein
+   Warn-Rand (kein --c-danger/--c-accent), siehe DECISIONS.md. */
+.session-fatigue-card {
+  width: 100%; background: var(--c-surface2); border: 1px solid var(--c-border);
+  border-radius: var(--r-lg); padding: var(--sp-4); text-align: left;
+}
+.session-fatigue-card__title {
+  font-size: 13px; font-weight: 600; color: var(--c-text); margin-bottom: var(--sp-2);
+}
+.session-fatigue-card__body {
+  font-size: 13px; color: var(--c-text); line-height: 1.6; margin: 0 0 var(--sp-2);
+}
+.session-fatigue-card__options {
+  font-size: 12px; color: var(--c-text-2); margin: 0; padding-left: var(--sp-4);
+}
+
 .deload-plan-card {
   background: var(--c-surface); border: 1px solid var(--c-border);
   border-radius: var(--r-lg); padding: var(--sp-3) var(--sp-4); margin-top: var(--sp-2);
@@ -1144,6 +1160,17 @@ exercise { position: unset; }
 .sub-suggestion__icon { flex-shrink: 0; }
 .sub-suggestion__name { flex: 1; }
 .sub-suggestion__count { color: var(--c-text-2); font-size: 12px; flex-shrink: 0; }
+/* B138: kuratierte Alternativ-Chips (exerciseAlternatives.js) — neutral, NICHT
+   --c-accent, bewusst optisch schwächer als der bestehende Bestätigen-Button. */
+.alt-chips-block { display: flex; flex-direction: column; gap: var(--sp-1); }
+.alt-chips { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.alt-chip {
+  background: var(--c-surface2); border: 1px solid var(--c-border);
+  border-radius: 8px; color: var(--c-text); font-size: 12px;
+  padding: var(--sp-1) var(--sp-2); cursor: pointer; font-family: var(--font-body);
+}
+.alt-chip:hover, .alt-chip:focus-visible { border-color: var(--c-text-2); }
+.save-alt-btn.is-hidden { display: none; }
 .sub-name-input {
   background: var(--c-surface); border: 1px solid var(--c-border);
   border-radius: var(--r-sm); color: var(--c-text);

@@ -16,7 +16,7 @@
  *   asset conflicts.
  */
 
-const CACHE_VERSION  = 'train-v221';
+const CACHE_VERSION  = 'train-v222';
 
 /**
  * App shell – every file the app needs to render its first frame offline.
@@ -54,6 +54,7 @@ const PRECACHE_URLS = [
   './consistencyUtils.js',
   './sessionCoach.js',
   './sessionSummary.js',
+  './exerciseAlternatives.js',
   './fonts/BebasNeue-latin.woff2',
   './fonts/BebasNeue-latinext.woff2',
   './fonts/DMSans-latin.woff2',

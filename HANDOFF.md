@@ -1,6 +1,114 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-27 — B133 (Scheiben-Anzeige dezent + Live-Update), train-v221, siehe unten. B130/B131/B132 (Plate Calculator neu + Coach Signal Unterdrückung, train-v220), B128/B129 (Auto-Steigerung Opt-out + Skip-Grund-Abfrage, train-v219), B123-B127 (5 Features vor Launch, train-v218), B114-B122 (9 Bugs vor Launch, train-v217), B113 (Einstellungen in 4 Zwischenüberschriften gegliedert, train-v216), B112/E1 (Transparenz Coach-Tab, train-v215), B111 (movementMap.js erweitert, train-v214), B110 (Streak-Badge-Fenstergrenze, train-v213), B109/D2 ("Heute anders", train-v212) und B105-B108 (train-v211, Onboarding-Verbesserungen) sowie B102+B103/B101/B100 bereits gepusht und CI-grün.*
-*Nächster Schritt: C3 Compound-Edit-Option. Push dieser Session braucht noch die reguläre Session-Bestätigung (Push-Policy LOOPS.md). Weiterhin nur als Notiz (kein Bug): mehrere Test-Dateien konstruieren Datums-Fixtures über lokale `Date`-Methoden + `.toISOString()` — verschiebt `startDate` bei lokalem Ausführen in einer positiven-UTC-Offset-Zeitzone um einen Tag; betrifft nur lokale Testläufe außerhalb UTC, nicht CI/Produktionscode, bei Bedarf mit `TZ=UTC npx playwright test` gegentesten. Möglicher Folge-Sprint (nicht angefordert): B79 (`_checkCompoundIsolationBalance`) auf die neue `isCompoundExercise()` umstellen, siehe DECISIONS.md. Loops 7-11 aktiv (diese Session: Loop 5+7+11 aktualisiert). Nicht committet: `Research/TRAIN_Parameter_Review.md` (Nutzer-Recherche, bewusst uncommitted gelassen).*
+*Letzte Aktualisierung: 2026-07-28 — B138 (Alternativübungen) + B139 (Ernährungsphase/kcal-Toggle) + B140 (Intra-Session-Erschöpfung), train-v222. Davor: B132 Re-Diagnose (Deadlift-Plateau vs. Coach-Tab, kein Code-Fix), Re-Diagnose-Sprint B134-B137 (2026-07-27, kein Code-Fix), B133 (Scheiben-Anzeige dezent + Live-Update, train-v221). B130/B131/B132 (Plate Calculator neu + Coach Signal Unterdrückung, train-v220), B128/B129 (Auto-Steigerung Opt-out + Skip-Grund-Abfrage, train-v219), B123-B127 (5 Features vor Launch, train-v218), B114-B122 (9 Bugs vor Launch, train-v217) und ältere Sprints — siehe SESSION_LOG.md für die vollständige Historie.*
+*Nächster Schritt: B55 Impressum (Blocker vor weiterer Nutzerwerbung — wartet weiterhin auf echte Name-/Adress-/E-Mail-Angaben des Betreibers, siehe LEGAL.md; strukturell seit train-v177/v178 vorbereitet). Chat-Wechsel angekündigt (neue Session startet mit diesem HANDOFF.md-Stand). Push dieser Session braucht noch die reguläre Session-Bestätigung (Push-Policy LOOPS.md), inkl. B133/Re-Diagnose-Sprints, die bisher nicht gepusht wurden. Weiterhin nur als Notiz (kein Bug): mehrere Test-Dateien konstruieren Datums-Fixtures über lokale `Date`-Methoden + `.toISOString()` — verschiebt `startDate` bei lokalem Ausführen in einer positiven-UTC-Offset-Zeitzone um einen Tag; betrifft nur lokale Testläufe außerhalb UTC, nicht CI/Produktionscode. Möglicher Folge-Sprint (nicht angefordert): B79 (`_checkCompoundIsolationBalance`) auf die neue `isCompoundExercise()` umstellen; `getMetricRecommendation()` (Distanz/Zeit) von `nutritionPhase` profitieren lassen (B139 hat das bewusst ausgeklammert, siehe DECISIONS.md). Loops 7-11 aktiv. Nicht committet: `Research/TRAIN_Parameter_Review.md` (Nutzer-Recherche, bewusst uncommitted gelassen), alle `context-exports/`-Updates (gitignored).*
+
+---
+
+## B138/B139/B140 — Alternativübungen + Ernährungsphase + Intra-Session-Erschöpfung (train-v222, 2026-07-28)
+
+Sequenzieller 3-Feature-Sprint (auf Nutzerwunsch, keine Parallelisierung —
+Aufgabe 1+2 schreiben beide additiv in state.js, laut AGENTS.md-Grundregel
+ein Kollisionsrisiko bei gleichzeitiger Bearbeitung). Technische Spec vor
+Implementierung geschrieben und bestätigt (inkl. 2 Rückfragen zu
+Sprint-Text-Ambiguitäten, siehe unten).
+
+- **B138 (Alternativübungen, Option C):** neue Datei `exerciseAlternatives.js`
+  (`EXERCISE_ALTERNATIVES`, 24 Übungen + `getAlternatives()`). Neue Chip-Reihe
+  im "Heute anders"-Dialog — **wichtige Klärung per Rückfrage:** bewusst
+  NEBEN der bereits bestehenden historienbasierten `sub-suggestions`-Liste
+  (B109/D2) gestapelt, nicht ersetzend. Chip-Tap nutzt dasselbe
+  Zwei-Dispatch-Muster wie `apply-sub-suggestion` (nicht das
+  Ein-Dispatch-Muster von `confirm-sub` — dabei ein vorbestehendes,
+  außerhalb des Sprint-Scopes liegendes Detail in der Sub-Form-Mechanik
+  bemerkt, aber bewusst nicht angefasst, siehe BUGS.md B138). Neues
+  additives Feld `state.customAlternatives`.
+- **B139 (Ernährungsphase/kcal-Toggle):** neues additives Feld
+  `settings.nutritionPhase`. **Wichtige Klärung per Rückfrage:** `cut` ist
+  bewusst strikt (volle Steigerung nur bis RPE 6.0, danach IMMER halten,
+  KEINE Halbzone) statt einer reinen Verschiebung des alten
+  7.5er-Schwellenwerts — physiologische Begründung siehe DECISIONS.md.
+  `_checkPlateau()` unterdrückt sich bei `cut` komplett. Alle 8 echten
+  `getWeightRecommendation()`-Call-Sites aktualisiert (ui.js ×4,
+  weeklyFocus.js ×1, insightEngine.js ×3).
+- **B140 (Intra-Session-Erschöpfung, Ansatz B):** neue Funktion
+  `detectSessionFatigue(day)` — bewusst in `sessionSummary.js` (nicht
+  weeklyFocus.js, nicht neue Datei — architektonische Entscheidung während
+  der Spec-Phase, siehe DECISIONS.md). Neuer Block im Session-Summary-Screen,
+  NICHT im Coach-Tab.
+
+**Unerwarteter Fund während der Umsetzung:** `detectSessionFatigue`-Import
+in ui.js wurde vor der eigentlichen Funktion in sessionSummary.js
+geschrieben (Aufgabe-3-Vorgriff während Aufgabe 1) — ein fehlender
+Named-Export bricht bei ES-Modulen den kompletten App-Boot, nicht nur die
+betroffene Funktion. Alle Aufgabe-1-Tests schlugen dadurch kollateral mit
+"#app.is-ready nie sichtbar" fehl, bis per Diagnose-Test (`pageerror`
+mitgeloggt) der echte Fehler sichtbar wurde. Lehre: bei mehreren
+Aufgaben, die denselben Import-Block berühren, Imports erst hinzufügen,
+wenn die exportierte Funktion auch existiert — oder sofort danach.
+
+16 neue Tests über 3 Spec-Dateien (`exercise_alternatives.spec.js`,
+`nutrition_phase.spec.js`, `session_fatigue.spec.js`) plus 1 korrigierter
+bestehender Test (`heute_anders_history.spec.js` — Label-Änderung
+"Ursprüngliche Übung:"→"Andere Übung:" hatte einen alten, jetzt nicht mehr
+eindeutigen `.sub-form__label`-Selektor gebrochen, echte Regression,
+gefixt). Volle Suite (273 Tests) grün — **aber nur in 3 Datei-Batches
+verifizierbar**, ein einzelner `npx playwright test`-Lauf über alle 273
+Tests lässt den lokalen Devserver mit `EMFILE` abstürzen (neue, unabhängige
+Infra-Grenze, siehe CLAUDE.md "Regressions-Test" für Details/Workaround —
+kein Code-Bug, 3x per Batch-Läufen 0 Fehler bestätigt). state.js/ui.js/
+weightRecommendation.js/weeklyFocus.js/insightEngine.js/
+sessionSummary.js/styles.css/sw.js geändert + neue Datei
+exerciseAlternatives.js. CACHE_VERSION train-v221→v222, CSS ?v=210→211,
+SCHEMA unverändert (33, alle neuen Felder additiv). CLAUDE.md/BUGS.md/
+DECISIONS.md/AGENTS.md aktualisiert.
+
+---
+
+## B132 RE-DIAGNOSE 2026-07-28 (kein Code-Fix)
+
+Nutzer bat um erneute Diagnose von B132 (Deadlift-Plateau erscheint im
+Fortschritt-Tab, aber nicht im Coach-Tab), mit 3 gezielten Nachfragen zur
+bereits dokumentierten Root Cause (Gating in der akuten Kaskade). Ergebnis:
+weiterhin korrektes, gewolltes Verhalten, kein Bug, kein Code-Fix nötig.
+
+1. **B131 (Deload-"Weiter wie bisher") hat keine Wirkung auf `_checkPlateau()`**
+   — komplett getrennte Kaskaden (`_checkPreventiveDeload()` in
+   `computeStructuralSignals()`, liest `decisionLog`; `_checkPlateau()` in
+   `computeWeeklyFocus()`, liest `state.plateauActions`). Keine Code-Verbindung.
+2. **`plateauActions`-Lifecycle bereits enger als der vermutete Bug:**
+   `'ignored'` hebt sich spätestens nach 1 weiteren Woche automatisch auf
+   (sobald `plateauWeeks` weiterzählt), `'implemented'` läuft nach exakt 14
+   Tagen aus (`_isPlateauSuppressed()`, weeklyFocus.js) — beides weit unter
+   4 Wochen. Ein "reset wenn >4 Wochen alt"-Fix wäre wirkungslos, da diese
+   Bedingung praktisch nie eintritt. Kein Bug im `PLATEAU_ACTION`-Reducer
+   (state.js) gefunden.
+3. **Konkret demonstriert per Playwright-Reproduktion** (Kreuzheben, 4
+   Wochen konstantes Gewicht, danach wieder entfernt — Ad-hoc-Test, nicht
+   committet): ohne weiteres Signal zeigt der Coach-Tab korrekt "Plateau
+   überwinden"; mit zusätzlich schlechtem Schlaf (5h) in der aktuellen
+   Woche zeigt er stattdessen "🔋 Schlaf priorisieren" — der Overload-Zweig
+   (Prio 3) verdrängt Plateau (Prio 4), exakt wie in weeklyFocus.js
+   dokumentiert.
+
+Kein Code geändert (weeklyFocus.js/state.js unangetastet), kein
+CACHE_VERSION-Bump (Sprint-Vorgabe: nur bei Code-Änderung), nicht
+committet. Details: BUGS.md B132 (Re-Diagnose-Addendum ergänzt).
+
+---
+
+## RE-DIAGNOSE-SPRINT 2026-07-27 (kein Code-Fix)
+
+Nutzer brachte 4 vermeintliche Bugs (PR-Badge jedes Mal, Reorder-Pfeil verschwindet,
+erster Haken gold, RPE-Hint blockiert UI) mit der ausdrücklichen Vorgabe
+"Diagnose zuerst, Root Cause bestätigen, dann Fix". Diagnose (Code-Lesen +
+gezielte Playwright-Läufe, kein Raten) ergab: **alle 4 waren bereits behoben**
+— B134 seit train-v184 (state.js `_applyPrTracking`), B135/B136/B137 seit
+train-v217 (B116/B117/B118). Bestehende Tests (`pr_badge.spec.js`,
+`exercise_reorder.spec.js`) decken die exakten gemeldeten Szenarien ab und
+liefen grün; volle Suite 156 passed/3 flaky-aber-grün/0 failed. Details siehe
+BUGS.md B134-B137. Nutzer hat sich nach Rückfrage gegen Version-Bump/Commit/
+Push entschieden, da keine funktionale Änderung vorliegt — nur dieser
+Doku-Eintrag, bewusst uncommitted.
 
 ---
 

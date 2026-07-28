@@ -612,6 +612,8 @@ function _isPlateauSuppressed(p, action, curWeekStart) {
 // state.plateauActions (_isPlateauSuppressed, oben). S-06 hat keine der
 // beiden Gates. Siehe DECISIONS.md für die vollständige Diagnose.
 function _checkPlateau(state) {
+  // B139: im Kaloriendefizit ist Stagnation normal/erwartbar, kein Coach-Signal.
+  if (state.settings?.nutritionPhase === 'cut') return null;
   const plateaus = detectPlateaus(state.weeks, state.favoriteExercises ?? [], state.settings?.rpeEnabled ?? true);
   if (!plateaus.length) return null;
   const curWk = getLatestWeek(state.weeks);
@@ -689,7 +691,7 @@ function _checkProgression(state) {
       const plateStep = ex.weightStep ?? state.settings?.plateStep ?? 2.5;
       if (!isReadyForAutoSelect(ex.name, calcWeeks, exProgressionMode, exTargetRepsMax)) return;
       const isCompound = isCompoundExercise(ex.name, catMap);
-      const rec = getWeightRecommendation(ex.name, calcWeeks, plateStep, exProgressionMode, exTargetRepsMax, isCompound);
+      const rec = getWeightRecommendation(ex.name, calcWeeks, plateStep, exProgressionMode, exTargetRepsMax, isCompound, state.settings?.nutritionPhase ?? 'maintenance');
       if (!rec) return;
       // B122: Priorität favorit+compound > favorit > compound > (Fallback:
       // höchstes rec.delta) statt reiner Steigerungs-Höhe.
@@ -922,11 +924,20 @@ function _fallback(state) {
   const daysTotal = latestWk ? latestWk.days.length : 0;
   const scored = recentReal.map(_scoreWeek).filter(s => s.total > 0);
   const avgPct = scored.length ? Math.round(scored.reduce((s, w) => s + w.pct, 0) / scored.length) : null;
+  // B139: Ernährungsphasen-Subtext im steady-state-Fallback — 'maintenance'
+  // bewusst ohne Subtext (unverändertes Verhalten).
+  const nutritionPhase = state.settings?.nutritionPhase ?? 'maintenance';
+  const phaseSubtext = nutritionPhase === 'cut'
+    ? 'Definitionsphase — Gewicht halten ist Erfolg'
+    : nutritionPhase === 'bulk'
+      ? 'Aufbauphase — Steigerung priorisieren'
+      : undefined;
   return {
     status: 'onTrack',
     headline: 'Auf Kurs',
     reasoning,
     recommendation: null,
+    ...(phaseSubtext ? { subtext: phaseSubtext } : {}),
     evidence: [
       { label: 'Absolvierte Einheiten', value: daysTotal > 0 ? `${daysDone}/${daysTotal} (letzte Woche)` : 'noch keine Daten' },
       { label: 'Ø Erfolgsquote', value: avgPct != null ? `${avgPct}% (letzte ${scored.length} Wochen)` : '–' },

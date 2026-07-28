@@ -497,3 +497,43 @@ nicht committeten Eingabefelds, während ein voller Re-Render bei jedem
 Tastendruck bewusst vermieden wird). `timer.js` selbst bewusst NICHT
 angefasst — die Robustheit wird auf der lesenden (ui.js-)Seite hergestellt,
 nicht durch Koordination mit dem auslösenden Modul.
+
+### 2026-07 — B139: nutritionPhase — cut unterdrückt Plateau-Signal, strengere Steigerungsschwelle (≤6.0 strikt)
+**Entscheidung:** `settings.nutritionPhase` ('bulk'|'maintenance'|'cut')
+beeinflusst die Steigerungs-Empfehlung (`weightRecommendation.js`) und den
+Coach-Tab (`weeklyFocus.js`). `cut`: volle Steigerung nur bis RPE 6.0,
+danach IMMER halten — bewusst KEINE Halbzone (anders als eine reine
+Verschiebung des bisherigen 7.5er-Schwellenwerts). `_checkPlateau()` gibt
+bei `cut` unconditional `null` zurück (Stagnation im Defizit ist normal,
+kein Coach-Signal). `bulk`: lockerer, volle Steigerung bis RPE 8.0
+(Halbzone bis 8.5 bei Compound-Übungen bleibt bestehen).
+**Begründung (Halbzonen-Entscheidung, per Rückfrage bestätigt):** im
+Kaloriendefizit ist selbst eine kleine Steigerung physiologisch
+unwahrscheinlich und kann zu Übertraining führen — die Halbzone macht im
+Defizit keinen Sinn, entweder genug Luft (≤6.0, steigern) oder halten.
+**Gilt:** Permanent bis gegenteilige Entscheidung. `getMetricRecommendation()`
+(Distanz/Zeit-Übungen) bewusst NICHT von `nutritionPhase` beeinflusst —
+außerhalb des Sprint-Scopes, kann bei Bedarf als eigener Folge-Sprint
+nachgezogen werden.
+
+### 2026-07 — B140: Intra-Session-Erschöpfung lebt in sessionSummary.js (Session Summary), nicht Coach-Tab
+**Entscheidung:** `detectSessionFatigue(day)` erkennt, wenn die letzten
+Übungen einer Session deutlich schlechter performen (RPE-Anstieg ≥1.5 UND
+Erfolgsquote sinkt ≥10 Prozentpunkte) als die ersten — Signal für
+Erschöpfung INNERHALB der Session, nicht für ein wochenübergreifendes
+Plateau. Zeigt sich als informativer Block im Session Summary (nach
+Tagesabschluss), NICHT im Coach-Tab.
+**Begründung:** Coach-Tab ist wochenskaliert (`computeWeeklyFocus()`/
+`computeStructuralSignals()`, weeklyFocus.js), Intra-Session-Erschöpfung ist
+tagesskaliert — dieselbe Trennung wie bereits bei
+Wochen-Empfehlung/Intra-Session-Feedback (siehe Eintrag oben "Getrennte
+Logik für Wochen-Empfehlung vs. Intra-Session-Feedback", B77). Neue
+Funktion lebt daher in `sessionSummary.js` (bereits das etablierte Muster
+für tagesskalierte, importfreie Berechnungen wie `buildSessionHighlights()`),
+nicht in `weeklyFocus.js` und nicht als neue Datei.
+**Langfristig (nicht jetzt gebaut):** wenn das Muster über 3+ Wochen
+konsistent auftritt, könnte ein neues Coach-Tab-Struktursignal
+"Trainingsstruktur optimieren" mit konkretem Übungs-Reihenfolge-Vorschlag
+sinnvoll sein — das wäre der Übergang zu einem echten Planungstool. Bewusst
+nicht spezifiziert/gebaut, nur als Idee vermerkt.
+**Gilt:** Permanent bis gegenteilige Entscheidung.

@@ -112,7 +112,12 @@ test('Keine History fuer diese Uebung: Feld erscheint direkt wie bisher', async 
   await openSubForm(page);
   await expect(page.locator('.sub-suggestions')).toHaveCount(0);
   await expect(page.locator('.sub-name-input')).toBeVisible();
-  await expect(page.locator('.sub-form__label')).toHaveText('Ursprüngliche Übung:');
+  // B138: Eingabefeld-Label heisst seit train-v222 "Andere Uebung:" (Sprint-
+  // Mockup) statt "Ursprüngliche Übung:" -- .sub-form__label ist seither
+  // NICHT mehr eindeutig (auch "Vorschläge:" nutzt dieselbe Klasse, siehe
+  // die kuratierten Alternativ-Chips fuer "Sled Push"), daher exakter Text-
+  // Locator statt der reinen Klasse.
+  await expect(page.getByText('Andere Übung:', { exact: true })).toBeVisible();
 
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
 });

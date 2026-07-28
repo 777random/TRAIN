@@ -1,7 +1,9 @@
 # TRAIN — Parallel Agent Regeln
 # Wird nach jedem Multi-Agent Sprint
 # automatisch aktualisiert.
-# Letzte Aktualisierung: 2026-07-26 / train-v211
+# Letzte Aktualisierung: 2026-07-28 / train-v222 (nur Datei-Abhängigkeits-Matrix
+# aktualisiert — B138/B139/B140-Sprint lief bewusst sequenziell, kein
+# Multi-Agent-Sprint, siehe HANDOFF.md)
 
 ---
 
@@ -35,6 +37,7 @@ sondern der Einstiegspunkt, der `state.js`, `backup.js`, `ui.js`,
 | icons.js | — | ui.js |
 | setUtils.js | — | plateauDetector.js, weeklyFocus.js, weightRecommendation.js, weekReview.js (seit train-v170, siehe unten), ui.js (seit train-v171 — B45-Konsolidierung: `weekSuccessCounts()`) |
 | movementMap.js | — | overallPerformance.js, ui.js, weeklyFocus.js, sessionSummary.js (seit train-v194 — B79), timer.js (seit train-v204 — Sprint C1: isCompoundExercise() für Pausenzeiten-Empfehlung) |
+| exerciseAlternatives.js | — | ui.js (seit train-v222 — B138: `getAlternatives()` für die Alternativ-Chips im "Heute anders"-Dialog) |
 | progressChart.js | — | ui.js |
 | sessionCoach.js | — | ui.js, timer.js (beide seit train-v193 — B77: `buildSetFeedback()`/`buildLastSetMessage()`/`buildWarmupSets()`, importfrei/Tiefe 0, siehe DECISIONS.md für die bewusste Ausnahme von der "NIEMALS ui.js↔timer.js"-Regel) |
 | weekReview.js | setUtils.js, state.js (seit train-v170 — B44/B45-Konsolidierung: `isTrainingDay()` für `_reachableDays()`, `weekSuccessCounts()` für `_calcSuccessScore()`; seit train-v190/B74 zusätzlich `calcCurrentStreak()` für `_calcStreak()`; alle reine, zustandslose Funktionen, kein `getState()`/`dispatch()` — Datei ist weiterhin "State-frei" im ursprünglich gemeinten Sinn) | ui.js |
@@ -62,7 +65,8 @@ Kettenglieder bis zum Blatt):**
 ```
 Tiefe 0: state.js, icons.js, setUtils.js, movementMap.js, progressChart.js,
          exerciseNameCleanup.js, shareImage.js (seit train-v186 — B68),
-         sessionCoach.js (seit train-v193 — B77), registerSW.js, dragdrop.js*
+         sessionCoach.js (seit train-v193 — B77), registerSW.js, dragdrop.js*,
+         exerciseAlternatives.js (seit train-v222 — B138)
 Tiefe 1: backup.js, timer.js (importiert jetzt state.js + sessionCoach.js,
          beide Tiefe 0, bleibt daher Tiefe 1), plateauDetector.js,
          weightRecommendation.js, weekReview.js (seit train-v170 —

@@ -1,7 +1,7 @@
 # TRAIN — CLAUDE.md
 # Vollständiger Projektkontext für Claude Code
-# Stand: train-v221 / SCHEMA 33 / Juli 2026
-# Letztes Update: nach train-v221 (B133: Scheiben-Anzeige zurück zu dezentem Text (B130s Chip-Design zurückgebaut) + Live-Update beim Tippen/nach "Übernehmen")
+# Stand: train-v222 / SCHEMA 33 / Juli 2026
+# Letztes Update: nach train-v222 (B138 Alternativübungen, B139 Ernährungsphase/kcal-Toggle, B140 Intra-Session-Erschöpfung — siehe BUGS.md/DECISIONS.md)
 
 ---
 
@@ -49,7 +49,7 @@ TRAIN ist eine deutschsprachige PWA für Krafttraining. Pure Vanilla ES Modules 
   Sessions müssen aus diesem neuen Pfad heraus gestartet werden, sonst
   landet man am alten (jetzt leeren) OneDrive-Ort. Nutzer zieht den Ordner
   regelmäßig manuell auf eine externe Festplatte statt über Cloud-Sync.
-- Aktueller Stand: SCHEMA_VERSION 33 · CACHE_VERSION train-v221 · CSS ?v=210
+- Aktueller Stand: SCHEMA_VERSION 33 · CACHE_VERSION train-v222 · CSS ?v=211
 
 ---
 
@@ -114,6 +114,20 @@ Commit-Message Format: `type(scope): short description`
 Nach JEDEM Sprint: `tests/regression_core.html` in headless Chrome ausführen.
 Erwartung: 10/10 grün, 0 uncaught errors.
 Bekannte Limitierung: Test 8 schlägt im Headless-Modus konsistent fehl (rAF-Timing) — akzeptiert.
+
+**Bekannte Infra-Grenze (gefunden 2026-07-28, B138/B139/B140-Sprint):** die volle
+`npx playwright test`-Suite (273 Tests, keine Datei-Filter) kann den lokalen
+`npx serve .`-Devserver mit `EMFILE: too many open files` abstürzen lassen —
+danach schlagen ALLE nachfolgenden Tests mit `net::ERR_CONNECTION_REFUSED`
+fehl (Server-Prozess tot, nicht neu gestartet). Reproduziert unabhängig von
+`--workers`-Anzahl und nach Killen verwaister `chrome`/`node`-Prozesse —
+scheint eine Windows-spezifische Handle-Grenze von `serve` bei sehr langen
+Testläufen (>10 Min) zu sein, kein Code-Bug. **Workaround:** Suite in 2-3
+Datei-Batches aufteilen (`npx playwright test <dateien-batch-1>`, dann
+Batch 2, Batch 3 — jeder Aufruf startet einen frischen Serverprozess). Bei
+einem plötzlichen Massenausfall (>50% der Tests, immer derselbe
+Connection-Refused-Fehler) NICHT von einer echten Regression ausgehen, ohne
+das vorher per Batch-Lauf gegenzuprüfen.
 
 ### Lokale Milestone-Backups:
 Nach jedem Milestone: alle Projektdateien (außer `backups/` und `.git/`) nach `backups/TRAIN_<YYYY-MM-DD>_<milestone-name>/` kopieren. `backups/` ist gitignored.
@@ -180,7 +194,8 @@ Bei unklarem Root Cause immer erst Diagnose → Ergebnis abwarten → dann Fix. 
 | `overallPerformance.js` | `computeVolumeTrend/QualityTrend/ConsistencyTrend`. |
 | `progressInsights.js` | Erkenntnisse-Sektion. |
 | `insightEngine.js` | Toast-Regeln, Insights. Seit train-v173 auch `detectRecurringStep()`/`exMetricHistory()`/`detectRecurringWeightStep()` — Muster-Erkennung für Schrittweite-Vorschläge (B49), rein rückblickend, nie automatisch angewendet. |
-| `movementMap.js` | Übungsname → Kategorie (Push/Pull/Squat/Hinge/Core/Carry). 218 Übungen/Synonyme (seit train-v214/B111, davor 139 — +79 Variationen/deutsche+englische Synonyme). Seit train-v170 auch `buildCategoryMap()`/`resolveCategory()` — einzige Quelle für den Kategorie-Override-Lookup (`state.customExercises`-Override vor `MOVEMENT_MAP`-Fallback), genutzt von ui.js, weeklyFocus.js UND overallPerformance.js. |
+| `movementMap.js` | Übungsname → Kategorie (Push/Pull/Squat/Hinge/Core/Carry). 217 Übungen/Synonyme (seit train-v214/B111, davor 139 — +79 Variationen/deutsche+englische Synonyme; Zahl per Loop-5-Vollverifikation train-v221 von 218 auf 217 korrigiert, exakter nachgezählt). Seit train-v170 auch `buildCategoryMap()`/`resolveCategory()` — einzige Quelle für den Kategorie-Override-Lookup (`state.customExercises`-Override vor `MOVEMENT_MAP`-Fallback), genutzt von ui.js, weeklyFocus.js UND overallPerformance.js. |
+| `exerciseAlternatives.js` | Seit train-v222 (B138). `EXERCISE_ALTERNATIVES` (24 Übungen mit je 2-5 kuratierten Alternativen) + `getAlternatives(exName, state)` (kombiniert `state.customAlternatives[exName]` mit vordefinierten Einträgen, dedupliziert). Importfrei (Tiefe 0), nur von ui.js genutzt (Chip-Reihe im "Heute anders"-Dialog, neben der bereits bestehenden historienbasierten `sub-suggestions`-Liste aus B109/D2). |
 | `progressChart.js` | Übungsfortschritt-Chart. |
 | `weekReview.js` | Wochenrückblick. |
 | `timer.js` | Session-Uhr + Pause-Timer. Vollständig entkoppelt von `ui.js` via custom `window` Events. Seit train-v193 (B77) importiert es zusätzlich `sessionCoach.js` (`buildSetFeedback()`) für die Pause-Dauer-Empfehlung — kein Bruch der ui.js-Entkopplung, siehe DECISIONS.md. |
@@ -231,11 +246,13 @@ Flux-Pattern: `dispatch(A.ACTION_TYPE, payload)` → `reduce()` → `persistStat
   settings: {
     erkenntnisseHorizont: 8,  // geclampt gegen realWeeks beim Render
     autoEval, plateStep, barbellWeight, ...
+    nutritionPhase: 'maintenance',  // 'bulk'|'maintenance'|'cut' — B139, additiver Default, kein SCHEMA-Bump
   },
   prs: {},
   coachPerformance: { suggestions: [] },
   substituteHistory: {},   // { [originalExerciseName]: { name, count, lastUsed }[] } — D2, additiver Default, kein SCHEMA-Bump
   exerciseNotes: {},       // { [exerciseName]: string } — B127, permanent, additiver Default, kein SCHEMA-Bump
+  customAlternatives: {},  // { [exerciseName]: string[] } — B138, additiver Default, kein SCHEMA-Bump
   coachQuestion: { weekStart, questionId, answer, outcome, measuredWeekStart },
   coachQuestionHistory: [],
   lastReentryHandled: null | timestamp,
@@ -351,7 +368,7 @@ manuellen Wochenwechsel).
 ## FEATURE-STATUS
 
 ### Implementiert ✓:
-**Training-Tab:** Wochenstruktur, Pillen-Nav, Satz-Bewertung (auto+manuell), Gewichtsempfehlung (seit v165 auch Distanz/Zeit-Progression für metric 'm'/'sec' via getMetricRecommendation(), B18; seit v172 pro-Übung-Schrittweite statt fixem Delta, B48), Schrittweite-Vorschlag aus Historie (v173, B49, nur sichtbarer Hinweis), anpassbare Steigerungsmenge im Empfehlungs-Chip (v173, B50), Progressions-Präferenz, PR-Erkennung, "Heute anders", Übung archivieren, Stoppuhr, Auto-Wochenerstellung, Deload/Urlaubsmodus (seit v205/B96: Deload-Plan im Coach-Tab reduziert Volumen [Satz-Anzahl, `s.deloadSkip`, gesperrt+ausgegraut mit "Deload"-Badge] statt Intensität [Gewicht] — Wahl zwischen "Diese Woche"/"Nächste Woche" beim Übernehmen, Restore der originalen Satz-Anzahl aus der Vor-Deload-Woche danach), Körpergewicht, Schlaf+Energie, Share-Bild bei echtem PR (v186, B68 — Tagesabschluss-Screen; v189, B73 — zusätzlich sofortiger Toast direkt nach dem PR-Satz), Pre-Session Check-in + Session Briefing (v192, B76 — Zwei-Tap Schlaf/Energie-Check-in am heutigen Tag, Briefing mit Fokus-Übung + RPE-Ziel, Gewichtsreduktion bei schlechter Tagesform, per Settings-Toggle "Session Coach" abschaltbar; seit v202/B87 nachträglich korrigierbar über "✎ Tagesform anpassen"; seit v202/B88 zusätzlicher manueller Catch-up-Button für die Reduktion; seit v205/B96 differenziert nach kumuliertem vs. einmaligem Schlafmangel — `reduced_mild` [-5%, alle Übungen] vs. `reduced` [-10%, nur Compound-Übungen, `modifierScope`], niedrige Energie eskaliert immer zu `reduced`), Intra-Session Coach (v193, B77 — Feedback direkt unter jedem bewerteten Satz: Gewichts-/Pause-Empfehlung nach RPE-Bereich bzw. Erfolg/Fehlschlag ohne RPE, Abschluss-Nachricht mit Nächste-Woche-Projektion, Weiterer-Satz-Vorschlag bei RPE≤6, Aufwärm-Empfehlung 50/70/85%, erweiterte Favoriten-RPE-Nudge — alles über denselben "Session Coach"-Toggle abschaltbar; seit v202/B89 mit "Übernehmen ↗"-Button, setzt Gewicht des nächsten Satzes + startet Pause-Timer in einem Tap, seit v203/B94 bleibt die Bestätigung dauerhaft sichtbar statt nach 2s zu verschwinden, auch nach Undo; seit v203/B92 Entscheidungsmatrix v2 — RPE + Wdh-Differenz kombiniert statt nur RPE, plus RPE-Trend-Erkennung; seit v203/B93 aufklappbare "▾ Warum?"-Begründung; seit v204/B95 Pausendauer sportwissenschaftlich nach Trainingsziel [neue Settings-Zeile "Trainingsziel", `state.settings.goal`] + Compound/Isolation [`isCompoundExercise()`, movementMap.js] differenziert statt einer einzigen RPE-Spalte, Vorschau im Session Briefing; seit v205/B96 respektiert auch die Intra-Session-Dämpfung den Compound/Isolation-Scope), Session Summary (v194, B79 — Vollbild-Screen direkt nach Tagesabschluss vor dem bestehenden Tagesabschluss-Screen: bis zu 3 Übungs-Highlights, 1-2-Satz-Einordnung nach Prioritätskaskade, Vorschau nächstes Training; einmalige Schlaf-Erfolgsquote-Korrelation wenn nachweisbar und genug Historie vorhanden).
+**Training-Tab:** Wochenstruktur, Pillen-Nav, Satz-Bewertung (auto+manuell), Gewichtsempfehlung (seit v165 auch Distanz/Zeit-Progression für metric 'm'/'sec' via getMetricRecommendation(), B18; seit v172 pro-Übung-Schrittweite statt fixem Delta, B48), Schrittweite-Vorschlag aus Historie (v173, B49, nur sichtbarer Hinweis), anpassbare Steigerungsmenge im Empfehlungs-Chip (v173, B50), Progressions-Präferenz, PR-Erkennung, "Heute anders", Übung archivieren, Stoppuhr, Auto-Wochenerstellung, Deload/Urlaubsmodus (seit v205/B96: Deload-Plan im Coach-Tab reduziert Volumen [Satz-Anzahl, `s.deloadSkip`, gesperrt+ausgegraut mit "Deload"-Badge] statt Intensität [Gewicht] — Wahl zwischen "Diese Woche"/"Nächste Woche" beim Übernehmen, Restore der originalen Satz-Anzahl aus der Vor-Deload-Woche danach), Körpergewicht, Schlaf+Energie, Share-Bild bei echtem PR (v186, B68 — Tagesabschluss-Screen; v189, B73 — zusätzlich sofortiger Toast direkt nach dem PR-Satz), Pre-Session Check-in + Session Briefing (v192, B76 — Zwei-Tap Schlaf/Energie-Check-in am heutigen Tag, Briefing mit Fokus-Übung + RPE-Ziel, Gewichtsreduktion bei schlechter Tagesform, per Settings-Toggle "Session Coach" abschaltbar; seit v202/B87 nachträglich korrigierbar über "✎ Tagesform anpassen"; seit v202/B88 zusätzlicher manueller Catch-up-Button für die Reduktion; seit v205/B96 differenziert nach kumuliertem vs. einmaligem Schlafmangel — `reduced_mild` [-5%, alle Übungen] vs. `reduced` [-10%, nur Compound-Übungen, `modifierScope`], niedrige Energie eskaliert immer zu `reduced`), Intra-Session Coach (v193, B77 — Feedback direkt unter jedem bewerteten Satz: Gewichts-/Pause-Empfehlung nach RPE-Bereich bzw. Erfolg/Fehlschlag ohne RPE, Abschluss-Nachricht mit Nächste-Woche-Projektion, Weiterer-Satz-Vorschlag bei RPE≤6, Aufwärm-Empfehlung 50/70/85%, erweiterte Favoriten-RPE-Nudge — alles über denselben "Session Coach"-Toggle abschaltbar; seit v202/B89 mit "Übernehmen ↗"-Button, setzt Gewicht des nächsten Satzes + startet Pause-Timer in einem Tap, seit v203/B94 bleibt die Bestätigung dauerhaft sichtbar statt nach 2s zu verschwinden, auch nach Undo; seit v203/B92 Entscheidungsmatrix v2 — RPE + Wdh-Differenz kombiniert statt nur RPE, plus RPE-Trend-Erkennung; seit v203/B93 aufklappbare "▾ Warum?"-Begründung; seit v204/B95 Pausendauer sportwissenschaftlich nach Trainingsziel [neue Settings-Zeile "Trainingsziel", `state.settings.goal`] + Compound/Isolation [`isCompoundExercise()`, movementMap.js] differenziert statt einer einzigen RPE-Spalte, Vorschau im Session Briefing; seit v205/B96 respektiert auch die Intra-Session-Dämpfung den Compound/Isolation-Scope), Session Summary (v194, B79 — Vollbild-Screen direkt nach Tagesabschluss vor dem bestehenden Tagesabschluss-Screen: bis zu 3 Übungs-Highlights, 1-2-Satz-Einordnung nach Prioritätskaskade, Vorschau nächstes Training; einmalige Schlaf-Erfolgsquote-Korrelation wenn nachweisbar und genug Historie vorhanden; seit v222/B140 zusätzlich ein informativer Intra-Session-Erschöpfungs-Block, wenn die letzten Übungen einer Session deutlich schlechter performen als die ersten [RPE-Anstieg ≥1.5 UND Erfolgsquote sinkt ≥10 Prozentpunkte], `detectSessionFatigue()` in sessionSummary.js, tagesskaliert, NICHT im Coach-Tab). Alternativübungen im "Heute anders"-Dialog (v222, B138 — kuratierte Chip-Vorschläge aus exerciseAlternatives.js + eigene gespeicherte Alternativen `state.customAlternatives`, neben der bereits bestehenden historienbasierten Vorschlagsliste). Ernährungsphase (v222, B139 — Settings-Toggle Aufbau/Erhalt/Diät, `state.settings.nutritionPhase`, beeinflusst Steigerungs-Empfehlung und Coach-Tab-Plateau-Signal/Subtext, siehe DECISIONS.md).
 
 **Wochenrückblick-Modal:** Zusammenfassung/Highlights/Lowlights/Empfehlungen (weekReview.js/weekReviewModal.js), Share-Bild-Button (v186, B68; Sparkline-Redesign v187, B71; Favoriten-Kaskade v189, B73) — auch im manuellen Wochenrückblick-Dropdown im Fortschritt-Tab (v188, B72).
 

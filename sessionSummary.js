@@ -205,3 +205,64 @@ export function calcSleepCorrelation(sortedWeeks) {
     totalDaysWithSleep: poorPct.length + goodPct.length,
   };
 }
+
+/**
+ * B140 (Sprint 2026-07, Ansatz B): erkennt Intra-Session-Erschöpfung — wenn
+ * die letzten Übungen eines Tages deutlich schlechter performen (höheres
+ * RPE, sinkende Erfolgsquote) als die ersten, ist das ein Signal für
+ * Erschöpfung INNERHALB der Session, nicht für ein wochenübergreifendes
+ * Plateau. Bewusst hier (tagesskaliert, sessionSummary.js) statt in
+ * weeklyFocus.js (wochenskaliert) — siehe DECISIONS.md "Getrennte Logik für
+ * Wochen-Empfehlung vs. Intra-Session-Feedback".
+ *
+ * @param {Object} day
+ * @returns {{ rpeDiff: number, firstAvg: number, secondAvg: number,
+ *   mostFatiguedExercise: string, successDrop: number } | null}
+ */
+export function detectSessionFatigue(day) {
+  // Nur bewertete Übungen (mindestens 1 success/fail-Satz mit RPE)
+  const scoredExercises = (day.exercises ?? []).filter(ex =>
+    (ex.sets ?? []).some(s => s.status !== 'pending' && s.rpe !== null));
+
+  // Mindestens 3 Übungen mit RPE — sonst zu wenig Daten
+  if (scoredExercises.length < 3) return null;
+
+  const avgRpePerEx = scoredExercises.map(ex => {
+    const rpes = ex.sets
+      .filter(s => s.rpe !== null && s.status !== 'pending')
+      .map(s => s.rpe);
+    const evaluated = ex.sets.filter(s => s.status !== 'pending');
+    return {
+      name: ex.name,
+      avgRpe: rpes.reduce((a, b) => a + b, 0) / rpes.length,
+      successRate: evaluated.filter(s => s.status === 'success').length / evaluated.length,
+    };
+  });
+
+  // Erste Hälfte vs. zweite Hälfte
+  const half = Math.floor(avgRpePerEx.length / 2);
+  const firstHalf  = avgRpePerEx.slice(0, half);
+  const secondHalf = avgRpePerEx.slice(half);
+
+  const firstAvg  = firstHalf.reduce((a, b) => a + b.avgRpe, 0) / firstHalf.length;
+  const secondAvg = secondHalf.reduce((a, b) => a + b.avgRpe, 0) / secondHalf.length;
+
+  // Trigger: RPE-Anstieg >= 1.5 UND Erfolgsquote sinkt >= 10 Prozentpunkte
+  const rpeDiff = secondAvg - firstAvg;
+  const successDrop =
+    firstHalf.reduce((a, b) => a + b.successRate, 0) / firstHalf.length -
+    secondHalf.reduce((a, b) => a + b.successRate, 0) / secondHalf.length;
+
+  if (rpeDiff < 1.5 || successDrop < 0.1) return null;
+
+  // Erschöpfteste Übung (höchstes RPE, zweite Hälfte)
+  const mostFatigued = secondHalf.slice().sort((a, b) => b.avgRpe - a.avgRpe)[0];
+
+  return {
+    rpeDiff: Math.round(rpeDiff * 10) / 10,
+    firstAvg: Math.round(firstAvg * 10) / 10,
+    secondAvg: Math.round(secondAvg * 10) / 10,
+    mostFatiguedExercise: mostFatigued.name,
+    successDrop: Math.round(successDrop * 100),
+  };
+}
