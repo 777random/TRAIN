@@ -132,6 +132,46 @@ test('Alle 5 Optionen setzen den korrekten skipReason', async ({ page }) => {
   }
 });
 
+// Pre-Launch-Diagnose-Sprint 2026-07-29, Befund #1: weekReview.js'
+// _findFailHighlight() filterte NICHT nach ex.skipReason — eine verletzungs-
+// bedingt übersprungene Übung (ex.skipReason === 'injury') landete trotzdem
+// im "Was nicht gut lief"-Lowlight inkl. der Empfehlung "Gewicht um 5 %
+// reduzieren". Fix schließt injury-Skips aus der Lowlight-/Empfehlungs-
+// Betrachtung aus, ändert aber bewusst NICHT weekSuccessCounts()/
+// _calcSuccessScore() (Erfolgsquote bleibt für die Statistik unverändert).
+test('Verletzungsbedingt übersprungene Übung erscheint NICHT im "Was nicht gut lief"-Lowlight, normaler Fehlschlag weiterhin schon', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForSelector('#app.is-ready', { timeout: 10000 });
+
+  const today = todayISO();
+  const week = {
+    id: 1, startDate: today, note: '', mode: 'standard',
+    days: [mkDay(11, [
+      mkExercise('Kreuzheben', [mkDoneSet('fail'), mkDoneSet('fail')], { skipReason: 'injury', skipDate: today }),
+      mkExercise('Bankdrücken', [mkDoneSet('fail')]),
+    ])],
+    sessionLog: [], bodyData: {}, restDays: [], isSeedWeek: false,
+  };
+
+  const review = await page.evaluate(async (week) => {
+    const { buildWeekReview } = await import('./weekReview.js');
+    return buildWeekReview(week, [week], []);
+  }, week);
+
+  const lowlightNames = review.lowlights.map(l => l.exName);
+  expect(lowlightNames).not.toContain('Kreuzheben');
+  expect(lowlightNames).toContain('Bankdrücken');
+
+  const failLowlight = review.lowlights.find(l => l.type === 'fails');
+  expect(failLowlight).toBeTruthy();
+  expect(failLowlight.text).toContain('Bankdrücken');
+
+  const rec = review.recommendations.find(r => r.text.includes('Gewicht um 5'));
+  expect(rec).toBeTruthy();
+  expect(rec.text).toContain('Bankdrücken');
+  expect(rec.text).not.toContain('Kreuzheben');
+});
+
 test('Migration: altes State ohne skipReason/skipDate/nextWeekPlanAutoReviewed lädt ohne Absturz, SCHEMA wird 33', async ({ page }) => {
   const pageErrors = [];
   page.on('pageerror', err => pageErrors.push(err.message));

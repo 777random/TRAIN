@@ -1,7 +1,10 @@
 # TRAIN — CLAUDE.md
 # Vollständiger Projektkontext für Claude Code
-# Stand: train-v222 / SCHEMA 33 / Juli 2026
-# Letztes Update: nach train-v222 (B138 Alternativübungen, B139 Ernährungsphase/kcal-Toggle, B140 Intra-Session-Erschöpfung — siehe BUGS.md/DECISIONS.md)
+# Stand: train-v223 / SCHEMA 33 / Juli 2026
+# Letztes Update: nach train-v223, Pre-Launch-Fix-Sprint (2026-07-29) — 9 von 13
+# Befunden aus dem Browser-Test train-v222 behoben (B141 offen/nicht reproduzierbar,
+# B142 neue Entscheidung, 4 Befunde als Doku-Only/kein Bug eingestuft — siehe
+# BUGS.md/DECISIONS.md/Diagnose & Sprints/sprint-ergebnis-praelaunch-v222-2026-07-29.txt)
 
 ---
 
@@ -76,6 +79,7 @@ Bei CSS-Änderungen: Cache-Buster in `index.html` erhöhen:
 | `LEGAL.md` | Rechts-Recherche zu Impressum/Datenschutz (Name-/Adress-Pflicht, c/o-Workaround, DDG/DSGVO-Fakten) + Blaupause für AGB/Widerrufsrecht/BFSG, sobald Paywall/App-Store kommen |
 | `LOOPS.md` | Automatische Session-Loops (beim Start jeder Session ausführen) |
 | `SESSION_LOG.md` | Protokoll aller Sessions und Loop-Ergebnisse |
+| `Diagnose & Sprints/` | Diagnose-Ergebnisse (nach Phase 2) und Sprint-Ergebnisse (nach Phase 4) als .txt, siehe `TRAIN-Sprint-Prompts.md` — für externe Produkt-/Strategie-Gespräche ("Claude Cowork"), gitignored (nie auf GitHub) |
 | `prompts/` | Wiederverwendbare Prompt-Vorlagen für Claude Code und externe Beratung |
 | `context-exports/for-advisor-product.txt` | Produkt + User Journey für externe Beratung (Loop 7) |
 | `context-exports/for-advisor-market.txt` | Markt + Konkurrenz für externe Beratung (Loop 8) |
@@ -83,7 +87,7 @@ Bei CSS-Änderungen: Cache-Buster in `index.html` erhöhen:
 | `context-exports/for-advisor-growth.txt` | Growth + Distribution für externe Beratung (Loop 10) |
 | `context-exports/for-advisor-consolidated.txt` | Konsolidierter Export aus allen Perspektiven — für neue externe Chats (Loop 11) |
 
-Nach jedem Sprint: `HANDOFF.md` und `BUGS.md` aktualisieren (behobene Bugs verschieben, Commit-Hash eintragen, nächsten Schritt setzen).
+Nach jedem Sprint: `HANDOFF.md` und `BUGS.md` aktualisieren (behobene Bugs verschieben, Commit-Hash eintragen, nächsten Schritt setzen). Bei Sprints nach dem Diagnose-vor-Fix-Muster (siehe `Diagnose & Sprints/TRAIN-Sprint-Prompts.md`): zusätzlich Diagnose- und Sprint-Ergebnis als .txt in `Diagnose & Sprints/` ablegen.
 
 ---
 
@@ -194,7 +198,7 @@ Bei unklarem Root Cause immer erst Diagnose → Ergebnis abwarten → dann Fix. 
 | `overallPerformance.js` | `computeVolumeTrend/QualityTrend/ConsistencyTrend`. |
 | `progressInsights.js` | Erkenntnisse-Sektion. |
 | `insightEngine.js` | Toast-Regeln, Insights. Seit train-v173 auch `detectRecurringStep()`/`exMetricHistory()`/`detectRecurringWeightStep()` — Muster-Erkennung für Schrittweite-Vorschläge (B49), rein rückblickend, nie automatisch angewendet. |
-| `movementMap.js` | Übungsname → Kategorie (Push/Pull/Squat/Hinge/Core/Carry). 217 Übungen/Synonyme (seit train-v214/B111, davor 139 — +79 Variationen/deutsche+englische Synonyme; Zahl per Loop-5-Vollverifikation train-v221 von 218 auf 217 korrigiert, exakter nachgezählt). Seit train-v170 auch `buildCategoryMap()`/`resolveCategory()` — einzige Quelle für den Kategorie-Override-Lookup (`state.customExercises`-Override vor `MOVEMENT_MAP`-Fallback), genutzt von ui.js, weeklyFocus.js UND overallPerformance.js. |
+| `movementMap.js` | Übungsname → Kategorie (Push/Pull/Squat/Hinge/Core/Carry). 218 Übungen/Synonyme (seit train-v214/B111, davor 139 — +79 Variationen/deutsche+englische Synonyme; Zahl per `Object.keys(MOVEMENT_MAP).length`-Laufzeitzählung train-v222 verifiziert — ein früherer regex-basierter Zähler hatte fälschlich 217 ermittelt, da ein Eintrag mit Apostroph im Namen [`"Farmer's Walk"`, doppelte Anführungszeichen] übersehen wurde). Seit train-v170 auch `buildCategoryMap()`/`resolveCategory()` — einzige Quelle für den Kategorie-Override-Lookup (`state.customExercises`-Override vor `MOVEMENT_MAP`-Fallback), genutzt von ui.js, weeklyFocus.js UND overallPerformance.js. |
 | `exerciseAlternatives.js` | Seit train-v222 (B138). `EXERCISE_ALTERNATIVES` (24 Übungen mit je 2-5 kuratierten Alternativen) + `getAlternatives(exName, state)` (kombiniert `state.customAlternatives[exName]` mit vordefinierten Einträgen, dedupliziert). Importfrei (Tiefe 0), nur von ui.js genutzt (Chip-Reihe im "Heute anders"-Dialog, neben der bereits bestehenden historienbasierten `sub-suggestions`-Liste aus B109/D2). |
 | `progressChart.js` | Übungsfortschritt-Chart. |
 | `weekReview.js` | Wochenrückblick. |

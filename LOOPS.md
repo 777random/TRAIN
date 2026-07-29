@@ -207,6 +207,12 @@ Stopp-Bedingung: Datei geschrieben
 Hinweis: context-exports/ ist gitignored (siehe .gitignore) — diese
 Datei wird nie mitgepusht, rein lokales Artefakt für externe Beratung.
 
+Abgrenzung zu `Diagnose & Sprints/`: Ebenfalls gitignored, aber läuft nicht über einen
+Session-Start-Loop, sondern über die Sprint-Phasen selbst (Phase 2/4 in
+`Diagnose & Sprints/TRAIN-Sprint-Prompts.md`) — dort werden konsolidierte Diagnosen und
+Sprint-Ergebnisse als .txt abgelegt, für externe Produkt-/Strategie-Gespräche
+("Claude Cowork"), siehe auch CLAUDE.md (Projektdokumente-Tabelle).
+
 ---
 
 ## LOOP 6 — GoatCounter count.js Versions-Check (AKTIV)

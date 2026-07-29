@@ -1679,6 +1679,30 @@ function _applyPrTracking(state, ex, s, weight, reps) {
   }
 }
 
+/**
+ * Zentrale "canSuccess"-Logik + Status/Done-Zuweisung für einen Satz —
+ * konsolidiert aus 3 unabhängigen Kopien in SET_TOGGLE_DONE/CONFIRM_SET/
+ * AUTO_EVAL_SET (Befund #2, train-vXXX). Regel überall identisch: ein Satz
+ * gilt nur dann als 'success', wenn die Wdh das targetReps-Ziel erreichen
+ * (>=) — ohne definiertes targetReps reicht reps > 0 (kein Blockieren).
+ * Setzt s.status auf 'success'/'fail' und s.done passend dazu und gibt den
+ * ermittelten canSuccess-Boolean zurück. SET_TOGGLE_DONE hat eine eigene
+ * Statuszyklus-Logik (pending→success→fail→pending) und nutzt daher nur den
+ * Rückgabewert als Entscheidungsgrundlage — sein finales s.status/s.done
+ * wird von der Zyklus-Logik selbst gesetzt (überschreibt den Nebeneffekt
+ * dieser Funktion, siehe dort). CONFIRM_SET/AUTO_EVAL_SET sowie SET_UPDATE
+ * (Neubewertung nach nachträglicher Wdh-/Gewichts-Korrektur) übernehmen
+ * Status/Done direkt von hier.
+ */
+function _evaluateSetStatus(ex, s) {
+  const targetReps = parseFloat(ex?.targetReps) || 0;
+  const repsVal     = parseFloat(s?.reps) || 0;
+  const canSuccess  = targetReps > 0 ? repsVal >= targetReps : repsVal > 0;
+  s.status = canSuccess ? 'success' : 'fail';
+  s.done   = canSuccess;
+  return canSuccess;
+}
+
 function reduce(state, action) {
   const { type, payload: p } = action;
 
@@ -2375,7 +2399,7 @@ function reduce(state, action) {
       const ex = _currentWeek()?.days[p.di]?.exercises[p.ei]; if (!ex) break;
       const s  = ex.sets[p.si]; if (!s) break;
       let v = p.value;
-      if      (p.field === 'weight') v = parseFloat(v) || 0;
+      if      (p.field === 'weight') v = Math.max(0, parseFloat(v) || 0);
       else if (p.field === 'reps') {
         // Leeres Feld bleibt leer (null), wird NICHT auf 0 normalisiert —
         // sonst liest "Satz bestätigen" eine 0 und wertet fälschlich als
@@ -2396,6 +2420,16 @@ function reduce(state, action) {
             ex.sets[j].weight = v;
         }
       }
+      // Befund #2: eine Wdh-/Gewichts-Korrektur an einem bereits bewerteten
+      // Satz (status !== 'pending') soll den Status neu bewerten statt ihn
+      // einzufrieren — z.B. Wdh-Korrektur nach einem Fehlschlag soll das
+      // Status-Icon automatisch auf ✓ aktualisieren, wenn das Ziel jetzt
+      // erreicht ist (und umgekehrt). Pending Sätze bleiben unangetastet
+      // (die werden ohnehin erst über SET_TOGGLE_DONE/CONFIRM_SET/
+      // AUTO_EVAL_SET erstmalig bewertet).
+      if ((p.field === 'reps' || p.field === 'weight') && s.status !== 'pending') {
+        _evaluateSetStatus(ex, s);
+      }
       break;
     }
     case A.SET_TOGGLE_DONE: {
@@ -2407,12 +2441,11 @@ function reduce(state, action) {
         cur = s.done ? 'success' : 'pending';
       }
       const i = Math.max(0, order.indexOf(cur));
-      // Ein Satz darf nur 'success' werden wenn die Wdh das Ziel erreichen —
-      // ohne definiertes targetReps gilt weiterhin nur reps > 0 (kein Blockieren).
-      const targetReps = parseFloat(exForToggle.targetReps) || 0;
-      const canSuccess = targetReps > 0
-        ? (parseFloat(s.reps) || 0) >= targetReps
-        : (parseFloat(s.reps) || 0) > 0;
+      // canSuccess via zentralen Helper (_evaluateSetStatus) — setzt
+      // s.status/s.done als Nebeneffekt bereits vorläufig auf success/fail,
+      // wird unten von der eigentlichen Zyklus-Logik (next) aber ohnehin
+      // überschrieben. Nur der Rückgabewert wird hier gebraucht.
+      const canSuccess = _evaluateSetStatus(exForToggle, s);
       let next = order[(i + 1) % 3];
       if (next === 'success' && !canSuccess) next = 'fail';
       s.status = next;
@@ -2465,17 +2498,10 @@ function reduce(state, action) {
       const s  = ex.sets[p.si];
       if (!s || s.status === 'success') break;
       if (p.reps != null) s.reps = parseFloat(p.reps) || 0;
-      // Gleiche canSuccess-Logik wie SET_TOGGLE_DONE: ein Satz wird nur
-      // 'success' wenn die Wdh das Ziel erreichen — ohne definiertes
-      // targetReps gilt weiterhin nur reps > 0 (kein Blockieren).
-      const targetReps = parseFloat(ex.targetReps) || 0;
-      const repsVal     = parseFloat(s.reps) || 0;
-      const canSuccess  = targetReps > 0 ? repsVal >= targetReps : repsVal > 0;
-      s.status = canSuccess ? 'success' : 'fail';
-      // s.done bleibt an status===success gekoppelt (wie überall sonst im
-      // Code — _normSt, doneSets-Zähler, SET_TOGGLE_DONE), NICHT bedingungslos
-      // true, sonst würden Fail-Sätze fälschlich als "done" mitgezählt.
-      s.done   = canSuccess;
+      // canSuccess/status/done über zentralen Helper (_evaluateSetStatus,
+      // Befund #2-Konsolidierung) — gleiche Logik wie SET_TOGGLE_DONE/
+      // AUTO_EVAL_SET.
+      const canSuccess = _evaluateSetStatus(ex, s);
       if (canSuccess && wk.mode !== 'deload') {
         const weight = parseFloat(s.weight) || 0;
         const reps   = parseFloat(s.reps)   || 0;
@@ -2492,11 +2518,10 @@ function reduce(state, action) {
       const s  = ex.sets[p.si]; if (!s) break;
       if (s.status !== 'pending') break;
       s.reps = parseFloat(p.reps) || 0;
-      const targetReps  = parseFloat(ex.targetReps) || 0;
-      const repsVal     = parseFloat(s.reps) || 0;
-      const canSuccess  = targetReps > 0 ? repsVal >= targetReps : repsVal > 0;
-      s.status = canSuccess ? 'success' : 'fail';
-      s.done   = canSuccess;
+      // canSuccess/status/done über zentralen Helper (_evaluateSetStatus,
+      // Befund #2-Konsolidierung) — gleiche Logik wie SET_TOGGLE_DONE/
+      // CONFIRM_SET.
+      const canSuccess = _evaluateSetStatus(ex, s);
       if (canSuccess && wk.mode !== 'deload') {
         const weight = parseFloat(s.weight) || 0;
         const reps   = parseFloat(s.reps)   || 0;
@@ -2859,7 +2884,11 @@ function reduce(state, action) {
         weightStep: defaultWeightStepForExercise(sw.name, state.customExercises), nextWeekPlan: 0, nextWeekPlanConfirmed: false, nextWeekPlanAutoReviewed: true,
         skipReason: null, skipDate: null,
         targetSets: 1, targetReps: sw.reps ?? 5,
-        _showCfg: false, setType: 'standard', tags: [], showPlates: false,
+        // Befund #3: Hantelscheiben-Rechner-Default an. Unconditional true
+        // hier korrekt (nicht nur "meist"), weil metric oben in diesem
+        // Reducer bereits hart auf 'reps' (Gewichts-Metrik) gesetzt ist —
+        // ONBOARDING_SEED erzeugt nie Distanz-/Zeit-Übungen.
+        _showCfg: false, setType: 'standard', tags: [], showPlates: true,
         progressionType: 'weight', substituteFor: null,
         progressionMode: 'weight_first', targetRepsMax: null, prRepsHistory: {},
       }));

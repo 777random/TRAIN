@@ -262,6 +262,14 @@ export const INSIGHTS = [
   },
 
   // ── W-01: >30% failed sets in a completed day ──────────────────────────────
+  // History-Gate (Befund #10, Diagnose-Sprint): ohne Mindest-Historie gibt es
+  // keine Vergleichsbasis für "ungewöhnlich für dich" — am allerersten
+  // Trainingstag ist JEDE Fail-Quote per Definition "normal" für diesen
+  // Nutzer, da es noch kein "normal" gibt. Schwelle: 6 abgeschlossene
+  // Trainingstage VOR dem aktuellen Tag (~2 Wochen bei der für die
+  // Zielgruppe angenommenen 3x/Woche-Mindestfrequenz, siehe CLAUDE.md
+  // "Zielgruppe: 3–5x/Woche") — analog zum Historie-Gate in K-02
+  // (`sorted.length < 2`) bzw. `_checkMultiExerciseFailure` (weeklyFocus.js).
   {
     id: 'W-01', priority: 13, type: 'warning',
     trigger: ['TAG_ABGESCHLOSSEN'],
@@ -269,6 +277,8 @@ export const INSIGHTS = [
       const { di } = event.payload;
       const day = state.weeks[state.curIdx]?.days[di];
       if (!day) return null;
+      const doneDaysBefore = getDoneDays(getSortedWeeks(state)).filter(d => d !== day).length;
+      if (doneDaysBefore < 6) return null;
       const allSets = day.exercises.flatMap(ex => ex.sets);
       const total   = allSets.length;
       const failed  = allSets.filter(s => s.status === 'fail').length;

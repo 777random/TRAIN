@@ -122,18 +122,28 @@ test('Keine History fuer diese Uebung: Feld erscheint direkt wie bisher', async 
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
 });
 
-test('Manueller Pfad unveraendert: umbenennen + Original eintippen erzeugt History-Eintrag', async ({ page }) => {
+test('Manueller Pfad (confirm-sub): Ersatzname eintippen benennt um + erzeugt History-Eintrag', async ({ page }) => {
+  // Fix (Diagnose-Sprint Befund #5): 'confirm-sub' hat früher NUR
+  // EX_SET_SUBSTITUTE gefeuert (kein EX_UPDATE), weshalb das Eintippen im
+  // "Andere Übung:"-Feld allein die Übung NICHT umbenannte — Nutzer mussten
+  // vorher manuell über das separate Namensfeld umbenennen und dann hier
+  // nochmal den ALTEN Namen eintippen (siehe Git-Historie dieser Datei für
+  // den alten Testaufbau). Seit dem Fix feuert 'confirm-sub' dasselbe
+  // Zwei-Dispatch-Muster wie 'apply-sub-suggestion'/'apply-alt-chip':
+  // EX_UPDATE (name = eingetippter Text) + EX_SET_SUBSTITUTE (substituteFor
+  // = ursprünglicher Name, VOR der Umbenennung erfasst).
   const pageErrors = [];
   page.on('pageerror', err => pageErrors.push(err.message));
-  await seed(page);
+  await seed(page); // ex.name = 'Sled Push' (mkWeek-Default)
 
-  await page.fill('[data-action="ex-name"][data-di="0"][data-ei="0"]', 'Leg Press');
-  await page.dispatchEvent('[data-action="ex-name"][data-di="0"][data-ei="0"]', 'change');
   await openSubForm(page);
-  await page.fill('.sub-name-input[data-di="0"][data-ei="0"]', 'Sled Push');
+  await page.fill('.sub-name-input[data-di="0"][data-ei="0"]', 'Leg Press');
   await page.click('[data-action="confirm-sub"][data-di="0"][data-ei="0"]');
 
   const st = await readState(page);
+  const ex = st.weeks[0].days[0].exercises[0];
+  expect(ex.name).toBe('Leg Press');
+  expect(ex.substituteFor).toBe('Sled Push');
   expect(st.substituteHistory['Sled Push']).toEqual([
     { name: 'Leg Press', count: 1, lastUsed: expect.any(String) },
   ]);
@@ -156,12 +166,12 @@ test('Limit: max 5 Eintraege pro Uebung, aeltester (nach lastUsed) wird entfernt
     },
   });
 
-  // Umbenennen auf einen 6. neuen Ersatznamen VOR dem Öffnen des Dialogs
-  // (der belegte Normalfall, siehe Test "Manueller Pfad unverändert" oben)
-  await page.fill('[data-action="ex-name"][data-di="0"][data-ei="0"]', 'F');
-  await page.dispatchEvent('[data-action="ex-name"][data-di="0"][data-ei="0"]', 'change');
+  // 6. Ersatzname direkt über den confirm-sub-Dialog eintippen (ex.name
+  // startet als 'Sled Push', siehe mkWeek-Default) — 'confirm-sub'
+  // benennt selbst um, kein vorheriges manuelles Umbenennen mehr nötig
+  // (siehe Fix-Kommentar im Test "Manueller Pfad (confirm-sub)" oben).
   await openSubForm(page);
-  await page.fill('.sub-name-input[data-di="0"][data-ei="0"]', 'Sled Push');
+  await page.fill('.sub-name-input[data-di="0"][data-ei="0"]', 'F');
   await page.click('[data-action="confirm-sub"][data-di="0"][data-ei="0"]');
 
   const st = await readState(page);

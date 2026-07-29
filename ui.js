@@ -1535,6 +1535,7 @@ function _renderSessionCheckIn(di) {
   return `
   <div class="session-checkin-card" data-di="${di}">
     <div class="session-checkin-card__headline">WIE STARTEST DU HEUTE?</div>
+    <div class="session-checkin-card__label">Hilft der Trainingsempfehlung für heute</div>
     <div class="session-checkin-card__row" role="group" aria-label="Schlaf">
       ${sleepOpts.map(o => _btn(o, 'sleep')).join('')}
     </div>
@@ -2238,7 +2239,6 @@ function renderExercise(wk, di, ei, state) {
             ? '<span class="pause-row__label" style="color:var(--c-text-3);font-size:10px">Gewicht wird automatisch auf alle Sätze kopiert</span>'
             : ''}
         </div>` : ''}
-        ${!locked ? `
         <div class="weight-plan-row" role="group" aria-label="Gewichtsscheiben">
           <span class="pause-row__label">Scheiben:</span>
           <button
@@ -2248,7 +2248,7 @@ function renderExercise(wk, di, ei, state) {
             aria-pressed="${!!ex.showPlates}"
           >${ex.showPlates ? 'An' : 'Aus'}</button>
           ${ex.showPlates ? '<span class="pause-row__label" style="color:var(--c-text-3);font-size:10px">Langhantel 20 kg Basis</span>' : ''}
-        </div>` : ''}
+        </div>
         ${!locked ? `
         <div class="weight-plan-row" role="group" aria-label="Superset">
           <span class="pause-row__label">Superset:</span>
@@ -3414,9 +3414,18 @@ function _structuralSignalHtml(sig) {
     return { icon: '🛑', text: `Erfolgsquote insgesamt nur ${sig.rate}% — am stärksten betroffen: ${names}.`, evidence: sig.evidence };
   }
   if (sig.type === 'injury_reminder') {
+    // B129-Folgefix: "Letzte Woche" war hartcodiert und ignorierte den
+    // echten Zeitabstand. sig.daysSince kommt direkt von weeklyFocus.js
+    // (_checkInjuryReminder) — bewusst NICHT hier separat aus sig.skipDate
+    // neu berechnet, nachdem eine erste Version genau das tat und dabei
+    // durch abweichende Tageszeit-Normierung (volle Uhrzeit statt 12:00,
+    // anders als todayNoon in _trainingContextAnchor() oben) einen Off-by-
+    // one-Tag-Fehler hatte — per exaktem Zeitbezug-Test aufgedeckt.
+    const daysSince = sig.daysSince;
+    const timeText = daysSince <= 0 ? 'heute' : daysSince === 1 ? 'gestern' : `vor ${daysSince} Tagen`;
     return {
       icon: '⚠️',
-      text: `${h(sig.exerciseName)}: Letzte Woche wegen Schmerzen übersprungen. Mit Vorsicht starten.`,
+      text: `${h(sig.exerciseName)}: ${timeText} wegen Schmerzen übersprungen. Mit Vorsicht starten.`,
       evidence: sig.evidence,
     };
   }
@@ -6307,7 +6316,9 @@ function _handleClick(e) {
       const _subInp = document.querySelector(`.sub-name-input[data-di="${di}"][data-ei="${ei}"]`);
       const _subName = _subInp?.value.trim();
       if (!_subName) { _subInp?.focus(); break; }
-      dispatch(A.EX_SET_SUBSTITUTE, { di: +di, ei: +ei, substituteFor: _subName });
+      const _origName = getState().weeks[getState().curIdx]?.days[+di]?.exercises[+ei]?.name;
+      dispatch(A.EX_UPDATE, { di: +di, ei: +ei, field: 'name', value: _subName });
+      dispatch(A.EX_SET_SUBSTITUTE, { di: +di, ei: +ei, substituteFor: _origName });
       _subFormOpenKey = null;
       break;
     }
@@ -8542,7 +8553,7 @@ function _showSessionSummary(di, completionStats) {
   el.className = 'session-summary-screen';
   el.innerHTML = `
     <div class="session-summary-screen__inner">
-      <div class="session-summary-screen__title">Session Summary</div>
+      <div class="session-summary-screen__title">Trainingsrückblick</div>
       ${data.highlights.length ? `
       <div class="session-summary-screen__highlights">
         ${data.highlights.map(t => `<div class="session-summary-screen__highlight">${h(t)}</div>`).join('')}
@@ -8879,6 +8890,7 @@ function _showDayCompletionModal(di) {
       overlay.innerHTML = `
         <div class="completion-modal">
           <h3 class="completion-modal__title">Erholung heute</h3>
+          <div class="completion-modal__label" style="text-align:center;white-space:normal;margin-bottom:var(--sp-2)">Fließt in deine Wochenanalyse und Trends ein</div>
           <div class="completion-modal__slider-row">
             <span class="completion-modal__label">🛌 Schlaf</span>
             <input type="range" id="cm-sleep" class="completion-modal__slider"
@@ -9393,7 +9405,11 @@ function _showOnboarding() {
           metricStep: ex.m === 'm' ? 50 : ex.m === 'sec' ? 10 : undefined,
           targetSets: n, targetReps: tr,
           _showCfg: false, setType: 'standard',
-          tags: [], showPlates: false,
+          // Befund #3: Hantelscheiben-Rechner-Default an — NUR für
+          // Gewichts-Übungen (ex.m === 'reps'/undefined), nicht für
+          // Distanz-/Zeit-Übungen ('m'/'sec'), analog zur progressionType-
+          // Weiche direkt darunter.
+          tags: [], showPlates: (ex.m ?? 'reps') === 'reps',
           progressionType: (ex.m ?? 'reps') === 'reps' ? 'weight' : 'reps',
           substituteFor: null,
           progressionMode: 'weight_first', targetRepsMax: null, prRepsHistory: {},

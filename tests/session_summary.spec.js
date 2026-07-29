@@ -91,6 +91,27 @@ test('Summary erscheint nach day-done mit Highlights + Einordnung + Vorschau (PR
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
 });
 
+test('Wdh-PR (prBadge:reps, kein Gewichts-PR) erzeugt eigenes Highlight statt Fallback (B142)', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', err => pageErrors.push(err.message));
+  await page.goto('/');
+  await page.waitForSelector('#app.is-ready', { timeout: 10000 });
+
+  const wk = mkWeek({
+    id: 1, startDate: weeksAgoISO(0),
+    days: [mkDay({ exercises: [mkEx({ name: 'Kniebeuge', sets: [mkSet(100, 8, 'success', 7, 'reps')] })] })],
+  });
+  await seed(page, [wk], 0);
+
+  await completeDay(page);
+
+  const summary = page.locator('#session-summary-screen');
+  await expect(summary).toContainText('Kniebeuge: Neue Wdh-Bestleistung ↑');
+  await expect(summary).toContainText('Neue Wdh-Bestleistung heute');
+  await expect(summary).not.toContainText('Training abgeschlossen.');
+  expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});
+
 test('RPE-Warnung (>8.5) erscheint als Highlight', async ({ page }) => {
   const pageErrors = [];
   page.on('pageerror', err => pageErrors.push(err.message));

@@ -71,18 +71,26 @@ export function buildSessionHighlights(day, sortedWeeks, curWeekIdx) {
   const rows = [];
   for (const ex of day.exercises ?? []) {
     if (ex.archived) continue;
-    const prSet = (ex.sets ?? []).find(s => s.status === 'success' && s.prBadge === 'weight');
+    // B141: Wdh-PR (prBadge:'reps') wird gleichrangig zum Gewichts-PR erkannt
+    // (vorher NUR 'weight' — siehe DECISIONS.md, bewusster Bruch von B73/B79).
+    const prSet = (ex.sets ?? []).find(s => s.status === 'success' && (s.prBadge === 'weight' || s.prBadge === 'reps'));
     if (prSet) {
-      const weeksSince = curWeekIdx != null
-        ? _weeksSincePreviousIncrease(sortedWeeks, ex.name, curWeekIdx)
-        : null;
-      const prevBest = curWeekIdx != null
-        ? Math.max(0, ...exWeightHistory(sortedWeeks.slice(0, curWeekIdx), ex.name))
-        : 0;
-      const delta = prevBest > 0 ? Math.round((prSet.weight - prevBest) * 10) / 10 : null;
-      rows.push({ prio: 0, text: delta != null && delta > 0
-        ? `${ex.name}: +${delta}kg ↑`
-        : `${ex.name}: Neuer Rekord ↑` });
+      if (prSet.prBadge === 'weight') {
+        const weeksSince = curWeekIdx != null
+          ? _weeksSincePreviousIncrease(sortedWeeks, ex.name, curWeekIdx)
+          : null;
+        const prevBest = curWeekIdx != null
+          ? Math.max(0, ...exWeightHistory(sortedWeeks.slice(0, curWeekIdx), ex.name))
+          : 0;
+        const delta = prevBest > 0 ? Math.round((prSet.weight - prevBest) * 10) / 10 : null;
+        rows.push({ prio: 0, text: delta != null && delta > 0
+          ? `${ex.name}: +${delta}kg ↑`
+          : `${ex.name}: Neuer Rekord ↑` });
+      } else {
+        // Wdh-PR: eigener Text (kein Gewichts-Delta — mehr Wdh bei GLEICHEM
+        // Gewicht, nicht mehr Gewicht), bewusst unterscheidbar vom Gewichts-Text.
+        rows.push({ prio: 0, text: `${ex.name}: Neue Wdh-Bestleistung ↑` });
+      }
       continue;
     }
     const hardSet = (ex.sets ?? []).find(s => (s.status === 'success' || s.status === 'fail') && s.rpe != null && s.rpe > RPE_WARN_THRESHOLD);
@@ -104,19 +112,27 @@ export function buildSessionHighlights(day, sortedWeeks, curWeekIdx) {
  */
 export function buildSessionEinordnung(day, sortedWeeks, curWeekIdx) {
   const exercises = (day.exercises ?? []).filter(ex => !ex.archived);
-  const hasPR = exercises.some(ex => (ex.sets ?? []).some(s => s.status === 'success' && s.prBadge === 'weight'));
+  // B141: Wdh-PR gleichrangig zum Gewichts-PR erkannt (vorher NUR 'weight'),
+  // aber mit eigenem Text — siehe DECISIONS.md.
+  const weightPrEx = exercises.find(ex => (ex.sets ?? []).some(s => s.status === 'success' && s.prBadge === 'weight'));
+  const repsPrEx = exercises.find(ex => (ex.sets ?? []).some(s => s.status === 'success' && s.prBadge === 'reps'));
   const avgRpe = _dayAvgRpe(day);
   const fullSuccess = exercises.length > 0 && exercises.every(_exerciseFullySuccessful);
   const anyFullSuccess = exercises.some(_exerciseFullySuccessful);
   const anyRated = exercises.some(ex => (ex.sets ?? []).some(s => s.status === 'success' || s.status === 'fail'));
 
-  // a) PR diese Session
-  if (hasPR) {
-    const prEx = exercises.find(ex => (ex.sets ?? []).some(s => s.status === 'success' && s.prBadge === 'weight'));
-    const weeksSince = curWeekIdx != null ? _weeksSincePreviousIncrease(sortedWeeks, prEx.name, curWeekIdx) : null;
+  // a) Gewichts-PR diese Session
+  if (weightPrEx) {
+    const weeksSince = curWeekIdx != null ? _weeksSincePreviousIncrease(sortedWeeks, weightPrEx.name, curWeekIdx) : null;
     return weeksSince != null
       ? `Neuer Rekord heute — das war dein bestes Training seit ${weeksSince} ${weeksSince === 1 ? 'Woche' : 'Wochen'}.`
       : 'Neuer Rekord heute — dein bisher stärkstes Training.';
+  }
+  // a2) Wdh-PR diese Session (kein Gewichts-PR) — eigener Text, kein
+  // "seit X Wochen"-Vergleich (der basiert auf exWeightHistory, für einen
+  // reinen Wdh-PR nicht aussagekräftig).
+  if (repsPrEx) {
+    return `Neue Wdh-Bestleistung heute — mehr Wiederholungen bei ${repsPrEx.name} als je zuvor bei diesem Gewicht.`;
   }
   // b) alle Ziele erreicht, ø RPE <= 7
   if (fullSuccess && avgRpe != null && avgRpe <= 7) {

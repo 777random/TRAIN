@@ -27,7 +27,7 @@ function mkEx(name, overrides = {}) {
   };
 }
 
-function mkWeek(ex) {
+function mkWeek(ex, dayOverrides = {}) {
   return {
     id: 1, startDate: todayISO(), note: '', mode: 'standard',
     days: [{
@@ -36,12 +36,13 @@ function mkWeek(ex) {
       sleepHours: null, energyLevel: null,
       exercises: [ex],
       sessionLog: [], bodyData: {}, restDays: [], isSeedWeek: false,
+      ...dayOverrides,
     }],
     sessionLog: [], bodyData: {}, restDays: [], isSeedWeek: false,
   };
 }
 
-async function seed(page, ex, barbellWeight = 20) {
+async function seed(page, ex, barbellWeight = 20, dayOverrides = {}) {
   await page.goto('/');
   await page.waitForSelector('#app.is-ready', { timeout: 10000 });
   await page.evaluate(({ weekArg, barbellWeight }) => {
@@ -54,7 +55,7 @@ async function seed(page, ex, barbellWeight = 20) {
       lastReentryHandled: null, plateauActions: {}, decisionLog: [], badges: [],
       longestStreakEver: 0, seenTips: ['tip-11'],
     }));
-  }, { weekArg: mkWeek(ex), barbellWeight });
+  }, { weekArg: mkWeek(ex, dayOverrides), barbellWeight });
   await page.reload();
   await page.waitForSelector('#app.is-ready', { timeout: 10000 });
 }
@@ -247,6 +248,41 @@ test('90kg -> 85kg via "Übernehmen ↗" (sessionCoach): Hinweis von Satz 2 aktu
   expect(nextWeight).toBe(92.5);
   // 92.5kg/20kg-Stange -> perSide=36.25 -> 25+10+1.25
   await expect(page.locator('.plate-hint').nth(1)).toHaveText('+ 25+10+1.25  pro Seite · Stange 20kg');
+
+  expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});
+
+// ─── Befund #3 Teil B: Scheiben-Toggle bleibt nach Tagesabschluss editierbar ──
+
+// Der "Scheiben: An/Aus"-Toggle im "Erweitert"-Panel hing bisher an derselben
+// `!locked`-Bedingung wie z.B. "Typ" (Straight/Manuell) und "Superset" -- er
+// verschwand deshalb nach dem Tagesabschluss (day.locked), obwohl der
+// Hantelscheiben-Rechner gerade dann noch nützlich ist (rückblickend prüfen,
+// welche Scheiben ein bereits abgeschlossener Satz brauchte). Pause/Kategorie
+// sind schon länger unabhängig vom Lock-Status editierbar -- Scheiben zieht
+// jetzt nach, Typ/Superset bleiben bewusst weiterhin gesperrt.
+test('Scheiben-Toggle bleibt nach Tagesabschluss (day.locked) sichtbar und bedienbar, Typ/Superset bleiben gesperrt', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', err => pageErrors.push(err.message));
+  await seed(page, mkEx('Bankdrücken', { showPlates: false }), 20, { locked: true, markedDone: true });
+
+  await page.click('[data-action="toggle-ex-menu"][data-di="0"][data-ei="0"]');
+  await page.click('[data-action="toggle-cfg"][data-di="0"][data-ei="0"]');
+  await page.click('[data-action="toggle-cfg-adv"][data-di="0"][data-ei="0"]');
+
+  const platesToggle = page.locator('[data-action="toggle-plates"][data-di="0"][data-ei="0"]');
+  await expect(platesToggle).toBeVisible();
+  await expect(platesToggle).toHaveText('Aus');
+
+  // Typ/Superset bleiben weiterhin an !locked gebunden -- dürfen NICHT
+  // mit aufgetaut worden sein (Scope dieses Fixes war nur der Scheiben-Toggle).
+  await expect(page.locator('[data-action="set-settype"][data-di="0"][data-ei="0"]')).toHaveCount(0);
+  await expect(page.locator('[data-action="toggle-superset"][data-di="0"][data-ei="0"]')).toHaveCount(0);
+
+  await platesToggle.click();
+  const showPlatesAfter = await page.evaluate(() => JSON.parse(localStorage.getItem('train_v6')).weeks[0].days[0].exercises[0].showPlates);
+  expect(showPlatesAfter).toBe(true);
+  await expect(platesToggle).toHaveText('An');
 
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
 });

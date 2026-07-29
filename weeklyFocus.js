@@ -1144,13 +1144,18 @@ function _checkInjuryReminder(state) {
   const currentWeek = weeks[weeks.length - 1];
 
   const lookback = weeks.slice(-2); // aktuelle + vorherige Woche
-  const today = new Date();
+  // Beide Seiten der Differenz auf 12:00 normiert (statt Tageskante 00:00
+  // gegen die volle aktuelle Uhrzeit) — sonst driftet daysSince je nach
+  // Tageszeit um +/-1 Tag (Befund #7-Folgefix, gefunden durch die neuen
+  // exakten Zeitbezug-Tests in coach_injury_reminder.spec.js). Gleiches
+  // Muster wie todayNoon/_realDayDate in _trainingContextAnchor() (ui.js).
+  const todayNoon = (() => { const d = new Date(); d.setHours(12, 0, 0, 0); return d; })();
   let found = null;
   for (const wk of lookback) {
     for (const day of wk.days) {
       for (const ex of day.exercises) {
         if (ex.skipReason !== 'injury' || !ex.skipDate) continue;
-        const daysSince = Math.round((today - new Date(ex.skipDate + 'T00:00:00')) / DAY_MS);
+        const daysSince = Math.round((todayNoon - new Date(ex.skipDate + 'T12:00:00')) / DAY_MS);
         if (daysSince < 0 || daysSince > 14) continue;
         const stillPresent = currentWeek.days.some(d => d.exercises.some(e => e.name === ex.name));
         if (!stillPresent) continue;
@@ -1165,8 +1170,9 @@ function _checkInjuryReminder(state) {
   return {
     exerciseName: found.exerciseName,
     skipDate: found.skipDate,
+    daysSince: found.daysSince,
     evidence: [
-      { label: 'Übersprungen', value: `${found.daysSince} Tage her wegen Schmerzen` },
+      { label: 'Übersprungen', value: `${found.daysSince} ${found.daysSince === 1 ? 'Tag' : 'Tage'} her wegen Schmerzen` },
     ],
   };
 }

@@ -1,5 +1,6 @@
 backups/
 context-exports/
+Diagnose & Sprints/
 node_modules/
 package-lock.json
 test-results/

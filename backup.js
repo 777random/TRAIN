@@ -67,6 +67,7 @@ export function exportJSONAuto(startDate) {
   const filename = `TRAIN_Backup_${startDate}.json`;
   const blob     = new Blob([json], { type: 'application/json;charset=utf-8' });
   triggerDownload(blob, filename);
+  dispatch(A.SETTING_SET, { key: 'lastBackupDate', value: Date.now() });
 }
 
 // ─── Import-Härtung ───────────────────────────────────────────────────────────
@@ -321,5 +322,5 @@ export function exportCSV(scope = 'all') {
     ? wkLabel(weeks[0]?.startDate ?? '').replace(/\s\/\s/g, '-').replace(/\s/g, '')
     : 'Alle_Wochen';
   triggerDownload(blob, `TRAIN_Export_${tag}_${today()}.csv`);
-  dispatch(A.SETTING_SET, { key: 'lastBackupDate', value: today() });
+  dispatch(A.SETTING_SET, { key: 'lastBackupDate', value: Date.now() });
 }

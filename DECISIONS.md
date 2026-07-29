@@ -537,3 +537,31 @@ konsistent auftritt, könnte ein neues Coach-Tab-Struktursignal
 sinnvoll sein — das wäre der Übergang zu einem echten Planungstool. Bewusst
 nicht spezifiziert/gebaut, nur als Idee vermerkt.
 **Gilt:** Permanent bis gegenteilige Entscheidung.
+
+### 2026-07-29 — B142: Session Summary erkennt Wdh-PRs gleichrangig zu Gewichts-PRs (bewusster Bruch von B73/B79)
+**Entscheidung:** `buildSessionHighlights()`/`buildSessionEinordnung()`
+(sessionSummary.js) erkannten PRs bisher ausschließlich über
+`s.prBadge === 'weight'` — ein Wdh-PR (`s.prBadge === 'reps'`, von
+`_applyPrTracking()` in state.js bereits korrekt gesetzt) wurde komplett
+ignoriert und fiel auf den generischen Fallback-Text "Training
+abgeschlossen." zurück, obwohl ein echter PR vorlag (Pre-Launch-
+Diagnose-Sprint, Befund #9b). Ab sofort erkennen beide Funktionen
+`prBadge === 'weight' || prBadge === 'reps'`, mit jeweils eigenem, klar
+unterscheidbarem Text (Gewichts-PR: "+Xkg ↑"/"Neuer Rekord ↑" wie bisher;
+Wdh-PR: "Neue Wdh-Bestleistung ↑" bzw. eigener Einordnungssatz — kein
+"seit X Wochen"-Gewichtsvergleich, da für einen reinen Wdh-PR nicht
+aussagekräftig).
+**Begründung:** Die bisherige weight-only-Konvention (B73: sofortiger
+PR-Toast direkt nach dem Satz; B79: Session-Summary-Prioritätenkaskade
+"PR > RPE-Warnung > Ziel erreicht") war ursprünglich nicht bewusst auf
+Gewichts-PRs beschränkt gemeint, sondern hat schlicht das bestehende
+Muster unreflektiert übernommen. Ein Wdh-PR (mehr Wiederholungen bei
+gleichem Gewicht) ist für den Nutzer ein genauso echter Fortschritt wie
+ein Gewichts-PR und sollte im Session-Summary entsprechend gewürdigt
+werden, statt unter einem generischen Fallback-Text zu verschwinden.
+**Bewusst NICHT geändert:** `_maybeShowPrMomentToast()` (ui.js, der
+sofortige PR-Toast direkt nach dem Satz) und der Satz-Pokal
+(`isRepsPRAtMax`/`isRepsPRSubmax`, ui.js) bleiben unverändert — Wdh-PRs
+werden dort bereits korrekt angezeigt (Pokal-Icon am Satz), nur der
+nachgelagerte Session-Summary-Screen hatte die Lücke.
+**Gilt:** Permanent bis gegenteilige Entscheidung.

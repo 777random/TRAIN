@@ -104,3 +104,40 @@ test('Übung mit nicht-injury Skip-Grund -> KEIN Signal', async ({ page }) => {
   const body = await page.locator('body').innerText();
   expect(body).not.toMatch(/wegen Schmerzen übersprungen/);
 });
+
+// Befund #7 (Diagnose-Sprint): "Letzte Woche" war hartcodiert statt aus dem
+// echten Zeitabstand (skipDate) abgeleitet — Skip AM SELBEN TAG zeigte
+// fälschlich "Letzte Woche" statt "heute".
+test('Übung heute wegen Verletzung übersprungen -> Text zeigt "heute", nicht "Letzte Woche"', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', err => pageErrors.push(err.message));
+
+  const weeks = [
+    mkWeek(1, isoDaysAgo(0), [mkDay(1, [mkExercise('Bankdrücken', { skipReason: 'injury', skipDate: isoDaysAgo(0) })], false)]),
+  ];
+  await seed(page, weeks, 0);
+  await openCoachTab(page);
+
+  const text = await page.locator('.coach-structural-item').innerText();
+  expect(text).toMatch(/heute wegen Schmerzen übersprungen/);
+  expect(text).not.toMatch(/Letzte Woche/);
+
+  expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});
+
+// Befund #7 (Diagnose-Sprint): Singular/Plural-Fix für "Tag"/"Tage" in der
+// evidence-Zeile (weeklyFocus.js, _checkInjuryReminder) — bei genau 1 Tag
+// Abstand muss es "1 Tag her" heißen, nicht "1 Tage her".
+test('Übung vor genau 1 Tag übersprungen -> evidence zeigt "1 Tag her", nicht "1 Tage her"', async ({ page }) => {
+  const weeks = [
+    mkWeek(1, isoDaysAgo(1), [mkDay(1, [mkExercise('Bankdrücken', { skipReason: 'injury', skipDate: isoDaysAgo(1) })])]),
+    mkWeek(2, isoDaysAgo(0), [mkDay(2, [mkExercise('Bankdrücken')], false)]),
+  ];
+  await seed(page, weeks, 1);
+  await openCoachTab(page);
+
+  await page.click('.coach-structural-item .coach-why-collapse, .coach-structural-item summary');
+  const body = await page.locator('.coach-structural-item').innerText();
+  expect(body).toMatch(/1 Tag her wegen Schmerzen/);
+  expect(body).not.toMatch(/1 Tage her/);
+});

@@ -1,9 +1,9 @@
 # TRAIN — Parallel Agent Regeln
 # Wird nach jedem Multi-Agent Sprint
 # automatisch aktualisiert.
-# Letzte Aktualisierung: 2026-07-28 / train-v222 (nur Datei-Abhängigkeits-Matrix
-# aktualisiert — B138/B139/B140-Sprint lief bewusst sequenziell, kein
-# Multi-Agent-Sprint, siehe HANDOFF.md)
+# Letzte Aktualisierung: 2026-07-29 / train-v223 (Pre-Launch-Fix-Sprint,
+# B143-B151 — neues Muster 8 ergänzt, echter Multi-Runden-Multi-Agent-Sprint
+# mit bis zu 3 Agents parallel, siehe HANDOFF.md)
 
 ---
 
@@ -346,6 +346,49 @@ escaped gerendert wird (`h(item.text)`) — kein rohes HTML einschleusbar.
 Präzisere Regel: **eine Funktion + ihre unmittelbare, escaped-rendernde
 Caller-Stelle gelten als eine Einheit für die Scope-Zuweisung**, falls
 neues Markup (nicht nur Text) eingefügt werden soll.
+
+### Muster 8 — 4 Runden für 9 Befunde, state.js zuerst und allein, danach bis
+zu 3 Agents parallel pro Runde (verifiziert 2026-07-29, train-v223,
+Pre-Launch-Fix-Sprint B143-B151):
+```
+Runde 1 (solo, EIN Agent): state.js SET_UPDATE (Status-Neubewertung +
+  Gewichts-Floor) + gekoppelter ui.js-Teil (Plate-Rechner-Defaults/-Gating)
+→ git diff geprüft, Playwright-Baseline (Batch-Läufe, s.u.) grün, erst dann
+  Runde 2 gestartet.
+Runde 2 (3 parallel): weekReview.js, backup.js, insightEngine.js
+  — bewusst gewählt, weil keine der drei Dateien state.js importiert
+  (weekReview.js/backup.js zwar schon, aber state.js war zu diesem
+  Zeitpunkt bereits fertig und gemergt — die NIE-parallel-Regel gilt für
+  GLEICHZEITIGE Änderungen, nicht für sequenzielle Runden) und keine der
+  drei die andere importiert.
+Runde 3a (2 parallel): ui.js+weeklyFocus.js (EIN Agent für beide gekoppelten
+  Dateien einer Verletzungs-Erinnerungs-Funktion) + ui.js (andere, disjunkte
+  Region: confirm-sub-Handler) — zweiter Agent.
+Runde 3b (2 parallel, nach 3a gemerged): ui.js+sessionSummary.js (Session-
+  Summary-Titel + PR-Highlight) + ui.js (andere, disjunkte Region:
+  Check-in-Copy-Texte).
+→ Konsolidierungs-Agent zuletzt (Version, Docs, Commit).
+```
+Ergebnis: keine Kollision über alle 4 Runden, `git diff --stat` nach jeder
+Runde geprüft bevor die nächste startete (wie in Muster 6/7). **Neue,
+verallgemeinerte Präzisierung der Grundregel:** "state.js + jede
+importierende Datei NIE parallel" bezieht sich auf GLEICHZEITIGE Agents in
+DERSELBEN Runde — eine Datei, die state.js importiert, darf in einer
+SPÄTEREN Runde geändert werden, nachdem state.js in einer FRÜHEREN, für sich
+allein laufenden Runde bereits fertig und verifiziert ist. Das erlaubte hier,
+`weekReview.js`/`backup.js` (beide state.js-Importer) bereits in Runde 2
+anzufassen, statt bis zum Sprint-Ende zu warten.
+
+**Bekannte Infra-Grenze, während dieses Sprints erstmals konkret bestätigt
+(nicht Teil der Parallelisierungsregeln, aber relevant für die Verifikation
+zwischen den Runden):** die volle Playwright-Suite (282 Tests nach diesem
+Sprint) kann den lokalen `npx serve`-Devserver bei langen Läufen mit `EMFILE:
+too many open files` abstürzen lassen (siehe CLAUDE.md) — Verifikation
+zwischen den Runden lief deshalb in 3 Datei-Batches statt einem einzigen
+`npx playwright test`-Aufruf. Ein scheinbarer Massenausfall (>50% der Tests,
+durchgängig `net::ERR_CONNECTION_REFUSED`) nach einem langen vorherigen Lauf
+ist ein Hinweis auf diese Infra-Grenze, keine echte Regression — vor jeder
+Schlussfolgerung per Batch-Lauf gegenprüfen.
 
 ---
 

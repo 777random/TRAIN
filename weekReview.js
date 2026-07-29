@@ -141,10 +141,22 @@ function _calcStreak(sortedWeeks, week) {
   return calcCurrentStreak(sortedWeeks.slice(0, idx + 1));
 }
 
+// Pre-Launch-Diagnose-Sprint 2026-07-29, Befund #1: eine Übung, die per
+// Skip-Grund-Dialog (B129) explizit als "Verletzung/Schmerzen" markiert
+// wurde (ex.skipReason === 'injury'), landete trotzdem ungeprüft im "Was
+// nicht gut lief"-Lowlight inkl. der Empfehlung "Gewicht um 5 % reduzieren"
+// (_buildRecommendations) — obwohl der Nutzer die Übung aktiv als
+// verletzungsbedingt ausgesetzt gekennzeichnet hat, nicht als Trainingsfehler.
+// Fix: verletzungsbedingt übersprungene Übungen werden hier ausgeschlossen.
+// Bewusst NICHT in weekSuccessCounts()/_calcSuccessScore() geändert — die
+// Erfolgsquoten-Kernmetrik bleibt unverändert (ein Ausfall bleibt für die
+// Statistik ein Ausfall), nur die konkrete Handlungsempfehlung/Lowlight-
+// Anzeige entfällt für explizit verletzungsbedingte Fälle.
 function _findFailHighlight(week) {
   let worstName = null, worstCount = 0;
   for (const d of week.days)
     for (const ex of d.exercises) {
+      if (ex.skipReason === 'injury') continue;
       const n = ex.sets.filter(s => s.status === 'fail').length;
       if (n > worstCount) { worstCount = n; worstName = ex.name; }
     }
