@@ -16,7 +16,7 @@
  *   asset conflicts.
  */
 
-const CACHE_VERSION  = 'train-v223';
+const CACHE_VERSION  = 'train-v224';
 
 /**
  * App shell – every file the app needs to render its first frame offline.
@@ -149,11 +149,21 @@ async function cacheFirstWithRefresh(request, cacheName) {
 // ─── Message handling ─────────────────────────────────────────────────────────
 //
 // UI layer (ui.js '#sw-update-btn' click) sends:
-//   navigator.serviceWorker.controller.postMessage({ type: 'SKIP_WAITING' })
-// This is the ONLY way this worker ever skips waiting — see 'install' above.
+//   registration.waiting.postMessage({ type: 'SKIP_WAITING' })
+// (targets the new, waiting worker directly — not navigator.serviceWorker.controller,
+// which is still the OLD active worker at that point). This is the ONLY way this
+// worker ever skips waiting — see 'install' above.
+//
+// UI layer (ui.js Settings-Tab, einmalig beim Rendern) sends:
+//   navigator.serviceWorker.controller.postMessage({ type: 'GET_VERSION' })
+// to read the running CACHE_VERSION at runtime (sw.js is a classic script, not
+// an ES module, so ui.js cannot import CACHE_VERSION directly).
 
 self.addEventListener('message', event => {
   if (event.data?.type === 'SKIP_WAITING') {
     self.skipWaiting();
+  }
+  if (event.data?.type === 'GET_VERSION') {
+    event.source?.postMessage({ type: 'VERSION', version: CACHE_VERSION });
   }
 });

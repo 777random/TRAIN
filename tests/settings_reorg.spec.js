@@ -87,3 +87,120 @@ test('Mobile (375px): Einstellungen rendern ohne Absturz', async ({ page }) => {
   await expect(page.locator('.settings-group-title').first()).toBeVisible();
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
 });
+
+// P1-Fix (2026-08): der rote --Button ("Tag entfernen") unter "Trainingstage
+// verwalten" nutzte bis dahin ein natives, synchron blockierendes confirm() --
+// von Browser-Automatisierung (und potenziell echten Nutzern auf manchen
+// Plattformen) nicht sauber handhabbar. Ersetzt durch dasselbe In-App
+// Inline-Panel-Muster wie "Übung archivieren"/"Übung löschen": Klick öffnet
+// das Panel (_removeDayConfirmKey), "Löschen" (confirm-remove-day) führt
+// DAY_REMOVE aus, "Abbrechen" (cancel-remove-day) verwirft nur den State.
+// Ein page.on('dialog', ...)-Handler, der NIE feuern darf, dient als
+// Regressionswächter -- ein wiederkehrendes confirm() würde die Seite ohne
+// automatische Bestätigung hängen lassen und den Test per Timeout kippen.
+
+async function seedWithTwoDays(page) {
+  await page.goto('/');
+  await page.waitForSelector('#app.is-ready', { timeout: 10000 });
+  await page.evaluate(() => {
+    const todayISO = new Date().toISOString().split('T')[0];
+    localStorage.setItem('train_v6', JSON.stringify({
+      meta: { schemaVersion: 32, savedAt: Date.now(), createdAt: Date.now() },
+      curIdx: 0,
+      weeks: [{
+        id: 1, startDate: todayISO, note: '', mode: 'standard',
+        days: [
+          { id: 11, title: 'Tag A', subtitle: '', warmup: '', cooldown: '',
+            locked: false, markedDone: false, isVacation: false,
+            sleepHours: null, energyLevel: null, exercises: [] },
+          { id: 12, title: 'Tag B', subtitle: '', warmup: '', cooldown: '',
+            locked: false, markedDone: false, isVacation: false,
+            sleepHours: null, energyLevel: null, exercises: [] },
+        ],
+        sessionLog: [], bodyData: {}, restDays: [], isSeedWeek: false,
+      }],
+      onboardingDone: true,
+      customTemplate: [], settings: { sessionCoach: true, rpeEnabled: true },
+      favoriteExercises: [], customExercises: [], prs: {}, coachPerformance: { suggestions: [] },
+      coachQuestion: null, coachQuestionHistory: [], lastReentryHandled: null,
+      plateauActions: {}, decisionLog: [], badges: [], longestStreakEver: 0, seenTips: [],
+    }));
+  });
+  await page.reload();
+  await page.waitForSelector('#app.is-ready', { timeout: 10000 });
+  await page.click('[data-tab="settings"]');
+}
+
+test('Tag entfernen (roter Minus-Button): Inline-Panel statt nativem Dialog, Bestätigen löscht den Tag', async ({ page }) => {
+  const pageErrors = [];
+  const unexpectedDialogs = [];
+  page.on('pageerror', err => pageErrors.push(err.message));
+  page.on('dialog', dialog => { unexpectedDialogs.push(dialog.message()); dialog.dismiss(); });
+  await seedWithTwoDays(page);
+  const settingsScope = page.locator('#settings-tab-content');
+
+  // Nur der letzte Tag (di=1, "Tag B") zeigt den roten Minus-Button.
+  await settingsScope.locator('[data-action="remove-day"][data-di="1"]').click();
+
+  await expect(settingsScope.locator('[data-action="confirm-remove-day"][data-di="1"]')).toBeVisible({ timeout: 3000 });
+  await expect(settingsScope.locator('[data-action="cancel-remove-day"]')).toBeVisible();
+
+  await settingsScope.locator('[data-action="confirm-remove-day"][data-di="1"]').click();
+  await page.waitForTimeout(150);
+
+  const st = await page.evaluate(() => JSON.parse(localStorage.getItem('train_v6')));
+  const titles = st.weeks[0].days.map(d => d.title);
+  expect(titles).toEqual(['Tag A']);
+
+  expect(unexpectedDialogs, unexpectedDialogs.join('; ')).toHaveLength(0);
+  expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});
+
+test('Tag entfernen: Abbrechen im Inline-Panel laesst beide Tage unangetastet', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', err => pageErrors.push(err.message));
+  await seedWithTwoDays(page);
+  const settingsScope = page.locator('#settings-tab-content');
+
+  await settingsScope.locator('[data-action="remove-day"][data-di="1"]').click();
+  await expect(settingsScope.locator('[data-action="confirm-remove-day"][data-di="1"]')).toBeVisible({ timeout: 3000 });
+
+  await settingsScope.locator('[data-action="cancel-remove-day"]').click();
+  await expect(settingsScope.locator('[data-action="confirm-remove-day"]')).toHaveCount(0);
+
+  const st = await page.evaluate(() => JSON.parse(localStorage.getItem('train_v6')));
+  const titles = st.weeks[0].days.map(d => d.title);
+  expect(titles).toEqual(['Tag A', 'Tag B']);
+
+  expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});
+
+// Befund (Minor): Stangengewicht-Feld akzeptierte unrealistisch hohe Werte
+// (z.B. 99999) ohne Obergrenze -- nur negative Werte fielen bereits auf den
+// Default (20) zurück. Fix: Bedingung um `&& bw <= 50` erweitert, Fallback
+// bleibt konsistent 20 (nicht der letzte gültige Wert).
+test('Stangengewicht: unrealistisch hoher Wert (99999) faellt beim Verlassen des Feldes auf 20 zurueck', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', err => pageErrors.push(err.message));
+  await seed(page);
+  const input = page.locator('[data-action="set-barbell-weight"]');
+  await input.fill('99999');
+  await input.blur();
+  const bw = await page.evaluate(() => JSON.parse(localStorage.getItem('train_v6')).settings.barbellWeight);
+  expect(bw).toBe(20);
+  expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});
+
+// Bestehendes Negativ-Fallback-Verhalten bleibt unveraendert (Regressionsschutz
+// fuer die genaue Bedingung, nicht Teil dieses Fixes selbst).
+test('Stangengewicht: negativer Wert faellt weiterhin auf 20 zurueck (unveraendertes Verhalten)', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', err => pageErrors.push(err.message));
+  await seed(page);
+  const input = page.locator('[data-action="set-barbell-weight"]');
+  await input.fill('-5');
+  await input.blur();
+  const bw = await page.evaluate(() => JSON.parse(localStorage.getItem('train_v6')).settings.barbellWeight);
+  expect(bw).toBe(20);
+  expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});

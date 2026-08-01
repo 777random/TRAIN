@@ -97,8 +97,44 @@ let _confirmFlashKey = null;
 /** Key of the exercise with the open substitute-name form: `${di}-${ei}` or null. */
 let _subFormOpenKey = null;
 
+/**
+ * ServiceWorkerRegistration of the currently waiting (new, installed but not
+ * yet active) service worker — set from `event.detail.registration` in the
+ * 'train:show-update-banner' listener (index.html re-dispatches registerSW.js'
+ * 'train:sw-update-ready' with the same registration). Read by the
+ * '#sw-update-btn' click handler so it can post SKIP_WAITING to
+ * `registration.waiting` (the new worker) instead of
+ * `navigator.serviceWorker.controller` (still the OLD active worker at that
+ * point — posting there was a no-op for the waiting worker, root cause of the
+ * update-doesn't-activate bug).
+ */
+let _pendingSwRegistration = null;
+
+/**
+ * Runtime-queried CACHE_VERSION from sw.js (e.g. 'TRAIN train-v223'), or null
+ * until the 'VERSION' response arrives. sw.js is a classic script (no ES
+ * module), so ui.js cannot import CACHE_VERSION directly — instead this asks
+ * the active worker at runtime via postMessage({type:'GET_VERSION'}) once
+ * (see renderSettingsTab()/the 'message' listener in mountApp()) and patches
+ * #sw-version-label directly on response, rather than triggering a full
+ * settings re-render (which could race with unrelated state changes).
+ */
+let _swVersionLabel = null;
+
+/** Guards against re-sending GET_VERSION on every renderSettingsTab() call. */
+let _swVersionRequested = false;
+
 /** Key of the exercise with the open archive-confirm panel: `${di}-${ei}` or null. */
 let _archiveConfirmKey = null;
+
+/** Index (as string) of the day whose remove-confirm panel is open, or null. Shared between the week-menu "Tag löschen" item and the Settings-Tab red minus button (both trigger the same 'remove-day' action). */
+let _removeDayConfirmKey = null;
+
+/** Key of the exercise with the open remove-confirm panel: `${di}-${ei}` or null. */
+let _removeExConfirmKey = null;
+
+/** Whether the "Alle Daten löschen" confirm panel (Settings-Tab, Abschnitt "Deine Daten") offen ist. */
+let _deleteAllDataConfirmOpen = false;
 
 /** Pending auto-evaluation after blur (cancelled if user manually confirms/fails before setTimeout fires). */
 let _pendingAutoEval = null;
@@ -360,7 +396,7 @@ const _ONBOARDING_TEMPLATES = [
     weekTitle: 'Körpergewicht — Woche 1',
     days: [
       {
-        title: 'Tag A — Push + Legs',
+        title: 'Tag A',
         warmup:   '5 Min Gelenkmobilisation: Schultern, Hüfte, Knöchel',
         cooldown: '5 Min statisches Dehnen: Brust, Hüfte',
         exercises: [
@@ -372,7 +408,7 @@ const _ONBOARDING_TEMPLATES = [
         ],
       },
       {
-        title: 'Tag B — Pull + Core',
+        title: 'Tag B',
         warmup:   '5 Min Schulterblatt-Mobilisation',
         cooldown: '5 Min Rücken + Hüftbeuger dehnen',
         exercises: [
@@ -921,6 +957,14 @@ function renderDayList(state) {
     <button class="toolbar__btn toolbar__btn--accent" data-action="open-new-week"
       aria-label="Neue Trainingswoche erstellen">${ic.plus()}</button>
   </div>
+  ${!_overviewMode && _activeDayIdx !== null && _removeDayConfirmKey === String(_activeDayIdx) && wk.days[+_removeDayConfirmKey] ? `
+  <div class="sub-form" style="text-align:center;padding:var(--sp-3) var(--sp-4)">
+    <p style="font-size:13px;color:var(--c-text-2);margin-bottom:var(--sp-2)">"${h(wk.days[+_removeDayConfirmKey].title)}" löschen? Alle Einträge dieses Tags werden entfernt.</p>
+    <div style="display:flex;gap:var(--sp-2);justify-content:center">
+      <button class="btn btn--danger btn--sm" data-action="confirm-remove-day" data-di="${_removeDayConfirmKey}">Löschen</button>
+      <button class="btn btn--sm" data-action="cancel-remove-day">Abbrechen</button>
+    </div>
+  </div>` : ''}
   <div class="day-tab-pills-row">
     <div class="day-tab-pills-scroll">
       <div class="day-tab-pills">
@@ -2414,6 +2458,15 @@ function renderExercise(wk, di, ei, state) {
     <div style="display:flex;gap:var(--sp-2);justify-content:center">
       <button class="btn btn--danger btn--sm" data-action="confirm-archive-ex" data-di="${di}" data-ei="${ei}">Archivieren</button>
       <button class="btn btn--sm" data-action="cancel-archive-ex">Abbrechen</button>
+    </div>
+  </div>` : ''}
+
+  ${_removeExConfirmKey === `${di}-${ei}` ? `
+  <div class="sub-form" style="text-align:center;padding:var(--sp-4)">
+    <p style="font-size:13px;color:var(--c-text-2);margin-bottom:var(--sp-3)">"${h(ex.name)}" entfernen?</p>
+    <div style="display:flex;gap:var(--sp-2);justify-content:center">
+      <button class="btn btn--danger btn--sm" data-action="confirm-remove-ex" data-di="${di}" data-ei="${ei}">Entfernen</button>
+      <button class="btn btn--sm" data-action="cancel-remove-ex">Abbrechen</button>
     </div>
   </div>` : ''}
 
@@ -4842,6 +4895,16 @@ function renderSettingsTab(state) {
   const wk  = state.weeks[state.curIdx] ?? null;
   const s   = state.settings ?? {};
 
+  // Einmalige Laufzeit-Abfrage der CACHE_VERSION bei sw.js (kein gemeinsamer
+  // Konstanten-Import möglich, sw.js ist Classic Script). Antwort kommt async
+  // über den 'message'-Listener in mountApp() und patcht #sw-version-label
+  // direkt, statt hier auf eine Antwort zu warten oder einen Re-Render
+  // auszulösen.
+  if (!_swVersionRequested && navigator.serviceWorker?.controller) {
+    _swVersionRequested = true;
+    navigator.serviceWorker.controller.postMessage({ type: 'GET_VERSION' });
+  }
+
   const tog = (key, label, desc) => `
   <div class="settings-row">
     <div><div class="settings-row__label">${label}</div><div class="settings-row__desc">${desc}</div></div>
@@ -5049,6 +5112,18 @@ function renderSettingsTab(state) {
       </div>
       <div class="settings-row__action">${ic.chevronRight()}</div>
     </div>
+    ${_deleteAllDataConfirmOpen ? `
+    <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:var(--sp-3)">
+      <p style="font-size:13px;color:var(--c-text-2);margin:0">
+        Alle Trainingsdaten auf diesem Gerät werden unwiderruflich gelöscht.<br>
+        Erstelle vorher ein Backup, falls du die Daten behalten willst.<br><br>
+        Wirklich alles löschen?
+      </p>
+      <div style="display:flex;gap:var(--sp-2);justify-content:center">
+        <button class="btn btn--danger btn--sm" data-action="confirm-delete-all-data">Alles löschen</button>
+        <button class="btn btn--sm" data-action="cancel-delete-all-data">Abbrechen</button>
+      </div>
+    </div>` : ''}
   </div>
 
   <!-- Trainingstage -->
@@ -5068,7 +5143,15 @@ function renderSettingsTab(state) {
           data-action="remove-day" data-di="${di}"
           aria-label="${h(day.title)} entfernen"
         >${ic.minus()}</button>` : '<div style="width:52px"></div>'}
-      </div>`).join('') : ''}
+      </div>
+      ${_removeDayConfirmKey === String(di) ? `
+      <div class="sub-form" style="width:100%;text-align:center;padding:var(--sp-3)">
+        <p style="font-size:13px;color:var(--c-text-2);margin-bottom:var(--sp-2)">"${h(day.title)}" löschen? Alle Einträge dieses Tags werden entfernt.</p>
+        <div style="display:flex;gap:var(--sp-2);justify-content:center">
+          <button class="btn btn--danger btn--sm" data-action="confirm-remove-day" data-di="${di}">Löschen</button>
+          <button class="btn btn--sm" data-action="cancel-remove-day">Abbrechen</button>
+        </div>
+      </div>` : ''}`).join('') : ''}
     </div>
   </div>
 
@@ -5147,7 +5230,7 @@ function renderSettingsTab(state) {
   <div class="settings-section">
     <div class="settings-section__title">Info</div>
     <div class="settings-row">
-      <div><div class="settings-row__label">Version</div><div class="settings-row__desc">TRAIN train-v222</div></div>
+      <div><div class="settings-row__label">Version</div><div class="settings-row__desc" id="sw-version-label">${h(_swVersionLabel ?? 'TRAIN')}</div></div>
     </div>
     <div class="settings-row">
       <div>
@@ -5974,18 +6057,34 @@ function _handleClick(e) {
     }
 
     case 'remove-day': {
+      // P1-Fix: kein natives confirm() mehr (blockierte Browser-Automatisierung/
+      // Playwright synchron) -- stattdessen Inline-Panel-Muster wie bei
+      // 'open-archive-confirm'. _removeDayConfirmKey wird sowohl im Wochen-Menü
+      // (Tag "${_ad.title}" löschen) als auch im Settings-Tab (roter --Button,
+      // "Trainingstage verwalten") gerendert -- gleiche Aktion, zwei Trigger-Orte.
       const _di = +el.dataset.di;
-      const _day = getState().weeks[getState().curIdx]?.days[_di];
-      if (!confirm(`"${_day?.title ?? 'Tag'}" löschen? Alle Einträge dieses Tags werden entfernt.`)) break;
-      if (_activeDayIdx === _di) _activeDayIdx = null;
-      else if (_activeDayIdx > _di) _activeDayIdx--;
+      _removeDayConfirmKey = String(_di);
       _dayMenuOpenKey = null;
       _weekMenuOpen = false;
+      scheduleRender();
+      break;
+    }
+
+    case 'confirm-remove-day': {
+      const _di = +el.dataset.di;
+      if (_activeDayIdx === _di) _activeDayIdx = null;
+      else if (_activeDayIdx > _di) _activeDayIdx--;
+      _removeDayConfirmKey = null;
       dispatch(A.DAY_REMOVE, { di: _di });
       showToast('Tag gelöscht — Undo möglich', 'info');
       if (_activeTab === 'settings') renderSettingsTab(getState());
       break;
     }
+
+    case 'cancel-remove-day':
+      _removeDayConfirmKey = null;
+      scheduleRender();
+      break;
 
     case 'toggle-complete': {
       const stBefore  = getState();
@@ -6169,9 +6268,21 @@ function _handleClick(e) {
       dispatch(A.EX_UPDATE, { di: +di, ei: +ei, field: 'pauseSec', value: +sec }); break;
 
     case 'remove-ex':
-      if (confirm('Übung entfernen?')) {
-        dispatch(A.EX_REMOVE, { di: +di, ei: +ei });
-      }
+      // P1-Fix: kein natives confirm() mehr -- Inline-Panel-Muster wie
+      // 'open-archive-confirm' (gleiches Kebab-Menü, direkt darüber).
+      _removeExConfirmKey = `${di}-${ei}`;
+      _exMenuOpenKey = null;
+      renderDayList(getState());
+      break;
+
+    case 'confirm-remove-ex':
+      dispatch(A.EX_REMOVE, { di: +di, ei: +ei });
+      _removeExConfirmKey = null;
+      break;
+
+    case 'cancel-remove-ex':
+      _removeExConfirmKey = null;
+      renderDayList(getState());
       break;
 
     case 'open-archive-confirm':
@@ -6870,15 +6981,23 @@ function _handleClick(e) {
       break;
 
     case 'delete-all-data':
-      if (confirm(
-        'Alle Trainingsdaten auf diesem Gerät werden unwiderruflich gelöscht.\n' +
-        'Erstelle vorher ein Backup, falls du die Daten behalten willst.\n\n' +
-        'Wirklich alles löschen?'
-      )) {
-        localStorage.removeItem(STORAGE_KEY);
-        localStorage.removeItem(STORAGE_KEY_SHADOW);
-        location.reload();
-      }
+      // P1-Fix: kein natives confirm() mehr -- Inline-Panel-Muster wie
+      // 'open-archive-confirm'. Boolean statt Key, da es (anders als bei
+      // Tag/Übung) keine Multi-Instanz-Situation gibt -- nur ein globaler
+      // "Alle Daten löschen"-Button im Settings-Tab.
+      _deleteAllDataConfirmOpen = true;
+      if (_activeTab === 'settings') renderSettingsTab(getState());
+      break;
+
+    case 'confirm-delete-all-data':
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(STORAGE_KEY_SHADOW);
+      location.reload();
+      break;
+
+    case 'cancel-delete-all-data':
+      _deleteAllDataConfirmOpen = false;
+      if (_activeTab === 'settings') renderSettingsTab(getState());
       break;
 
     // Named templates (3.4)
@@ -7255,7 +7374,7 @@ function _handleChange(e) {
     }
     case 'set-barbell-weight': {
       const bw = parseFloat(el.value);
-      dispatch(A.SETTING_SET, { key: 'barbellWeight', value: Number.isFinite(bw) && bw > 0 ? bw : 20 });
+      dispatch(A.SETTING_SET, { key: 'barbellWeight', value: Number.isFinite(bw) && bw > 0 && bw <= 50 ? bw : 20 });
       break;
     }
     case 'set-deload-factor-value': {
@@ -8322,11 +8441,15 @@ export function mountApp(root) {
     // selbst (siehe 'install' dort). localStorage bleibt über den Reload
     // hinweg erhalten (unabhängig vom Service-Worker-Cache).
     e.target.disabled = true;
-    if (!navigator.serviceWorker?.controller) { window.location.reload(); return; }
+    const waiting = _pendingSwRegistration?.waiting;
+    if (!waiting) { window.location.reload(); return; }
     let reloaded = false;
     const doReload = () => { if (!reloaded) { reloaded = true; window.location.reload(); } };
     navigator.serviceWorker.addEventListener('controllerchange', doReload, { once: true });
-    navigator.serviceWorker.controller.postMessage({ type: 'SKIP_WAITING' });
+    // Ziel ist der WARTENDE (neue) Worker, nicht navigator.serviceWorker.controller
+    // (das ist zu diesem Zeitpunkt noch der alte, aktive Worker — SKIP_WAITING
+    // dorthin ist ein No-op, siehe _pendingSwRegistration-Kommentar oben).
+    waiting.postMessage({ type: 'SKIP_WAITING' });
     setTimeout(doReload, 3000); // Sicherheitsnetz falls controllerchange ausbleibt
   });
 
@@ -8354,8 +8477,20 @@ export function mountApp(root) {
   // Von index.html gefeuert sobald ein neuer Service Worker installiert ist
   // und wartet (train:sw-update-ready -> train:show-update-banner). Bleibt
   // sichtbar bis Klick auf "Jetzt aktualisieren" — kein Auto-Dismiss.
-  window.addEventListener('train:show-update-banner', () => {
+  window.addEventListener('train:show-update-banner', (e) => {
+    _pendingSwRegistration = e.detail?.registration ?? null;
     document.getElementById('sw-update-banner')?.classList.add('is-visible');
+  });
+
+  // Antwort auf das einmalige GET_VERSION-postMessage in renderSettingsTab()
+  // (Fix für hartkodiertes Versions-Label — sw.js läuft als Classic Script,
+  // kein gemeinsamer Konstanten-Import möglich). Gezielter DOM-Patch statt
+  // Re-Render, um keine Race Condition mit anderen State-Changes einzuführen.
+  navigator.serviceWorker?.addEventListener('message', event => {
+    if (event.data?.type !== 'VERSION') return;
+    _swVersionLabel = `TRAIN ${event.data.version}`;
+    const el = document.getElementById('sw-version-label');
+    if (el) el.textContent = _swVersionLabel;
   });
 
   window.addEventListener('train:badge-earned', e => {
@@ -9138,6 +9273,18 @@ function _showOnboarding() {
   ].join(';');
   document.body.appendChild(el);
 
+  // Empfehlung-Logik (Sprint C1, train-v108): Fitness > Anfänger > Muskelaufbau > sonst.
+  // Ausgelagert aus _render(), damit auch die select-exp/select-goal-Handler den
+  // aktuell empfohlenen Index kennen (B-Fix: "Vorlage laden" blieb inaktiv, wenn
+  // die Empfehlung nie aktiv angeklickt wurde — siehe Handler unten).
+  function _computeRecommendedIdx() {
+    return (!_expLevel && !_mainGoal) ? null
+      : _mainGoal === 'fitness'      ? 2
+      : _expLevel === 'anfaenger'    ? 0
+      : _mainGoal === 'muskelaufbau' ? 1
+      : 1;
+  }
+
   function _render() {
     if (_obPhase === 'privacy') {
       el.innerHTML = `
@@ -9175,11 +9322,7 @@ function _showOnboarding() {
     }
 
     // Empfehlung-Logik (Sprint C1, train-v108): Fitness > Anfänger > Muskelaufbau > sonst
-    const _recommendedIdx = (!_expLevel && !_mainGoal) ? null
-      : _mainGoal === 'fitness'      ? 2
-      : _expLevel === 'anfaenger'    ? 0
-      : _mainGoal === 'muskelaufbau' ? 1
-      : 1;
+    const _recommendedIdx = _computeRecommendedIdx();
 
     const _expOptions  = [['anfaenger', 'Anfänger'], ['fortgeschritten', 'Fortgeschritten'], ['erfahren', 'Erfahren']];
     const _goalOptions = [
@@ -9298,14 +9441,20 @@ function _showOnboarding() {
     switch (btn.dataset.ob) {
       case 'select':
         _selTpl = +btn.dataset.tpl; _render(); break;
-      case 'select-exp':
+      case 'select-exp': {
         _expLevel = _expLevel === btn.dataset.exp ? null : btn.dataset.exp;
         _optionalOpen = true;
+        const _rec = _computeRecommendedIdx();
+        if (_rec !== null) _selTpl = _rec;
         _render(); break;
-      case 'select-goal':
+      }
+      case 'select-goal': {
         _mainGoal = _mainGoal === btn.dataset.goal ? null : btn.dataset.goal;
         _optionalOpen = true;
+        const _rec = _computeRecommendedIdx();
+        if (_rec !== null) _selTpl = _rec;
         _render(); break;
+      }
       case 'load':
         if (_selTpl !== null) _applyTpl(_selTpl);
         _afterSetup(); break;

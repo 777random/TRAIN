@@ -67,3 +67,81 @@ test('Vorlagen-Übernahme: showPlates ist true für Gewichts-Übungen, false fü
 
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
 });
+
+// Befund (P1): "Vorlage laden" blieb inaktiv, obwohl eine Karte durch
+// Erfahrung+Hauptziel bereits als "Empfohlen für dich" markiert war -- die
+// Empfehlung (_recommendedIdx, rein visuell) war nie mit der echten Auswahl
+// (_selTpl, steuert den Button + case 'load') verknüpft. Fix: die
+// select-exp/select-goal-Handler übernehmen die berechnete Empfehlung jetzt
+// zusätzlich in _selTpl, ohne dass ein Klick auf die Karte selbst nötig ist.
+test('Erfahrung+Hauptziel setzen (ohne Kartenklick) aktiviert "Vorlage laden" und lädt die empfohlene Vorlage', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', err => pageErrors.push(err.message));
+
+  await page.goto('/');
+  await page.waitForSelector('#onboarding', { timeout: 10000 });
+
+  const loadBtn = page.locator('[data-ob="load"]');
+  await expect(loadBtn).toBeDisabled();
+
+  // "Optional: Vorlage anpassen" aufklappen, damit die Buttons sichtbar/klickbar sind.
+  await page.click('.ob-optional__summary');
+  await page.click('[data-ob="select-exp"][data-exp="anfaenger"]');
+  // Anfänger -> _recommendedIdx = 0 (siehe _computeRecommendedIdx(), ui.js)
+  await expect(page.locator('.ob-tpl-card').nth(0)).toHaveClass(/is-selected/);
+  await expect(loadBtn).toBeEnabled();
+
+  await loadBtn.click();
+  // Datenschutz-Screen folgt direkt nach "load" -> Beleg, dass _applyTpl()
+  // tatsächlich gelaufen ist (case 'load' ruft _applyTpl() nur wenn
+  // _selTpl !== null).
+  await expect(page.locator('.ob-screen h2')).toHaveText('Deine Daten bleiben bei dir');
+  await page.click('[data-ob="privacy-continue"]');
+  await page.waitForSelector('#onboarding', { state: 'detached', timeout: 10000 });
+
+  const weeks = await page.evaluate(() => JSON.parse(localStorage.getItem('train_v6')).weeks);
+  expect(weeks.length).toBe(1);
+  expect(weeks[0].days[0].exercises.length).toBeGreaterThan(0);
+
+  expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});
+
+test('Klick auf eine ANDERE Karte überschreibt die zuvor per Empfehlung gesetzte Auswahl weiterhin normal', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', err => pageErrors.push(err.message));
+
+  await page.goto('/');
+  await page.waitForSelector('#onboarding', { timeout: 10000 });
+
+  await page.click('.ob-optional__summary');
+  await page.click('[data-ob="select-exp"][data-exp="anfaenger"]'); // empfiehlt+wählt Karte 0
+  await expect(page.locator('.ob-tpl-card').nth(0)).toHaveClass(/is-selected/);
+
+  await page.click('.ob-tpl-card >> nth=1'); // manueller Klick auf andere Karte
+  await expect(page.locator('.ob-tpl-card').nth(1)).toHaveClass(/is-selected/);
+  await expect(page.locator('.ob-tpl-card').nth(0)).not.toHaveClass(/is-selected/);
+
+  expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});
+
+// Befund (Minor): Körpergewicht-Vorlage hatte Split-Terminologie ("Push +
+// Legs" / "Pull + Core") in den Tag-Titeln, obwohl die Vorlage als
+// "Ganzkörper" beworben wird (siehe .ob-tpl-meta). Neutral auf "Tag A"/
+// "Tag B" vereinheitlicht.
+test('Körpergewicht-Vorlage erzeugt Tage mit neutralen Titeln "Tag A"/"Tag B" (kein Push/Pull-Split-Titel mehr)', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', err => pageErrors.push(err.message));
+
+  await page.goto('/');
+  await page.waitForSelector('#onboarding', { timeout: 10000 });
+
+  await page.click('.ob-tpl-card >> nth=2'); // Körpergewicht ist die 3. Vorlage (Index 2)
+  await page.click('[data-ob="load"]');
+  await page.click('[data-ob="privacy-continue"]');
+  await page.waitForSelector('#onboarding', { state: 'detached', timeout: 10000 });
+
+  const dayTitles = await page.evaluate(() => JSON.parse(localStorage.getItem('train_v6')).weeks[0].days.map(d => d.title));
+  expect(dayTitles).toEqual(['Tag A', 'Tag B']);
+
+  expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});

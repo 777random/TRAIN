@@ -2,6 +2,40 @@
 # Automatisch von Claude Code
 # befüllt beim Session-Start
 
+## 2026-08-01 train-v224 (Runde-3-Tiefentest-Fix-Sprint B152-B157, 6 von 6 Befunden)
+Loop 1: nicht separat gelaufen (volle Suite lief batch-weise, s.u.), 0 fehlgeschlagen
+Loop 2: aktuell ✓ (CLAUDE.md/HANDOFF.md/BUGS.md/AGENTS.md auf train-v224 gebracht)
+Eigentliche Aufgabe: Runde-3-Tiefentest-Sprint basierend auf
+  Diagnose & Sprints/TRAIN-Test-Uebergabe.md (Teil 3+4) und
+  TRAIN-Sprint-Prompts-Runde3.md. Baseline vorab 282/282 grün (3 Batches).
+  Phase 1: 3 parallele Diagnose-Agents (ein Agent pro Cluster, kein Code
+  geändert), konsolidiert in diagnose-runde3-2026-08-01.txt. Phase 2:
+  Plan-Mode-Bestätigung inkl. 2 Produktentscheidungen (Versions-Label:
+  Laufzeit-Abfrage per SW-Message; Tag-Titel: neutral ohne Fokus-Zusatz).
+  Wichtiger Unterschied zum letzten Sprint: Diagnose bestätigte, dass KEINER
+  der drei Cluster state.js selbst ändern musste (nur unveränderte Dispatches
+  an bestehende Reducer) — alle 3 Cluster liefen daher in EINER Runde
+  parallel statt sequenziell (neues Muster 9 in AGENTS.md, inkl. Präzisierung:
+  "ein Dispatch ruft state.js auf" ≠ "state.js wird als Datei geändert").
+  B152 (P0): Service-Worker-Update aktivierte nicht zuverlässig (SKIP_WAITING
+  ging an den falschen/alten Worker statt an registration.waiting) — betraf
+  den Mechanismus, über den künftige Bugfixes überhaupt bei Bestandsnutzern
+  ankommen, wichtigster Fund des Sprints. B153 (Minor): Versions-Label jetzt
+  per Laufzeit-Abfrage (GET_VERSION-Message) statt hartcodiert. B154 (P1):
+  3× native confirm() → In-App-Dialog (exakt das bestehende
+  "Übung archivieren"-Muster repliziert, keine neue generische Komponente).
+  Nebenfund: renderDayCard() als toter Code identifiziert, nicht entfernt.
+  B155 (P1): Onboarding-Empfehlung setzt jetzt auch die echte Auswahl (Button
+  war zuvor trotz Empfehlung inaktiv). B156/B157 (Minor): Tag-Titel-Copy-Fix
+  + Stangengewicht-Obergrenze. Alle 3 Agents liefen gleichzeitig ohne
+  Kollision (disjunkte ui.js-Regionen, git diff --stat danach geprüft).
+  Phase 4: 293/293 grün in 3 Batches + 1 bekannter, unabhängiger Flake
+  (share_image.spec.js, Download-Timeout, nichts mit diesem Sprint zu tun).
+  Sprint-Ergebnis vollständig in
+  Diagnose & Sprints/sprint-ergebnis-runde3-2026-08-01.txt (für Claude
+  Cowork). CACHE_VERSION train-v223→v224. Committed, Push braucht noch
+  Nutzer-Bestätigung.
+
 ## 2026-07-29 train-v223 (Pre-Launch-Fix-Sprint B143-B151, 9 von 13 Befunden)
 Loop 1: nicht separat gelaufen (volle Suite lief batch-weise, s.u.), 0 fehlgeschlagen
 Loop 2: aktuell ✓ (CLAUDE.md/HANDOFF.md/BUGS.md/DECISIONS.md/AGENTS.md auf train-v223 gebracht)

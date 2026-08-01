@@ -1,9 +1,10 @@
 # TRAIN — Parallel Agent Regeln
 # Wird nach jedem Multi-Agent Sprint
 # automatisch aktualisiert.
-# Letzte Aktualisierung: 2026-07-29 / train-v223 (Pre-Launch-Fix-Sprint,
-# B143-B151 — neues Muster 8 ergänzt, echter Multi-Runden-Multi-Agent-Sprint
-# mit bis zu 3 Agents parallel, siehe HANDOFF.md)
+# Letzte Aktualisierung: 2026-08-01 / train-v224 (Runde-3-Tiefentest-Fix-Sprint,
+# B152-B157 — neues Muster 9 ergänzt: 3 Cluster, alle disjunkt, KEIN state.js
+# involviert, komplett in EINER Runde parallel statt vorsorglich sequenziell,
+# siehe HANDOFF.md)
 
 ---
 
@@ -389,6 +390,31 @@ zwischen den Runden lief deshalb in 3 Datei-Batches statt einem einzigen
 durchgängig `net::ERR_CONNECTION_REFUSED`) nach einem langen vorherigen Lauf
 ist ein Hinweis auf diese Infra-Grenze, keine echte Regression — vor jeder
 Schlussfolgerung per Batch-Lauf gegenprüfen.
+
+### Muster 9 — 3 Cluster komplett in EINER Runde parallel, weil Diagnose
+state.js-Unbeteiligung vorab bestätigte (verifiziert 2026-08-01, train-v224,
+Runde-3-Tiefentest-Sprint B152-B157):
+```
+Alle 3 Agents gleichzeitig, EINE Runde (kein Vorab-Solo-Agent nötig):
+  Agent A: ui.js (~5150 Versions-Label, ~8298-8360 SW-Update-Handler) + sw.js
+  Agent B: ui.js (~5979, ~6172, ~6872-6882 — 3× confirm()→In-App-Dialog)
+  Agent C: ui.js (~357-387, ~7256-7259, ~9113-9310 — Onboarding + 2 Minor-Fixes)
+→ Konsolidierungs-Agent zuletzt (Version, Docs, Commit)
+```
+Ergebnis: keine Kollision, `git diff --stat` nach allen 3 Agents geprüft — alle
+Regionen exakt disjunkt wie in der Diagnose-Phase vorhergesagt. Anders als
+Muster 8 (wo state.js-Arbeit vorab eine Solo-Runde brauchte) war hier VORHER
+per Diagnose-Agent explizit geklärt worden, ob die vermuteten state.js-Dispatches
+(`EX_REMOVE`, `DAY_REMOVE` in Cluster B) eine Datei-ÄNDERUNG an state.js
+erfordern — Antwort: nein, die Dispatches selbst blieben unverändert, nur ihr
+Aufruf-Guard (`confirm()` → Inline-Panel) wurde ersetzt. **Präzisierung:**
+"state.js betroffen" im Sinne der Grundregel heißt "state.js wird als Datei
+geändert", nicht "ein Dispatch zu state.js wird aufgerufen" — ein reiner
+UI-Guard-Fix um einen unveränderten Dispatch herum zählt nicht als
+state.js-Berührung und braucht daher keine exklusive Runde. Diese Unterscheidung
+lohnt sich, VOR der Implementierungsplanung explizit per Diagnose-Frage zu
+klären (wie hier in der Cluster-B-Diagnose geschehen), statt sie erst beim
+Blick auf den fertigen Diff festzustellen.
 
 ---
 

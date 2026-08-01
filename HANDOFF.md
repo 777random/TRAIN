@@ -1,10 +1,46 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-07-29 — Pre-Launch-Fix-Sprint, train-v223 (B143-B151, 9 von 13 Befunden aus dem Browser-Test train-v222 behoben; B141 offen/nicht reproduzierbar, B8/B13 reine Doku-Sync-Punkte, keine Code-Änderung). Davor: B138 (Alternativübungen) + B139 (Ernährungsphase/kcal-Toggle) + B140 (Intra-Session-Erschöpfung), train-v222. B132 Re-Diagnose (Deadlift-Plateau vs. Coach-Tab, kein Code-Fix), Re-Diagnose-Sprint B134-B137 (2026-07-27, kein Code-Fix), B133 (Scheiben-Anzeige dezent + Live-Update, train-v221). B130/B131/B132 (Plate Calculator neu + Coach Signal Unterdrückung, train-v220), B128/B129 (Auto-Steigerung Opt-out + Skip-Grund-Abfrage, train-v219), B123-B127 (5 Features vor Launch, train-v218), B114-B122 (9 Bugs vor Launch, train-v217) und ältere Sprints — siehe SESSION_LOG.md für die vollständige Historie.*
-*Nächster Schritt: B55 Impressum (Blocker vor weiterer Nutzerwerbung — wartet weiterhin auf echte Name-/Adress-/E-Mail-Angaben des Betreibers, siehe LEGAL.md; strukturell seit train-v177/v178 vorbereitet). Befund #4 (Notiz-Icon macht Satz-Tabelle unsichtbar, jetzt B141) bleibt offen — braucht bessere Repro-Angaben vom Nutzer (Gerät/Browser, Klickreihenfolge, localStorage-Export) vor einer erneuten Diagnose. Push dieser Session braucht noch die reguläre Session-Bestätigung (Push-Policy LOOPS.md). Weiterhin nur als Notiz (kein Bug): mehrere Test-Dateien konstruieren Datums-Fixtures über lokale `Date`-Methoden + `.toISOString()` — verschiebt `startDate` bei lokalem Ausführen in einer positiven-UTC-Offset-Zeitzone um einen Tag; betrifft nur lokale Testläufe außerhalb UTC, nicht CI/Produktionscode. **Neu aus diesem Sprint (bestätigte Infra-Grenze):** die volle Playwright-Suite (jetzt 282 Tests) kann den lokalen `npx serve`-Devserver bei sehr langen Läufen mit `EMFILE: too many open files` abstürzen lassen — Workaround ist der bereits in CLAUDE.md dokumentierte 3-Datei-Batch-Lauf, NICHT von einer echten Regression ausgehen bei plötzlichem Massenausfall ohne vorherige Batch-Gegenprüfung. Möglicher Folge-Sprint (nicht angefordert): B79 (`_checkCompoundIsolationBalance`) auf die neue `isCompoundExercise()` umstellen; `getMetricRecommendation()` (Distanz/Zeit) von `nutritionPhase` profitieren lassen (B139 hat das bewusst ausgeklammert, siehe DECISIONS.md). Loops 7-11 aktiv. Nicht committet: `Research/TRAIN_Parameter_Review.md` (Nutzer-Recherche, bewusst uncommitted gelassen), alle `context-exports/`-Updates + `Diagnose & Sprints/`-Exports (beide gitignored).*
+*Letzte Aktualisierung: 2026-08-01 — Runde-3-Tiefentest-Fix-Sprint, train-v224 (B152-B157, 6 von 6 Befunden behoben, inkl. P0 Service-Worker-Update-Fix). Davor: B143-B151, train-v223 (9 von 13 Befunden aus dem Browser-Test train-v222 behoben; B141 offen/nicht reproduzierbar, B8/B13 reine Doku-Sync-Punkte, keine Code-Änderung). Davor: B138 (Alternativübungen) + B139 (Ernährungsphase/kcal-Toggle) + B140 (Intra-Session-Erschöpfung), train-v222. B132 Re-Diagnose (Deadlift-Plateau vs. Coach-Tab, kein Code-Fix), Re-Diagnose-Sprint B134-B137 (2026-07-27, kein Code-Fix), B133 (Scheiben-Anzeige dezent + Live-Update, train-v221). B130/B131/B132 (Plate Calculator neu + Coach Signal Unterdrückung, train-v220), B128/B129 (Auto-Steigerung Opt-out + Skip-Grund-Abfrage, train-v219), B123-B127 (5 Features vor Launch, train-v218), B114-B122 (9 Bugs vor Launch, train-v217) und ältere Sprints — siehe SESSION_LOG.md für die vollständige Historie.*
+*Nächster Schritt: B55 Impressum (Blocker vor weiterer Nutzerwerbung — wartet weiterhin auf echte Name-/Adress-/E-Mail-Angaben des Betreibers, siehe LEGAL.md; strukturell seit train-v177/v178 vorbereitet). Befund #4 (Notiz-Icon macht Satz-Tabelle unsichtbar, B141) bleibt weiterhin offen — braucht bessere Repro-Angaben vom Nutzer. Aus Runde-3-Testprotokoll weiterhin nur manuell auf echtem Gerät zu prüfen: echter Offline-Start (Flugmodus), Share-Sheet des Betriebssystems, "Backup wiederherstellen" aus echter Datei. Push dieser Session braucht noch die reguläre Session-Bestätigung (Push-Policy LOOPS.md) — **besonders wichtig diesmal**, da B152 den Update-Mechanismus selbst fixt und daher überhaupt erst über einen Push+Deploy bei Bestandsnutzern ankommen kann. Weiterhin nur als Notiz (kein Bug): mehrere Test-Dateien konstruieren Datums-Fixtures über lokale `Date`-Methoden + `.toISOString()` — verschiebt `startDate` bei lokalem Ausführen in einer positiven-UTC-Offset-Zeitzone um einen Tag; betrifft nur lokale Testläufe außerhalb UTC, nicht CI/Produktionscode. Bestätigte Infra-Grenze (seit letztem Sprint dokumentiert): die volle Playwright-Suite (jetzt 293 Tests) kann den lokalen `npx serve`-Devserver bei sehr langen Läufen mit `EMFILE: too many open files` abstürzen lassen — Workaround ist der 3-Datei-Batch-Lauf (siehe CLAUDE.md/AGENTS.md). Möglicher Folge-Sprint (nicht angefordert): B79 (`_checkCompoundIsolationBalance`) auf die neue `isCompoundExercise()` umstellen; `getMetricRecommendation()` (Distanz/Zeit) von `nutritionPhase` profitieren lassen (B139 hat das bewusst ausgeklammert, siehe DECISIONS.md). In Runde 3 als tot identifizierter Code: `renderDayCard()` (ui.js) hat keine Aufrufer mehr — Kandidat für eine spätere Aufräum-Runde, nicht in diesem Sprint entfernt. Loops 7-11 aktiv. Nicht committet: `Research/TRAIN_Parameter_Review.md` (Nutzer-Recherche, bewusst uncommitted gelassen), alle `context-exports/`-Updates + `Diagnose & Sprints/`-Exports (beide gitignored).*
 
 ---
 
-## B143-B151 — Pre-Launch-Fix-Sprint: 9 von 13 Browser-Test-Befunden behoben (train-v223, 2026-07-29)
+## B152-B157 — Runde-3-Tiefentest-Fix-Sprint: 6 von 6 Befunden behoben (train-v224, 2026-08-01)
+
+Diagnose-vor-Fix-Sprint nach demselben Muster wie der vorherige, basierend auf
+einem Tiefentest gegen den deployten train-v223-Build
+(`Diagnose & Sprints/TRAIN-Test-Uebergabe.md`, Teil 3+4). Phase 1: 3 parallele,
+reine Diagnose-Agents (ein Agent pro Cluster), konsolidiert in
+`Diagnose & Sprints/diagnose-runde3-2026-08-01.txt`. Phase 2: Plan-Mode-
+Bestätigung inkl. 2 Produktentscheidungen (Versions-Label: Laufzeit-Abfrage
+per SW-Message; Tag-Titel: neutral ohne Fokus-Zusatz).
+
+**Wichtiger Unterschied zum letzten Sprint:** Die Diagnose bestätigte, dass
+KEINER der drei Cluster `state.js` selbst ändern musste (nur unveränderte
+Dispatches an bestehende Reducer) — alle drei Cluster liefen daher in EINER
+Runde parallel (3 Agents gleichzeitig, disjunkte `ui.js`-Regionen), statt wie
+in der Sprint-Vorlage vorsorglich sequenziell angenommen.
+
+- **B152 (P0) + B153 (Minor):** Service-Worker-Update aktivierte nicht
+  zuverlässig (SKIP_WAITING ging an den falschen/alten Worker) + hartcodiertes
+  Versions-Label. Betraf **jeden künftigen Bugfix-Rollout** — kritischster Fund
+  dieser Runde.
+- **B154 (P1):** 3× native `confirm()` → In-App-Dialog-Pattern (repliziert von
+  "Übung archivieren", keine neue generische Komponente eingeführt, wie vom
+  Sprint vorgegeben). Nebenfund: `renderDayCard()` als toter Code identifiziert
+  (nicht entfernt, siehe Nächster-Schritt-Notiz oben).
+- **B155 (P1) + B156/B157 (Minor):** Onboarding-Button-Fix (Empfehlung setzt
+  jetzt auch die echte Auswahl) + Tag-Titel-Copy-Fix + Stangengewicht-Obergrenze.
+
+Alle 3 Agents liefen gleichzeitig ohne Kollision (disjunkte `ui.js`-Regionen,
+`git diff --stat` danach geprüft). Baseline vorab: 282/282 grün (3 Batches).
+Nach dem Sprint: 293/293 grün (3 Batches) + 1 bekannter, unabhängiger Flake in
+`share_image.spec.js` (Download-Event-Timeout, nichts mit diesem Sprint zu tun,
+grün im Retry). CACHE_VERSION train-v223→v224. Sprint-Ergebnis vollständig in
+`Diagnose & Sprints/sprint-ergebnis-runde3-2026-08-01.txt`.
+
+---
+
+## B143-B151 — Pre-Launch-Fix-Sprint: 9 von 13 Browser-Test-Befunde behoben (train-v223, 2026-07-29)
 
 Diagnose-vor-Fix-Sprint nach dem in `Diagnose & Sprints/TRAIN-Sprint-Prompts.md`
 festgelegten Muster, basierend auf `test-results/TRAIN-Test-Uebergabe.md` (13
