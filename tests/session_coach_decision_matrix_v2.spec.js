@@ -208,7 +208,13 @@ test('Fix 4: nach "Übernehmen" bleibt Text dauerhaft sichtbar (kein 2s-Verschwi
 test('Fix 4: nach Undo bleibt Feedback sichtbar mit "(rückgängig gemacht)"', async ({ page }) => {
   await page.goto('/');
   await page.waitForSelector('#app.is-ready', { timeout: 10000 });
-  await seed(page, { exercises: [mkEx({ weight: 60, step: 2.5, targetReps: 8, nSets: 3 })] });
+  // nSets bewusst 2 (nicht 3): A4 (Runde 2) propagiert das Übernehmen bei
+  // Straight-Sätzen zusätzlich auf ALLE noch-pending Folgesätze (si+2, ...),
+  // nicht nur si+1 -- bei nSets=3 gäbe es hier einen dritten SET_UPDATE-
+  // Dispatch (auf Satz 2) und damit einen zusätzlichen Undo-Schritt, den
+  // dieser Test (der gezielt zwei Schritte prüft) nicht meint. Mit nSets=2
+  // existiert kein Satz 2, A4s Zusatz-Loop bleibt hier inaktiv.
+  await seed(page, { exercises: [mkEx({ weight: 60, step: 2.5, targetReps: 8, nSets: 2 })] });
   await setReps(page, 0, 0, 0, 8);
   await setRpe(page, 0, 0, 0, 6);
   await toggleDone(page, 0, 0, 0);

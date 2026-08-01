@@ -2,6 +2,43 @@
 # Automatisch von Claude Code
 # befüllt beim Session-Start
 
+## 2026-08-01 train-v225 (Runde-4-Nutzerfeedback-Fix-Sprint B158-B165, 8 von 9 Befunden)
+Loop 1: nicht separat gelaufen (volle Suite lief batch-weise, s.u.), 0 fehlgeschlagen
+Loop 2: aktuell ✓ (CLAUDE.md/HANDOFF.md/BUGS.md/AGENTS.md auf train-v225 gebracht)
+Eigentliche Aufgabe: Sprint basierend auf gesammeltem Nutzer-/Eigenfeedback
+  nach dem letzten Sprint, kategorisiert in
+  Diagnose & Sprints/TRAIN-Feedback-Analyse.md (Kategorie A: 9 Bugs),
+  ausgearbeitet in TRAIN-Sprint-Prompts-Runde4.md. Baseline vorab 294/294
+  grün (3 Batches). Besonderheit: 4 von 5 parallel gestarteten Phase-1-
+  Diagnose-Agents scheiterten sofort an einem session-weiten API-Limit —
+  statt zu warten, wurden diese 4 Cluster direkt manuell diagnostiziert
+  (Read/Grep, kein Agent-Spawn), der 5. lief nach Wiederherstellung per
+  Agent. Konsolidiert in diagnose-runde4-2026-08-01.txt. Plan-Mode-
+  Bestätigung ohne offene Produktfragen (reine Bugfixes). Wichtige
+  Abweichung von der Vorlage: Diagnose bestätigte, dass NUR A8 state.js als
+  Datei ändern musste (nicht auch A4/A7 wie vorsorglich angenommen) — daher
+  nur A8 solo (Runde 1), alle anderen 4 Cluster (A1+A2+A3, A5, A4+A7, A6)
+  liefen danach in EINER parallelen Runde (neues Muster 10 in AGENTS.md,
+  inkl. dokumentierter Diagnose-Ausfall-Resilienz). B158-B160 (Timer-Tag-
+  Sync inkl. eines tieferliegenden MutationObserver-Funds, Toast/Pause-
+  Overlay-Kollision, echter Pausendauer-Gating-Unterschied zwischen zwei
+  Bedienwegen). B161+B164 (Folgesatz-Propagation + Undo-Staleness bei
+  Satz-Feedback, ein Agent korrigierte dabei eine kollaterale Test-
+  Regression in einer bestehenden Undo-Schritte-Zählung). B162 (editierbares
+  Anpassen-Feld, nutzt bereits bestehenden EX_SET_NEXT_WEEK_PLAN-Reducer).
+  B163 (Skip-Fragebogen ignoriert jetzt skipReason:'substituted' — exakter
+  Wert per Test verifiziert, Diagnose hatte 'replaced' vermutet). B165
+  (DAY_RESET_SETS verengt, state.js, Solo-Runde). A9 bewusst nur
+  diagnostiziert (kein Fix) — deutlich weitreichenderer Fund als vermutet:
+  globale plateStep-Einstellung ist für jede reale Übung faktisch tot, da
+  ex.weightStep immer Vorrang hat; "1,25kg"-Beobachtung vermutlich die
+  bereits bestehende, korrekte Halbzone. Nach dem Sprint: 304/304 grün (3
+  Batches). CACHE_VERSION train-v224→v225, CSS ?v=211→212 (styles.css für
+  B159 geändert). Sprint-Ergebnis vollständig in
+  Diagnose & Sprints/sprint-ergebnis-runde4-2026-08-01.txt. Committed, Push
+  braucht noch Nutzer-Bestätigung — danach steht der erste echte Zwei-
+  Versionen-Deploy-Test für B152 aus.
+
 ## 2026-08-01 train-v224 (Runde-3-Tiefentest-Fix-Sprint B152-B157, 6 von 6 Befunden)
 Loop 1: nicht separat gelaufen (volle Suite lief batch-weise, s.u.), 0 fehlgeschlagen
 Loop 2: aktuell ✓ (CLAUDE.md/HANDOFF.md/BUGS.md/AGENTS.md auf train-v224 gebracht)

@@ -642,8 +642,8 @@ function _renderPlateHint(ex, dispW, di, ei, si) {
   return `<div class="plate-hint" data-di="${di}" data-ei="${ei}" data-si="${si}">${_plateHintText(ex, w)}</div>`;
 }
 
-/** Show a toast. type: 'ok' | 'info' | 'warn'. Optional durationMs overrides default 2600ms. */
-function showToast(msg, type = 'info', durationMs = 2600) {
+/** Show a toast. type: 'ok' | 'info' | 'warn'. Optional durationMs overrides default 3600ms (A2 — 2600ms was hard to read in time, especially now that it can also sit higher to clear the pause overlay). */
+function showToast(msg, type = 'info', durationMs = 3600) {
   if (!_toast) return;
   _toast.textContent = msg;
   _toast.className   = `toast is-visible toast--${type}`;
@@ -1644,18 +1644,38 @@ function _renderAutoPlanBanner(wk) {
   </div>`;
   }
 
+  // A5-Fix: editierbares Zielwert-Feld pro Zeile — vorbelegt mit dem
+  // aktuell berechneten Zielwert (weight: curWeight + nextWeekPlan wie im
+  // Anzeige-Text von lineFor(); reps/sets: nextWeekPlan-Delta selbst, da
+  // lineFor() dort ebenfalls nur das Delta zeigt, keinen absoluten Zielwert).
+  // Der editierte Wert wird erst beim Klick auf ✓ ausgelesen (siehe
+  // 'autoplan-accept-one'-Handler) — rein transientes DOM-Feld, kein
+  // eigener ui.js-Modul-State nötig.
+  const inputFor = ({ ex }) => {
+    const pt = ex.progressionType ?? 'weight';
+    if (pt === 'weight') {
+      const curWeight = Math.max(...ex.sets.map(s => s.weight ?? 0));
+      return { value: curWeight + ex.nextWeekPlan, step: ex.weightStep || 0.5 };
+    }
+    return { value: ex.nextWeekPlan, step: ex.metricStep || 1 };
+  };
+
   return `
   <div class="auto-plan-banner auto-plan-banner--expanded" data-wk-id="${wk.id}">
     <div class="auto-plan-banner__header">📈 Steigerungen vorgeschlagen</div>
     <div class="auto-plan-banner__list">
-      ${pending.map(p => `
+      ${pending.map(p => {
+        const { value, step } = inputFor(p);
+        return `
       <div class="auto-plan-banner__row auto-plan-banner__row--item">
         <span>${lineFor(p)}</span>
         <span class="auto-plan-banner__row-actions">
+          <input type="number" class="num-input auto-plan-banner__row-input" data-role="autoplan-value" value="${value}" step="${step}" aria-label="Zielwert für ${h(p.ex.name)} anpassen">
           <button type="button" class="btn-icon" data-action="autoplan-accept-one" data-di="${p.di}" data-ei="${p.ei}" aria-label="Übernehmen">✓</button>
           <button type="button" class="btn-icon" data-action="autoplan-reject-one" data-di="${p.di}" data-ei="${p.ei}" aria-label="Ablehnen">✗</button>
         </span>
-      </div>`).join('')}
+      </div>`;
+      }).join('')}
     </div>
   </div>`;
 }
@@ -4941,7 +4961,7 @@ function renderSettingsTab(state) {
     <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:var(--sp-2)">
       <div>
         <div class="settings-row__label">Trainingsziel</div>
-        <div class="settings-row__desc">Bestimmt die empfohlene Pausendauer im Session Coach (Sprint C1)</div>
+        <div class="settings-row__desc">Bestimmt die empfohlene Pausendauer im Session Coach, sobald ein Satz mit RPE bewertet wurde (Sprint C1) — ohne RPE bzw. bei deaktiviertem Session Coach gilt die feste Pausenzeit der jeweiligen Übung (⚙️ Übungseinstellungen)</div>
       </div>
       <div class="weight-step-opts">
         ${[['kraftaufbau', 'Stärker werden'], ['muskelaufbau', 'Mehr Muskeln'], ['fitness', 'Fitter werden']].map(([val, label]) => `
@@ -5570,6 +5590,8 @@ function _handleClick(e) {
     case 'overview-open-day': {
       _overviewMode  = false;
       _activeDayIdx  = +el.dataset.di;
+      // A1: same resync as _toggleAccordion() — see timer.js' listener.
+      window.dispatchEvent(new CustomEvent('train:active-day-change', { detail: { di: _activeDayIdx } }));
       scheduleRender();
       break;
     }
@@ -5580,10 +5602,38 @@ function _handleClick(e) {
       break;
 
     // ── Week navigation ────────────────────────────────────────────────────
-    case 'undo':
+    case 'undo': {
       dispatch(A.UNDO, {});
+      // A7: _acceptedFeedback lebt außerhalb des Undo-Snapshot-Mechanismus
+      // (state.js' A.UNDO klont nur weeks/customTemplate/settings/
+      // favoriteExercises/customExercises) -- ein Undo kann einen Satz, für
+      // den bereits ein Feedback "übernommen" wurde, wieder auf einen
+      // älteren weight/reps/rpe-Stand zurücksetzen, ohne dass die Map das
+      // mitbekommt. Ohne Aufräumen würde der Renderer (siehe B94-Kommentar
+      // bei renderSetRow) weiter den alten Snapshot statt einer frischen
+      // buildSetFeedback()-Auswertung zeigen -- canAdopt bliebe dauerhaft
+      // false. Günstiger als eine gezielte di/ei/si-Verfolgung durch den
+      // Undo-Stack: einmal über alle vorhandenen Einträge iterieren und nur
+      // die verwerfen, deren zugehöriger Satz sich tatsächlich geändert hat
+      // (robust auch bei mehrfach hintereinander gedrücktem Undo).
+      {
+        const _uSt = getState();
+        for (const [_uKey, _uFb] of [..._acceptedFeedback]) {
+          const _uParts = _uKey.split('-');
+          const _uSi = +_uParts.pop();
+          const _uEi = +_uParts.pop();
+          const _uDi = +_uParts.pop();
+          const _uWkId = _uParts.join('-');
+          const _uWk = _uSt.weeks.find(w => String(w.id) === _uWkId);
+          const _uS = _uWk?.days[_uDi]?.exercises[_uEi]?.sets?.[_uSi];
+          if (!_uS || _uS.weight !== _uFb._snapWeight || _uS.reps !== _uFb._snapReps || _uS.rpe !== _uFb._snapRpe) {
+            _acceptedFeedback.delete(_uKey);
+          }
+        }
+      }
       showToast('Rückgängig gemacht ↩', 'ok');
       break;
+    }
 
     case 'reset-timer': {
       const _rst = getState();
@@ -6098,9 +6148,16 @@ function _handleClick(e) {
         // B129: Skip-Grund-Abfrage zuerst (Snapshot VOR DAY_TOGGLE_COMPLETE --
         // der Reducer setzt jeden noch 'pending' Satz synchron auf 'fail',
         // danach wäre "komplett übersprungen" nicht mehr erkennbar).
+        // A6-Fix: Übungen mit skipReason === 'substituted' ("Durch andere
+        // ersetzt") NICHT erneut abfragen -- dieser Grund ist strukturell
+        // dauerhaft (die Übung wurde durch eine andere ersetzt, nicht nur an
+        // diesem Tag ausgelassen) und bleibt über Wochen-Klone hinweg
+        // erhalten (_resetClonedDays() in state.js lässt skipReason bewusst
+        // unangetastet). Andere Gründe (injury/time/fatigue/kein Grund) sind
+        // tagesspezifisch und sollen weiterhin jede Woche neu gefragt werden.
         const skipped = (dayBefore?.exercises ?? [])
           .map((ex, ei) => ({ ex, ei }))
-          .filter(({ ex }) => (ex.sets ?? []).every(s => s.status === 'pending'))
+          .filter(({ ex }) => (ex.sets ?? []).every(s => s.status === 'pending') && ex.skipReason !== 'substituted')
           .map(({ ex, ei }) => ({ name: ex.name, di: +di, ei }));
         _showSkipReasonQueue(+di, skipped, () => _showDayCompletionModal(+di));
       }
@@ -6392,7 +6449,7 @@ function _handleClick(e) {
 
     case 'day-reset-sets': {
       const _rsDay = getState().weeks[getState().curIdx]?.days[+di];
-      if (!confirm(`Alle Sätze von "${_rsDay?.title ?? 'Tag'}" zurücksetzen? Eingetragene Werte gehen verloren.`)) break;
+      if (!confirm(`Alle Sätze von "${_rsDay?.title ?? 'Tag'}" zurücksetzen? Wdh/RPE/Status werden gelöscht, Gewichte bleiben erhalten.`)) break;
       dispatch(A.DAY_RESET_SETS, { di: +di });
       _dayMenuOpenKey = null;
       _weekMenuOpen = false;
@@ -7240,7 +7297,29 @@ function _handleClick(e) {
       break;
     }
     case 'autoplan-accept-one': {
-      dispatch(A.EX_MARK_AUTOPLAN_REVIEWED, { selections: [{ di: +di, ei: +ei }], weekIdx: getState().curIdx });
+      // A5-Fix: falls der Nutzer den Zielwert im "Anpassen"-Feld geändert
+      // hat, wird der EDITIERTE Wert übernommen statt des unveränderten
+      // ex.nextWeekPlan-Deltas — erst EX_SET_NEXT_WEEK_PLAN (setzt das
+      // korrigierte Delta + confirmed=true, bereits genutzt vom "Anderer
+      // Wert"-Chip im Neue-Woche-Modal), danach wie gehabt
+      // EX_MARK_AUTOPLAN_REVIEWED (blendet die Zeile aus dem Banner aus).
+      const _apDi = +di, _apEi = +ei;
+      const _apWkIdx = getState().curIdx;
+      const _apEx = getState().weeks[_apWkIdx]?.days[_apDi]?.exercises[_apEi];
+      const _apInput = el.closest('.auto-plan-banner__row--item')?.querySelector('[data-role="autoplan-value"]');
+      if (_apEx && _apInput) {
+        const _apEdited = parseFloat(_apInput.value);
+        if (Number.isFinite(_apEdited)) {
+          const _apPt = _apEx.progressionType ?? 'weight';
+          const _apCustomDelta = _apPt === 'weight'
+            ? _apEdited - Math.max(...(_apEx.sets ?? []).map(s => s.weight ?? 0))
+            : _apEdited;
+          if (_apCustomDelta !== _apEx.nextWeekPlan) {
+            dispatch(A.EX_SET_NEXT_WEEK_PLAN, { di: _apDi, ei: _apEi, value: _apCustomDelta, weekIdx: _apWkIdx });
+          }
+        }
+      }
+      dispatch(A.EX_MARK_AUTOPLAN_REVIEWED, { selections: [{ di: _apDi, ei: _apEi }], weekIdx: _apWkIdx });
       break;
     }
     case 'autoplan-reject-one': {
@@ -7290,6 +7369,25 @@ function _handleClick(e) {
       if (_adEx?.sets?.[_adSi + 1] && Number.isFinite(_adNextWeight)) {
         dispatch(A.SET_UPDATE, { di: _adDi, ei: _adEi, si: _adSi + 1, field: 'weight', value: _adNextWeight });
       }
+      // A4: state.js' eigene SET_UPDATE-Propagation (auto-propagate weight
+      // from set 0) greift nur, wenn si===0 -- ein Übernehmen-Klick auf
+      // einen SPÄTEREN Satz (si>0) zog bisher nur si+1 mit, si+2/si+3/...
+      // blieben beim alten Wert stehen. Bei Straight-Sätzen (nicht bei
+      // Pyramiden -- dort sind unterschiedliche Gewichte pro Satz gewollt)
+      // holen wir das hier nach: alle noch offenen (pending) Folgesätze auf
+      // denselben Zielwert ziehen. Status wird direkt vor jedem Dispatch am
+      // (weiterhin live mutierten) ex-Objekt geprüft -- SET_UPDATE bewertet
+      // den Status eines Satzes nur neu, wenn er NICHT mehr 'pending' ist
+      // (state.js Befund #2), pending Sätze bleiben also unangetastet und
+      // dieser Loop kann keinen bereits abgeschlossenen Satz versehentlich
+      // neu bewerten.
+      if (Number.isFinite(_adNextWeight) && (_adEx?.setType ?? 'straight') === 'straight') {
+        for (let _adJ = _adSi + 2; _adJ < (_adEx?.sets?.length ?? 0); _adJ++) {
+          if (_adEx.sets[_adJ]?.status === 'pending') {
+            dispatch(A.SET_UPDATE, { di: _adDi, ei: _adEi, si: _adJ, field: 'weight', value: _adNextWeight });
+          }
+        }
+      }
       // Timer nur starten wenn er nicht schon läuft -- ui.js hat keinen
       // direkten Zugriff auf timer.js' internen Zustand (bewusste
       // Entkopplung, siehe CLAUDE.md), die einzige decoupling-konforme
@@ -7303,7 +7401,18 @@ function _handleClick(e) {
       // (ersetzt das B89-Verhalten, siehe DECISIONS.md).
       const _adIsCompound = _adEx ? isCompoundExercise(_adEx.name, buildCategoryMap(_adSt.customExercises)) : true;
       const _adFb = _adS ? buildSetFeedback(_adS, _adEx, _adDay?.sessionModifier ?? null, _adSi, _adSt.settings?.goal ?? null, _adIsCompound, _adDay?.sessionModifierScope ?? 'all') : null;
-      if (_adFb) _acceptedFeedback.set(`${_adWk?.id}-${_adDi}-${_adEi}-${_adSi}`, _adFb);
+      // A7: Snapshot von weight/reps/rpe DES SATZES (nicht Teil von
+      // buildSetFeedback()s Rückgabe) zusätzlich am fb-Objekt mitspeichern --
+      // einzige Grundlage, mit der der 'undo'-Handler unten erkennen kann,
+      // ob ein Undo diesen konkreten Satz seither verändert hat (dann ist
+      // dieser Eintrag stale und muss verworfen werden, sonst bleibt
+      // canAdopt dauerhaft false, siehe B94-Kommentar bei renderSetRow).
+      if (_adFb) {
+        _adFb._snapWeight = _adS.weight;
+        _adFb._snapReps   = _adS.reps;
+        _adFb._snapRpe    = _adS.rpe;
+        _acceptedFeedback.set(`${_adWk?.id}-${_adDi}-${_adEi}-${_adSi}`, _adFb);
+      }
       scheduleRender();
       break;
     }
@@ -7568,6 +7677,10 @@ function _scrollToFirstPending(di) {
 function _toggleAccordion(di) {
   if (_activeDayIdx === di) return; // already the only open day — keep it open
   _activeDayIdx = di;
+  // A1: let timer.js resync its own active-day tracking (_clockDi) when the
+  // user switches tabs to a different day within the same week — see
+  // timer.js' 'train:active-day-change' listener for why this was missing.
+  window.dispatchEvent(new CustomEvent('train:active-day-change', { detail: { di } }));
   scheduleRender();
   _scrollToFirstPending(di);
 }

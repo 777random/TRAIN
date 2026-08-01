@@ -198,6 +198,45 @@ test('Banner erscheint nach Tagesabschluss und "Alle übernehmen" setzt AutoRevi
   await expect(page.locator('.auto-plan-banner')).toHaveCount(0);
 });
 
+// A5-Fix: der "Anpassen"-Bereich hat jetzt pro Zeile ein editierbares
+// Zielwert-Feld (data-role="autoplan-value") — beim Klick auf ✓ muss der
+// im Feld GEÄNDERTE Wert übernommen werden, nicht das unveränderte
+// ex.nextWeekPlan-Delta. Root Cause war: der Button übernahm bislang
+// IMMER den vorberechneten Wert, unabhängig vom (bislang nicht
+// existierenden) Eingabefeld.
+test('"Anpassen" -> editierter Zielwert im Eingabefeld wird beim Übernehmen verwendet statt Original-Vorschlag', async ({ page }) => {
+  const weeks = buildEligibleWeeks('Bankdrücken', [mkTodayEx('Bankdrücken', 75)]);
+  await seed(page, weeks, 3);
+  await completeDay(page);
+  await page.click('#session-summary-continue');
+  await page.waitForTimeout(300);
+
+  await page.click('[data-action="autoplan-expand"]');
+  await page.waitForTimeout(150);
+
+  const stBefore = await readState(page);
+  const planBefore = stBefore.weeks[3].days[0].exercises[0].nextWeekPlan;
+  expect(planBefore).toBeGreaterThan(0); // Sanity: Auto-Vorschlag existiert
+
+  const input = page.locator('[data-role="autoplan-value"]');
+  await expect(input).toBeVisible();
+  // curWeight (75) + planBefore ist vorbelegt -- wir überschreiben bewusst
+  // mit einem ANDEREN Zielwert (80 statt curWeight+planBefore), um zu
+  // beweisen, dass tatsächlich das Feld gelesen wird und nicht einfach
+  // der alte Vorschlag durchgereicht wird.
+  await input.fill('80');
+  await page.click('[data-action="autoplan-accept-one"]');
+  await page.waitForTimeout(150);
+
+  const st = await readState(page);
+  const ex = st.weeks[3].days[0].exercises[0];
+  expect(ex.nextWeekPlan).toBe(5); // 80kg Ziel - 75kg curWeight = +5kg Delta
+  expect(ex.nextWeekPlan).not.toBe(planBefore);
+  expect(ex.nextWeekPlanConfirmed).toBe(true);
+  expect(ex.nextWeekPlanAutoReviewed).toBe(true);
+  await expect(page.locator('.auto-plan-banner')).toHaveCount(0);
+});
+
 test('"Anpassen" -> "Ablehnen" setzt Plan zurück (echter Opt-out)', async ({ page }) => {
   const weeks = buildEligibleWeeks('Bankdrücken', [mkTodayEx('Bankdrücken', 75)]);
   await seed(page, weeks, 3);

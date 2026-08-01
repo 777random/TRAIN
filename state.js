@@ -1995,17 +1995,19 @@ function reduce(state, action) {
         for (const s of ex.sets) {
           s.status = 'pending';
           s.done   = false;
-          s.weight = null;
           s.reps   = null;
           s.rpe    = null;
+          // s.weight bewusst NICHT zurückgesetzt (B-A8): "Sätze zurücksetzen"
+          // soll nur die Satz-BEWERTUNG zurücksetzen, nicht das eingetragene
+          // Gewicht — beim erneuten Trainieren behält der Nutzer meist
+          // dasselbe Gewicht. Tag-Ebene-Felder (markedDone/locked/
+          // sessionStartTs/sessionRating/sleepHours/energyLevel) werden
+          // hier bewusst NICHT mehr angefasst — die gehören zu einem
+          // kompletten Tag-Reset, nicht zu "Sätze zurücksetzen", und ihr
+          // vorheriges Mitreißen war Ursache für den fälschlich als
+          // "Streak gelöscht" gemeldeten Seiteneffekt (B-A8).
         }
       }
-      day.markedDone    = false;
-      day.locked        = false;
-      day.sessionStartTs = null;
-      day.sessionRating  = null;
-      day.sleepHours     = null;
-      day.energyLevel    = null;
       break;
     }
     case A.DAY_TOGGLE_COMPLETE: {

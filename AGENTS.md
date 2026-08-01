@@ -1,10 +1,11 @@
 # TRAIN — Parallel Agent Regeln
 # Wird nach jedem Multi-Agent Sprint
 # automatisch aktualisiert.
-# Letzte Aktualisierung: 2026-08-01 / train-v224 (Runde-3-Tiefentest-Fix-Sprint,
-# B152-B157 — neues Muster 9 ergänzt: 3 Cluster, alle disjunkt, KEIN state.js
-# involviert, komplett in EINER Runde parallel statt vorsorglich sequenziell,
-# siehe HANDOFF.md)
+# Letzte Aktualisierung: 2026-08-01 / train-v225 (Runde-4-Nutzerfeedback-Fix-
+# Sprint, B158-B165 — neues Muster 10 ergänzt: EIN Cluster mit echter state.js-
+# Änderung läuft solo (Runde 1), danach 4 Cluster ohne state.js-Berührung
+# parallel (Runde 2). Zusätzlich: Diagnose-Phase-Resilienz bei Agent-Ausfall
+# dokumentiert (siehe unten), siehe HANDOFF.md)
 
 ---
 
@@ -415,6 +416,44 @@ state.js-Berührung und braucht daher keine exklusive Runde. Diese Unterscheidun
 lohnt sich, VOR der Implementierungsplanung explizit per Diagnose-Frage zu
 klären (wie hier in der Cluster-B-Diagnose geschehen), statt sie erst beim
 Blick auf den fertigen Diff festzustellen.
+
+### Muster 10 — EIN Cluster solo (echte state.js-Änderung), danach 4 Cluster
+in EINER parallelen Runde (verifiziert 2026-08-01, train-v225,
+Runde-4-Nutzerfeedback-Sprint B158-B165):
+```
+Runde 1 (solo): state.js DAY_RESET_SETS-Reducer verengen (A8)
+→ git diff geprüft, gezielte Tests grün, erst dann Runde 2 gestartet.
+Runde 2 (4 parallel, alle disjunkte ui.js-Regionen, KEINE state.js-Berührung):
+  Agent 1: timer.js + styles.css + ui.js (Timer-Sync, Toast/Pause-Overlay,
+    Pausendauer-Gating) — A1+A2+A3
+  Agent 2: ui.js Steigerungs-Banner (A5)
+  Agent 3: ui.js Satz-Feedback/Undo (A4+A7, EIN Agent wegen überlappender
+    Regionen zwischen den beiden Befunden selbst)
+  Agent 4: ui.js Skip-Fragebogen-Filter (A6)
+→ Konsolidierungs-Agent zuletzt.
+```
+Ergebnis: keine Kollision, `git diff --stat` nach jeder Runde geprüft. Vorab
+per Diagnose-Frage explizit geklärt (nicht erst beim Diff festgestellt), dass
+NUR A8 state.js als Datei ändern musste — A4/A7 dispatchen zwar an state.js,
+ändern die Datei selbst aber nicht (Präzisierung aus Muster 9 bestätigt sich
+hier erneut). Ein Agent fand dabei eine kollaterale Test-Regression (neue
+Dispatches in A4 änderten die Anzahl der Undo-Stack-Einträge, wodurch eine
+bestehende, auf eine exakte Anzahl fixierte Testannahme brach) und korrigierte
+die Testannahme selbst, statt den Fix zurückzunehmen — richtige Reaktion,
+da die Testannahme (nicht der Fix) die veraltete Seite war.
+
+**Resilienz bei Diagnose-Phase-Agent-Ausfall (neu dokumentiert, kein
+Parallelisierungsmuster im engeren Sinne, aber relevant für künftige
+Sprints):** In dieser Runde scheiterten 4 von 5 parallel gestarteten
+Diagnose-Agents sofort an einem session-weiten API-Nutzungslimit (nicht
+AGENTS.md-Regeln, sondern eine externe Kapazitätsgrenze). Statt auf das
+Limit-Reset zu warten, wurden die 4 betroffenen Cluster direkt per Read/Grep
+von Claude selbst diagnostiziert (kein Agent-Spawn) — inhaltlich gleichwertig
+zu einer Agent-Diagnose, nur ohne Parallelität. Der 5. Cluster lief nach
+Wiederherstellung des Limits doch noch erfolgreich per Agent. Lehre: ein
+Ausfall der Diagnose-Phase muss den Sprint nicht blockieren — Diagnose ist
+ohnehin nur Read/Grep, kann bei Bedarf ohne Qualitätsverlust manuell
+durchgeführt werden, wenn Agent-Spawning temporär nicht verfügbar ist.
 
 ---
 

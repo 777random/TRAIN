@@ -138,3 +138,65 @@ test('toggle-done ohne autoStartPauseTimer: Feedback trotzdem sichtbar (Scroll u
 
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
 });
+
+// A2: .toast (styles.css) und timer.js' .pause-overlay sitzen beide auf
+// fast derselben bottom:88px-Höhe -- der zentrierte Toast kann rechts mit
+// dem 220px breiten Pause-Overlay in der unteren rechten Ecke kollidieren.
+// Fix: `body:has(.pause-overlay--visible) .toast` hebt den Toast an,
+// solange das Pause-Overlay sichtbar ist.
+test('A2: Toast wird über dem sichtbaren Pause-Overlay angehoben statt zu kollidieren', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', err => pageErrors.push(err.message));
+  await seed(page); // autoStartPauseTimer = true
+
+  await evaluateSetWithRpe(page, 0, 6); // startet den Pause-Timer
+  await expect(page.locator('#pause-overlay')).toHaveClass(/pause-overlay--visible/);
+
+  // Realistische Toast-Länge (vergleichbar mit echten Meldungen wie "Sätze
+  // zurückgesetzt — Undo möglich") -- kurze/leere Texte würden die
+  // horizontale Kollision nicht zuverlässig reproduzieren.
+  const bottomGapWithOverlay = await page.evaluate(() => {
+    const toast = document.getElementById('toast');
+    toast.textContent = 'Sätze zurückgesetzt — Undo möglich';
+    toast.classList.add('is-visible');
+    return window.innerHeight - toast.getBoundingClientRect().bottom;
+  });
+  const overlapWithOverlay = await page.evaluate(() => {
+    const t = document.getElementById('toast').getBoundingClientRect();
+    const p = document.getElementById('pause-overlay').getBoundingClientRect();
+    return !(t.right < p.left || t.left > p.right || t.bottom < p.top || t.top > p.bottom);
+  });
+
+  await page.evaluate(() => document.getElementById('pause-overlay').classList.remove('pause-overlay--visible'));
+  const bottomGapWithoutOverlay = await page.evaluate(() =>
+    window.innerHeight - document.getElementById('toast').getBoundingClientRect().bottom);
+
+  expect(bottomGapWithOverlay).toBeGreaterThan(bottomGapWithoutOverlay);
+  expect(overlapWithOverlay).toBe(false); // die eigentliche, vom Nutzer gemeldete Kollision
+
+  expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});
+
+// A2: showToast()s Default-Anzeigedauer wurde von 2600ms auf 3600ms erhöht
+// (Aufrufstellen mit explizit übergebener Dauer sind davon unberührt).
+test('A2: Standard-Toast bleibt länger sichtbar als der alte 2600ms-Default', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', err => pageErrors.push(err.message));
+  page.on('dialog', dialog => dialog.accept());
+  await seed(page, false);
+
+  // "Sätze zurückgesetzt — Undo möglich" (day-reset-sets) ruft showToast()
+  // ohne explizite Dauer auf -> nutzt den Default. Braucht keine
+  // abgeschlossene Woche (anders als der Körpergewicht-Eintrag im
+  // Fortschritt-Tab, der ohne Historie gar nicht gerendert wird).
+  await page.click('[data-action="toggle-week-menu"]');
+  await page.click('[data-action="day-reset-sets"][data-di="0"]');
+
+  await expect(page.locator('.toast.is-visible')).toHaveCount(1);
+  await page.waitForTimeout(3000); // unter dem alten 2600ms-Default schon wieder ausgeblendet
+  await expect(page.locator('.toast.is-visible')).toHaveCount(1);
+  await page.waitForTimeout(1000); // insgesamt ~4000ms seit dem Trigger
+  await expect(page.locator('.toast.is-visible')).toHaveCount(0);
+
+  expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});

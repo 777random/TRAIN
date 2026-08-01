@@ -69,6 +69,81 @@ test('Streak bei Teil-Abschluss: Wochenrückblick stimmt mit Training-Tab-Badge 
   expect(result.badgeStreak).toBe(2);
 });
 
+// B-A8: DAY_RESET_SETS ("Sätze zurücksetzen") war zu breit — resettete neben
+// der Satz-Bewertung auch s.weight sowie Tag-Ebene-Felder (markedDone,
+// locked, sessionStartTs, sessionRating, sleepHours, energyLevel), obwohl das
+// eine ganz andere Aktion (kompletter Tag-Reset) betrifft. Der gemeldete
+// "Streak wird gelöscht"-Effekt hing am fälschlich mitgezogenen
+// `day.markedDone = false`. Fix: nur status/done/reps/rpe pro Satz werden
+// zurückgesetzt, s.weight und alle Tag-Ebene-Felder bleiben unverändert.
+test('DAY_RESET_SETS (B-A8): Gewicht + Tag-Felder + Streak bleiben erhalten, nur Satz-Bewertung wird zurückgesetzt', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', err => pageErrors.push(err.message));
+
+  const weeks = [fullWeek(1, mondayOffset(-2)), fullWeek(2, mondayOffset(-1)), fullWeek(3, mondayOffset(0))];
+  // Ziel-Tag trägt zusätzlich einen gesetzten sessionStartTs, um zu
+  // verifizieren, dass Tag-Ebene-Felder komplett unangetastet bleiben.
+  weeks[2].days[0].sessionStartTs = 1234567890;
+
+  await page.goto('/');
+  await page.waitForSelector('#app.is-ready', { timeout: 10000 });
+  await page.evaluate((weeksArg) => {
+    localStorage.setItem('train_v6', JSON.stringify({
+      meta: { schemaVersion: 31, savedAt: Date.now(), createdAt: Date.now() }, curIdx: 2,
+      weeks: weeksArg, customTemplate: [], settings: {},
+      prs: {}, coachPerformance: { suggestions: [] }, coachQuestion: null, coachQuestionHistory: [],
+      lastReentryHandled: null, plateauActions: {}, decisionLog: [], badges: [], onboardingDone: true,
+      longestStreakEver: 0, favoriteExercises: [],
+    }));
+  }, weeks);
+  await page.reload();
+  await page.waitForSelector('#app.is-ready', { timeout: 10000 });
+
+  const result = await page.evaluate(async () => {
+    const stateMod = await import('./state.js');
+    const before = stateMod.getState();
+    const streakBefore = stateMod.calcCurrentStreak(before.weeks);
+    const dayBefore = before.weeks[2].days[0];
+    const weightBefore = dayBefore.exercises[0].sets[0].weight;
+
+    stateMod.dispatch(stateMod.A.DAY_RESET_SETS, { di: 0 });
+
+    const after = stateMod.getState();
+    const dayAfter = after.weeks[2].days[0];
+    const s = dayAfter.exercises[0].sets[0];
+    const streakAfter = stateMod.calcCurrentStreak(after.weeks);
+
+    return {
+      streakBefore, streakAfter, weightBefore, weightAfter: s.weight,
+      status: s.status, done: s.done, reps: s.reps, rpe: s.rpe,
+      markedDone: dayAfter.markedDone, locked: dayAfter.locked,
+      sessionRating: dayAfter.sessionRating, sleepHours: dayAfter.sleepHours,
+      energyLevel: dayAfter.energyLevel, sessionStartTs: dayAfter.sessionStartTs,
+    };
+  });
+
+  // Satz-Bewertung wird zurückgesetzt ...
+  expect(result.status).toBe('pending');
+  expect(result.done).toBe(false);
+  expect(result.reps).toBeNull();
+  expect(result.rpe).toBeNull();
+  // ... aber das eingetragene Gewicht bleibt erhalten.
+  expect(result.weightAfter).toBe(result.weightBefore);
+  expect(result.weightAfter).toBe(80);
+  // Tag-Ebene-Felder bleiben komplett unangetastet.
+  expect(result.markedDone).toBe(true);
+  expect(result.locked).toBe(true);
+  expect(result.sessionRating).toBe(2);
+  expect(result.sleepHours).toBe(7);
+  expect(result.energyLevel).toBe(4);
+  expect(result.sessionStartTs).toBe(1234567890);
+  // Streak (calcCurrentStreak) bleibt unverändert.
+  expect(result.streakAfter).toBe(result.streakBefore);
+  expect(result.streakBefore).toBe(3);
+
+  expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});
+
 test('Streak bei Kalenderlücke: Wochenrückblick stimmt mit Training-Tab-Badge überein (bricht bei >7 Tagen Pause)', async ({ page }) => {
   await page.goto('/');
   await page.waitForSelector('#app.is-ready', { timeout: 10000 });

@@ -1841,6 +1841,22 @@ exercise { position: unset; }
 .toast--warn { border-color: var(--c-warn);   color: var(--c-warn); }
 .toast--info { border-color: var(--c-accent); color: var(--c-accent); }
 
+/* A2: .toast sits at the same bottom:88px height as timer.js' .pause-overlay
+   (fixed, bottom:88px, right:16px, min-width:220px — see timer.js inline
+   <style>). Since .toast is horizontally centered, its center point already
+   falls inside the pause overlay's right-side horizontal span on typical
+   phone widths — collides even for short messages, not just long ones.
+   Lift the toast clear of the pause overlay whenever it is visible
+   (.pause-overlay--visible, toggled by timer.js). Both elements are appended
+   to <body> (toast inside #app's static shell, pause overlay directly), so
+   :has() on the shared body ancestor is used instead of a sibling combinator. */
+body:has(.pause-overlay--visible) .toast {
+  bottom: calc(168px + var(--sab));
+}
+body:has(.pause-overlay--visible) .pr-moment-toast {
+  bottom: calc(168px + var(--sab));
+}
+
 /* PR-Moment-Toast (B73) — dezenter, klickbarer Banner direkt nach einem
    echten Gewichts-PR, unabhängig vom Toast-System oben (braucht einen
    Klick-Handler, den showToast() nicht unterstützt). */

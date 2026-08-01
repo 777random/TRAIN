@@ -1,6 +1,65 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-08-01 — Runde-3-Tiefentest-Fix-Sprint, train-v224 (B152-B157, 6 von 6 Befunden behoben, inkl. P0 Service-Worker-Update-Fix). Davor: B143-B151, train-v223 (9 von 13 Befunden aus dem Browser-Test train-v222 behoben; B141 offen/nicht reproduzierbar, B8/B13 reine Doku-Sync-Punkte, keine Code-Änderung). Davor: B138 (Alternativübungen) + B139 (Ernährungsphase/kcal-Toggle) + B140 (Intra-Session-Erschöpfung), train-v222. B132 Re-Diagnose (Deadlift-Plateau vs. Coach-Tab, kein Code-Fix), Re-Diagnose-Sprint B134-B137 (2026-07-27, kein Code-Fix), B133 (Scheiben-Anzeige dezent + Live-Update, train-v221). B130/B131/B132 (Plate Calculator neu + Coach Signal Unterdrückung, train-v220), B128/B129 (Auto-Steigerung Opt-out + Skip-Grund-Abfrage, train-v219), B123-B127 (5 Features vor Launch, train-v218), B114-B122 (9 Bugs vor Launch, train-v217) und ältere Sprints — siehe SESSION_LOG.md für die vollständige Historie.*
-*Nächster Schritt: B55 Impressum (Blocker vor weiterer Nutzerwerbung — wartet weiterhin auf echte Name-/Adress-/E-Mail-Angaben des Betreibers, siehe LEGAL.md; strukturell seit train-v177/v178 vorbereitet). Befund #4 (Notiz-Icon macht Satz-Tabelle unsichtbar, B141) bleibt weiterhin offen — braucht bessere Repro-Angaben vom Nutzer. Aus Runde-3-Testprotokoll weiterhin nur manuell auf echtem Gerät zu prüfen: echter Offline-Start (Flugmodus), Share-Sheet des Betriebssystems, "Backup wiederherstellen" aus echter Datei. Push dieser Session braucht noch die reguläre Session-Bestätigung (Push-Policy LOOPS.md) — **besonders wichtig diesmal**, da B152 den Update-Mechanismus selbst fixt und daher überhaupt erst über einen Push+Deploy bei Bestandsnutzern ankommen kann. Weiterhin nur als Notiz (kein Bug): mehrere Test-Dateien konstruieren Datums-Fixtures über lokale `Date`-Methoden + `.toISOString()` — verschiebt `startDate` bei lokalem Ausführen in einer positiven-UTC-Offset-Zeitzone um einen Tag; betrifft nur lokale Testläufe außerhalb UTC, nicht CI/Produktionscode. Bestätigte Infra-Grenze (seit letztem Sprint dokumentiert): die volle Playwright-Suite (jetzt 293 Tests) kann den lokalen `npx serve`-Devserver bei sehr langen Läufen mit `EMFILE: too many open files` abstürzen lassen — Workaround ist der 3-Datei-Batch-Lauf (siehe CLAUDE.md/AGENTS.md). Möglicher Folge-Sprint (nicht angefordert): B79 (`_checkCompoundIsolationBalance`) auf die neue `isCompoundExercise()` umstellen; `getMetricRecommendation()` (Distanz/Zeit) von `nutritionPhase` profitieren lassen (B139 hat das bewusst ausgeklammert, siehe DECISIONS.md). In Runde 3 als tot identifizierter Code: `renderDayCard()` (ui.js) hat keine Aufrufer mehr — Kandidat für eine spätere Aufräum-Runde, nicht in diesem Sprint entfernt. Loops 7-11 aktiv. Nicht committet: `Research/TRAIN_Parameter_Review.md` (Nutzer-Recherche, bewusst uncommitted gelassen), alle `context-exports/`-Updates + `Diagnose & Sprints/`-Exports (beide gitignored).*
+*Letzte Aktualisierung: 2026-08-01 — Runde-4-Nutzerfeedback-Fix-Sprint, train-v225 (B158-B165, 8 von 9 Befunden aus Kategorie A behoben; A9 bewusst nur diagnostiziert, Fix separat für C2-Konzeptgespräch). Davor: Runde-3-Tiefentest-Fix-Sprint, train-v224 (B152-B157, 6 von 6 Befunden behoben, inkl. P0 Service-Worker-Update-Fix). Davor: B143-B151, train-v223 (9 von 13 Befunden aus dem Browser-Test train-v222 behoben; B141 offen/nicht reproduzierbar, B8/B13 reine Doku-Sync-Punkte, keine Code-Änderung). Davor: B138 (Alternativübungen) + B139 (Ernährungsphase/kcal-Toggle) + B140 (Intra-Session-Erschöpfung), train-v222 und ältere Sprints — siehe SESSION_LOG.md für die vollständige Historie.*
+*Nächster Schritt: B55 Impressum (Blocker vor weiterer Nutzerwerbung — wartet weiterhin auf echte Name-/Adress-/E-Mail-Angaben des Betreibers, siehe LEGAL.md). Befund #4 (Notiz-Icon macht Satz-Tabelle unsichtbar, B141) bleibt weiterhin offen. **Sofort nach dem Push dieser Session (siehe unten):** erster echter Zwei-Versionen-Deploy-Test für B152 (train-v224→v225) — alte Version offen lassen, Push+GitHub-Pages-Deploy abwarten, Update-Banner antippen, prüfen dass v225 sofort aktiv ist ohne manuellen Reload. Aus der Feedback-Analyse zurückgestellt (siehe `Diagnose & Sprints/TRAIN-Feedback-Analyse.md`): Kategorie B (5 kleinere UX-Punkte), C2+C9 (Steigerungs-Regelmatrix — A9-Diagnose aus diesem Sprint bereits als Grundlage vorhanden), C5+C6 (Coaching-Text-Qualität + Abhängigkeits-Audit, reiner Diagnose-Block), C1+C8 (Onboarding-Umbau "Eigenen Plan erstellen", eigener größerer Konzept-Sprint), C3/C4/C7/C10/C11/C12 (Backlog). Noch nicht committet aus einer früheren Anfrage (unabhängig von diesem Sprint, eigene Nutzer-Entscheidung nötig): `LICENSE` (all-rights-reserved) + `MAINTENANCE.md` (Branding-Rename-Checkliste) liegen im Arbeitsverzeichnis, noch ungestaged. In Runde 3 als tot identifizierter Code weiterhin vorhanden: `renderDayCard()` (ui.js) hat keine Aufrufer mehr; in Runde 4 zusätzlich `SET_AUTOFILL_DOWN` (state.js) als verwaist bestätigt (nicht der gewählte Fix-Weg für A4) — beide Kandidaten für eine spätere Aufräum-Runde. Weiterhin nur als Notiz (kein Bug): mehrere Test-Dateien konstruieren Datums-Fixtures über lokale `Date`-Methoden + `.toISOString()` — verschiebt `startDate` bei lokalem Ausführen in einer positiven-UTC-Offset-Zeitzone um einen Tag. Bestätigte Infra-Grenze (weiterhin gültig): die volle Playwright-Suite (jetzt 304 Tests) kann den lokalen `npx serve`-Devserver bei sehr langen Läufen mit `EMFILE: too many open files` abstürzen lassen — Workaround ist der 3-Datei-Batch-Lauf (siehe CLAUDE.md/AGENTS.md). Push dieser Session braucht noch die reguläre Session-Bestätigung (Push-Policy LOOPS.md). Loops 7-11 aktiv. Nicht committet: `Research/TRAIN_Parameter_Review.md`, alle `context-exports/`-Updates + `Diagnose & Sprints/`-Exports (beide gitignored).*
+
+---
+
+## B158-B165 — Runde-4-Nutzerfeedback-Fix-Sprint: 8 von 9 Befunden behoben (train-v225, 2026-08-01)
+
+Diagnose-vor-Fix-Sprint basierend auf gesammeltem Nutzer-/Eigenfeedback nach
+dem Runde-3-Sprint, kategorisiert und priorisiert in
+`Diagnose & Sprints/TRAIN-Feedback-Analyse.md` (Kategorie A: 9 sprint-reife
+Bugs), ausgearbeitet in `TRAIN-Sprint-Prompts-Runde4.md`. A9 war von Anfang an
+als reiner Diagnose-Auftrag markiert (Grundlage für ein separates
+Konzeptgespräch zur Steigerungs-Regelmatrix, siehe Feedback-Analyse C2).
+
+**Besonderheit dieser Runde:** 4 der 5 parallel gestarteten Phase-1-Diagnose-
+Agents scheiterten sofort an einem session-weiten API-Limit. Statt zu warten,
+wurden diese 4 Cluster direkt manuell diagnostiziert (Read/Grep durch Claude
+selbst, kein Agent-Spawn); der 5. lief nach Wiederherstellung erfolgreich per
+Agent. Keine inhaltliche Einschränkung — alle 5 Diagnosen liegen vollständig
+vor, konsolidiert in `Diagnose & Sprints/diagnose-runde4-2026-08-01.txt`.
+
+**Wichtige Abweichung von der Sprint-Vorlage:** Die Vorlage nahm an, dass
+sowohl A4+A7 als auch A8 state.js als Datei ändern könnten und deshalb
+sequenziell laufen müssten. Die Diagnose bestätigte: NUR A8 (Sätze
+zurücksetzen) brauchte eine echte state.js-Änderung — A4/A7 waren vollständig
+in ui.js lösbar. Damit lief nur A8 solo (Runde 1), alle anderen 4 Cluster
+(A1+A2+A3, A5, A4+A7, A6) liefen danach in EINER parallelen Runde (4 Agents
+gleichzeitig, disjunkte ui.js-Regionen, `git diff --stat` nach jeder Runde
+geprüft).
+
+- **B158-B160 (A1-A3, ein Agent):** Timer-Reset-Tag-Bug (`_clockDi`-Sync bei
+  Tageswechsel — inkl. eines tieferliegenden zweiten Funds, ein
+  MutationObserver hob den ersten Fix bei jedem Re-Render wieder auf),
+  Toast/Pause-Overlay-Kollision + Anzeigedauer, sowie ein echter (nicht nur
+  vermuteter) Gating-Unterschied zwischen zwei Bedienwegen für die
+  Pausendauer (Urlaubstag/vergangene Woche).
+- **B161 (A4) + B164 (A7), ein Agent (überlappende ui.js-Regionen):**
+  Folgesatz-Propagation bei Straight-Sätzen (dabei eine kollaterale
+  Test-Annahme in `session_coach_decision_matrix_v2.spec.js` korrigiert) +
+  Undo-Staleness bei der Satz-Feedback-Übernahme-Cache (`_acceptedFeedback`).
+- **B162 (A5):** Editierbares Zahlenfeld im Steigerungs-"Anpassen"-Banner —
+  nutzt einen bereits bestehenden Reducer (`EX_SET_NEXT_WEEK_PLAN`), keine
+  state.js-Erweiterung nötig.
+- **B163 (A6):** Skip-Fragebogen ignoriert jetzt Übungen mit
+  `skipReason==='substituted'` (exakter interner Wert per Test verifiziert,
+  Diagnose hatte fälschlich `'replaced'` vermutet).
+- **B165 (A8):** `DAY_RESET_SETS`-Reducer verengt (state.js, Solo-Runde).
+
+**A9 (nur Diagnose, wie geplant kein Fix):** deutlich weitreichenderer Fund
+als in der Feedback-Analyse vermutet — die globale Einstellung
+"Kleinstmögliche Steigerung" (`settings.plateStep`) ist für JEDE real
+existierende Übung faktisch tot, weil `ex.weightStep` (immer bei Erstellung
+gesetzt) in der überall verwendeten `ex.weightStep ?? settings.plateStep ??
+2.5`-Kette immer Vorrang hat. Die gemeldete "1,25kg trotz 2,5kg-Einstellung"
+ist vermutlich die bereits bestehende, korrekte Halbzone (plateStep/2), kein
+Bug. Ergebnis vollständig in der Diagnose-Datei für das C2-Konzeptgespräch.
+
+Baseline vorab: 294/294 grün (3 Batches). Nach dem Sprint: 304/304 grün (3
+Batches), 0 fehlgeschlagen. CACHE_VERSION train-v224→v225, CSS ?v=211→212 (da
+styles.css für B159 geändert wurde). Sprint-Ergebnis vollständig in
+`Diagnose & Sprints/sprint-ergebnis-runde4-2026-08-01.txt`.
 
 ---
 

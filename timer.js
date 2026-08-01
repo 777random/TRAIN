@@ -37,7 +37,7 @@
  * • Visual feedback: clock turns accent-green when running.
  */
 
-import { dispatch, subscribe, getState, A } from './state.js';
+import { dispatch, subscribe, getState, A, getLatestWeek } from './state.js';
 import { buildSetFeedback } from './sessionCoach.js';
 import { buildCategoryMap, isCompoundExercise } from './movementMap.js';
 
@@ -325,6 +325,31 @@ function _bindCustomEvents() {
     if (di !== undefined) _ensureSessionStart(di);
   });
 
+  // A1: Fired by ui.js whenever the user switches the active/open day WITHIN
+  // the same week (day-tab click, overview day card). _clockDi previously
+  // only resynced on a WEEK change (_onStateChange below) — a pure day
+  // switch left it pointing at whichever day last called
+  // _ensureSessionStart(), so _getActiveDay() (and therefore the toolbar
+  // clock display AND "Timer zurücksetzen") kept tracking the OLD day even
+  // after the user switched to a different day that has its own,
+  // independently-running session. Only resync if the NEWLY active day
+  // itself actually has a running session (started, not ended) — otherwise
+  // leave _clockDi alone so a session still running on another day (that
+  // the user is just glancing away from) keeps ticking on the toolbar, same
+  // as before this fix.
+  window.addEventListener('train:active-day-change', e => {
+    const { di } = e.detail ?? {};
+    if (di === undefined || di === null) return;
+    const st  = getState();
+    const wk  = st.weeks[st.curIdx];
+    const day = wk?.days[di];
+    if (day?.sessionStartTs && !day.sessionEndTs) {
+      _clockDi = di;
+      if (!_sessInterval) _sessInterval = setInterval(_updateClockDisplay, 1000);
+      _updateClockDisplay();
+    }
+  });
+
   // Fired by ui.js when the "Abgeschlossen & sperren" button is tapped
   window.addEventListener('train:day-complete', () => {
     // Session is ended by DAY_TOGGLE_COMPLETE writing sessionEndTs
@@ -609,13 +634,25 @@ function _attachClockToToolbar() {
     el.removeEventListener('click', _manualToggle);
     el.addEventListener('click', _manualToggle);
     _clockEl = el;
-    // Restore visual state from persisted state (survives app-close/reopen)
+    // Restore visual state from persisted state (survives app-close/reopen).
+    // A1: this callback re-fires on EVERY re-render that recreates the
+    // toolbar DOM node (MutationObserver on #app — far more often than an
+    // actual app reopen), so it must NOT unconditionally re-derive _clockDi
+    // via the "first day with a running session" fallback every time --
+    // that clobbered the more specific resyncs above (day-tab switch,
+    // 'train:active-day-change') on the very next render, since it doesn't
+    // know a specific day was just deliberately selected/reset. Only fall
+    // back to that array-order guess if _clockDi isn't already pointing at
+    // an existing day — same precedence _getActiveDay() itself uses.
     const st  = getState();
     const wk  = st.weeks[st.curIdx];
-    const day = wk?.days.find(d => d.sessionStartTs && !d.sessionEndTs);
-    if (day) {
-      _clockDi = wk.days.indexOf(day);
-      if (!_sessInterval) _sessInterval = setInterval(_updateClockDisplay, 1000);
+    if (_clockDi === null || !wk?.days[_clockDi]) {
+      const day = wk?.days.find(d => d.sessionStartTs && !d.sessionEndTs);
+      if (day) _clockDi = wk.days.indexOf(day);
+    }
+    const activeDay = _clockDi !== null ? wk?.days[_clockDi] : null;
+    if (activeDay?.sessionStartTs && !activeDay.sessionEndTs && !_sessInterval) {
+      _sessInterval = setInterval(_updateClockDisplay, 1000);
     }
     _updateClockDisplay();
   };
@@ -635,6 +672,23 @@ function _attachClockToToolbar() {
 // Additionally, we patch the ui.js event delegation by hooking into the
 // existing #app click listener via a capturing listener. This avoids
 // any import cycle: timer.js imports state.js only, not ui.js.
+
+// A3: mirrors ui.js' _isTodayDay()+isVacation gating (renderSetRow's
+// showIntraCoach, confirm-set's pauseSec source) — a coach-computed
+// (RPE-based) pause duration is only ever DISPLAYED to the user for the
+// current/latest week's non-vacation, not-yet-completed day. Without this
+// check, this toggle-done path (the manual ✓/✗ button) could apply an
+// RPE-based pause duration in a case (vacation day, or editing a past/non-
+// latest week) where the confirm-set path — and the feedback text itself —
+// would never show anything but the exercise's static pauseSec, i.e. the
+// exact same physical "mark set done" action could silently start a
+// different pause duration depending on which of the two entry points was
+// used. Keeping both paths under the same eligibility condition avoids that.
+function _isCoachEligibleDay(state, wk, day) {
+  if (!wk || !day || day.markedDone || day.isVacation) return false;
+  const latest = getLatestWeek(state.weeks);
+  return !!latest && wk.startDate === latest.startDate;
+}
 
 function _bindAppInteractions() {
   const app = document.getElementById('app');
@@ -669,7 +723,12 @@ function _bindAppInteractions() {
           // reines, importfreies Berechnungsmodul (Tiefe 0), keine
           // ui.js-Kopplung.
           let pauseSec = ex?.pauseSec ?? 90;
-          if (newState.settings?.sessionCoach !== false) {
+          // A3: nur auf die coach-berechnete Pause zurückgreifen, wenn dieser
+          // Tag auch tatsächlich für Intra-Session-Coach-Feedback in Frage
+          // käme (siehe _isCoachEligibleDay() oben) — sonst identisches
+          // Verhalten zum confirm-set-Pfad (ui.js) sicherstellen.
+          const newWk = newState.weeks[newState.curIdx];
+          if (newState.settings?.sessionCoach !== false && _isCoachEligibleDay(newState, newWk, newDay)) {
             const isCompound = newEx ? isCompoundExercise(newEx.name, buildCategoryMap(newState.customExercises)) : true;
             const fb = buildSetFeedback(newSet, newEx, newDay?.sessionModifier ?? null, +doneBtn.dataset.si, newState.settings?.goal ?? null, isCompound, newDay?.sessionModifierScope ?? 'all');
             if (fb?.pauseSec) pauseSec = fb.pauseSec;

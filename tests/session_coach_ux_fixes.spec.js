@@ -269,3 +269,94 @@ test('Fix 4+5: Timer läuft bereits -> Übernehmen setzt nur das Gewicht, Timer 
   // 97.5kg aus: 97.5 + 2.5 = 100kg.
   expect(nextWeight).toBe(100);
 });
+
+// ─── A4 (Runde 2): Übernehmen propagiert auf ALLE pending Folgesätze ───────
+
+test('A4: "Übernehmen" bei Straight-Sätzen zieht auch Satz 3/4 (nicht nur Satz 2) auf den neuen Wert', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', err => pageErrors.push(err.message));
+  await page.goto('/');
+  await page.waitForSelector('#app.is-ready', { timeout: 10000 });
+  await seed(page, { exercises: [mkEx({ weight: 100, step: 2.5, nSets: 4 })] });
+
+  await setRpe(page, 0, 0, 0, 6); // RPE 6 -> steigern, +2.5kg -> 102.5kg
+  await toggleDone(page, 0, 0, 0);
+  await page.click('[data-action="adopt-set-feedback"][data-si="0"]');
+
+  const weights = await page.evaluate(() => JSON.parse(localStorage.getItem('train_v6')).weeks.at(-1).days[0].exercises[0].sets.map(s => s.weight));
+  // Satz 0 bleibt beim ursprünglichen Wert (Vorschlag gilt für NACHFOLGENDE
+  // Sätze), Sätze 1-3 (vormals alle noch 'pending') ziehen alle auf 102.5kg --
+  // vor dem A4-Fix blieb nur Satz 1 aktuell, Satz 2/3 auf dem alten Wert (100).
+  expect(weights).toEqual([100, 102.5, 102.5, 102.5]);
+
+  expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});
+
+test('A4: Kontrolltest -- bei Pyramiden-Sätzen (setType=pyramid) propagiert "Übernehmen" NICHT über Satz+1 hinaus', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForSelector('#app.is-ready', { timeout: 10000 });
+  const ex = mkEx({ weight: 100, step: 2.5, nSets: 4 });
+  ex.setType = 'pyramid';
+  await seed(page, { exercises: [ex] });
+
+  await setRpe(page, 0, 0, 0, 6); // RPE 6 -> steigern, +2.5kg -> 102.5kg
+  await toggleDone(page, 0, 0, 0);
+  await page.click('[data-action="adopt-set-feedback"][data-si="0"]');
+
+  const weights = await page.evaluate(() => JSON.parse(localStorage.getItem('train_v6')).weeks.at(-1).days[0].exercises[0].sets.map(s => s.weight));
+  // Nur Satz 1 (si+1, das bereits bestehende B89-Verhalten) übernimmt den
+  // Wert -- Satz 2/3 bleiben unangetastet, da bei Pyramiden unterschiedliche
+  // Gewichte pro Satz gewollt sind.
+  expect(weights).toEqual([100, 102.5, 100, 100]);
+});
+
+// ─── A7 (Runde 2): Undo darf keinen stale _acceptedFeedback-Eintrag hinterlassen ──
+
+test('A7: RPE 10 -> Übernehmen -> Undo -> erneut RPE 10 -> Vorschlag/Übernehmen-Button erscheint wieder frisch', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', err => pageErrors.push(err.message));
+  await page.goto('/');
+  await page.waitForSelector('#app.is-ready', { timeout: 10000 });
+  await seed(page, { exercises: [mkEx({ weight: 100, step: 2.5, nSets: 2 })] });
+
+  await setRpe(page, 0, 0, 0, 10); // RPE 10 -> deutlich reduzieren
+  await toggleDone(page, 0, 0, 0);
+  await page.click('[data-action="adopt-set-feedback"][data-si="0"]');
+  await expect(page.locator('.set-feedback__line--confirm')).toContainText('✓ Übernommen');
+  await expect(page.locator('[data-action="adopt-set-feedback"][data-si="0"]')).toHaveCount(0);
+
+  await page.click('[data-tab="workout"]'); // Fokus weg vom entfernten Button
+  // Komplett bis zum Anfang zurückspulen (Undo-Button klicken bis er
+  // deaktiviert ist, statt eine feste Anzahl Klicks anzunehmen) -- toggleDone
+  // dispatcht selbst mehrere SET_UPDATE-Zwischenschritte (Flush der Weight-/
+  // Reps-Inputfelder VOR dem eigentlichen SET_TOGGLE_DONE), die jeweils
+  // eigene Undo-Stack-Einträge belegen, auch wenn sie wertneutral sind (Input
+  // enthielt bereits denselben Wert). Am Ende steht Satz 0 wieder exakt im
+  // Ausgangszustand (rpe=null, status='pending') -- ERST das ist eine
+  // tatsächliche Wertänderung gegenüber dem beim Übernehmen gespeicherten
+  // Snapshot (rpe war 10) und muss den A7-Fix im 'undo'-Handler auslösen (die
+  // Zwischenschritte davor ändern Satz 0s weight/reps/rpe nicht, der
+  // _acceptedFeedback-Eintrag darf dort laut B94 bewusst bestehen bleiben,
+  // siehe session_coach_decision_matrix_v2.spec.js).
+  const undoBtn = page.locator('[data-action="undo"]');
+  for (let i = 0; i < 20 && await undoBtn.isEnabled(); i++) {
+    await undoBtn.click();
+    await page.waitForTimeout(120);
+  }
+  await expect(undoBtn).toBeDisabled();
+  const setAfterFullUndo = await page.evaluate(() => JSON.parse(localStorage.getItem('train_v6')).weeks.at(-1).days[0].exercises[0].sets[0]);
+  expect(setAfterFullUndo.rpe).toBeNull();
+  expect(setAfterFullUndo.status).toBe('pending');
+
+  // Satz erneut mit RPE 10 bewerten (identischer Wert wie zuvor) -- der alte
+  // _acceptedFeedback-Eintrag darf das NICHT weiter blockieren (A7-Bug: ohne
+  // Fix bliebe die alte "✓ Übernommen"-Bestätigung dauerhaft stehen, weil der
+  // Undo-Handler den Eintrag nie invalidiert hatte).
+  await setRpe(page, 0, 0, 0, 10);
+  await toggleDone(page, 0, 0, 0);
+
+  await expect(page.locator('[data-action="adopt-set-feedback"][data-si="0"]')).toBeVisible();
+  await expect(page.locator('.set-feedback__line--confirm')).toHaveCount(0);
+
+  expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});

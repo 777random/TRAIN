@@ -172,6 +172,40 @@ test('Verletzungsbedingt übersprungene Übung erscheint NICHT im "Was nicht gut
   expect(rec.text).not.toContain('Kreuzheben');
 });
 
+// A6-Fix (Runde 2): eine Übung mit ex.skipReason === 'substituted' aus einer
+// Vorwoche (z.B. nach Wochen-Klon, wieder alle Sätze 'pending') soll NICHT
+// erneut in die Skip-Abfrage-Warteschlange aufgenommen werden -- "Durch
+// andere ersetzt" ist strukturell dauerhaft, nicht tagesspezifisch. Andere
+// skipReason-Werte (injury/time/fatigue) sind tagesspezifisch und lösen die
+// Abfrage weiterhin jede Woche neu aus.
+test('Übung mit skipReason "substituted" aus Vorwoche wird NICHT erneut gefragt, andere skipReason-Werte weiterhin schon', async ({ page }) => {
+  await seed(page, [mkDay(11, [
+    mkExercise('Bankdrücken', [mkPendingSet()], { skipReason: 'substituted', skipDate: null }),
+    mkExercise('Kniebeuge', [mkPendingSet()], { skipReason: 'injury', skipDate: '2026-07-01' }),
+  ])]);
+
+  await page.click('[data-action="toggle-complete"]');
+  // Nur Kniebeuge (injury) landet in der Abfrage-Warteschlange -- Bankdrücken
+  // (substituted) wird übersprungen, obwohl auch dort alle Sätze pending sind.
+  await expect(page.locator('.completion-modal__title')).toContainText('Kniebeuge wurde nicht durchgeführt');
+  await page.click('[data-skip-val="time"]');
+  await page.waitForTimeout(150);
+
+  // Keine weitere Abfrage (Bankdrücken wurde nicht in die Warteschlange
+  // aufgenommen) -- direkt der normale Bewertungs-Dialog.
+  await expect(page.locator('.completion-modal__rate-btn').first()).toBeVisible();
+  await page.click('.completion-modal__rate-btn[data-val="2"]');
+  await page.click('.completion-modal__skip');
+  await page.waitForSelector('#session-summary-continue', { timeout: 5000 });
+
+  const st = await readState(page);
+  const exercises = st.weeks[0].days[0].exercises;
+  // Bankdrücken bleibt unangetastet bei 'substituted' (nie erneut gefragt).
+  expect(exercises[0].skipReason).toBe('substituted');
+  // Kniebeuge wurde neu abgefragt und mit der aktuellen Antwort überschrieben.
+  expect(exercises[1].skipReason).toBe('time');
+});
+
 test('Migration: altes State ohne skipReason/skipDate/nextWeekPlanAutoReviewed lädt ohne Absturz, SCHEMA wird 33', async ({ page }) => {
   const pageErrors = [];
   page.on('pageerror', err => pageErrors.push(err.message));

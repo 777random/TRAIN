@@ -30,8 +30,8 @@ function makeDay(idx, { markedDone = false, withExercise = true } = {}) {
   };
 }
 
-async function seedTwoWeekState(page, { activeWeekDays, curIdx, oldWeekDone = true }) {
-  return page.evaluate(({ activeWeekDays, curIdx, oldWeekDone }) => {
+async function seedTwoWeekState(page, { activeWeekDays, curIdx, oldWeekDone = true, autoStartPauseTimer = false }) {
+  return page.evaluate(({ activeWeekDays, curIdx, oldWeekDone, autoStartPauseTimer }) => {
     const today = new Date();
     const dow = today.getDay();
     const monday = new Date(today);
@@ -70,14 +70,14 @@ async function seedTwoWeekState(page, { activeWeekDays, curIdx, oldWeekDone = tr
       meta: { schemaVersion: 32, savedAt: today.toISOString(), createdAt: today.toISOString() },
       curIdx,
       weeks: [oldWeek, activeWeek],
-      customTemplate: [], settings: { sessionCoach: true }, prs: {},
+      customTemplate: [], settings: { sessionCoach: true, autoStartPauseTimer }, prs: {},
       coachPerformance: { suggestions: [] },
       coachQuestion: null, coachQuestionHistory: [], lastReentryHandled: null,
       plateauActions: {}, decisionLog: [], badges: [], onboardingDone: true,
     }));
     localStorage.setItem('train_v6_shadow', 'x');
     return { activeStart, oldStart };
-  }, { activeWeekDays, curIdx, oldWeekDone });
+  }, { activeWeekDays, curIdx, oldWeekDone, autoStartPauseTimer });
 }
 
 test('Mo/Mi/Fr-Split: Session Coach erscheint für den offenen Tag an Index 2 (aktuelle Woche)', async ({ page }) => {
@@ -184,6 +184,71 @@ test('Intra-Session Feedback erscheint nach Satz + RPE im offenen Tag der aktuel
   await page.waitForTimeout(300);
 
   await expect(page.locator('.set-feedback')).toHaveCount(1);
+
+  expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});
+
+// A3: der manuelle ✓/✗-Button (toggle-done, timer.js _bindAppInteractions())
+// hatte KEINE Prüfung, ob der bewertete Tag überhaupt für Intra-Session-
+// Coach-Feedback in Frage kommt -- dieselbe isVacation/_isTodayDay()-
+// Bedingung, die showIntraCoach oben (ui.js renderSetRow()) UND der
+// confirm-set-Pfad (ui.js) bereits respektieren. Ohne diese Prüfung konnte
+// der manuelle Button an einem Urlaubstag trotzdem eine RPE-basierte
+// Pausendauer starten, obwohl weder der confirm-set-Pfad noch das
+// Feedback selbst dort je etwas anzeigen würden -- derselbe physische Klick
+// hätte je nach benutztem Button (Satz bestätigen vs. manuelles Icon) eine
+// andere tatsächliche Pausendauer ausgelöst.
+function buildExercise2Sets() {
+  return {
+    name: 'Bankdrücken', note: '', pauseSec: 90, metric: 'reps',
+    sets: [
+      { weight: 60, reps: 8, rpe: null, status: 'pending', done: false },
+      { weight: 60, reps: 8, rpe: null, status: 'pending', done: false },
+    ],
+    weightStep: 2.5, metricStep: null, nextWeekPlan: null, nextWeekPlanConfirmed: false,
+    targetReps: 8, progressionType: 'weight', archived: false, substituteFor: null,
+    prWeight: null, prRepsAtMaxWeight: null, prRepsHistory: {},
+    progressionMode: 'weight_first', targetRepsMax: null,
+  };
+}
+
+function makeVacationDay(idx) {
+  return {
+    id: 200 + idx, title: `Tag ${idx}`, subtitle: '', warmup: '', cooldown: '',
+    locked: false, markedDone: false, isVacation: true,
+    sleepHours: null, energyLevel: null, sessionRating: null,
+    sessionCheckIn: null, sessionModifier: null,
+    exercises: [buildExercise2Sets()],
+  };
+}
+
+test('A3: an einem Urlaubstag nutzt der manuelle ✓-Button die STATISCHE Pausenzeit, nicht die RPE-Empfehlung', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', err => pageErrors.push(err.message));
+  await page.goto('/');
+  await page.waitForSelector('#app.is-ready', { timeout: 10000 });
+
+  const days = [makeVacationDay(0)];
+  await seedTwoWeekState(page, { activeWeekDays: days, curIdx: 1, autoStartPauseTimer: true });
+  await page.reload();
+  await page.waitForSelector('#app.is-ready', { timeout: 10000 });
+
+  // Kein Session-Coach-Feedback an diesem Tag (bestehendes Verhalten).
+  await expect(page.locator('.session-checkin-card')).toHaveCount(0);
+  await expect(page.locator('.session-briefing-card')).toHaveCount(0);
+
+  await page.click('[data-action="open-rpe-popover"][data-di="0"][data-ei="0"][data-si="0"]');
+  await page.click('[data-action="set-rpe-val"][data-di="0"][data-ei="0"][data-si="0"][data-val="9"]');
+  await page.click('[data-action="toggle-done"][data-di="0"][data-ei="0"][data-si="0"]');
+  await page.waitForTimeout(300);
+
+  await expect(page.locator('#pause-overlay')).toHaveClass(/pause-overlay--visible/);
+  const num = Number(await page.locator('#pause-ring-num').textContent());
+  // ex.pauseSec ist statisch 90s. Vor dem A3-Fix hätte RPE 9 (Compound, kein
+  // Trainingsziel gesetzt -> Hypertrophie-Zweig) stattdessen 180s ausgelöst
+  // (siehe sessionCoach.js _pauseSecForRpe()) -- deutlich mehr als 90s.
+  expect(num).toBeGreaterThanOrEqual(87);
+  expect(num).toBeLessThanOrEqual(90);
 
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
 });

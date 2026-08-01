@@ -349,6 +349,86 @@ test('Aufwärm-Empfehlung: eingeklappt per Default, korrekte 50/70/85%-Formel', 
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
 });
 
+// A1: timer.js verfolgt den "aktiven Tag" (_clockDi) intern separat von
+// ui.js' eigenem _activeDayIdx (welcher Tag-Tab gerade offen ist) -- bisher
+// wurde _clockDi NUR bei einem Wochen-Wechsel resynchronisiert, nicht bei
+// einem reinen Tag-Wechsel innerhalb derselben Woche. Reproduktion: zwei
+// Tage in derselben Woche starten je ihre eigene, unabhängige Session
+// (durch Interaktion). Wechselt man zurück zum ERSTEN Tag (dessen Session
+// weiterhin läuft) und klickt "Timer zurücksetzen", setzte der State-Reset
+// selbst zwar korrekt am richtigen Tag an (ui.js verwendet dafür seinen
+// eigenen _activeDayIdx) -- aber die TOOLBAR-UHR blieb an der internen
+// Nachverfolgung von timer.js hängen, die noch auf den zuvor aktiven Tag
+// (Tag B) zeigte, und zeigte weiterhin dessen (unangetastete) laufende Zeit
+// statt auf 00:00 zu springen.
+test('A1: Tag-Wechsel synct den Timer — Reset wirkt sichtbar auf den gerade offenen Tag, nicht auf einen zuvor aktiven', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', err => pageErrors.push(err.message));
+  page.on('dialog', dialog => dialog.accept());
+  await page.goto('/');
+  await page.waitForSelector('#app.is-ready', { timeout: 10000 });
+
+  function mkPlainDay(id, title, exName) {
+    return {
+      id, title, subtitle: '', warmup: '', cooldown: '',
+      locked: false, markedDone: false, isVacation: false,
+      sleepHours: null, energyLevel: null, sessionStartTs: null, sessionEndTs: null,
+      sessionCheckIn: null, sessionModifier: null,
+      exercises: [mkEx({ name: exName })],
+      sessionLog: [], bodyData: {}, restDays: [], isSeedWeek: false,
+    };
+  }
+
+  await page.evaluate(({ dayA, dayB }) => {
+    localStorage.setItem('train_v6', JSON.stringify({
+      meta: { schemaVersion: 32, savedAt: Date.now(), createdAt: Date.now() },
+      curIdx: 0,
+      weeks: [{
+        id: 1, startDate: new Date().toISOString().split('T')[0], note: '', mode: 'standard',
+        days: [dayA, dayB], sessionLog: [], bodyData: {}, restDays: [], isSeedWeek: false,
+      }],
+      customTemplate: [], settings: { sessionCoach: false, rpeEnabled: true, autoStartPauseTimer: false },
+      prs: {}, coachPerformance: { suggestions: [] }, coachQuestion: null, coachQuestionHistory: [],
+      lastReentryHandled: null, plateauActions: {}, decisionLog: [], badges: [], onboardingDone: true,
+    }));
+  }, { dayA: mkPlainDay(11, 'Tag A', 'Bankdrücken'), dayB: mkPlainDay(12, 'Tag B', 'Kniebeuge') });
+  await page.reload();
+  await page.waitForSelector('#app.is-ready', { timeout: 10000 });
+
+  // Tag A: Session per Gewichtseingabe starten (train:set-input -> _clockDi=0).
+  await page.fill('[data-action="set-weight"][data-di="0"][data-ei="0"][data-si="0"]', '100');
+  await page.waitForTimeout(300);
+  await expect(page.locator('#toolbar-session-timer')).toContainText('●');
+
+  // Zu Tag B wechseln und DORT ebenfalls eine eigene, unabhängige Session
+  // starten (_clockDi wandert auf 1 -- das funktionierte auch vor dem Fix,
+  // weil eine echte Interaktion _ensureSessionStart() direkt aufruft).
+  await page.click('.day-tab[data-day-hdr="1"]');
+  await page.waitForTimeout(150);
+  await page.fill('[data-action="set-weight"][data-di="1"][data-ei="0"][data-si="0"]', '60');
+  await page.waitForTimeout(300);
+
+  // Zurück zu Tag A wechseln -- OHNE dort weiter zu interagieren. Das ist
+  // die entscheidende Stelle: vor dem A1-Fix blieb _clockDi bei diesem
+  // reinen Tab-Wechsel auf Tag B stehen.
+  await page.click('.day-tab[data-day-hdr="0"]');
+  await page.waitForTimeout(300);
+
+  // Timer zurücksetzen, während Tag A der sichtbare/aktive Tab ist.
+  await page.click('#btn-reset-timer');
+  await page.waitForTimeout(300);
+
+  const st = await page.evaluate(() => JSON.parse(localStorage.getItem('train_v6')));
+  expect(st.weeks[0].days[0].sessionStartTs).toBeNull(); // State-Reset war schon vorher korrekt
+  expect(st.weeks[0].days[1].sessionStartTs).not.toBeNull(); // Tag B unangetastet
+
+  // Der eigentliche A1-Bug: die Toolbar-Uhr muss jetzt 00:00 zeigen (Tag A,
+  // gerade zurückgesetzt) -- nicht weiterhin Tag Bs laufende Zeit anzeigen.
+  await expect(page.locator('#toolbar-session-timer')).toHaveText('00:00');
+
+  expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});
+
 test('sessionCoach=false: kein Satz-Feedback, keine Aufwärm-Empfehlung, keine erweiterte Favoriten-Nudge', async ({ page }) => {
   const pageErrors = [];
   page.on('pageerror', err => pageErrors.push(err.message));
