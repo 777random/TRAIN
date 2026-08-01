@@ -2,6 +2,49 @@
 # Automatisch von Claude Code
 # befüllt beim Session-Start
 
+## 2026-07-29 train-v223 (Pre-Launch-Fix-Sprint B143-B151, 9 von 13 Befunden)
+Loop 1: nicht separat gelaufen (volle Suite lief batch-weise, s.u.), 0 fehlgeschlagen
+Loop 2: aktuell ✓ (CLAUDE.md/HANDOFF.md/BUGS.md/DECISIONS.md/AGENTS.md auf train-v223 gebracht)
+Eigentliche Aufgabe: Diagnose-vor-Fix-Sprint basierend auf 13 Befunden aus
+  dem Browser-Test train-v222 (test-results/TRAIN-Test-Uebergabe.md).
+  Vorab: tests/-Ordner war leer (versehentlich nach test-results/
+  verschoben, Playwrights eigener Output-Ordner überschreibt sich selbst),
+  zurückverschoben, Baseline 144/144 grün. Phase 1: 5 parallele
+  Diagnose-Agents (ein Agent pro Themen-Cluster, kein Code geändert),
+  konsolidiert in Diagnose & Sprints/diagnose-praelaunch-v222-2026-07-29.txt.
+  Phase 2: Plan-Mode-Bestätigung inkl. 3 Produktentscheidungen. Phase 3:
+  4 Implementierungsrunden (state.js zuerst und allein, danach bis zu 3
+  Agents parallel pro Runde, neues Muster 8 in AGENTS.md) — B143 (Skip-
+  Injury-Lowlight), B144 (Status-Neubewertung + negativer-Gewicht-Floor,
+  state.js), B145 (Plate-Rechner Default+Gating), B146 ("Heute anders"
+  Substitution), B147 (Verletzungs-Erinnerung Zeitbezug + Grammatik —
+  deckte dabei einen echten, vorbestehenden Off-by-one-Tag-Fehler in
+  weeklyFocus.js auf, im selben Zug gefixt), B148 (Session-Summary Titel +
+  Wdh-PR-Highlight, neue Entscheidung DECISIONS.md B142), B149 (Check-in-
+  Copy, kein Logik-Fix), B150 (Auto-Backup lastBackupDate + B42 mitgefixt),
+  B151 (insightEngine.js W-01 Mindest-Historie-Gate). Zwei Agents in Runde
+  3b brachen wegen eines API-Session-Limits vorzeitig ab — verbleibende
+  Arbeit (fehlender Copy-Text, DECISIONS.md-Eintrag, neuer Test) direkt
+  fertiggestellt. Befund #4 (Notiz-Icon macht Satz-Tabelle unsichtbar)
+  bleibt offen (B141), Root Cause trotz mehrerer Reproduktionsversuche
+  nicht gefunden. Befunde #8/#13 waren reine Doku-Sync-Punkte
+  (context-exports/), kein Code-Fix. **Neu bestätigte Infra-Grenze:** volle
+  Playwright-Suite (282 Tests) kann npx-serve-Devserver mit EMFILE
+  abstürzen lassen — Workaround (3 Datei-Batches) jetzt in CLAUDE.md/
+  AGENTS.md dokumentiert, hier ebenfalls konkret demonstriert (ein naiver
+  Volllauf zeigte 134 falsch-negative Tests, batch-weise alle grün).
+  Phase 4: 282/282 grün in 3 Batches. Sprint-Ergebnis vollständig in
+  Diagnose & Sprints/sprint-ergebnis-praelaunch-v222-2026-07-29.txt (für
+  Claude Cowork). CACHE_VERSION train-v222→v223. Committed + gepusht,
+  CI (GitHub Actions) grün.
+
+**Hinweis zur Lücke train-v202 bis train-v221:** In diesem Zeitraum wurden
+laut BUGS.md/HANDOFF.md mehrere Sprints durchgeführt (B105 ff.), aber
+offenbar ohne SESSION_LOG.md-Eintrag — dieses Log war seit train-v201
+(2026-07-22) nicht mehr aktualisiert worden. Nicht rückwirkend
+rekonstruiert (keine Erstinformation aus dieser Session verfügbar) — bei
+Bedarf aus BUGS.md/HANDOFF.md/git-Historie nachträglich befüllbar.
+
 ## 2026-07-22 train-v201 (B66 erneut geprüft, kein Fund — B86 SVG height="auto" behoben)
 Loop 1: 10/10 grün ✓, volle Suite 87/87 grün nach dem Fix
 Loop 2: aktuell ✓ (CLAUDE.md/HANDOFF.md/BUGS.md auf train-v201 gebracht)
