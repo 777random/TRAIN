@@ -41,6 +41,23 @@ export function defaultWeightStepForExercise(name, customExercises) {
   return (category === 'Squat' || category === 'Hinge') ? 5 : 2.5;
 }
 
+// Runde 6 (A9-Folgefix): zentraler Resolver für die tatsächlich wirksame
+// Schrittweite einer Übung. ex.weightStep wird seit Runde 6 NICHT mehr bei
+// EX_ADD hart gesetzt (siehe dort) — bleibt also für die meisten Übungen
+// undefined, bis der Nutzer EX_SET_STEP explizit auslöst. Dadurch greift
+// hier die globale Einstellung settings.plateStep, wo sie vorher durch den
+// immer gesetzten Default nie zum Zug kam.
+// Truthy-Check (nicht ??): der Schrittweite-Picker (ui.js, data-action=
+// "set-step") nutzt ex.weightStep === 0 als expliziten "Reset"-Sentinel
+// ("keine individuelle Anpassung") — 0 muss daher wie undefined behandelt
+// werden und auf die globale Einstellung zurückfallen, nicht wörtlich als
+// Schrittweite 0 gelesen werden.
+export function getEffectiveWeightStep(ex, settings, customExercises) {
+  if (ex?.weightStep) return ex.weightStep;
+  if (settings?.plateStep) return settings.plateStep;
+  return defaultWeightStepForExercise(ex?.name, customExercises);
+}
+
 export const BADGE_THRESHOLDS = [
   { id: 'badge_4',   weeks: 4,   title: 'Erster Schritt' },
   { id: 'badge_8',   weeks: 8,   title: 'Fundament'      },
@@ -216,6 +233,7 @@ function buildDefaultState() {
       maxSessionMs:                   10800000, // 3h default
       autoStartPauseTimer:            true,
       hideStreakBadge:                false, // B60: Streak-Badge im Trainings-Tab optional ausblendbar
+      hideStopwatch:                  false, // Runde 6/B4: Session-Stoppuhr in der Toolbar optional ausblendbar
       sessionCoach:                   true,  // B76: Pre-Session Check-in + Briefing
       goal:                           null,  // Sprint C1: 'kraftaufbau'|'muskelaufbau'|'fitness'|null — für Pausenzeiten-Empfehlung
       nutritionPhase:                 'maintenance', // B139: 'bulk'|'maintenance'|'cut' — beeinflusst Steigerungs-Empfehlung + Coach-Signale
@@ -971,6 +989,7 @@ function migrate(raw) {
   if (raw.settings.maxSessionMs                   === undefined) raw.settings.maxSessionMs                   = 10800000;
   if (raw.settings.autoStartPauseTimer            === undefined) raw.settings.autoStartPauseTimer            = true;
   if (raw.settings.hideStreakBadge                === undefined) raw.settings.hideStreakBadge                = false;
+  if (raw.settings.hideStopwatch                  === undefined) raw.settings.hideStopwatch                  = false;
   if (raw.settings.sessionCoach                   === undefined) raw.settings.sessionCoach                   = true;
   if (raw.settings.goal                           === undefined) raw.settings.goal                           = null;
   if (raw.settings.nutritionPhase                 === undefined) raw.settings.nutritionPhase                 = 'maintenance';
@@ -1433,7 +1452,6 @@ export const A = Object.freeze({
   SET_REMOVE:          'SET_REMOVE',          // { di, ei, si }
   SET_UPDATE:          'SET_UPDATE',          // { di, ei, si, field, value }
   SET_TOGGLE_DONE:     'SET_TOGGLE_DONE',     // { di, ei, si }
-  SET_AUTOFILL_DOWN:   'SET_AUTOFILL_DOWN',   // { di, ei, si } — weight (all) + reps (next)
   SET_AUTOFILL_RPE:    'SET_AUTOFILL_RPE',    // { di, ei, si } — rpe → next set only
   CONFIRM_SET:         'CONFIRM_SET',          // { di, ei, si, reps } — quick-confirm next pending set
   AUTO_EVAL_SET:       'AUTO_EVAL_SET',        // { di, ei, si, reps } — auto-evaluation on blur (autoEval setting)
@@ -1503,13 +1521,13 @@ export const A = Object.freeze({
  * movementMap.js importiert) als Liste von Übungsnamen — state.js bleibt
  * dadurch importfrei (Muster wie Sprint C1).
  */
-function _reducePendingWeights(day, modifier, scope, compoundNames) {
+function _reducePendingWeights(day, modifier, scope, compoundNames, settings, customExercises) {
   const pct = modifier === 'reduced_mild' ? 0.95 : 0.9;
   const compoundSet = new Set(compoundNames ?? []);
   for (const ex of day.exercises ?? []) {
     if (ex.archived) continue;
     if (scope === 'compound' && !compoundSet.has(ex.name)) continue;
-    const step = ex.weightStep || 2.5;
+    const step = getEffectiveWeightStep(ex, settings, customExercises);
     for (const s of ex.sets ?? []) {
       if (s.status === 'pending' && (s.weight ?? 0) > 0) {
         s.weight = Math.round((s.weight * pct) / step) * step;
@@ -1593,7 +1611,7 @@ function _applyPlannedProgression(days, state) {
           if (ex.targetSets !== undefined) ex.targetSets += toAdd;
           console.log(`[TRAIN] sets-progression: "${ex.name}" nachher: ${ex.sets.length} Sätze`);
         } else {
-          const step = ex.weightStep || state?.settings?.plateStep || 2.5;
+          const step = getEffectiveWeightStep(ex, state?.settings, state?.customExercises);
           (ex.sets ?? []).forEach(s => {
             const raw = (parseFloat(s.weight) || 0) + plan;
             s.weight = Math.round(raw / step) * step;
@@ -2149,7 +2167,7 @@ function reduce(state, action) {
       day.sessionModifier = p.modifier ?? 'normal';
       day.sessionModifierScope = p.modifierScope ?? 'all';
       if (p.modifier === 'reduced' || p.modifier === 'reduced_mild') {
-        _reducePendingWeights(day, p.modifier, p.modifierScope, p.compoundExerciseNames);
+        _reducePendingWeights(day, p.modifier, p.modifierScope, p.compoundExerciseNames, state.settings, state.customExercises);
       }
       break;
     }
@@ -2166,7 +2184,7 @@ function reduce(state, action) {
     // hartcodiert -10%/alle Übungen.
     case A.DAY_REDUCE_PENDING_WEIGHTS: {
       const day = _currentWeek()?.days[p.di]; if (!day) break;
-      _reducePendingWeights(day, day.sessionModifier, day.sessionModifierScope ?? 'all', p.compoundExerciseNames);
+      _reducePendingWeights(day, day.sessionModifier, day.sessionModifierScope ?? 'all', p.compoundExerciseNames, state.settings, state.customExercises);
       break;
     }
 
@@ -2174,19 +2192,31 @@ function reduce(state, action) {
     case A.EX_ADD: {
       const day = _currentWeek()?.days[p.di]; if (!day) break;
       const m = p.metric ?? 'reps';
-      // B18: bei Distanz/Zeit-Übungen (metric 'm'/'sec') gibt es keine
-      // Gewichtsachse — 'weight' als progressionType wäre hier bedeutungslos
-      // (s.weight bleibt immer 0). 'reps' bumpt stattdessen ex.targetReps,
-      // was bei diesen Metriken die Ziel-Distanz/-Zeit ist — der sinnvolle
-      // Default. metricStep analog zu weightStep, je Metrik unterschiedlich
-      // sinnvoll (50m-Schritte vs. 10s-Schritte).
+      // metricStep analog zu weightStep, je Metrik unterschiedlich sinnvoll
+      // (50m-Schritte vs. 10s-Schritte). Siehe unten (progressionType) für
+      // die B18/C12-Logik zur Gewichtsachse bei Distanz/Zeit-Übungen.
       // B124: bekannte Einstellungen derselben Übung (case-insensitive)
       // übernehmen statt Default-Werten — Gewicht/Sätze bleiben immer frisch.
       const history = _findExerciseSettingsHistory(state, p.name, p.di);
+      // Runde 6 (A9-Folgefix): ex.weightStep wird hier NICHT mehr hart
+      // gesetzt (weder Kategorie-Default noch ein anderer Wert) — bleibt
+      // also undefined, solange der Nutzer nichts individuell anpasst
+      // (EX_SET_STEP) oder history unten einen zuvor customized Wert liefert.
+      // Die tatsächlich wirksame Schrittweite wird erst zur Lesezeit über
+      // getEffectiveWeightStep() aufgelöst (ex.weightStep ?? settings.
+      // plateStep ?? Kategorie-Default) — das macht settings.plateStep
+      // endlich wirksam, ohne bestehende Customization anzutasten.
+      const carryCategory = resolveCategory(p.name, buildCategoryMap(state.customExercises ?? [])) === 'Carry';
       const newEx = {
         name: p.name, note: '', pauseSec: 90, metric: m,
-        progressionType: m === 'reps' ? 'weight' : 'reps',
-        weightStep: defaultWeightStepForExercise(p.name, state.customExercises),
+        // B18/C12: bei Distanz/Zeit-Übungen (metric 'm'/'sec') bleibt
+        // 'reps' (hier: Ziel-Distanz/-Zeit) weiterhin der sinnvolle Default
+        // — AUSSER die Übung ist als 'Carry' klassifiziert (z.B. Farmer's
+        // Walk): dort ist eine Gewichtssteigerung bei fixer/sekundärer
+        // Distanz die naheliegendere Progressionsform, deshalb bleibt
+        // 'weight' dort wählbar. Bestehende Datensätze sind davon nicht
+        // betroffen (die v29->v30-Migration bleibt unverändert).
+        progressionType: (m === 'reps' || carryCategory) ? 'weight' : 'reps',
         metricStep: m === 'm' ? 50 : m === 'sec' ? 10 : undefined,
         progressionMode: 'weight_first', targetRepsMax: null, prRepsHistory: {},
         prWeight: null, prRepsAtMaxWeight: null,
@@ -2260,7 +2290,7 @@ function reduce(state, action) {
     }
     case A.EX_INC_WEIGHT: {
       const ex = _currentWeek()?.days[p.di]?.exercises[p.ei]; if (!ex) break;
-      const step = p.amount ?? ex.weightStep ?? 2.5;
+      const step = p.amount ?? getEffectiveWeightStep(ex, state.settings, state.customExercises);
       
       if (step === 0) {
         // Wenn 0 gewählt ist, setzen wir die gesamte Planung für nächste Woche zurück
@@ -2460,27 +2490,6 @@ function reduce(state, action) {
         const reps   = parseFloat(s.reps)   || 0;
         if (ex && reps > 0) {
           _applyPrTracking(state, ex, s, weight, reps);
-        }
-      }
-      break;
-    }
-    case A.SET_AUTOFILL_DOWN: {
-      const ex = _currentWeek()?.days[p.di]?.exercises[p.ei]; if (!ex) break;
-      const si   = p.si;
-      const sets = ex.sets;
-      if (si < 0 || si >= sets.length - 1) break;
-      if (!sets[si]) break;
-      if (p.repsOnly) {
-        const repsVal = parseFloat(p.repsVal);
-        const v = Number.isFinite(repsVal) ? repsVal : 0;
-        for (let j = si + 1; j < sets.length; j++) {
-          sets[j].reps = v;
-        }
-      } else {
-        const w = parseFloat(sets[si].weight) || 0;
-        for (let j = si + 1; j < sets.length; j++) {
-          sets[j].weight = w;
-          sets[j].rpe = null;
         }
       }
       break;
@@ -2832,7 +2841,7 @@ function reduce(state, action) {
       wk.days.forEach(day => (day.exercises ?? []).forEach(ex => {
         const hasWeight = ex.metric === 'reps' && ex.sets.some(s => (s.weight ?? 0) > 0);
         if (hasWeight) {
-          const step = ex.weightStep || 2.5;
+          const step = getEffectiveWeightStep(ex, state.settings, state.customExercises);
           ex.sets.forEach(s => {
             if ((s.weight ?? 0) > 0) s.weight = Math.round((s.weight * (1 - factor)) / step) * step;
           });

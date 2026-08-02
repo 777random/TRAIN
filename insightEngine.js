@@ -13,6 +13,7 @@
 
 import { getWeightRecommendation } from './weightRecommendation.js';
 import { detectPlateaus } from './plateauDetector.js';
+import { getEffectiveWeightStep } from './state.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -972,7 +973,7 @@ export const INSIGHTS = [
       const candidates = [];
       for (const name of exNames) {
         const exInst = curWk.days.flatMap(d => d.exercises).find(e => e.name === name);
-        const exStep = exInst?.weightStep ?? state.settings?.plateStep ?? 2.5;
+        const exStep = getEffectiveWeightStep(exInst, state.settings, state.customExercises);
         const rec = getWeightRecommendation(name, calcWeeks, exStep, exInst?.progressionMode ?? 'weight_first', exInst?.targetRepsMax ?? null, true, state.settings?.nutritionPhase ?? 'maintenance');
         if (rec && rec.delta > 0) candidates.push({ name, rec });
       }
@@ -1006,7 +1007,7 @@ export const INSIGHTS = [
       const candidates = [];
       for (const name of exNames2) {
         const exInst = curWk.days.flatMap(d => d.exercises).find(e => e.name === name);
-        const exStep = exInst?.weightStep ?? state.settings?.plateStep ?? 2.5;
+        const exStep = getEffectiveWeightStep(exInst, state.settings, state.customExercises);
         const rec = getWeightRecommendation(name, calcWeeks, exStep, exInst?.progressionMode ?? 'weight_first', exInst?.targetRepsMax ?? null, true, state.settings?.nutritionPhase ?? 'maintenance');
         if (rec && rec.delta > 0) candidates.push({ name, rec });
       }
@@ -1038,7 +1039,7 @@ export const INSIGHTS = [
       const exNames = favs3.length > 0 ? allExNames3.filter(n => favs3.includes(n)) : allExNames3;
       for (const name of exNames) {
         const exInst = curWk.days.flatMap(d => d.exercises).find(e => e.name === name);
-        const exStep = exInst?.weightStep ?? state.settings?.plateStep ?? 2.5;
+        const exStep = getEffectiveWeightStep(exInst, state.settings, state.customExercises);
         const rec = getWeightRecommendation(name, calcWeeks, exStep, exInst?.progressionMode ?? 'weight_first', exInst?.targetRepsMax ?? null, true, state.settings?.nutritionPhase ?? 'maintenance');
         if (rec && rec.delta === 0) {
           return {

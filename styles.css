@@ -759,6 +759,13 @@ exercise { position: unset; }
   transition: border-color var(--t-fast), box-shadow var(--t-fast);
 }
 .day-card--deload .exercise__name-sticky { background: var(--c-deload-bg); }
+/* Runde 6: das offene ⋮-Menü (.ex-menu-dropdown, z-index 400) liegt als
+   Nachfahre dieses Elements -- sein z-index gilt nur INNERHALB dieses
+   Stacking-Contexts. Ohne Anhebung hier gewinnt eine spätere Übung mit
+   gleichem z-index:100 (nach DOM-Reihenfolge) die Stapelung und verdeckt
+   das eigentlich höher priorisierte Dropdown. Nur aktiv, solange das
+   Menü DIESER Übung offen ist. */
+.exercise__name-sticky.has-open-menu { z-index: 500; }
 .exercise__name-sticky.is-stuck {
   border-bottom-color: var(--c-border);
   box-shadow: 0 2px 8px rgba(0,0,0,.35);
@@ -1060,6 +1067,7 @@ exercise { position: unset; }
 .set-note-btn svg { width: 14px; height: 14px; }
 .set-note-btn:hover { color: var(--c-blue); }
 .set-note-btn.has-note { color: var(--c-blue); }
+.set-note-btn.set-note-btn--anomaly { color: var(--c-warn); }
 
 .set-note-row {
   padding: 4px 0 6px;
@@ -1398,6 +1406,11 @@ exercise { position: unset; }
 }
 .chart-card__title { font-family: var(--font-display); font-size: 17px; letter-spacing: .08em; margin-bottom: var(--sp-3); display: flex; align-items: center; gap: 6px; }
 .chart-card__title svg { width: 18px; height: 18px; flex-shrink: 0; }
+.chart-card__title-link {
+  margin-left: auto; background: none; border: none; font-family: var(--font-body);
+  font-size: 12px; letter-spacing: normal; color: var(--c-accent); padding: var(--sp-1);
+  min-height: var(--touch); cursor: pointer;
+}
 .erkenntnis-line { font-size: 13px; color: var(--c-text-2); margin: 0 0 var(--sp-2); }
 .erkenntnis-line:last-child { margin-bottom: 0; }
 .erkenntnisse-divider { border: none; border-top: 1px solid var(--c-border); margin: var(--sp-3) 0; }
@@ -2122,6 +2135,7 @@ label > svg {
 }
 .set-note-btn:hover  { opacity: 1; color: var(--c-accent); }
 .set-note-btn.has-note { opacity: 1; color: var(--c-accent); }
+.set-note-btn.set-note-btn--anomaly { opacity: 1; color: var(--c-warn); }
 
 .set-note-row {
   /* Erstreckt sich über alle 6 Grid-Spalten */

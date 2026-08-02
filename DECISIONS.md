@@ -565,3 +565,64 @@ sofortige PR-Toast direkt nach dem Satz) und der Satz-Pokal
 werden dort bereits korrekt angezeigt (Pokal-Icon am Satz), nur der
 nachgelagerte Session-Summary-Screen hatte die Lücke.
 **Gilt:** Permanent bis gegenteilige Entscheidung.
+
+### 2026-08 — Notiz-Feld pro Satz: permanent sichtbar → kontextuelles Auffälligkeits-Q&A (B1+C4, B175)
+**Entscheidung:** Das bisher bei jedem unlocked Satz permanent sichtbare
+Notiz-Icon wird nur noch eingeblendet, wenn (a) bereits eine Notiz existiert
+(unabhängig davon immer sichtbar/editierbar) oder (b) eine Auffälligkeit
+erkannt wird: RPE ≥ 9, WDH-Fehlbetrag ≥ 2, oder Gewichtsabweichung ≥ 15% vom
+Coach-Vorschlag. Kein neues `state.js`-Feld — `s.note` bleibt das
+Speicherfeld, nur die Anzeigebedingung ändert sich.
+**Begründung:** Nutzerfeedback (B1) empfand das immer sichtbare Feld als
+Fehlerquelle (leicht vertippt) und visuelles Rauschen; gleichzeitig bestand
+der Wunsch (C4) nach einem freiwilligen Q&A speziell bei Auffälligkeiten
+statt eines generischen Notizfelds. Beide Punkte werden durch dieselbe
+Änderung gelöst, statt zwei getrennte Features zu bauen.
+**Gilt:** Permanent für dieses Feature. Die drei Schwellenwerte (RPE 9,
+WDH-Fehlbetrag 2, Gewichtsabweichung 15%) sind bewusst als Startwerte
+gewählt (siehe `diagnose-runde6-2026-08-02.txt`) — bei Nutzerfeedback zu
+"zu selten"/"zu oft" ausgelöst zuerst hier nachjustieren, bevor die
+Trigger-Logik selbst geändert wird.
+
+## TECHNISCH (Fortsetzung)
+
+### 2026-08 — Globale Steigerungs-Einstellung als Fallback-Ebene UNTER Kategorie-Default, nicht als hart geschriebener Wert (A9-Folgefix, B167)
+**Entscheidung:** `ex.weightStep` wird bei Übungserstellung nicht mehr hart
+gesetzt. Ein zentraler Resolver `getEffectiveWeightStep(ex, settings,
+customExercises)` berechnet den tatsächlichen Schritt zur Laufzeit:
+`ex.weightStep ?? settings.plateStep ?? categoryDefault ?? 2.5` — die
+globale Nutzer-Einstellung sitzt damit über dem Kategorie-Default
+(Squat/Hinge→5kg), aber weiterhin unter einer echten Individual-Anpassung.
+**Begründung:** Die Alternative (globale Einstellung als expliziter
+Override, nur für nicht-individuell-angepasste Übungen) hätte ein neues
+"wurde das individuell angepasst?"-Flag gebraucht (die bestehende Heuristik
+dafür, `ex.weightStep !== undefined && ex.weightStep !== 2.5`, kann einen
+bewusst gewählten Wert nicht von einem nie berührten Default unterscheiden)
+und einen retroaktiven Rewrite bereits bestehender Übungsdatensätze bei
+jeder Einstellungsänderung — ein deutlich größerer, migrationsartiger
+Eingriff für vergleichsweise wenig Zusatznutzen gegenüber dem dynamischen
+Resolver-Ansatz.
+**Gilt:** Permanent. Neue Stellen, die eine Gewichts-Schrittweite lesen,
+müssen `getEffectiveWeightStep()` verwenden, nicht die alte Fallback-Kette
+`ex.weightStep ?? settings.plateStep ?? 2.5` direkt inline wiederholen.
+
+### 2026-08 — Fixed-positioned Dropdowns brauchen z-index-Anhebung ihres Sticky-Ancestors, nicht nur einen hohen eigenen z-index (B176)
+**Entscheidung:** Wenn ein `position:fixed`-Element (hier: `.ex-menu-dropdown`,
+z-index 400) als DOM-Nachfahre eines Elements mit eigenem Stacking-Context
+liegt (hier: `.exercise__name-sticky`, `position:sticky` + `z-index:100`),
+reicht der eigene z-index des Dropdowns NICHT, um es zuverlässig über
+GLEICHRANGIGE Sticky-Elemente in späteren Geschwister-Subtrees zu heben —
+deren z-index wird bei Gleichstand nach DOM-Reihenfolge verglichen, nicht
+gegen den lokal gefangenen Wert des Dropdowns. Fix-Muster: der Sticky-
+Ancestor selbst bekommt eine bedingte Klasse (`has-open-menu`) mit
+angehobenem z-index, solange sein eigenes Dropdown offen ist.
+**Begründung:** Dieser Bug lag seit Einführung von `.exercise__name-sticky`
+latent im Code, wurde aber erst durch eine (unabhängige) Layout-Verkleinerung
+in Runde 6 tatsächlich sichtbar (siehe B176-Eintrag in BUGS.md) — ein
+klassischer, leicht zu übersehender CSS-Stacking-Context-Fallstrick.
+**Gilt:** Permanent. Bei jedem künftigen `position:fixed`-Overlay, das
+innerhalb eines Sticky-/z-index-tragenden Ancestors liegt, dieses Muster
+(Ancestor-z-index bei offenem Overlay anheben) statt eines rein am Overlay
+selbst erhöhten z-index verwenden. Kandidat für eine generischere Lösung
+(z.B. Dropdown-Portal an `document.body`), falls weitere Fälle dieser Art
+auftreten.

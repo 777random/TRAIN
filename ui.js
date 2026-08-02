@@ -20,6 +20,7 @@ import {
   getState, dispatch, subscribe, A, canUndo, BADGE_THRESHOLDS, VACATION_PLANS,
   calcCurrentStreak, calcLongestStreakEver, weekTrainingStatus, getLatestWeek,
   clearAutoWeekPending, STORAGE_KEY, STORAGE_KEY_SHADOW, defaultWeightStepForExercise,
+  getEffectiveWeightStep,
 } from './state.js';
 import {
   exportJSON, exportJSONAuto, importJSON, exportCSV,
@@ -243,6 +244,12 @@ let _editingCheckIn = new Set();
 // B77: Intra-Session Coach — rein UI-lokale, nicht persistierte Zustände.
 /** "Fertig"-Dismiss für den Weiterer-Satz-Vorschlag (Keys `${di}-${ei}-${si}`). */
 let _optionalSetDismissed = new Set();
+// B1+C4 (Runde 6): Sätze (Keys `${di}-${ei}-${si}`), deren nur wegen einer
+// Auffälligkeit (RPE/WDH-Fehlbetrag/Gewichtsabweichung) eingeblendeter,
+// noch leerer Notiz-Prompt bereits wieder geschlossen wurde -- erscheint
+// für diesen Satz nicht erneut, bis zum nächsten vollen Reload. Sätze mit
+// bereits gespeichertem s.note sind davon unabhängig immer sichtbar.
+let _noteAnomalyDismissed = new Set();
 /** Auf-/Zuklappen der Aufwärm-Empfehlung pro Tag (di), Default zu. */
 let _warmupExpanded = new Set();
 /** B128: Auf-/Zuklappen des Auto-Steigerung-Banners ("Anpassen"), pro Woche (wk.id). */
@@ -710,6 +717,25 @@ function closeModal(id) {
   document.getElementById(id)?.classList.remove('is-open');
 }
 
+/** B5: fills #favorites-overview-body with all favorited exercises + their PR data. */
+function _renderFavoritesOverview(state) {
+  const container = document.getElementById('favorites-overview-body');
+  if (!container) return;
+  const prs = state.prs ?? {};
+  const favNames = state.favoriteExercises ?? [];
+  if (!favNames.length) {
+    container.innerHTML = `<p style="color:var(--c-text-2);font-size:13px">Noch keine favorisierten Übungen. Markiere eine Übung im Trainings-Tab mit ⭐.</p>`;
+    return;
+  }
+  container.innerHTML = favNames.map(nm => {
+    const pr = prs[nm];
+    return `<div class="pr-row pr-row--fav">
+      <span class="pr-name">⭐ ${h(nm)}</span>
+      ${pr ? `<span class="pr-val">${pr.maxWeight} kg</span>${pr.date ? `<span class="pr-date">${pr.date}</span>` : ''}` : `<span class="pr-val" style="color:var(--c-text-3)">–</span>`}
+    </div>`;
+  }).join('');
+}
+
 // ─── Sticky observer ─────────────────────────────────────────────────────────
 function _initStickyObserver() {
   if (_stickyObserver) _stickyObserver.disconnect();
@@ -898,8 +924,8 @@ function renderDayList(state) {
   const tabsHtml = `<div class="day-tab-bar" role="tablist" aria-label="Trainingstage">
   <div class="day-tab-bar__toolbar" role="toolbar" aria-label="Wochenaktionen">
     <span class="toolbar__spacer"></span>
-    <span id="toolbar-session-timer" class="toolbar-timer" role="timer" aria-label="Session-Timer">00:00</span>
-    <button class="toolbar__btn toolbar__btn--reset" id="btn-reset-timer" data-action="reset-timer" aria-label="Timer zurücksetzen" title="Timer zurücksetzen">↺</button>
+    ${!state.settings?.hideStopwatch ? `<span id="toolbar-session-timer" class="toolbar-timer" role="timer" aria-label="Session-Timer">00:00</span>
+    <button class="toolbar__btn toolbar__btn--reset" id="btn-reset-timer" data-action="reset-timer" aria-label="Timer zurücksetzen" title="Timer zurücksetzen">↺</button>` : ''}
     <button class="toolbar__btn" id="btn-undo" data-action="undo"
       aria-label="Rückgängig machen"${!canUndo() ? ' disabled' : ''}>${ic.undo()}</button>
     <div class="week-menu-wrap">
@@ -1058,97 +1084,6 @@ function renderDayList(state) {
 
   _initStickyObserver();
   if (!_overviewMode && _activeDayIdx !== null) _bindDrag(container);
-}
-
-function renderDayCard(wk, di, state) {
-  const day    = wk.days[di];
-  const isDl   = wk.mode === 'deload';
-  const locked = !!day.locked;
-  const done   = !!day.markedDone;
-
-  const totalSets = day.exercises.reduce((s, ex) => s + ex.sets.length, 0);
-  const doneSets  = day.exercises.reduce((s, ex) => s + ex.sets.filter(st => st.done).length, 0);
-
-  const dotClass = done
-    ? 'day-card__dot day-card__dot--done'
-    : locked
-      ? 'day-card__dot day-card__dot--locked'
-      : 'day-card__dot';
-
-  const cardClass = [
-    'day-card',
-    done ? 'day-card--done'   : '',
-    isDl ? 'day-card--deload' : '',
-  ].filter(Boolean).join(' ');
-
-  return `
-<article class="${cardClass}" data-di="${di}">
-  <div class="sticky-sentinel" aria-hidden="true" style="height:1px;pointer-events:none;"></div>
-
-  <button
-    class="day-card__header"
-    data-day-hdr="${di}"
-    aria-expanded="false"
-    aria-controls="day-body-${di}"
-    id="day-hdr-${di}"
-  >
-    <div class="day-card__header-left">
-      <div class="${dotClass}" aria-hidden="true"></div>
-      <div class="day-card__title-wrap">
-        <div class="day-card__title day-editable-wrap">
-          <span class="day-editable" data-action="edit-day-field"
-            data-di="${di}" data-field="title"
-            aria-label="${h(day.title)} bearbeiten"
-          >${h(day.title)}</span>
-          ${isDl ? '<span class="deload-badge">Deload</span>' : ''}
-        </div>
-        <div class="day-card__subtitle day-editable-wrap">
-          <span class="day-editable day-editable--sub" data-action="edit-day-field"
-            data-di="${di}" data-field="subtitle"
-            aria-label="${h(day.subtitle || 'Schwerpunkt')} bearbeiten"
-          >${h(day.subtitle) || '<span class="day-subtitle-placeholder">Schwerpunkt …</span>'}</span>
-        </div>
-      </div>
-    </div>
-    <div class="day-card__header-right">
-      <span class="day-card__pill" data-set-pill="${di}"
-        aria-label="${doneSets} von ${totalSets} Sätzen erledigt">
-        ${doneSets}/${totalSets}
-      </span>
-      <span class="day-card__chevron" aria-hidden="true">${ic.chevronDown()}</span>
-    </div>
-  </button>
-
-  <div class="day-menu-wrap">
-    <button class="ex-menu-btn"
-      data-action="toggle-day-menu" data-di="${di}"
-      aria-label="Tag-Menü öffnen"
-      aria-expanded="${_dayMenuOpenKey === String(di)}"
-    >⋮</button>
-    ${_dayMenuOpenKey === String(di) ? `
-    <div class="ex-menu-dropdown" role="menu">
-      ${(day.sessionNote ?? '').trim() ? `<button class="ex-menu-item" role="menuitem" data-action="day-edit-note" data-di="${di}">📝 Notiz bearbeiten</button>` : ''}
-      <button class="ex-menu-item" role="menuitem" data-action="day-rename" data-di="${di}">✏️ Tag umbenennen</button>
-      <button class="ex-menu-item" role="menuitem" data-action="day-duplicate" data-di="${di}">📋 Tag duplizieren</button>
-      <button class="ex-menu-item" role="menuitem" data-action="day-reset-sets" data-di="${di}">🔄 Sätze zurücksetzen</button>
-      <button class="ex-menu-item" role="menuitem" data-action="toggle-day-vacation" data-di="${di}">🏖 Urlaubstag markieren</button>
-      <hr style="border-color:var(--c-border);margin:0">
-      <button class="ex-menu-item ex-menu-item--danger" role="menuitem" data-action="remove-day" data-di="${di}"${wk.days.length <= 1 ? ' disabled' : ''}>🗑 Tag löschen</button>
-    </div>` : ''}
-  </div>
-
-  <div
-    class="day-card__body"
-    id="day-body-${di}"
-    data-day-body="${di}"
-    role="region"
-    aria-labelledby="day-hdr-${di}"
-  >
-    <div class="day-card__body-inner">
-      ${renderDayBody(wk, di, state)}
-    </div>
-  </div>
-</article>`;
 }
 
 /** Kalenderdatum eines Tags innerhalb einer Woche — Tag-Index = Tage-Offset
@@ -1655,7 +1590,8 @@ function _renderAutoPlanBanner(wk) {
     const pt = ex.progressionType ?? 'weight';
     if (pt === 'weight') {
       const curWeight = Math.max(...ex.sets.map(s => s.weight ?? 0));
-      return { value: curWeight + ex.nextWeekPlan, step: ex.weightStep || 0.5 };
+      const _stState = getState();
+      return { value: curWeight + ex.nextWeekPlan, step: getEffectiveWeightStep(ex, _stState.settings, _stState.customExercises) };
     }
     return { value: ex.nextWeekPlan, step: ex.metricStep || 1 };
   };
@@ -1849,7 +1785,7 @@ function renderDayBody(wk, di, state) {
     const compoundEx = _findFirstCompoundExercise(day, state.customExercises);
     const workingWeight = compoundEx?.sets?.[0]?.weight ?? 0;
     if (compoundEx && workingWeight > 0) {
-      const warmupSets = buildWarmupSets(workingWeight, compoundEx.weightStep);
+      const warmupSets = buildWarmupSets(workingWeight, getEffectiveWeightStep(compoundEx, state.settings, state.customExercises));
       if (warmupSets.length > 0) {
         const isOpen = _warmupExpanded.has(di);
         const setsText = warmupSets.map(ws => `${ws.weight}kg × ${ws.reps}`).join(' · ');
@@ -2010,13 +1946,15 @@ function renderExercise(wk, di, ei, state) {
   if (showIntraCoach) {
     const _lastS = ex.sets[ex.sets.length - 1];
     if (_lastS && (_lastS.status === 'success' || _lastS.status === 'fail') && _lastS.rpe != null) {
-      const exMetric = ex.metric === 'sec' || ex.metric === 'm' ? ex.metric : 'reps';
-      if (exMetric === 'reps' && (ex.progressionType ?? 'weight') !== 'reps') {
+      // Runde 6 (C12): Gate über progressionType statt exMetric — erfasst jetzt
+      // auch 'Carry'-Distanz/Zeit-Übungen mit progressionType 'weight' (siehe
+      // state.js EX_ADD), nicht mehr nur klassische metric:'reps'-Übungen.
+      if ((ex.progressionType ?? 'weight') === 'weight') {
         const calcWeeks = state.weeks
           .filter(w => w.mode !== 'deload' && w.mode !== 'vacation')
           .filter(w => w.days.some(d => d.exercises.some(e => e.name === ex.name && e.sets.some(s2 => s2.status === 'success'))));
         if (calcWeeks.length >= 2) {
-          const recStep = ex.weightStep || state.settings?.plateStep || 2.5;
+          const recStep = getEffectiveWeightStep(ex, state.settings, state.customExercises);
           const _nwIsCompound = isCompoundExercise(ex.name, buildCategoryMap(state.customExercises));
           const rec = getWeightRecommendation(ex.name, calcWeeks, recStep, ex.progressionMode ?? 'weight_first', ex.targetRepsMax ?? null, _nwIsCompound, state.settings?.nutritionPhase ?? 'maintenance');
           _nextWeekWeight = rec?.recommendedWeight ?? null;
@@ -2029,7 +1967,13 @@ function renderExercise(wk, di, ei, state) {
     renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled, showIntraCoach, sessionModifier, _nextWeekWeight, wk.id, sessionModifierScope)
   ).join('');
 
-  const step = ex.weightStep ?? 2.5;
+  // Runde 6 (A9-Folgefix): ex.weightStep === 0 ist der explizite "Reset"-
+  // Sentinel des Schrittweite-Pickers (siehe state.js getEffectiveWeightStep)
+  // — muss hier weiterhin als "0/Reset ausgewählt" angezeigt werden, sonst
+  // verliert der Reset-Button seine visuelle Markierung. Für den Fall "nie
+  // individuell gesetzt" (undefined) zeigt der Picker jetzt den tatsächlich
+  // wirksamen Wert (Kategorie/Setting) statt eines hartcodierten 2.5.
+  const step = ex.weightStep === 0 ? 0 : getEffectiveWeightStep(ex, state.settings, state.customExercises);
   const metric = ex.metric === 'sec' || ex.metric === 'm' ? ex.metric : 'reps';
   // B18: Schrittweite für Distanz/Zeit — Analogon zu ex.weightStep, aber
   // eigenes Feld (ex.metricStep), da Gewicht und Distanz/Zeit nie gleichzeitig
@@ -2361,7 +2305,7 @@ function renderExercise(wk, di, ei, state) {
   ${ex.supersetId ? '<div class="ss-badge">SUPER</div>' : ''}
   <div class="sticky-sentinel" aria-hidden="true" style="height:1px;pointer-events:none;"></div>
 
-  <div class="exercise__name-sticky">
+  <div class="exercise__name-sticky${_exMenuOpenKey === `${di}-${ei}` ? ' has-open-menu' : ''}">
     <input
       class="exercise__name-input"
       type="text"
@@ -2735,6 +2679,11 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
   // manuelle ✓/✗-Icon bewertet wurde.
   let intraCoachHtml = '';
   const feedbackKey = `${di}-${ei}-${si}`;
+  // B1+C4 (Runde 6): vom Intra-Coach bereits berechneter Gewichtsvorschlag
+  // für GENAU diesen Satz -- wiederverwendet unten für die Auffälligkeits-
+  // Erkennung (Gewichtsabweichung), damit keine zweite Berechnung nötig ist.
+  // Bleibt null, wenn showIntraCoach aus ist oder der Satz noch pending ist.
+  let _noteSuggestedWeight = null;
   // B94: _acceptedFeedback ist wk.id-präfixiert (anders als das rein
   // kosmetische _setFeedbackExpanded/_optionalSetDismissed) -- der Snapshot
   // trägt echte Daten (Gewicht/RPE/repDiff), ein Bluten über einen
@@ -2746,7 +2695,9 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
   if (showIntraCoach && st !== 'pending') {
     const isLastSet = si === ex.sets.length - 1;
     if (isLastSet) {
-      const msg = buildLastSetMessage(s, ex, nextWeekWeight);
+      const _lsmState = getState();
+      const msg = buildLastSetMessage(s, ex, nextWeekWeight, getEffectiveWeightStep(ex, _lsmState.settings, _lsmState.customExercises));
+      _noteSuggestedWeight = msg.suggestedWeight ?? null;
       const dismissed = msg.canAddSet && _optionalSetDismissed.has(feedbackKey);
       if (!dismissed) {
         intraCoachHtml = `
@@ -2765,7 +2716,8 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
       // geändert haben sollte.
       const _rsrState = getState();
       const _rsrIsCompound = isCompoundExercise(ex.name, buildCategoryMap(_rsrState.customExercises));
-      const fb = accepted ?? buildSetFeedback(s, ex, sessionModifier, si, _rsrState.settings?.goal ?? null, _rsrIsCompound, sessionModifierScope);
+      const fb = accepted ?? buildSetFeedback(s, ex, sessionModifier, si, _rsrState.settings?.goal ?? null, _rsrIsCompound, sessionModifierScope, getEffectiveWeightStep(ex, _rsrState.settings, _rsrState.customExercises));
+      _noteSuggestedWeight = (fb && fb.nextWeight != null) ? fb.nextWeight : null;
       if (fb && fb.nextWeight != null) {
         const canAdopt = !accepted && fb.hint != null && fb.nextWeight !== (s.weight ?? 0);
         intraCoachHtml = _renderIntraFeedback(fb, feedbackKey, di, ei, si, accepted ? 'accepted' : 'live', canAdopt);
@@ -2778,6 +2730,31 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
     // damit der Athlet sieht, was er ursprünglich entschieden hatte.
     intraCoachHtml = _renderIntraFeedback(accepted, feedbackKey, di, ei, si, 'reverted', false);
   }
+
+  // B1+C4 (Runde 6): kontextuelle Notiz-Aufforderung statt permanent
+  // sichtbarem Icon (B1: weniger visuelles Rauschen/Fehlbedienung; C4:
+  // freiwilliges Q&A speziell bei Auffälligkeiten). Auffälligkeit = RPE>=9
+  // ODER WDH-Fehlbetrag>=2 ggü. Zielwiederholungen ODER tatsächliches
+  // Gewicht weicht >=15% vom aktuell berechneten Coach-Vorschlag ab (letzteres
+  // nur verfügbar, wenn showIntraCoach aktiv ist). Schwellen sind Startwerte
+  // zur Diskussion, siehe diagnose-runde6-2026-08-02.txt (Cluster 8). Bereits
+  // gespeicherte Notizen (s.note) bleiben unabhängig davon immer sichtbar/
+  // editierbar -- keine bestehenden Nutzerdaten werden durch diese Änderung
+  // versteckt.
+  const _repDiffForNote = (st !== 'pending' && (ex.metric === 'reps' || !ex.metric) && ex.targetReps != null && s.reps != null && s.reps !== '')
+    ? (ex.targetReps - parseFloat(s.reps))
+    : null;
+  const _weightDeviationPct = (_noteSuggestedWeight != null && _noteSuggestedWeight > 0 && s.weight != null && s.weight !== '')
+    ? Math.abs((parseFloat(s.weight) - _noteSuggestedWeight) / _noteSuggestedWeight)
+    : null;
+  const _noteAnomaly = st !== 'pending' && (
+    (s.rpe != null && s.rpe >= 9) ||
+    (_repDiffForNote != null && _repDiffForNote >= 2) ||
+    (_weightDeviationPct != null && _weightDeviationPct >= 0.15)
+  );
+  const hasExistingNote = !!(s.note && String(s.note).trim());
+  const noteDismissed = _noteAnomalyDismissed.has(feedbackKey);
+  const showNoteAffordance = !rowLocked && (hasExistingNote || (_noteAnomaly && !noteDismissed));
 
   return `
 <div class="set-row${isDeloadSkip ? ' set-row--deload-skip' : ''}" role="listitem" data-di="${di}" data-ei="${ei}" data-si="${si}">
@@ -2793,7 +2770,7 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
       aria-label="Satz ${si + 1} Gewicht in kg"
     />
     ${isDeloadSkip ? `<span class="deload-badge">Deload</span>` : ''}
-    ${isWeightPR ? `<span class="pr-badge"           aria-label="Gewichts-PR! ${s.weight} kg">🏆 ${s.weight} kg</span>` : ''}
+    ${isWeightPR ? `<span class="pr-badge" aria-label="Gewichts-PR! ${s.weight} kg" title="Gewichts-PR! ${s.weight} kg">🏆</span>` : ''}
     ${isEffortGoal ? `<span class="pr-badge pr-badge--goal" aria-label="${effortScore}% Zielerfüllung">✓ ${effortScore}% Ziel</span>` : ''}
     ${_prevWeightHint}
   </div>
@@ -2863,11 +2840,11 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
     aria-label="Satz ${si + 1} entfernen"
   >${ic.minus()}</button>
 
-  ${!rowLocked ? `
+  ${showNoteAffordance ? `
   <button
-    class="set-note-btn${s.note ? ' has-note' : ''}"
+    class="set-note-btn${hasExistingNote ? ' has-note' : ' set-note-btn--anomaly'}"
     data-action="toggle-set-note" data-di="${di}" data-ei="${ei}" data-si="${si}"
-    aria-label="Notiz zu Satz ${si + 1}${s.note ? ' (Notiz vorhanden)' : ''}"
+    aria-label="Notiz zu Satz ${si + 1}${hasExistingNote ? ' (Notiz vorhanden)' : ' (Auffälligkeit erkannt – was ist passiert?)'}"
     aria-expanded="${!!s._showNote}"
   >${ic.noteIcon()}</button>` : ''}
 
@@ -4337,7 +4314,9 @@ function renderProgressTab(state) {
         <div class="pr-collapse__body">${restEntries.map(e => renderRow(e, false)).join('')}</div>
       </details>` : '';
     return `<div class="chart-card">
-      <div class="chart-card__title">${ic.trophy()} Bestleistungen</div>
+      <div class="chart-card__title">${ic.trophy()} Bestleistungen
+        <button type="button" class="chart-card__title-link" data-action="open-favorites-overview">Alle Favoriten →</button>
+      </div>
       ${favEntries.map(e => renderRow(e, true)).join('')}
       ${restHtml}
     </div>`;
@@ -4956,6 +4935,7 @@ function renderSettingsTab(state) {
     ${tog('rpeEnabled', 'RPE anzeigen', 'Rate of Perceived Exertion — Anstrengungsgrad pro Satz')}
     ${tog('autoEval', 'Automatische Satz-Bewertung', 'Satz wird bewertet sobald du die Wdh-Zahl einträgst und das Feld verlässt.')}
     ${tog('autoStartPauseTimer', 'Pausentimer automatisch', 'Timer startet automatisch nach jedem bestätigten Satz (außer dem letzten)')}
+    ${tog('hideStopwatch', 'Stoppuhr ausblenden', 'Session-Timer oben in der Toolbar verstecken')}
     ${tog('vibrationEnabled', 'Vibration nach Pause', 'Funktioniert nur auf Android — iOS unterstützt Vibration in PWAs technisch nicht.')}
     ${tog('swipe', 'Swipe-Navigation', 'Wischen zum Wochenwechsel')}
     <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:var(--sp-2)">
@@ -5732,6 +5712,10 @@ function _handleClick(e) {
     case 'open-export':
       openModal('modal-export'); break;
 
+    case 'open-favorites-overview':
+      _renderFavoritesOverview(getState());
+      openModal('modal-favorites'); break;
+
     case 'open-delete-week': {
       const _wIdx = el.dataset.weekIdx !== undefined ? +el.dataset.weekIdx : getState().curIdx;
       _deleteWeekIdx = _wIdx;
@@ -5957,7 +5941,7 @@ function _handleClick(e) {
           if (ei === -1) continue;
           if (plateau.strategy === 'deload') {
             const ex = curWk.days[di].exercises[ei];
-            const weightStep = ex.weightStep || 2.5;
+            const weightStep = getEffectiveWeightStep(ex, _plSt.settings, _plSt.customExercises);
             const rawDelta = -(plateau.currentWeight * 0.225);
             // Auf weightStep runden — bei sehr leichten Gewichten kann das auf 0
             // runden (_applyPlannedProgression behandelt plan=0 als "kein Plan"
@@ -6026,7 +6010,7 @@ function _handleClick(e) {
             const ei = curWk.days[di].exercises.findIndex(ex => ex.name === _dlFocus.exerciseName);
             if (ei === -1) continue;
             const ex = curWk.days[di].exercises[ei];
-            const weightStep = ex.weightStep || 2.5;
+            const weightStep = getEffectiveWeightStep(ex, _dlState.settings, _dlState.customExercises);
             const deloadFactor = _dlState.settings?.deloadFactor ?? 0.75;
             const rawDelta = -(_dlFocus.currentWeight * (1 - deloadFactor));
             const delta = Math.round(rawDelta / weightStep) * weightStep || -weightStep;
@@ -6748,7 +6732,18 @@ function _handleClick(e) {
     case 'toggle-set-note': {
       const wk  = getState().weeks[getState().curIdx];
       const s   = wk?.days[+di]?.exercises[+ei]?.sets[+si];
-      if (s) { s._showNote = !s._showNote; scheduleRender(); }
+      if (s) {
+        const wasOpen = !!s._showNote;
+        s._showNote = !wasOpen;
+        // B1+C4 (Runde 6): schließt der Nutzer den nur wegen einer
+        // Auffälligkeit eingeblendeten, noch leeren Prompt wieder (ohne
+        // etwas einzutippen), gilt er als gesehen/verworfen -- taucht für
+        // GENAU diesen Satz nicht erneut auf, bis zum nächsten Reload.
+        if (wasOpen && !s._showNote && !(s.note && String(s.note).trim())) {
+          _noteAnomalyDismissed.add(`${di}-${ei}-${si}`);
+        }
+        scheduleRender();
+      }
       break;
     }
     case 'toggle-done': {
@@ -6895,7 +6890,7 @@ function _handleClick(e) {
         const _fbDay = _fbWk?.days[+di];
         if (_fbDay && _aft.settings?.sessionCoach !== false && !_fbDay.isVacation && _isTodayDay(_fbWk, +di)) {
           const _fbIsCompound = isCompoundExercise(_aftEx.name, buildCategoryMap(_aft.customExercises));
-          const _fb = buildSetFeedback(_aftSet, _aftEx, _fbDay.sessionModifier ?? null, _csi, _aft.settings?.goal ?? null, _fbIsCompound, _fbDay.sessionModifierScope ?? 'all');
+          const _fb = buildSetFeedback(_aftSet, _aftEx, _fbDay.sessionModifier ?? null, _csi, _aft.settings?.goal ?? null, _fbIsCompound, _fbDay.sessionModifierScope ?? 'all', getEffectiveWeightStep(_aftEx, _aft.settings, _aft.customExercises));
           if (_fb?.pauseSec) _feedbackPauseSec = _fb.pauseSec;
         }
         window.dispatchEvent(new CustomEvent('train:set-done', { detail: { pauseSec: _feedbackPauseSec ?? (_cex.pauseSec ?? 90), di: +di } }));
@@ -7400,7 +7395,7 @@ function _handleClick(e) {
       // dauerhaft sichtbar (siehe _renderIntraFeedback), nicht mehr nur 2s
       // (ersetzt das B89-Verhalten, siehe DECISIONS.md).
       const _adIsCompound = _adEx ? isCompoundExercise(_adEx.name, buildCategoryMap(_adSt.customExercises)) : true;
-      const _adFb = _adS ? buildSetFeedback(_adS, _adEx, _adDay?.sessionModifier ?? null, _adSi, _adSt.settings?.goal ?? null, _adIsCompound, _adDay?.sessionModifierScope ?? 'all') : null;
+      const _adFb = _adS ? buildSetFeedback(_adS, _adEx, _adDay?.sessionModifier ?? null, _adSi, _adSt.settings?.goal ?? null, _adIsCompound, _adDay?.sessionModifierScope ?? 'all', _adEx ? getEffectiveWeightStep(_adEx, _adSt.settings, _adSt.customExercises) : null) : null;
       // A7: Snapshot von weight/reps/rpe DES SATZES (nicht Teil von
       // buildSetFeedback()s Rückgabe) zusätzlich am fb-Objekt mitspeichern --
       // einzige Grundlage, mit der der 'undo'-Handler unten erkennen kann,
@@ -7957,20 +7952,24 @@ function _prepNewWeekModal() {
           if (seen.has(ex.name)) return;
           if (ex.substituteFor) return;
           const exMetric = ex.metric === 'sec' || ex.metric === 'm' ? ex.metric : 'reps';
+          // Runde 6 (C12): Dispatch über progressionType statt exMetric, damit
+          // 'Carry'-Distanz/Zeit-Übungen mit progressionType='weight' (siehe
+          // state.js EX_ADD) eine echte Gewichtsempfehlung bekommen statt
+          // fälschlich als Distanz/Zeit-Progression behandelt zu werden.
           // Bodyweight-Übungen mit progressionType='reps' (klassische "Wdh
-          // statt Gewicht steigern"-Wahl) bekommen bewusst keine Empfehlung
-          // — unverändertes Originalverhalten. Bei Distanz/Zeit-Übungen
-          // (metric 'm'/'sec') bedeutet progressionType='reps' dagegen
-          // "Distanz/Zeit steigern" (B18-Default, siehe state.js EX_ADD) —
-          // dafür gibt es unten jetzt eine eigene Empfehlung, kein Skip.
-          if (exMetric === 'reps' && (ex.progressionType ?? 'weight') === 'reps') return;
+          // statt Gewicht steigern"-Wahl) bekommen weiterhin bewusst keine
+          // Empfehlung — unverändertes Originalverhalten. Bei Distanz/Zeit-
+          // Übungen (metric 'm'/'sec') bedeutet progressionType='reps'
+          // "Distanz/Zeit steigern" (B18-Default) — eigene Empfehlung unten.
+          const progressesByWeight = (ex.progressionType ?? 'weight') === 'weight';
+          if (!progressesByWeight && exMetric === 'reps') return;
           seen.add(ex.name);
           const exProgressionMode = ex.progressionMode ?? 'weight_first';
           const exTargetRepsMax   = ex.targetRepsMax ?? null;
-          const step = exMetric === 'reps'
-            ? (ex.weightStep || state.settings?.plateStep || 2.5)
+          const step = progressesByWeight
+            ? getEffectiveWeightStep(ex, state.settings, state.customExercises)
             : (ex.metricStep || (exMetric === 'm' ? 50 : 10));
-          const rec = exMetric === 'reps'
+          const rec = progressesByWeight
             ? getWeightRecommendation(ex.name, calcWeeks, step, exProgressionMode, exTargetRepsMax, isCompoundExercise(ex.name, buildCategoryMap(state.customExercises)), state.settings?.nutritionPhase ?? 'maintenance')
             : getMetricRecommendation(ex.name, calcWeeks, step, exProgressionMode, exTargetRepsMax);
           if (rec) {
@@ -8455,6 +8454,18 @@ function _buildScaffold(root) {
   </div>
 </div>
 
+<!-- Modal: Favoriten-Übersicht (B5) -->
+<div class="modal-overlay" id="modal-favorites" role="dialog"
+  aria-modal="true" aria-labelledby="modal-fav-title">
+  <div class="modal">
+    <h2 class="modal__title" id="modal-fav-title">${ic.trophy()} Alle Favoriten</h2>
+    <div id="favorites-overview-body"></div>
+    <div class="modal__actions">
+      <button class="btn btn--ghost" data-action="close-modal">Schließen</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal: Template -->
 <div class="modal-overlay" id="modal-template" role="dialog"
   aria-modal="true" aria-labelledby="modal-tpl-title">
@@ -8773,7 +8784,7 @@ function _buildSessionSummaryData(di) {
       .filter(w => w.mode !== 'deload' && w.mode !== 'vacation')
       .filter(w => w.days.some(d => d.exercises.some(e => e.name === focusEx.name && e.sets.some(s => s.status === 'success'))));
     if (calcWeeks.length >= 2) {
-      const step = focusEx.weightStep || state.settings?.plateStep || 2.5;
+      const step = getEffectiveWeightStep(focusEx, state.settings, state.customExercises);
       const _fpIsCompound = isCompoundExercise(focusEx.name, buildCategoryMap(state.customExercises));
       const rec = getWeightRecommendation(focusEx.name, calcWeeks, step, focusEx.progressionMode ?? 'weight_first', focusEx.targetRepsMax ?? null, _fpIsCompound, state.settings?.nutritionPhase ?? 'maintenance');
       nextWeekWeight = rec?.recommendedWeight ?? null;
@@ -8881,13 +8892,17 @@ function _autoSetNextWeekPlanForDay(di, skippedNames) {
     if (ex.substituteFor) return;
     if (ex.nextWeekPlanConfirmed) return; // manuell gesetzt oder bereits aktiver Plan — nicht überschreiben
     const exMetric = ex.metric === 'sec' || ex.metric === 'm' ? ex.metric : 'reps';
-    if (exMetric === 'reps' && (ex.progressionType ?? 'weight') === 'reps') return;
+    // Runde 6 (C12): siehe gleiches Muster oben (_calcAiRecs) — Dispatch über
+    // progressionType statt exMetric für 'Carry'-Distanz/Zeit-Übungen mit
+    // progressionType='weight'.
+    const progressesByWeight = (ex.progressionType ?? 'weight') === 'weight';
+    if (!progressesByWeight && exMetric === 'reps') return;
     const exProgressionMode = ex.progressionMode ?? 'weight_first';
     const exTargetRepsMax   = ex.targetRepsMax ?? null;
-    const step = exMetric === 'reps'
-      ? (ex.weightStep || state.settings?.plateStep || 2.5)
+    const step = progressesByWeight
+      ? getEffectiveWeightStep(ex, state.settings, state.customExercises)
       : (ex.metricStep || (exMetric === 'm' ? 50 : 10));
-    const rec = exMetric === 'reps'
+    const rec = progressesByWeight
       ? getWeightRecommendation(ex.name, calcWeeks, step, exProgressionMode, exTargetRepsMax, isCompoundExercise(ex.name, buildCategoryMap(state.customExercises)), state.settings?.nutritionPhase ?? 'maintenance')
       : getMetricRecommendation(ex.name, calcWeeks, step, exProgressionMode, exTargetRepsMax);
     if (!rec || !(rec.delta > 0)) return; // kein Plan bei X->X bzw. keiner Steigerung

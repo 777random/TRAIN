@@ -108,11 +108,16 @@ export function _pauseSecForRpe(rpe, goal, isCompound) {
  * @param {string|null} goal       state.settings.goal ('kraftaufbau'|'muskelaufbau'|'fitness'|null)
  * @param {boolean} isCompound     movementMap.js isCompoundExercise(ex.name, categoryMap) — vom Aufrufer bestimmt (sessionCoach.js bleibt importfrei)
  * @param {string} modifierScope   day.sessionModifierScope ('compound'|'all', Sprint C2 Teil A) — steuert ob 'reduced' auch Isolationsübungen dämpft
+ * @param {number} [effectiveStep] Runde 6 (A9-Folgefix): vom Aufrufer via state.js
+ *   getEffectiveWeightStep(ex, settings, customExercises) aufgelöste Schrittweite
+ *   (ex.weightStep ?? settings.plateStep ?? Kategorie-Default) — vom Aufrufer
+ *   bestimmt, damit sessionCoach.js importfrei bleibt (gleiches Muster wie
+ *   isCompound oben). Fällt ohne Angabe auf das alte ex.weightStep||2.5 zurück.
  * @returns {{ nextWeight: number, pauseSec: number|null, hint: string|null, repDiff: number|null, rpe: number|null, rpeZone: string|null, reps: number, targetReps: number, unit: string } | null}
  */
-export function buildSetFeedback(s, ex, sessionModifier, si, goal = null, isCompound = true, modifierScope = 'all') {
+export function buildSetFeedback(s, ex, sessionModifier, si, goal = null, isCompound = true, modifierScope = 'all', effectiveStep = null) {
   if (!s || (s.status !== 'success' && s.status !== 'fail')) return null;
-  const step = ex.weightStep || 2.5;
+  const step = effectiveStep ?? (ex.weightStep || 2.5);
   const currentWeight = s.weight ?? 0;
   const rpe = s.rpe;
   const unit = ex.metric === 'sec' ? 'Sek' : ex.metric === 'm' ? 'm' : 'Wdh';
@@ -136,10 +141,10 @@ export function buildSetFeedback(s, ex, sessionModifier, si, goal = null, isComp
   if (repDiff >= 2) { // Gruppe A: Wdh deutlich verfehlt
     if (rpe >= 9) {
       nextWeight = currentWeight - (step * 2);
-      hint = `Zu schwer (-${repDiff} ${unit}, RPE ${rpe}) — deutlich reduzieren`;
+      hint = `Zu schwer (-${repDiff} ${unit}, RPE ${rpe}) — deutlich reduzieren oder Ziel-${unit} um 2-3 senken`;
     } else {
       nextWeight = currentWeight - step;
-      hint = `Ziel deutlich verfehlt (-${repDiff} ${unit}) — reduzieren`;
+      hint = `Ziel deutlich verfehlt (-${repDiff} ${unit}) — reduzieren oder Ziel-${unit} senken`;
     }
     pauseSec = _pauseSecForRpe(rpe, goal, isCompound);
   } else if (repDiff === 1) { // Gruppe B: Wdh knapp verfehlt
@@ -151,7 +156,7 @@ export function buildSetFeedback(s, ex, sessionModifier, si, goal = null, isComp
       hint = `1 ${unit} gefehlt — Gewicht halten`;
     } else {
       nextWeight = currentWeight - step;
-      hint = `1 ${unit} gefehlt bei RPE ${rpe} — reduzieren`;
+      hint = `1 ${unit} gefehlt bei RPE ${rpe} — Gewicht reduzieren oder 1 ${unit} weniger anpeilen`;
     }
     pauseSec = _pauseSecForRpe(rpe, goal, isCompound);
   } else if (repDiff < 0) { // Gruppe D: Wdh übertroffen
@@ -171,8 +176,8 @@ export function buildSetFeedback(s, ex, sessionModifier, si, goal = null, isComp
     else if (rpe < 8)    { nextWeight = currentWeight;              hint = 'Ziel erreicht, gute Intensität — halten'; }
     else if (rpe < 8.5)  { nextWeight = currentWeight;              hint = 'Optimale Zone — halten'; }
     else if (rpe < 9)    { nextWeight = currentWeight;              hint = 'Ziel erreicht aber hart — nächster Satz halten, Pause verlängern'; }
-    else if (rpe < 10)   { nextWeight = currentWeight - step;       hint = 'Sehr hart — reduzieren'; }
-    else                 { nextWeight = currentWeight - (step * 2); hint = 'Maximum — deutlich reduzieren'; }
+    else if (rpe < 10)   { nextWeight = currentWeight - step;       hint = `Sehr hart — Gewicht reduzieren oder 1 ${unit} weniger anpeilen`; }
+    else                 { nextWeight = currentWeight - (step * 2); hint = `Maximum — deutlich reduzieren oder Ziel-${unit} um 2-3 senken`; }
     pauseSec = _pauseSecForRpe(rpe, goal, isCompound);
   }
 
@@ -195,10 +200,12 @@ export function buildSetFeedback(s, ex, sessionModifier, si, goal = null, isComp
  * einzige legitime Gebrauch dieser Funktion hier: eine echte "nächste
  * Woche"-Projektion, kein Ersatz für den session-lokalen nextWeight oben).
  *
+ * @param {number} [effectiveStep] Runde 6 (A9-Folgefix): siehe buildSetFeedback()
+ *   oben — vom Aufrufer via state.js getEffectiveWeightStep() aufgelöst.
  * @returns {{ text: string, canAddSet: boolean, suggestedWeight: number|null }}
  */
-export function buildLastSetMessage(s, ex, nextWeekWeight) {
-  const step = ex.weightStep || 2.5;
+export function buildLastSetMessage(s, ex, nextWeekWeight, effectiveStep = null) {
+  const step = effectiveStep ?? (ex.weightStep || 2.5);
   const rpe = s.rpe;
   const nextWeekText = nextWeekWeight != null ? `${nextWeekWeight}kg` : 'gleiches Gewicht';
 

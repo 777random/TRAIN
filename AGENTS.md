@@ -1,16 +1,17 @@
 # TRAIN — Parallel Agent Regeln
 # Wird nach jedem Multi-Agent Sprint
 # automatisch aktualisiert.
-# Letzte Aktualisierung: 2026-08-02 / train-v226 (Runde-5-Fix-Sprint, B166 —
-# kein neues Parallelisierungsmuster nötig, einzelner fokussierter Cluster
-# ohne state.js-Beteiligung, 1 Diagnose-Agent + 1 Implementierungs-Agent.
-# Erneut ein Agent-Ausfall durch Session-Limit — diesmal MITTEN in der
-# Implementierung statt in der Diagnose-Phase (siehe HANDOFF.md); die
-# bereits fertigen Code-Änderungen wurden übernommen, nur der verbliebene
-# Test-Schritt manuell nachgeholt. Bestätigt: Muster 9/10s Erkenntnis "state.js
-# als Datei geändert" ≠ "ein Dispatch ruft state.js auf" bleibt gültig,
-# hier aber gar nicht relevant, da registerSW.js/ui.js/sw.js keinerlei
-# state.js-Bezug haben, siehe HANDOFF.md)
+# Letzte Aktualisierung: 2026-08-02 / train-v227 (Runde-6-Feedback-Sprint,
+# B167-B177 — siehe Muster 11 unten für das neue, in diesem Sprint erstmals
+# aufgetretene Kopplungsmuster zwischen zwei Clustern, die denselben
+# state.js-Reducer ändern, sowie den erneuten Beleg, dass zwei Agents
+# tatsächlich dieselbe Funktion in ui.js gleichzeitig ändern durften, weil
+# ihre konkreten Teiländerungen disjunkt blieben. Erneut ein Agent-Ausfall
+# durch Session-Limit — diesmal MITTEN in einer Diagnose-Recherche
+# (Root-Cause-Suche für einen während der Verifikation gefundenen
+# Regressions-Bug, B176); die Recherche wurde manuell fortgesetzt statt auf
+# das Limit-Reset zu warten (dieselbe Lehre wie in Runde 4/5: ein
+# Agent-Ausfall muss den Sprint nicht blockieren).
 
 ---
 
@@ -459,6 +460,72 @@ Wiederherstellung des Limits doch noch erfolgreich per Agent. Lehre: ein
 Ausfall der Diagnose-Phase muss den Sprint nicht blockieren — Diagnose ist
 ohnehin nur Read/Grep, kann bei Bedarf ohne Qualitätsverlust manuell
 durchgeführt werden, wenn Agent-Spawning temporär nicht verfügbar ist.
+
+### Muster 11 — zwei Cluster mit echtem state.js-Overlap im selben Solo-Slot
+zusammengefasst, danach 5 Agents in EINER parallelen Runde inkl. zweier
+Agents in derselben ui.js-Funktion (verifiziert 2026-08-02, train-v227,
+Runde-6-Feedback-Sprint B167-B177):
+```
+Runde 1 (solo, EIN Agent für ZWEI Cluster): state.js EX_ADD-Reducer —
+  Cluster 1 (A9-Folgefix, getEffectiveWeightStep-Resolver) UND Cluster 2/C12
+  (Carry-Progressionstyp) ändern denselben Reducer-Body, im selben
+  Agenten-Durchgang behandelt statt als zwei getrennte Solo-Schritte.
+  Danach: SET_AUTOFILL_DOWN-Entfernung (Cluster 6) als eigener, kurzer
+  Solo-Schritt (anderer state.js-Bereich, aber sequenziell NACH Runde 1,
+  nicht gleichzeitig).
+Runde 2 (5 parallel):
+  Agent 1: ui.js (PR-Badge renderSetRow + Settings-Toggle + Bestleistungen-
+    Karte/Modal) + state.js (2 additive Zeilen, hideStopwatch) + styles.css
+  Agent 2: sessionCoach.js (Wdh-Reduzierungs-Hinweistext)
+  Agent 3: ui.js (renderDayCard()-Entfernung, isolierter Bereich)
+  Agent 4: nur tests/ (4 neue Playwright-Tests, kein Produktivcode)
+  Agent 5: ui.js (renderSetRow: Notiz-Anzeigebedingung) + styles.css
+→ Konsolidierungs-Agent zuletzt (Version, Docs, Commit)
+```
+Ergebnis: keine Kollision zwischen den 5 Agents — `git diff --stat` und ein
+gezielter Hunk-Review nach allen 5 bestätigten das. **Neue Erkenntnis:**
+Agent 1 (PR-Badge) und Agent 5 (Notiz-Button) änderten beide Code INNERHALB
+derselben Funktion `renderSetRow()` (nicht nur derselben Datei) — die
+bisherige Warnregel "zwei Agents ändern dieselbe Funktion in ui.js" (siehe
+unten) traf damit formal zu, blieb hier aber unproblematisch, weil beide
+Teiländerungen auf komplett getrennte, nicht ineinander verschachtelte
+Code-Blöcke innerhalb der Funktion fielen (PR-Badge: eine einzelne
+Template-Zeile; Notiz-Button: ein neuer Berechnungsblock + eine geänderte
+Bedingung, mehrere Zeilen weiter unten) und keine der beiden Änderungen von
+Variablen/Zustand abhing, die die andere neu einführte. **Präzisierung:**
+"dieselbe Funktion" ist ein zu grobes Kriterium für die Warnregel — die
+tatsächliche Gefahr ist Überlappung auf Zeilen-/Block-Ebene plus
+Daten-Abhängigkeit zwischen den beiden Änderungen, nicht die Funktionsgrenze
+als solche (bestätigt/verfeinert Muster 7s bereits ähnliche Beobachtung).
+
+**Neues Kopplungsmuster (state.js, oben in Runde 1):** die bisherige Annahme
+war, dass genau EIN Cluster pro Sprint state.js als Solo-Block ändert
+(Muster 8/9/10). Hier änderten ZWEI unabhängig geplante Cluster (aus
+unterschiedlichen Nutzerfeedback-Punkten, A9 und C12) denselben Reducer
+(`EX_ADD`) — erst die Diagnose-Phase deckte diesen Overlap auf (das
+Sprint-Planungsdokument hatte ihn nicht vorhergesehen). Lehre: bei der
+Diagnose jedes Clusters IMMER explizit gegen die state.js-Regionen ALLER
+anderen Cluster derselben Runde abgleichen, nicht nur die vom
+Sprint-Dokument selbst als potenziell überlappend markierten Paare — ein
+State.js-Overlap zwischen zwei inhaltlich unabhängigen Features ist leicht
+zu übersehen, wenn man nur an die naheliegenden Paare denkt.
+
+**Nachträglich in der Verifikation gefundene, echte Regression (kein
+Parallelisierungsfehler, aber relevant für künftige Sprints):** die volle
+Test-Suite nach Runde 2 deckte eine bis dahin unentdeckte Regression auf
+(B176, siehe BUGS.md/DECISIONS.md) — ein CSS-Stacking-Context-Fallstrick
+(`.ex-menu-dropdown` als Nachfahre von `.exercise__name-sticky`), der durch
+Agent 5s harmlose Layout-Verkleinerung (Notiz-Button seltener sichtbar)
+erstmals tatsächlich auslöste, obwohl der Bug selbst schon lange im Code
+lag. Lehre: **jede Layout-/Höhen-Änderung, auch eine scheinbar rein
+kosmetische, kann latente Sticky-/Stacking-Bugs an ganz anderer Stelle
+sichtbar machen** — die volle Regressionssuite NACH jeder Parallel-Runde
+(nicht nur ein gezielter Test der eigenen Änderung) bleibt deshalb Pflicht,
+genau wie in Muster 8-10 bereits etabliert. Root-Cause-Bestätigung lief hier
+nicht per Theorie, sondern per kurzem Playwright-Diagnoseskript
+(`getBoundingClientRect`/`getComputedStyle`/`elementFromPoint` an der
+Fehlerstelle) — schneller und zuverlässiger als reine Code-Lektüre bei
+CSS-Stacking-Fragen, als Vorlage für künftige ähnliche Fälle.
 
 ---
 

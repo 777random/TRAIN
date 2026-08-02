@@ -47,7 +47,7 @@
  * Beide Funktionen sind pure, keine Seiteneffekte.
  */
 
-import { getLatestWeek } from './state.js';
+import { getLatestWeek, getEffectiveWeightStep } from './state.js';
 import { detectPlateaus } from './plateauDetector.js';
 import { getWeightRecommendation, isReadyForAutoSelect, roundToPlate } from './weightRecommendation.js';
 import { isFullSuccess } from './setUtils.js';
@@ -688,7 +688,7 @@ function _checkProgression(state) {
       seen.add(ex.name);
       const exProgressionMode = ex.progressionMode ?? 'weight_first';
       const exTargetRepsMax   = ex.targetRepsMax ?? null;
-      const plateStep = ex.weightStep ?? state.settings?.plateStep ?? 2.5;
+      const plateStep = getEffectiveWeightStep(ex, state.settings, state.customExercises);
       if (!isReadyForAutoSelect(ex.name, calcWeeks, exProgressionMode, exTargetRepsMax)) return;
       const isCompound = isCompoundExercise(ex.name, catMap);
       const rec = getWeightRecommendation(ex.name, calcWeeks, plateStep, exProgressionMode, exTargetRepsMax, isCompound, state.settings?.nutritionPhase ?? 'maintenance');
@@ -992,7 +992,7 @@ function _checkPersistentFailure(state) {
   const exNames = [...new Set(last3.flatMap(w => w.days.flatMap(d => d.exercises.map(e => e.name))))];
 
   for (const name of exNames) {
-    let succ = 0, fail = 0, weeksAttempted = 0, lastFailWeight = null, lastFailWeightStep = null;
+    let succ = 0, fail = 0, weeksAttempted = 0, lastFailWeight = null, lastFailEx = null;
     for (const wk of last3) {
       let wkEvaluated = 0;
       for (const d of wk.days) for (const ex of d.exercises) if (ex.name === name) {
@@ -1000,7 +1000,7 @@ function _checkPersistentFailure(state) {
           if (s.status === 'success') { succ++; wkEvaluated++; }
           else if (s.status === 'fail') {
             fail++; wkEvaluated++;
-            if ((s.weight ?? 0) > 0) { lastFailWeight = s.weight; lastFailWeightStep = ex.weightStep ?? null; }
+            if ((s.weight ?? 0) > 0) { lastFailWeight = s.weight; lastFailEx = ex; }
           }
         }
       }
@@ -1014,7 +1014,7 @@ function _checkPersistentFailure(state) {
       // (analog zu getWeightRecommendation()) — vorher wurde hier immer der
       // globale Hantelscheiben-Schritt gerundet, unabhängig von der pro
       // Übung eingestellten Schrittweite (z.B. 1.25kg bei Bizepscurls).
-      const plateStep    = lastFailWeightStep ?? state.settings?.plateStep ?? 2.5;
+      const plateStep    = getEffectiveWeightStep(lastFailEx, state.settings, state.customExercises);
       const deloadFactor = state.settings?.deloadFactor ?? 0.75;
       const suggestedWeight = lastFailWeight != null
         ? roundToPlate(lastFailWeight * deloadFactor, plateStep)
@@ -1081,12 +1081,12 @@ function _checkMultiExerciseFailure(state) {
   for (const wk of last3) {
     for (const d of wk.days) for (const ex of d.exercises) {
       let entry = perExercise.get(ex.name);
-      if (!entry) { entry = { succ: 0, fail: 0, lastFailWeight: null, lastFailWeightStep: null }; perExercise.set(ex.name, entry); }
+      if (!entry) { entry = { succ: 0, fail: 0, lastFailWeight: null, lastFailEx: null }; perExercise.set(ex.name, entry); }
       for (const s of ex.sets) {
         if (s.status === 'success') { succ++; entry.succ++; }
         else if (s.status === 'fail') {
           fail++; entry.fail++;
-          if ((s.weight ?? 0) > 0) { entry.lastFailWeight = s.weight; entry.lastFailWeightStep = ex.weightStep ?? null; }
+          if ((s.weight ?? 0) > 0) { entry.lastFailWeight = s.weight; entry.lastFailEx = ex; }
         }
       }
     }
@@ -1109,7 +1109,7 @@ function _checkMultiExerciseFailure(state) {
       // B101: ex.weightStep pro betroffener Übung hat Vorrang vor dem
       // globalen settings.plateStep — vorher wurde hier für ALLE betroffenen
       // Übungen derselbe globale Hantelscheiben-Schritt verwendet.
-      const plateStep = v.lastFailWeightStep ?? state.settings?.plateStep ?? 2.5;
+      const plateStep = getEffectiveWeightStep(v.lastFailEx, state.settings, state.customExercises);
       return {
         name,
         rate: v.succ / (v.succ + v.fail),

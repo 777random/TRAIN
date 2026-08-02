@@ -37,7 +37,7 @@
  * • Visual feedback: clock turns accent-green when running.
  */
 
-import { dispatch, subscribe, getState, A, getLatestWeek } from './state.js';
+import { dispatch, subscribe, getState, A, getLatestWeek, getEffectiveWeightStep } from './state.js';
 import { buildSetFeedback } from './sessionCoach.js';
 import { buildCategoryMap, isCompoundExercise } from './movementMap.js';
 
@@ -730,7 +730,7 @@ function _bindAppInteractions() {
           const newWk = newState.weeks[newState.curIdx];
           if (newState.settings?.sessionCoach !== false && _isCoachEligibleDay(newState, newWk, newDay)) {
             const isCompound = newEx ? isCompoundExercise(newEx.name, buildCategoryMap(newState.customExercises)) : true;
-            const fb = buildSetFeedback(newSet, newEx, newDay?.sessionModifier ?? null, +doneBtn.dataset.si, newState.settings?.goal ?? null, isCompound, newDay?.sessionModifierScope ?? 'all');
+            const fb = buildSetFeedback(newSet, newEx, newDay?.sessionModifier ?? null, +doneBtn.dataset.si, newState.settings?.goal ?? null, isCompound, newDay?.sessionModifierScope ?? 'all', newEx ? getEffectiveWeightStep(newEx, newState.settings, newState.customExercises) : null);
             if (fb?.pauseSec) pauseSec = fb.pauseSec;
           }
           window.dispatchEvent(new CustomEvent('train:set-done', {
