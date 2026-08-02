@@ -17,6 +17,18 @@ function _round(weight, step) {
 }
 
 /**
+ * Per-Satz-Schwelle: ab diesem RPE gilt EIN Satz als maximal ausgereizt
+ * (sofortiges, taktisches Signal ohne jede Historie — resettet mit jedem
+ * Satz). NICHT zu verwechseln mit RPE_PAUSE_TIER_HIGH weiter unten (selber
+ * Zahlenwert, andere Bedeutung: Pausenzeit-Staffelung statt Zonen-Label),
+ * noch mit plateauDetector.js' RPE_PLATEAU_DELOAD_STRATEGY_1WK_AVG oder
+ * weeklyFocus.js' RPE_PREVENTIVE_DELOAD_3WK_AVG (beide mehrwöchige
+ * Durchschnitte an ganz anderen Stellen der Coaching-Kaskade) — siehe
+ * diagnose-runde7-2026-08-02.txt für die vollständige Abgrenzung aller 4.
+ */
+const RPE_SET_HARD_ZONE = 8.5;
+
+/**
  * Dämpft einen vorgeschlagenen Wert bei reduzierter Tagesform (B76-Modifier)
  * — aber NUR bei einer echten Reduzierungs-Empfehlung (nextWeight <
  * currentWeight). Weder eine Steigerung (B84) noch ein Halten (B91) dürfen
@@ -54,6 +66,12 @@ function _applyModifier(nextWeight, currentWeight, sessionModifier, step, modifi
  * Kraft-Ziel, 'muskelaufbau'/'fitness'/nicht gesetzt laufen alle über den
  * Hypertrophie-Zweig (siehe DECISIONS.md).
  */
+// Pausenzeit-Staffelung, EIGENE Bedeutung trotz gleichem Zahlenwert wie
+// RPE_SET_HARD_ZONE oben: hier nur eine von 6 Stufen einer Pausendauer-
+// Tabelle (wie lang PAUSIEREN, nicht ob der Satz als "hart" zählt) — bewusst
+// NICHT mit RPE_SET_HARD_ZONE zusammengelegt, siehe Kommentar dort.
+const RPE_PAUSE_TIER_HIGH = 8.5;
+
 export function _pauseSecForRpe(rpe, goal, isCompound) {
   if (rpe == null) return null;
   const isStrength = goal === 'kraftaufbau';
@@ -67,7 +85,7 @@ export function _pauseSecForRpe(rpe, goal, isCompound) {
   if (rpe <= 8) return isStrength
     ? (isCompound ? 180 : 120)
     : (isCompound ? 120 : 90);
-  if (rpe <= 8.5) return isStrength
+  if (rpe <= RPE_PAUSE_TIER_HIGH) return isStrength
     ? (isCompound ? 240 : 150)
     : (isCompound ? 180 : 120);
   if (rpe <= 9) return isStrength
@@ -151,7 +169,7 @@ export function buildSetFeedback(s, ex, sessionModifier, si, goal = null, isComp
     if (rpe <= 7) {
       nextWeight = currentWeight;
       hint = `1 ${unit} gefehlt bei RPE ${rpe} — Technik prüfen, Gewicht halten`;
-    } else if (rpe < 8.5) {
+    } else if (rpe < RPE_SET_HARD_ZONE) {
       nextWeight = currentWeight;
       hint = `1 ${unit} gefehlt — Gewicht halten`;
     } else {
@@ -163,7 +181,7 @@ export function buildSetFeedback(s, ex, sessionModifier, si, goal = null, isComp
     if (rpe <= 7) {
       nextWeight = currentWeight + step;
       hint = `Mehr als Ziel (${reps}/${targetReps} ${unit}) bei RPE ${rpe} — steigern`;
-    } else if (rpe < 8.5) {
+    } else if (rpe < RPE_SET_HARD_ZONE) {
       nextWeight = currentWeight;
       hint = 'Mehr als Ziel geschafft — halten';
     } else {
@@ -174,7 +192,7 @@ export function buildSetFeedback(s, ex, sessionModifier, si, goal = null, isComp
   } else { // Gruppe C: repDiff === 0, Wdh erreicht
     if (rpe <= 6)        { nextWeight = currentWeight + step;      hint = 'Ziel erreicht, noch Luft — steigern'; }
     else if (rpe < 8)    { nextWeight = currentWeight;              hint = 'Ziel erreicht, gute Intensität — halten'; }
-    else if (rpe < 8.5)  { nextWeight = currentWeight;              hint = 'Optimale Zone — halten'; }
+    else if (rpe < RPE_SET_HARD_ZONE) { nextWeight = currentWeight; hint = 'Optimale Zone — halten'; }
     else if (rpe < 9)    { nextWeight = currentWeight;              hint = 'Ziel erreicht aber hart — nächster Satz halten, Pause verlängern'; }
     else if (rpe < 10)   { nextWeight = currentWeight - step;       hint = `Sehr hart — Gewicht reduzieren oder 1 ${unit} weniger anpeilen`; }
     else                 { nextWeight = currentWeight - (step * 2); hint = `Maximum — deutlich reduzieren oder Ziel-${unit} um 2-3 senken`; }
@@ -189,7 +207,7 @@ export function buildSetFeedback(s, ex, sessionModifier, si, goal = null, isComp
     hint += ' · RPE steigt schnell';
   }
 
-  const rpeZone = rpe <= 6 ? 'leicht' : rpe < 8.5 ? 'optimal' : 'hart';
+  const rpeZone = rpe <= 6 ? 'leicht' : rpe < RPE_SET_HARD_ZONE ? 'optimal' : 'hart';
   nextWeight = _applyModifier(nextWeight, currentWeight, sessionModifier, step, modifierScope, isCompound);
   return { nextWeight: _round(nextWeight, step), pauseSec, hint, repDiff, rpe, rpeZone, reps, targetReps, unit };
 }
@@ -202,27 +220,35 @@ export function buildSetFeedback(s, ex, sessionModifier, si, goal = null, isComp
  *
  * @param {number} [effectiveStep] Runde 6 (A9-Folgefix): siehe buildSetFeedback()
  *   oben — vom Aufrufer via state.js getEffectiveWeightStep() aufgelöst.
+ * @param {string|null} [nextWeekReason] Runde 7 (C5): rec.reason von
+ *   getWeightRecommendation() (weightRecommendation.js) — ein echter
+ *   Mehrwochen-Trend (Erfolgsquote/RPE der letzten 3-4 Wochen), den ui.js
+ *   ohnehin bereits berechnet, aber bisher verworfen hat. Wird als kurzer
+ *   Klammerzusatz angehängt statt den Nachrichtentext zu ersetzen. Bei
+ *   fehlendem Wert (nicht genug Historie) bleibt der Text unverändert wie
+ *   zuvor — kein erzwungener/leerer Zusatz.
  * @returns {{ text: string, canAddSet: boolean, suggestedWeight: number|null }}
  */
-export function buildLastSetMessage(s, ex, nextWeekWeight, effectiveStep = null) {
+export function buildLastSetMessage(s, ex, nextWeekWeight, effectiveStep = null, nextWeekReason = null) {
   const step = effectiveStep ?? (ex.weightStep || 2.5);
   const rpe = s.rpe;
   const nextWeekText = nextWeekWeight != null ? `${nextWeekWeight}kg` : 'gleiches Gewicht';
+  const reasonSuffix = nextWeekReason ? ` (${nextWeekReason})` : '';
 
   if (s.status !== 'success') {
-    return { text: 'Ziel nicht erreicht — Nächste Woche: gleiches Gewicht, Technik prüfen', canAddSet: false, suggestedWeight: null };
+    return { text: `Ziel nicht erreicht — Nächste Woche: gleiches Gewicht, Technik prüfen${reasonSuffix}`, canAddSet: false, suggestedWeight: null };
   }
   if (rpe != null && rpe <= 6) {
     const suggestedWeight = _round((s.weight ?? 0) + step, step);
     return { text: `Du hast noch Kapazität. Optionaler Satz: ${suggestedWeight}kg?`, canAddSet: true, suggestedWeight };
   }
   if (rpe == null || rpe <= 7) {
-    return { text: `Übung abgeschlossen ✓ Nächste Woche: ${nextWeekText}`, canAddSet: false, suggestedWeight: null };
+    return { text: `Übung abgeschlossen ✓ Nächste Woche: ${nextWeekText}${reasonSuffix}`, canAddSet: false, suggestedWeight: null };
   }
   if (rpe < 9) { // 8, 8.5
-    return { text: `Perfekt abgeschlossen ✓ Nächste Woche: ${nextWeekText}`, canAddSet: false, suggestedWeight: null };
+    return { text: `Perfekt abgeschlossen ✓ Nächste Woche: ${nextWeekText}${reasonSuffix}`, canAddSet: false, suggestedWeight: null };
   }
-  return { text: 'Hart aber fertig ✓ Nächste Woche: gleiches Gewicht', canAddSet: false, suggestedWeight: null };
+  return { text: `Hart aber fertig ✓ Nächste Woche: gleiches Gewicht${reasonSuffix}`, canAddSet: false, suggestedWeight: null };
 }
 
 /**

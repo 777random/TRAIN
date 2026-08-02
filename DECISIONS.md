@@ -626,3 +626,79 @@ innerhalb eines Sticky-/z-index-tragenden Ancestors liegt, dieses Muster
 selbst erhöhten z-index verwenden. Kandidat für eine generischere Lösung
 (z.B. Dropdown-Portal an `document.body`), falls weitere Fälle dieser Art
 auftreten.
+
+## COACH-LOGIK (Fortsetzung)
+
+### 2026-08 — Vier RPE-Schwellenwerte bleiben getrennt und werden nur benannt, nicht konsolidiert (C6, B179)
+**Entscheidung:** Die vier im Runde-6-Audit gefundenen RPE-Schwellenwerte
+(`sessionCoach.js` 8.5 pro Satz, `sessionCoach.js` 8.5 Pausenzeit-Staffelung,
+`plateauDetector.js` 8.5 als 1-Wochen-Durchschnitt pro Übung,
+`weeklyFocus.js` 7.5 als 3-Wochen-Durchschnitt fürs ganze Programm,
+`insightEngine.js` E-03 0.3 als Delta) bleiben inhaltlich getrennt. Einzige
+Änderung: jeder Wert bekommt eine benannte Konstante mit Scope-Kommentar
+(`RPE_SET_HARD_ZONE`, `RPE_PAUSE_TIER_HIGH`, `RPE_PLATEAU_DELOAD_STRATEGY_
+1WK_AVG`, `RPE_PREVENTIVE_DELOAD_3WK_AVG`).
+**Begründung:** Jeder Wert misst etwas anderes — sofortiges taktisches
+Signal für genau diesen Satz vs. Tie-Breaker für eine Deload-Strategie NACH
+bereits erkanntem Plateau (1-Wochen-Fenster, pro Übung) vs. präventive
+Frühwarnung fürs gesamte Programm (3-Wochen-Fenster, damit gedämpft). Die
+unterschiedlichen Zeitfenster rechtfertigen unterschiedliche Zahlenwerte:
+ein kürzeres Fenster (Einzelsatz/1-Woche) braucht eine höhere Schwelle, um
+einen einzelnen Ausreißer nicht überzubewerten; ein längeres, gedämpftes
+Fenster (3-Wochen-Durchschnitt) darf bei einem niedrigeren Absolutwert
+auslösen, weil ein sustained-hoher Durchschnitt selbst schon das Signal
+ist. Eine Konsolidierung in eine gemeinsame Konstante hätte entweder die
+Einzelsatz-Reaktion zu träge gemacht (wartet auf einen 3-Wochen-Trend, bevor
+ein einzelner harter Satz erkannt wird) oder das präventive Deload-Signal
+zu reizbar (löst bei einer einzelnen Wochen-Spitze statt einem echten Trend
+aus).
+**Gilt:** Permanent, bis eine der vier Stellen tatsächlich denselben Zweck
+wie eine andere übernehmen soll (dann explizite Neu-Entscheidung, nicht
+stillschweigend zusammenführen). Neue RPE-Schwellenwerte an anderer Stelle
+im Code sollten ebenfalls sofort benannt werden (nicht als anonymes
+Zahlenliteral), um diese Verwechslungsgefahr nicht erneut entstehen zu
+lassen.
+
+### 2026-08 — Satzzahl-Progression überschreibt Plateau-/Stagnations-Flag additiv, ersetzt die Gewichts-/Wdh-Logik nicht (C3, B180)
+**Entscheidung:** `plateauDetector.js`/`insightEngine.js` erkennen jetzt
+einen Anstieg der erfolgreichen Satzzahl über dasselbe Zeitfenster, das
+bereits für die Gewichts-Prüfung verwendet wird (3 Wochen bzw. 4 Wochen —
+kein neues, viertes Zeitfenster eingeführt), monoton nicht-fallend um
+mindestens 1 Satz — und unterdrückt in dem Fall das Plateau-/Stagnations-
+Flag. Die bestehende "Gewicht gestiegen → kein Plateau"-Fastpath, die
+Erfolgsquote-Bedingung und S-02/S-03 (RPE-Anstieg/Wdh-Rückgang bei
+gleichem Gewicht) bleiben unverändert.
+**Begründung:** Ein Nutzer, der bei gleichem Gewicht/Wdh mehr Sätze
+absolviert, progressiert real (mehr Gesamtvolumen bei gleicher Intensität)
+— wurde bisher aber fälschlich als stagnierend markiert. Das bestehende
+3-/4-Wochen-Fenster wiederzuverwenden (statt ein neues einzuführen) hält
+das Verhalten leicht nachvollziehbar ("dieselben Wochen, die ein Plateau
+melden würden, werden auch auf das Gegensignal geprüft") und macht die
+Implementierung nahezu kostenlos (keine neue Iterationsstruktur). Die
+Monotonie-Prüfung (nicht nur Erste-vs-Letzte-Woche) verhindert, dass eine
+einzelne verrauschte Woche (ein Satz einmal hinzugefügt, dann wieder
+zurückgenommen) fälschlich als Progression zählt. Die Schwelle (>=1 Satz)
+ist bewusst niedrig gewählt, da ein Satz-Anstieg im Trainingsalltag ohnehin
+selten passiert — eine höhere Schwelle würde das Feature in der Praxis kaum
+je auslösen lassen.
+**Gilt:** Permanent. Trainingsziel-Bezug (z.B. andere Schwelle für
+Kraft- vs. Hypertrophie-Fokus) bewusst NICHT verdrahtet, da noch kein
+`trainingGoal`-Setting in state.js existiert (nur `settings.nutritionPhase`,
+eine andere Achse) — bei Einführung eines solchen Settings kann diese
+Schwelle dort anknüpfen, aber das ist eine separate künftige Entscheidung.
+
+### 2026-08 — Pausenzeit-Ist-vs-Empfehlung-Trendvergleich zurückgestellt, keine state.js-Erweiterung ohne explizite Feature-Entscheidung (C5, B178)
+**Entscheidung:** Die Coach-Texte im `buildLastSetMessage()`-Fail-/Erfolgs-
+Zweig zeigen jetzt einen Mehrwochen-Trend (`rec.reason`, wiederverwendet aus
+`getWeightRecommendation()`). EIN weiterer, konzeptionell ähnlicher
+Trendvergleich (Ist-Pausendauer der letzten Session vs. aktuelle Pausen-
+Empfehlung) wurde bewusst NICHT umgesetzt.
+**Begründung:** Dafür existiert kein Datenfeld — keine Ist-Pausendauer wird
+je persistiert (nur der Live-Countdown in `timer.js`, nichts davon landet
+in `state.js`). Eine Umsetzung würde ein neues per-Satz-Feld brauchen (z.B.
+tatsächlich verstrichene Sekunden zwischen Sätzen) — eine größere,
+eigenständige Feature-Entscheidung, keine reine Wiederverwendung
+bestehender Daten wie die anderen beiden C5-Fixes in diesem Sprint.
+**Gilt:** Bis zur expliziten Entscheidung, dieses Feature separat zu bauen.
+Nicht versehentlich als Nebeneffekt eines künftigen Coach-Text-Sprints
+mit einführen, ohne die state.js-Erweiterung bewusst zu planen.

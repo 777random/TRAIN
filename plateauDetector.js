@@ -17,6 +17,19 @@
 
 import { isFullSuccess } from './setUtils.js';
 
+/**
+ * Deload-Strategie-Weiche: EIN Wochendurchschnitt pro Übung (letzte
+ * abgeschlossene Woche), ausgewertet erst NACHDEM ein Plateau bereits
+ * erkannt wurde (siehe detectPlateaus oben) — entscheidet nur, OB die
+ * Ursache Ermüdung ist (dann "deload") oder eher Stagnation/fehlende
+ * Reizvariation (dann "variation"/"volume"). Selber Zahlenwert wie
+ * sessionCoach.js' RPE_SET_HARD_ZONE, aber andere Bedeutung (1-Wochen-
+ * Durchschnitt pro Übung statt Einzelsatz) und andere Verwendungsstelle
+ * (Strategie-Wahl nach Plateau statt Satz-Zonen-Label) — bewusst NICHT
+ * zusammengelegt, siehe diagnose-runde7-2026-08-02.txt.
+ */
+const RPE_PLATEAU_DELOAD_STRATEGY_1WK_AVG = 8.5;
+
 function _exMaxWeight(wk, exName) {
   let max = 0;
   for (const d of wk.days)
@@ -37,6 +50,21 @@ function _exSuccessRate(wk, exName) {
           if (isFullSuccess(s, ex)) success++;
         }
   return total > 0 ? success / total : 0;
+}
+
+// Success-set count for one week (Runde 7, C3) — Analogon zu _exMaxWeight(),
+// zählt Sätze statt Gewicht. Wird als Volumen-/Satzzahl-Progressions-
+// Override genutzt: steigt die Satzzahl über dasselbe 3-Wochen-Fenster, das
+// bereits für den Gewichts-Check verwendet wird, gilt das als echter
+// Fortschritt, auch wenn das Gewicht flach blieb.
+function _exSuccessSetCount(wk, exName) {
+  let count = 0;
+  for (const d of wk.days)
+    for (const ex of d.exercises)
+      if (ex.name === exName)
+        for (const s of ex.sets)
+          if (isFullSuccess(s, ex)) count++;
+  return count;
 }
 
 function _exAvgRpe(wk, exName) {
@@ -135,6 +163,18 @@ export function detectPlateaus(allWeeks, favoriteExercises = [], rpeEnabled = tr
     if (maxWLast <= 0) continue;        // no weight logged
     if (maxWLast - maxW0 > 0) continue; // weight did increase → no plateau
 
+    // Volume-progression override (Runde 7, C3): Gewicht blieb flach, aber
+    // die Satzzahl ist über dasselbe 3-Wochen-Fenster monoton nicht-fallend
+    // um mindestens 1 gestiegen -- klassische Volumen-Progression (z.B.
+    // 3->4 Sätze bei gleichem Gewicht/Wdh). Zählt als Fortschritt, kein
+    // Plateau. Endpunkt-UND-Zwischenwert-Prüfung, damit eine einzelne
+    // Ausreißer-Woche (z.B. ein Satz mittendrin ausgelassen) das Ergebnis
+    // nicht verfälscht.
+    const setCount0 = _exSuccessSetCount(last3[0], exName);
+    const setCount1 = _exSuccessSetCount(last3[1], exName);
+    const setCount2 = _exSuccessSetCount(last3[2], exName);
+    if (setCount2 - setCount0 >= 1 && setCount1 >= setCount0 && setCount2 >= setCount1) continue;
+
     // Condition 2: avg success rate ≥ 0.8
     const avgSuccessRate = (
       _exSuccessRate(last3[0], exName) +
@@ -158,7 +198,7 @@ export function detectPlateaus(allWeeks, favoriteExercises = [], rpeEnabled = tr
     const trainingDays = mostRecentWk.days.filter(d => d.markedDone).length;
 
     let strategy;
-    if ((rpeEnabled && avgRpe >= 8.5) || trainingDays >= 4) {
+    if ((rpeEnabled && avgRpe >= RPE_PLATEAU_DELOAD_STRATEGY_1WK_AVG) || trainingDays >= 4) {
       strategy = 'deload';
     } else if (_hasSharedMuscleGroupDay(allWeeks, exName)) {
       strategy = 'variation';

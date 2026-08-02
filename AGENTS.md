@@ -1,17 +1,17 @@
 # TRAIN — Parallel Agent Regeln
 # Wird nach jedem Multi-Agent Sprint
 # automatisch aktualisiert.
-# Letzte Aktualisierung: 2026-08-02 / train-v227 (Runde-6-Feedback-Sprint,
-# B167-B177 — siehe Muster 11 unten für das neue, in diesem Sprint erstmals
-# aufgetretene Kopplungsmuster zwischen zwei Clustern, die denselben
-# state.js-Reducer ändern, sowie den erneuten Beleg, dass zwei Agents
-# tatsächlich dieselbe Funktion in ui.js gleichzeitig ändern durften, weil
-# ihre konkreten Teiländerungen disjunkt blieben. Erneut ein Agent-Ausfall
-# durch Session-Limit — diesmal MITTEN in einer Diagnose-Recherche
-# (Root-Cause-Suche für einen während der Verifikation gefundenen
-# Regressions-Bug, B176); die Recherche wurde manuell fortgesetzt statt auf
-# das Limit-Reset zu warten (dieselbe Lehre wie in Runde 4/5: ein
-# Agent-Ausfall muss den Sprint nicht blockieren).
+# Letzte Aktualisierung: 2026-08-02 / train-v228 (Runde-7-Coaching-Qualitäts-
+# Sprint, B178-B180 — erster Sprint, bei dem ALLE Cluster von vornherein
+# state.js-frei diagnostiziert wurden, siehe Muster 12 unten: keine Solo-
+# Runde nötig, alle 3 Agents liefen direkt in einer einzigen parallelen
+# Runde. Erneuter Beleg für Muster 11s Präzisierung (zwei Agents in
+# derselben Datei/denselben Nachbarfunktionen sind sicher bei disjunkten
+# Blöcken): Cluster A (buildLastSetMessage) und Cluster B (RPE-Konstanten
+# in buildSetFeedback + Pausenzeit-Staffelung) landeten beide in
+# sessionCoach.js, sowie Cluster B und C beide in plateauDetector.js —
+# beide Male ohne Kollision, da Fund-Diagnose vorab die genauen
+# Zeilenbereiche pro Cluster festgehalten hatte.)
 
 ---
 
@@ -526,6 +526,39 @@ nicht per Theorie, sondern per kurzem Playwright-Diagnoseskript
 (`getBoundingClientRect`/`getComputedStyle`/`elementFromPoint` an der
 Fehlerstelle) — schneller und zuverlässiger als reine Code-Lektüre bei
 CSS-Stacking-Fragen, als Vorlage für künftige ähnliche Fälle.
+
+### Muster 12 — 3 Cluster komplett state.js-frei, direkt EINE parallele Runde
+ohne vorherige Solo-Runde (verifiziert 2026-08-02, train-v228,
+Runde-7-Coaching-Qualitäts-Sprint B178-B180):
+```
+Alle 3 Agents gleichzeitig, EINE Runde (keine Solo-Runde nötig, da die
+Diagnose-Phase vorab bestätigt hatte, dass KEIN Cluster state.js ändert):
+  Agent 1: sessionCoach.js (buildLastSetMessage, ~Zeile 202-236) + ui.js
+    (Aufrufstelle für rec.reason)
+  Agent 2: sessionCoach.js (RPE-Konstanten in buildSetFeedback ~Zeile 192 +
+    Pausenzeit-Staffelung ~Zeile 70, disjunkt von Agent 1s Bereich) +
+    plateauDetector.js (RPE-Konstante) + weeklyFocus.js (RPE-Konstante)
+  Agent 3: plateauDetector.js (neue _exSuccessSetCount()-Hilfsfunktion +
+    Override, disjunkt von Agent 2s Konstante) + insightEngine.js (neue
+    exSetCountHistory()-Hilfsfunktion + S-01-Override)
+→ Konsolidierungs-Agent zuletzt (Version, Docs)
+```
+Ergebnis: keine Kollision — `git diff --stat` und Hunk-Review nach allen 3
+bestätigten disjunkte Bereiche in beiden gemeinsam genutzten Dateien
+(sessionCoach.js zwischen Agent 1/2, plateauDetector.js zwischen Agent 2/3).
+**Unterschied zu Muster 8-11:** in jenen Sprints stand VORAB fest oder wurde
+waehrend der Diagnose entdeckt, dass MINDESTENS ein Cluster state.js aendert
+und daher eine exklusive Solo-Runde braucht. Hier ergab die
+Diagnose-Phase aller 3 Cluster explizit "kein state.js noetig" (bis auf
+einen bewusst zurueckgestellten Einzelpunkt in Cluster A, der eine
+state.js-Erweiterung gebraucht haette und deshalb NICHT in diesem Sprint
+umgesetzt wurde) — dadurch konnte die gesamte Implementierung in einer
+einzigen parallelen Runde ohne vorherige Solo-Runde laufen, schneller als
+jeder bisherige Mehr-Cluster-Sprint. **Praezisierung:** die Diagnose-Phase
+sollte IMMER explizit pruefen, ob ALLE Cluster state.js-frei sind (nicht nur
+den offensichtlichen Kandidaten identifizieren) — nur dann darf die
+Solo-Runde komplett entfallen, sonst gilt weiterhin Muster 8-10 (mindestens
+eine exklusive Runde zuerst).
 
 ---
 

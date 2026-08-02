@@ -59,6 +59,22 @@ export function exWeightHistory(sortedWeeks, exName) {
   });
 }
 
+// Success-set count per week for a named exercise (0 if absent) — Analogon zu
+// exWeightHistory() für Volumen-/Satzzahl-Progression (Runde 7, C3): ein
+// Satzzahl-Anstieg über dasselbe Wochenfenster gilt als echter Fortschritt,
+// auch wenn das Gewicht flach blieb (siehe S-01 unten).
+export function exSetCountHistory(sortedWeeks, exName) {
+  return sortedWeeks.map(wk => {
+    let count = 0;
+    for (const d of wk.days)
+      for (const ex of d.exercises)
+        if (ex.name === exName)
+          for (const s of ex.sets)
+            if (s.status === 'success') count++;
+    return count;
+  });
+}
+
 // Analogon zu exWeightHistory() für Distanz/Zeit-Übungen (metric 'm'/'sec') —
 // liest s.reps (trägt bei diesen Metriken die Distanz/Zeit) statt s.weight,
 // identisches Muster zu getMetricRecommendation() (weightRecommendation.js).
@@ -468,13 +484,22 @@ export const INSIGHTS = [
         });
         if (weights.some(w => w === 0)) continue;
         const base = weights[0];
-        if (base > 0 && weights.every(w => Math.abs(w - base) < 0.1))
+        if (base > 0 && weights.every(w => Math.abs(w - base) < 0.1)) {
+          // Volume-progression override (Runde 7, C3): Gewicht blieb flach,
+          // aber die Satzzahl ist über dasselbe 4-Wochen-Fenster monoton
+          // nicht-fallend um mindestens 1 gestiegen -- gilt als echte
+          // Progression, keine Stagnation.
+          const setCounts = exSetCountHistory(last4, name);
+          const setsGrew = setCounts[setCounts.length - 1] - setCounts[0] >= 1
+            && setCounts.every((c, i) => i === 0 || c >= setCounts[i - 1]);
+          if (setsGrew) continue;
           return {
             id: 'S-01', type: 'stagnation', priority: 7,
             title: 'Stagnation',
             message: `${name}: Seit 4 Wochen dasselbe Gewicht (${base} kg). Bereit für den nächsten Schritt?`,
             recommendation: 'Versuche nächste Woche im ersten Satz +2,5 kg. Wenn du dein Mindestziel erreichst, bleib dabei.',
           };
+        }
       }
       return null;
     },

@@ -1943,6 +1943,7 @@ function renderExercise(wk, di, ei, state) {
   // nächste-Woche-Empfehlung, siehe sessionCoach.js-Kommentar), lazy
   // berechnet nur wenn der letzte Satz bereits mit RPE bewertet ist.
   let _nextWeekWeight = null;
+  let _nextWeekReason = null;
   if (showIntraCoach) {
     const _lastS = ex.sets[ex.sets.length - 1];
     if (_lastS && (_lastS.status === 'success' || _lastS.status === 'fail') && _lastS.rpe != null) {
@@ -1958,13 +1959,18 @@ function renderExercise(wk, di, ei, state) {
           const _nwIsCompound = isCompoundExercise(ex.name, buildCategoryMap(state.customExercises));
           const rec = getWeightRecommendation(ex.name, calcWeeks, recStep, ex.progressionMode ?? 'weight_first', ex.targetRepsMax ?? null, _nwIsCompound, state.settings?.nutritionPhase ?? 'maintenance');
           _nextWeekWeight = rec?.recommendedWeight ?? null;
+          // Runde 7 (C5): rec.reason ist bereits ein echter Mehrwochen-Trend
+          // (Erfolgsquote/RPE der letzten 3-4 Wochen) — bisher berechnet,
+          // aber verworfen. An buildLastSetMessage() durchreichen statt
+          // wegzuwerfen (siehe sessionCoach.js).
+          _nextWeekReason = rec?.reason ?? null;
         }
       }
     }
   }
 
   const setsHtml = ex.sets.map((s, si) =>
-    renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled, showIntraCoach, sessionModifier, _nextWeekWeight, wk.id, sessionModifierScope)
+    renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled, showIntraCoach, sessionModifier, _nextWeekWeight, wk.id, sessionModifierScope, _nextWeekReason)
   ).join('');
 
   // Runde 6 (A9-Folgefix): ex.weightStep === 0 ist der explizite "Reset"-
@@ -2566,7 +2572,7 @@ function _renderIntraFeedback(fb, key, di, ei, si, mode, canAdopt) {
 }
 
 // ─── Set row ─────────────────────────────────────────────────────────────────
-function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true, showIntraCoach = false, sessionModifier = null, nextWeekWeight = null, wkId = null, sessionModifierScope = 'all') {
+function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true, showIntraCoach = false, sessionModifier = null, nextWeekWeight = null, wkId = null, sessionModifierScope = 'all', nextWeekReason = null) {
   // B17: prevEx wird in renderExercise() bei einer Ausweichübung (substituteFor)
   // bewusst über den NAMEN DER URSPRÜNGLICHEN Übung gesucht (siehe _lookupName
   // dort) — für den Fulfill-Meter-Metrik-Check dort ist das sinnvoll, aber hier
@@ -2696,7 +2702,7 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
     const isLastSet = si === ex.sets.length - 1;
     if (isLastSet) {
       const _lsmState = getState();
-      const msg = buildLastSetMessage(s, ex, nextWeekWeight, getEffectiveWeightStep(ex, _lsmState.settings, _lsmState.customExercises));
+      const msg = buildLastSetMessage(s, ex, nextWeekWeight, getEffectiveWeightStep(ex, _lsmState.settings, _lsmState.customExercises), nextWeekReason);
       _noteSuggestedWeight = msg.suggestedWeight ?? null;
       const dismissed = msg.canAddSet && _optionalSetDismissed.has(feedbackKey);
       if (!dismissed) {

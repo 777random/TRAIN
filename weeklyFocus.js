@@ -247,12 +247,24 @@ function _avgRpeWeek(wk) {
 }
 
 // Präventiver Deload: kein Deload seit >=8 Wochen UND (Volumen steigt ODER
-// Ø RPE der letzten 3 Wochen > 7.5). Strukturelles Signal (8-Wochen-Horizont,
-// keine akute Wochenentscheidung) — seit Sprint "Coach-Tab Architektur" NICHT
-// mehr Teil von _checkOverload(), sondern eigenständig in
-// computeStructuralSignals() unten (Fix Problem 4: strukturelle Signale
-// verdrängten zuvor akute/spezifischere Signale durch ihre Platzierung in
-// der akuten Kaskade).
+// Ø RPE der letzten 3 Wochen > RPE_PREVENTIVE_DELOAD_3WK_AVG). Strukturelles
+// Signal (8-Wochen-Horizont, keine akute Wochenentscheidung) — seit Sprint
+// "Coach-Tab Architektur" NICHT mehr Teil von _checkOverload(), sondern
+// eigenständig in computeStructuralSignals() unten (Fix Problem 4:
+// strukturelle Signale verdrängten zuvor akute/spezifischere Signale durch
+// ihre Platzierung in der akuten Kaskade).
+//
+// Schwelle bewusst NIEDRIGER als sessionCoach.js' RPE_SET_HARD_ZONE (8.5)
+// und plateauDetector.js' RPE_PLATEAU_DELOAD_STRATEGY_1WK_AVG (8.5), obwohl
+// alle drei "hohe Anstrengung" messen: ein 3-Wochen-Durchschnitt ist eine
+// deutlich geglättetere, ausreißerresistentere Kennzahl als ein Einzelsatz
+// oder ein 1-Wochen-Schnitt — ein Programm, das über 3 Wochen konstant
+// >=7.5 hält, ist real stärker chronisch überlastet als eine einzelne Woche
+// mit 8.5, die schon danach wieder abklingen kann. Andere Zeitfenster
+// rechtfertigen hier den anderen Zahlenwert, siehe
+// diagnose-runde7-2026-08-02.txt — bewusst NICHT vereinheitlicht.
+const RPE_PREVENTIVE_DELOAD_3WK_AVG = 7.5;
+
 function _checkPreventiveDeload(state) {
   // B131: 4-Wochen-Unterdrückung nach explizitem "Weiter wie bisher" auf der
   // Strukturkarte selbst (dispatcht DECISION_LOG_ADD mit
@@ -275,7 +287,7 @@ function _checkPreventiveDeload(state) {
 
   const recentRpes = _nonDeloadWeeks(state).slice(-3).map(_avgRpeWeek).filter(v => v != null);
   const avgRpe  = recentRpes.length ? recentRpes.reduce((a, b) => a + b, 0) / recentRpes.length : null;
-  const rpeHigh = avgRpe != null && avgRpe > 7.5;
+  const rpeHigh = avgRpe != null && avgRpe > RPE_PREVENTIVE_DELOAD_3WK_AVG;
 
   if (!volumeUp && !rpeHigh) return null;
   return {

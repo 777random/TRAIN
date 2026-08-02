@@ -451,3 +451,76 @@ test('sessionCoach=false: kein Satz-Feedback, keine Aufwärm-Empfehlung, keine e
 
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
 });
+
+// Runde 7 (C5): buildLastSetMessage() reicht jetzt rec.reason von
+// getWeightRecommendation() als kurzen Klammerzusatz durch, statt ihn wie
+// bisher zu verwerfen -- braucht echte Mehrwochen-Historie (calcWeeks >= 2),
+// die der gemeinsame seed()-Helper (nur 1 Woche) nicht abbildet.
+test('Letzter Satz mit genug Mehrwochen-Historie: "Nächste Woche"-Text bekommt Trend-Klammerzusatz', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', err => pageErrors.push(err.message));
+  await page.goto('/');
+  await page.waitForSelector('#app.is-ready', { timeout: 10000 });
+
+  const past = new Date(); past.setDate(past.getDate() - 7);
+  const pastISO = past.toISOString().split('T')[0];
+
+  // Woche 1 (Vorwoche): 2 erfolgreiche Sätze bei RPE 6 -> niedrige
+  // Anstrengung, hohe Erfolgsquote -> avgRpe<=7.5 & successRate>=0.8 in
+  // weightRecommendation.js -> reason "RPE war niedrig, Steigerung möglich".
+  const week1 = {
+    id: 1, startDate: pastISO, note: '', mode: 'standard',
+    days: [{
+      id: 11, title: 'Tag A', subtitle: '', warmup: '', cooldown: '',
+      locked: true, markedDone: true, isVacation: false,
+      sleepHours: null, energyLevel: null, sessionStartTs: null, sessionEndTs: null,
+      exercises: [{
+        name: 'Bankdrücken', note: '', pauseSec: 90, metric: 'reps', weightStep: 5,
+        sets: [
+          { weight: 100, reps: 5, rpe: 6, status: 'success', done: true, note: '' },
+          { weight: 100, reps: 5, rpe: 6, status: 'success', done: true, note: '' },
+        ],
+        prWeight: 100, prRepsAtMaxWeight: 5, prRepsHistory: {},
+        nextWeekPlan: 0, nextWeekPlanConfirmed: false, targetSets: 2, targetReps: 5,
+        progressionType: 'weight', progressionMode: 'weight_first', targetRepsMax: null, archived: false,
+      }],
+      sessionLog: [], bodyData: {}, restDays: [], isSeedWeek: false,
+    }], sessionLog: [], bodyData: {}, restDays: [], isSeedWeek: false,
+  };
+  // Woche 2 (heute): derselbe Satz-Typ, letzter (einziger) Satz noch pending
+  // -- wird im Test bewertet.
+  const week2 = {
+    id: 2, startDate: todayISO(), note: '', mode: 'standard',
+    days: [mkDay([{
+      name: 'Bankdrücken', note: '', pauseSec: 90, metric: 'reps', weightStep: 5,
+      sets: [{ weight: 100, reps: 5, rpe: null, status: 'pending', done: false, note: '' }],
+      prWeight: 100, prRepsAtMaxWeight: 5, prRepsHistory: {},
+      nextWeekPlan: 0, nextWeekPlanConfirmed: false, targetSets: 1, targetReps: 5,
+      progressionType: 'weight', progressionMode: 'weight_first', targetRepsMax: null, archived: false,
+    }])],
+  };
+
+  await page.evaluate(({ week1, week2 }) => {
+    localStorage.setItem('train_v6', JSON.stringify({
+      meta: { schemaVersion: 32, savedAt: Date.now(), createdAt: Date.now() },
+      curIdx: 1,
+      weeks: [week1, week2],
+      customTemplate: [], settings: { sessionCoach: true, rpeEnabled: true }, favoriteExercises: [],
+      prs: {}, coachPerformance: { suggestions: [] }, coachQuestion: null, coachQuestionHistory: [],
+      lastReentryHandled: null, plateauActions: {}, decisionLog: [], badges: [], onboardingDone: true,
+      longestStreakEver: 0,
+    }));
+  }, { week1, week2 });
+  await page.reload();
+  await page.waitForSelector('#app.is-ready', { timeout: 10000 });
+
+  // RPE 7 (nicht <=6, sonst greift der "Optionaler Satz"-Zweig statt
+  // "Nächste Woche") -- avgRpe der aktuellen Woche bleibt trotzdem <=7.5.
+  await setRpe(page, 0, 0, 0, 7);
+  await toggleDone(page, 0, 0, 0);
+
+  const fb = page.locator('.set-feedback').first();
+  await expect(fb).toContainText('Nächste Woche:');
+  await expect(fb).toContainText('(RPE war niedrig, Steigerung möglich)');
+  expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});
