@@ -1,10 +1,15 @@
 # TRAIN — CLAUDE.md
 # Vollständiger Projektkontext für Claude Code
-# Stand: train-v225 / SCHEMA 33 / August 2026
-# Letztes Update: nach train-v225, Runde-4-Nutzerfeedback-Fix-Sprint (2026-08-01)
-# — 8 von 9 Befunden aus Kategorie A behoben (B158-B165, A9 bewusst nur
-# diagnostiziert für ein späteres Konzeptgespräch — siehe BUGS.md/
-# Diagnose & Sprints/sprint-ergebnis-runde4-2026-08-01.txt). Davor train-v224,
+# Stand: train-v226 / SCHEMA 33 / August 2026
+# Letztes Update: nach train-v226, Runde-5-Fix-Sprint (2026-08-02) — B166,
+# echte Regression von B152 (SW-Update aktiviert im echten Zwei-Versionen-
+# Zyklus nicht zuverlässig), gefunden per echtem Live-Test gegen den
+# deployten Build (siehe BUGS.md/Diagnose & Sprints/sprint-ergebnis-
+# runde5-2026-08-01.txt). WICHTIG: nach dem nächsten Push erneut per echtem
+# Zwei-Versionen-Zyklus verifizieren, bevor B152/B166 endgültig als
+# geschlossen gilt. Davor train-v225, Runde-4-Nutzerfeedback-Fix-Sprint
+# (2026-08-01) — 8 von 9 Befunden aus Kategorie A behoben (B158-B165, A9
+# bewusst nur diagnostiziert für ein späteres Konzeptgespräch). Davor train-v224,
 # Runde-3-Tiefentest-Fix-Sprint (2026-08-01) — 6 von 6 Befunden behoben
 # (B152-B157, inkl. P0 Service-Worker-Update-Fix). Davor train-v223,
 # Pre-Launch-Fix-Sprint (2026-07-29) — 9 von 13 Befunden aus dem
@@ -57,7 +62,7 @@ TRAIN ist eine deutschsprachige PWA für Krafttraining. Pure Vanilla ES Modules 
   Sessions müssen aus diesem neuen Pfad heraus gestartet werden, sonst
   landet man am alten (jetzt leeren) OneDrive-Ort. Nutzer zieht den Ordner
   regelmäßig manuell auf eine externe Festplatte statt über Cloud-Sync.
-- Aktueller Stand: SCHEMA_VERSION 33 · CACHE_VERSION train-v225 · CSS ?v=212
+- Aktueller Stand: SCHEMA_VERSION 33 · CACHE_VERSION train-v226 · CSS ?v=212
 
 ---
 

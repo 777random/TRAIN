@@ -8549,12 +8549,24 @@ export function mountApp(root) {
     exportJSON(() => showToast('✓ Backup gespeichert', 'ok', 2000));
   });
 
-  document.getElementById('sw-update-btn')?.addEventListener('click', (e) => {
+  document.getElementById('sw-update-btn')?.addEventListener('click', async (e) => {
     // Bewusste Nutzer-Aktion — sw.js aktiviert den wartenden Worker NIE von
     // selbst (siehe 'install' dort). localStorage bleibt über den Reload
     // hinweg erhalten (unabhängig vom Service-Worker-Cache).
     e.target.disabled = true;
-    const waiting = _pendingSwRegistration?.waiting;
+    // Selbstheilungs-Netz (B166): _pendingSwRegistration wird ausschließlich
+    // über 'train:show-update-banner' gesetzt, das wiederum von registerSW.js'
+    // Event-Kette abhängt. Falls diese Kette aus irgendeinem anderen Grund nie
+    // durchlief (der Haupt-Fix ist der initiale 'waiting'-Check in
+    // registerSW.js), hole hier zusätzlich eine frische Registration direkt
+    // vom Browser — schadet nichts, falls die Kette ohnehin funktioniert hat.
+    let freshRegistration = null;
+    try {
+      freshRegistration = await navigator.serviceWorker.getRegistration();
+    } catch {
+      // ignorieren — fällt unten auf _pendingSwRegistration zurück
+    }
+    const waiting = freshRegistration?.waiting ?? _pendingSwRegistration?.waiting;
     if (!waiting) { window.location.reload(); return; }
     let reloaded = false;
     const doReload = () => { if (!reloaded) { reloaded = true; window.location.reload(); } };

@@ -2,6 +2,40 @@
 # Automatisch von Claude Code
 # befüllt beim Session-Start
 
+## 2026-08-02 train-v226 (Runde-5-Fix-Sprint B166, Regression von B152)
+Loop 1: nicht separat gelaufen (volle Suite lief batch-weise, s.u.), 0 fehlgeschlagen
+Loop 2: aktuell ✓ (CLAUDE.md/HANDOFF.md/BUGS.md/AGENTS.md auf train-v226 gebracht)
+Eigentliche Aufgabe: TRAIN-Sprint-Prompts-Runde5.md ausgeführt — basiert auf
+  einem echten Zwei-Versionen-Live-Test (Claude Cowork, train-v223→v225
+  gegen den deployten Build), den Runde 4 empfohlen hatte. Ergebnis: der
+  B152-Fix aus Runde 3 (nur am simulierten Code-Pfad getestet) griff im
+  echten Zyklus NICHT vollständig — echte Regression (P0). Baseline vorab
+  304/304 grün (3 Batches). Diagnose (1 Agent): Root Cause in registerSW.js
+  — ein wartender Worker wurde ausschließlich über das updatefound-Event
+  erkannt, das laut Spec nur beim Übergang nach 'installing' feuert, nicht
+  einfach weil bereits ein Worker wartet. Lädt die Seite in einem frischen
+  JS-Kontext (Reload nach einem Reload, der bereits einen Worker warten
+  ließ), blieb ui.js' _pendingSwRegistration null, Klick-Handler fiel auf
+  den Fallback (Reload ohne SKIP_WAITING) zurück. Erklärt auch, warum der
+  Banner nie erneut erschien. Kein state.js involviert, sehr kleiner
+  Cluster. Plan-Mode-Bestätigung inkl. 1 Produktentscheidung (GET_VERSION-
+  Zweitbefund: stellte sich als Testmethodik-Mismatch heraus, nicht als
+  Regression — Nutzerentscheidung: nur dokumentieren, kein Code-Fix).
+  Implementierungs-Agent scheiterte MITTEN in der Arbeit erneut an einem
+  Session-Limit — beide Code-Änderungen (registerSW.js initialer waiting-
+  Check, ui.js Selbstheilungs-Netz per frischer getRegistration()-Abfrage)
+  waren aber bereits fertig; nur der verbliebene Test wurde direkt manuell
+  nachgeholt (neuer Test in tests/sw_update_and_version.spec.js, simuliert
+  exakt das Szenario ohne updatefound). Phase 4: 304/304 grün in 3 Batches,
+  2 unrelated Flakes identifiziert und geprüft (streak_inprogress_week.spec.js
+  durch einen echten Datums-Rollover MITTEN in der Session ausgelöst,
+  share_image.spec.js der bereits aus Runde 3 bekannte Download-Timeout-
+  Flake — beide nachweislich nichts mit den B166-Änderungen zu tun).
+  CACHE_VERSION train-v225→v226. Sprint-Ergebnis vollständig in
+  Diagnose & Sprints/sprint-ergebnis-runde5-2026-08-01.txt. Committed, Push
+  braucht noch Nutzer-Bestätigung — danach erneuter echter Zwei-Versionen-
+  Test nötig, bevor B152/B166 endgültig als geschlossen gilt.
+
 ## 2026-08-01 train-v225 (Runde-4-Nutzerfeedback-Fix-Sprint B158-B165, 8 von 9 Befunden)
 Loop 1: nicht separat gelaufen (volle Suite lief batch-weise, s.u.), 0 fehlgeschlagen
 Loop 2: aktuell ✓ (CLAUDE.md/HANDOFF.md/BUGS.md/AGENTS.md auf train-v225 gebracht)

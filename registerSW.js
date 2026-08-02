@@ -21,6 +21,36 @@ export async function registerServiceWorker() {
   try {
     const registration = await navigator.serviceWorker.register('./sw.js');
 
+    // B166 Fix: 'updatefound' fires (per spec) only when a worker NEWLY
+    // transitions into the 'installing' state — never merely because a
+    // worker already sits in 'waiting' at the moment this script runs. If
+    // the page loads in a fresh JS context (new tab, or a reload that
+    // happens after an earlier reload already left a worker waiting), this
+    // registration's 'updatefound' will never fire again for that worker,
+    // so without this check the update banner logic downstream (ui.js'
+    // _pendingSwRegistration) would never learn an update is ready.
+    if (registration.waiting) {
+      window.dispatchEvent(new CustomEvent('train:sw-update-ready', {
+        detail: { registration },
+      }));
+    } else if (registration.installing) {
+      // Nice-to-have: an update is already mid-download/installing while
+      // this page loads (so 'updatefound' won't fire for it either, since
+      // it already transitioned before we attached the listener below).
+      // Mirrors the exact event structure of the updatefound handler.
+      const installingWorker = registration.installing;
+      installingWorker.addEventListener('statechange', () => {
+        if (
+          installingWorker.state === 'installed' &&
+          navigator.serviceWorker.controller
+        ) {
+          window.dispatchEvent(new CustomEvent('train:sw-update-ready', {
+            detail: { registration },
+          }));
+        }
+      });
+    }
+
     registration.addEventListener('updatefound', () => {
       const newWorker = registration.installing;
       newWorker?.addEventListener('statechange', () => {

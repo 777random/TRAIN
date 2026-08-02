@@ -69,6 +69,63 @@ test('SW-Update-Handler postet SKIP_WAITING an registration.waiting, nicht an co
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
 });
 
+// B166 (Regression von B152, gefunden per echtem Zwei-Versionen-Live-Test
+// gegen den deployten Build): 'updatefound' feuert laut Spec nur, wenn ein
+// Worker NEU nach 'installing' übergeht — nie einfach weil ein Worker
+// bereits im 'waiting'-Zustand sitzt. Lädt die Seite in einem frischen JS-
+// Kontext (neuer Tab, oder ein Reload NACHDEM ein früherer Reload bereits
+// einen Worker warten ließ), feuert in diesem Kontext kein 'updatefound'
+// mehr für den bereits wartenden Worker — ui.js' _pendingSwRegistration
+// blieb dadurch null, der Klick-Handler fiel auf den '!waiting'-Fallback
+// (sofortiger Reload OHNE SKIP_WAITING) zurück. Fix: registerSW.js prüft
+// jetzt direkt nach register(), ob registration.waiting bereits existiert,
+// und feuert in dem Fall sofort dasselbe train:sw-update-ready-Event.
+//
+// Dieser Test ruft registerServiceWorker() ein zweites Mal auf (die echte,
+// beim normalen Seitenladen bereits erfolgte erste Registrierung bleibt
+// unberührt bestehen) mit einem gemockten navigator.serviceWorker.register(),
+// das eine bereits "wartende" Registration zurückgibt, OHNE je ein
+// 'updatefound'-Event zu feuern — genau das Szenario aus dem Live-Test.
+test('B166: registerServiceWorker() erkennt bereits wartenden Worker auch OHNE updatefound-Event', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', err => pageErrors.push(err.message));
+
+  await seed(page);
+
+  await page.evaluate(async () => {
+    window.__swTestPosted = null;
+    const fakeWaiting = {
+      postMessage: (msg) => { window.__swTestPosted = { source: 'waiting', msg }; },
+    };
+    // Kein 'updatefound' wird je gefeuert — nur .waiting ist bereits gesetzt,
+    // exakt wie bei einem Worker, der schon vor dieser Seitenladung wartete.
+    const fakeRegistration = {
+      waiting: fakeWaiting,
+      installing: null,
+      addEventListener: () => {}, // 'updatefound' hört hier bewusst nie zu
+    };
+    const originalRegister = navigator.serviceWorker.register.bind(navigator.serviceWorker);
+    navigator.serviceWorker.register = async () => fakeRegistration;
+    try {
+      const mod = await import('/registerSW.js');
+      await mod.registerServiceWorker();
+    } finally {
+      navigator.serviceWorker.register = originalRegister;
+    }
+  });
+
+  // Der initiale registration.waiting-Check in registerSW.js muss das Event
+  // OHNE jedes updatefound gefeuert haben -> Banner erscheint trotzdem.
+  await expect(page.locator('#sw-update-banner')).toHaveClass(/is-visible/);
+
+  await page.click('#sw-update-btn');
+
+  const posted = await page.evaluate(() => window.__swTestPosted);
+  expect(posted).toEqual({ source: 'waiting', msg: { type: 'SKIP_WAITING' } });
+
+  expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});
+
 test('Versions-Label zeigt die per Laufzeit-Message abgefragte CACHE_VERSION statt eines hartkodierten Strings', async ({ page }) => {
   const pageErrors = [];
   page.on('pageerror', err => pageErrors.push(err.message));

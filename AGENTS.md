@@ -1,11 +1,16 @@
 # TRAIN — Parallel Agent Regeln
 # Wird nach jedem Multi-Agent Sprint
 # automatisch aktualisiert.
-# Letzte Aktualisierung: 2026-08-01 / train-v225 (Runde-4-Nutzerfeedback-Fix-
-# Sprint, B158-B165 — neues Muster 10 ergänzt: EIN Cluster mit echter state.js-
-# Änderung läuft solo (Runde 1), danach 4 Cluster ohne state.js-Berührung
-# parallel (Runde 2). Zusätzlich: Diagnose-Phase-Resilienz bei Agent-Ausfall
-# dokumentiert (siehe unten), siehe HANDOFF.md)
+# Letzte Aktualisierung: 2026-08-02 / train-v226 (Runde-5-Fix-Sprint, B166 —
+# kein neues Parallelisierungsmuster nötig, einzelner fokussierter Cluster
+# ohne state.js-Beteiligung, 1 Diagnose-Agent + 1 Implementierungs-Agent.
+# Erneut ein Agent-Ausfall durch Session-Limit — diesmal MITTEN in der
+# Implementierung statt in der Diagnose-Phase (siehe HANDOFF.md); die
+# bereits fertigen Code-Änderungen wurden übernommen, nur der verbliebene
+# Test-Schritt manuell nachgeholt. Bestätigt: Muster 9/10s Erkenntnis "state.js
+# als Datei geändert" ≠ "ein Dispatch ruft state.js auf" bleibt gültig,
+# hier aber gar nicht relevant, da registerSW.js/ui.js/sw.js keinerlei
+# state.js-Bezug haben, siehe HANDOFF.md)
 
 ---
 

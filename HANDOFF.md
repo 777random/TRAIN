@@ -1,6 +1,52 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-08-01 — Runde-4-Nutzerfeedback-Fix-Sprint, train-v225 (B158-B165, 8 von 9 Befunden aus Kategorie A behoben; A9 bewusst nur diagnostiziert, Fix separat für C2-Konzeptgespräch). Davor: Runde-3-Tiefentest-Fix-Sprint, train-v224 (B152-B157, 6 von 6 Befunden behoben, inkl. P0 Service-Worker-Update-Fix). Davor: B143-B151, train-v223 (9 von 13 Befunden aus dem Browser-Test train-v222 behoben; B141 offen/nicht reproduzierbar, B8/B13 reine Doku-Sync-Punkte, keine Code-Änderung). Davor: B138 (Alternativübungen) + B139 (Ernährungsphase/kcal-Toggle) + B140 (Intra-Session-Erschöpfung), train-v222 und ältere Sprints — siehe SESSION_LOG.md für die vollständige Historie.*
-*Nächster Schritt: B55 Impressum (Blocker vor weiterer Nutzerwerbung — wartet weiterhin auf echte Name-/Adress-/E-Mail-Angaben des Betreibers, siehe LEGAL.md). Befund #4 (Notiz-Icon macht Satz-Tabelle unsichtbar, B141) bleibt weiterhin offen. **Sofort nach dem Push dieser Session (siehe unten):** erster echter Zwei-Versionen-Deploy-Test für B152 (train-v224→v225) — alte Version offen lassen, Push+GitHub-Pages-Deploy abwarten, Update-Banner antippen, prüfen dass v225 sofort aktiv ist ohne manuellen Reload. Aus der Feedback-Analyse zurückgestellt (siehe `Diagnose & Sprints/TRAIN-Feedback-Analyse.md`): Kategorie B (5 kleinere UX-Punkte), C2+C9 (Steigerungs-Regelmatrix — A9-Diagnose aus diesem Sprint bereits als Grundlage vorhanden), C5+C6 (Coaching-Text-Qualität + Abhängigkeits-Audit, reiner Diagnose-Block), C1+C8 (Onboarding-Umbau "Eigenen Plan erstellen", eigener größerer Konzept-Sprint), C3/C4/C7/C10/C11/C12 (Backlog). Noch nicht committet aus einer früheren Anfrage (unabhängig von diesem Sprint, eigene Nutzer-Entscheidung nötig): `LICENSE` (all-rights-reserved) + `MAINTENANCE.md` (Branding-Rename-Checkliste) liegen im Arbeitsverzeichnis, noch ungestaged. In Runde 3 als tot identifizierter Code weiterhin vorhanden: `renderDayCard()` (ui.js) hat keine Aufrufer mehr; in Runde 4 zusätzlich `SET_AUTOFILL_DOWN` (state.js) als verwaist bestätigt (nicht der gewählte Fix-Weg für A4) — beide Kandidaten für eine spätere Aufräum-Runde. Weiterhin nur als Notiz (kein Bug): mehrere Test-Dateien konstruieren Datums-Fixtures über lokale `Date`-Methoden + `.toISOString()` — verschiebt `startDate` bei lokalem Ausführen in einer positiven-UTC-Offset-Zeitzone um einen Tag. Bestätigte Infra-Grenze (weiterhin gültig): die volle Playwright-Suite (jetzt 304 Tests) kann den lokalen `npx serve`-Devserver bei sehr langen Läufen mit `EMFILE: too many open files` abstürzen lassen — Workaround ist der 3-Datei-Batch-Lauf (siehe CLAUDE.md/AGENTS.md). Push dieser Session braucht noch die reguläre Session-Bestätigung (Push-Policy LOOPS.md). Loops 7-11 aktiv. Nicht committet: `Research/TRAIN_Parameter_Review.md`, alle `context-exports/`-Updates + `Diagnose & Sprints/`-Exports (beide gitignored).*
+*Letzte Aktualisierung: 2026-08-02 — Runde-5-Fix-Sprint, train-v226 (B166, echte Regression von B152 — SW-Update aktivierte im echten Zwei-Versionen-Zyklus weiterhin nicht zuverlässig, gefunden per echtem Live-Test gegen den deployten Build). Davor: Runde-4-Nutzerfeedback-Fix-Sprint, train-v225 (B158-B165, 8 von 9 Befunden aus Kategorie A behoben; A9 bewusst nur diagnostiziert). Davor: Runde-3-Tiefentest-Fix-Sprint, train-v224 (B152-B157, 6 von 6 Befunden behoben). Davor: B143-B151, train-v223 (9 von 13 Befunden aus dem Browser-Test train-v222 behoben) und ältere Sprints — siehe SESSION_LOG.md für die vollständige Historie.*
+*Nächster Schritt: B55 Impressum (Blocker vor weiterer Nutzerwerbung — wartet weiterhin auf echte Name-/Adress-/E-Mail-Angaben des Betreibers, siehe LEGAL.md). Befund #4 (Notiz-Icon macht Satz-Tabelle unsichtbar, B141) bleibt weiterhin offen. **Sofort nach dem Push dieser Session (siehe unten): erneuter echter Zwei-Versionen-Deploy-Test für B152/B166** (train-v225→v226) — alte Version offen lassen, Push+GitHub-Pages-Deploy abwarten, Update-Banner antippen, prüfen dass v226 sofort aktiv ist ohne manuellen Reload UND dass der Banner bei einem Reload VOR dem Klick weiterhin/erneut erscheint (genau das Szenario, das B166 verursacht hat). Erst nach einem sauberen echten Durchlauf gilt B152/B166 als wirklich geschlossen — der letzte "erfolgreiche" Test war es nachweislich nicht. Aus der Feedback-Analyse weiterhin zurückgestellt (siehe `Diagnose & Sprints/TRAIN-Feedback-Analyse.md`): Kategorie B (5 kleinere UX-Punkte), C2+C9 (Steigerungs-Regelmatrix), C5+C6 (Coaching-Text-Qualität + Abhängigkeits-Audit), C1+C8 (Onboarding-Umbau "Eigenen Plan erstellen"), C3/C4/C7/C10/C11/C12 (Backlog). Tote Code-Kandidaten weiterhin vorhanden (nicht entfernt): `renderDayCard()` (ui.js, seit Runde 3), `SET_AUTOFILL_DOWN` (state.js, seit Runde 4). Weiterhin nur als Notiz (kein Bug, aber diese Session konkret erlebt): mehrere Test-Dateien konstruieren Datums-Fixtures über lokale `Date`-Methoden — `tests/streak_inprogress_week.spec.js` schlug in dieser Session durch einen echten Datums-Rollover MITTEN in der Session (2026-08-01→2026-08-02) fehl (Streak zeigte 0 statt 3), nichts mit den B166-Änderungen zu tun, per Code-Lektüre bestätigt unrelated. Bestätigte Infra-Grenze (weiterhin gültig): volle Playwright-Suite (304 Tests) kann `npx serve` mit `EMFILE` abstürzen lassen — Workaround ist der 3-Datei-Batch-Lauf. Push dieser Session braucht noch die reguläre Session-Bestätigung (Push-Policy LOOPS.md) — **besonders wichtig**, da B166 den Update-Mechanismus selbst betrifft. Loops 7-11 aktiv. Nicht committet: `Research/TRAIN_Parameter_Review.md`, alle `context-exports/`-Updates + `Diagnose & Sprints/`-Exports (beide gitignored).*
+
+---
+
+## B166 — Regression von B152: SW-Update aktiviert im echten Zwei-Versionen-Zyklus nicht (train-v226, 2026-08-02)
+
+Runde 4 endete mit der Empfehlung, den B152-Fix aus Runde 3 (bisher nur am
+simulierten Code-Pfad getestet) über einen echten Zwei-Versionen-Deploy-
+Zyklus zu verifizieren. Genau dieser Test (Claude Cowork, live gegen den
+deployten Build train-v223→v225) deckte auf: der Fix greift im echten
+Zyklus NICHT vollständig.
+
+**Root Cause:** `registerSW.js` erkannte einen wartenden Worker
+ausschließlich über das `updatefound`-Event — das feuert laut Spec nur beim
+Übergang eines Workers nach `installing`, nicht einfach weil bereits ein
+Worker im `waiting`-Zustand vorliegt. Lädt die Seite in einem frischen JS-
+Kontext (z.B. nach einem weiteren Reload, nachdem ein Worker bereits
+wartete), feuert kein `updatefound` mehr — `ui.js`s `_pendingSwRegistration`
+blieb `null`, der Klick-Handler fiel auf den `!waiting`-Fallback (Reload
+ohne `SKIP_WAITING`) zurück. Der Klick-Handler selbst war die ganze Zeit
+korrekt (unverändert seit Runde 3).
+
+**Fix:** `registerSW.js` prüft jetzt direkt nach `register()`, ob
+`registration.waiting`/`.installing` bereits existiert, und feuert in dem
+Fall sofort `train:sw-update-ready` — löst dabei den Banner-Retry-
+Nebenbefund automatisch mit. Zusätzliches Selbstheilungs-Netz im
+`ui.js`-Klick-Handler (frische `getRegistration()`-Abfrage beim Klick).
+
+**Separater Fund im selben Live-Test, KEINE Regression:** GET_VERSION
+antwortete im Test nicht — stellte sich als Testmethodik-Mismatch heraus
+(Live-Test nutzte MessageChannel/Ports, sw.js antwortet bewusst über
+`event.source`, passend zum echten Aufrufmuster). sw.js unverändert seit
+Runde 3, kein Code-Fix — Nutzerentscheidung war, dies nur zu dokumentieren.
+
+Diagnose (1 Agent) + Implementierung (1 Agent, kein state.js involviert)
+liefen ohne Parallelisierungsbedarf — sehr kleiner, fokussierter Cluster.
+Verifiziert per neuem Test in `tests/sw_update_and_version.spec.js`
+(simuliert exakt: `registration.waiting` bereits gesetzt, ohne dass
+`updatefound` je feuert). Baseline 304/304 grün, nach dem Fix ebenfalls
+304/304 grün (2 unrelated Flakes identifiziert und geprüft, siehe Notiz
+oben zum Datums-Rollover bzw. dem bereits aus Runde 3 bekannten
+`share_image.spec.js`-Download-Timeout). CACHE_VERSION train-v225→v226.
+
+**Wichtig:** Dieser Fix braucht — wie B152 selbst — einen erneuten echten
+Zwei-Versionen-Live-Test nach dem Push, bevor er endgültig als verifiziert
+gilt (siehe "Nächster Schritt" oben). Vollständiges Sprint-Ergebnis in
+`Diagnose & Sprints/sprint-ergebnis-runde5-2026-08-01.txt`.
 
 ---
 
