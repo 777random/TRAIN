@@ -20,7 +20,7 @@
  * and console.warn for non-fatal errors.
  */
 
-import { buildCategoryMap, resolveCategory } from './movementMap.js';
+import { buildCategoryMap, resolveCategory, resolveMuscleGroups } from './movementMap.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -225,6 +225,7 @@ function buildDefaultState() {
       deloadFactorCustom: null,
       barbellWeight:      20,
       plateStep:          2.5,
+      largestPlate:       25, // Runde 8/Cluster 4: schwerste verfügbare Hantelscheibe (Hantelscheiben-Rechner-Obergrenze)
       lastBackupDate:                 null,
       activeTags:                     ALL_TAGS_FLAT,
       vibrationEnabled:               true,
@@ -990,6 +991,7 @@ function migrate(raw) {
   if (raw.settings.autoStartPauseTimer            === undefined) raw.settings.autoStartPauseTimer            = true;
   if (raw.settings.hideStreakBadge                === undefined) raw.settings.hideStreakBadge                = false;
   if (raw.settings.hideStopwatch                  === undefined) raw.settings.hideStopwatch                  = false;
+  if (raw.settings.largestPlate                   === undefined) raw.settings.largestPlate                   = 25;
   if (raw.settings.sessionCoach                   === undefined) raw.settings.sessionCoach                   = true;
   if (raw.settings.goal                           === undefined) raw.settings.goal                           = null;
   if (raw.settings.nutritionPhase                 === undefined) raw.settings.nutritionPhase                 = 'maintenance';
@@ -2033,6 +2035,7 @@ function reduce(state, action) {
       const becomingDone = !day.markedDone;
       if (becomingDone) {
         for (const ex of day.exercises ?? []) {
+          if (ex.archived) continue;
           for (const s of ex.sets ?? []) {
             if (s.status === 'pending') { s.status = 'fail'; s.done = false; }
           }
@@ -2222,6 +2225,11 @@ function reduce(state, action) {
         prWeight: null, prRepsAtMaxWeight: null,
         nextWeekPlan: 0, nextWeekPlanConfirmed: false, nextWeekPlanAutoReviewed: true,
         skipReason: null, skipDate: null,
+        // Runde 8 (Cluster 2): Muskelgruppen-Zuordnung nur als Default für
+        // eine wirklich NEUE Übung ohne History — ein evtl. vorhandener
+        // history.tags-Wert (auch ein bewusst geleertes []) hat unten
+        // weiterhin Vorrang, siehe AGENTS.md-Diskussion zu B41.
+        tags: resolveMuscleGroups(p.name),
         sets: [mkSet(), mkSet(), mkSet()],
       };
       if (history) {

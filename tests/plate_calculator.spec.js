@@ -42,20 +42,22 @@ function mkWeek(ex, dayOverrides = {}) {
   };
 }
 
-async function seed(page, ex, barbellWeight = 20, dayOverrides = {}) {
+async function seed(page, ex, barbellWeight = 20, dayOverrides = {}, largestPlate = undefined) {
   await page.goto('/');
   await page.waitForSelector('#app.is-ready', { timeout: 10000 });
-  await page.evaluate(({ weekArg, barbellWeight }) => {
+  await page.evaluate(({ weekArg, barbellWeight, largestPlate }) => {
+    const settings = { sessionCoach: false, rpeEnabled: true, barbellWeight };
+    if (largestPlate !== undefined) settings.largestPlate = largestPlate;
     localStorage.setItem('train_v6', JSON.stringify({
       meta: { schemaVersion: 33, savedAt: Date.now(), createdAt: Date.now() },
       curIdx: 0, weeks: [weekArg], onboardingDone: true,
-      customTemplate: [], settings: { sessionCoach: false, rpeEnabled: true, barbellWeight },
+      customTemplate: [], settings,
       favoriteExercises: [], customExercises: [],
       prs: {}, coachPerformance: { suggestions: [] }, coachQuestion: null, coachQuestionHistory: [],
       lastReentryHandled: null, plateauActions: {}, decisionLog: [], badges: [],
       longestStreakEver: 0, seenTips: ['tip-11'],
     }));
-  }, { weekArg: mkWeek(ex, dayOverrides), barbellWeight });
+  }, { weekArg: mkWeek(ex, dayOverrides), barbellWeight, largestPlate });
   await page.reload();
   await page.waitForSelector('#app.is-ready', { timeout: 10000 });
 }
@@ -73,6 +75,16 @@ test('90kg / 20kg-Stange: dezenter Text "+ 25+10  pro Seite · Stange 20kg"', as
   await expect(page.locator('.plate-chips-row')).toHaveCount(0);
 
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});
+
+test('Runde 8/Cluster 4: largestPlate=20 -> 90kg schlägt keine 25kg-Scheibe mehr vor, nutzt 20+15 statt 25+10', async ({ page }) => {
+  await seed(page, mkEx('Bankdrücken', { sets: [{ weight: 90, reps: 8, rpe: null, status: 'pending', done: false, note: '' }] }), 20, {}, 20);
+  await expect(page.locator('.plate-hint')).toHaveText('+ 20+15  pro Seite · Stange 20kg');
+});
+
+test('Runde 8/Cluster 4: largestPlate unset (Default 25) -> unverändertes Verhalten wie vor dem Setting', async ({ page }) => {
+  await seed(page, mkEx('Bankdrücken', { sets: [{ weight: 90, reps: 8, rpe: null, status: 'pending', done: false, note: '' }] }), 20, {}, undefined);
+  await expect(page.locator('.plate-hint')).toHaveText('+ 25+10  pro Seite · Stange 20kg');
 });
 
 test('100kg / 20kg-Stange: "+ 25+15  pro Seite · Stange 20kg"', async ({ page }) => {

@@ -702,3 +702,37 @@ bestehender Daten wie die anderen beiden C5-Fixes in diesem Sprint.
 **Gilt:** Bis zur expliziten Entscheidung, dieses Feature separat zu bauen.
 Nicht versehentlich als Nebeneffekt eines künftigen Coach-Text-Sprints
 mit einführen, ohne die state.js-Erweiterung bewusst zu planen.
+
+### 2026-08 — Muskelgruppen-Zuordnung: per-Übung kuratierte Daten statt mechanischer Bewegungsmuster-Ableitung, kein Backfill (B41-Nachfolge, B184)
+**Entscheidung:** `ex.tags` wird jetzt bei Neuerstellung einer Übung (ohne
+vorhandene History) aus einer neuen, manuell kuratierten
+Name→Muskelgruppe(n)-Zuordnung (`movementMap.js` `MUSCLE_GROUP_MAP`/
+`resolveMuscleGroups()`) befüllt. Die Zuordnung wurde PRO ÜBUNG geprüft,
+nicht mechanisch aus der bestehenden Bewegungsmuster-Klassifizierung
+(Push/Pull/Squat/Hinge/Carry/Core) abgeleitet — beide Taxonomien sind
+bewusst getrennt und messen unterschiedliche Dinge. Bestandsdaten
+(bereits gespeicherte Wochen/Übungen) werden NICHT rückwirkend befüllt.
+**Begründung:** Eine mechanische Übertragung (z.B. "jede Push-Übung →
+Brust") wäre an genau den vom Nutzer genannten Beispielen gescheitert
+(Schulterdrücken ist Push-Muster, trifft aber die Schulter, nicht die
+Brust) — der Aufwand liegt bewusst in der Dateninhalts-Qualität, nicht in
+einer schnellen Formel. Kein Backfill, weil das rückwirkende Ändern
+bereits gespeicherter Nutzerdaten eine separate, riskantere Entscheidung
+wäre (u.a. falls ein Nutzer `ex.tags` selbst schon bewusst geleert hat,
+siehe B41-Historie) — dieser Sprint deckt nur den Neu-Erstellungspfad ab.
+**Gilt:** Permanent für den Neu-Erstellungspfad. Backfill für Bestandsdaten
+bleibt eine offene, separat zu entscheidende Frage für eine künftige Runde.
+
+### 2026-08 — Plate-Loading-Obergrenze als einfaches Setting statt Verfügbarkeits-Matrix (B182)
+**Entscheidung:** Ein einzelnes Setting `largestPlate` (Default 25kg)
+begrenzt die im Hantelscheiben-Rechner verwendeten Plattengrößen nach oben
+— alle kleineren Standard-Denominationen bis zu diesem Wert gelten
+weiterhin als verfügbar. KEINE vollständige Verfügbarkeits-Matrix (einzeln
+togglebare Plattengrößen).
+**Begründung:** Das gemeldete Problem war ausschließlich eine Obergrenze
+("mein Gym hat kein 25kg, aber alles andere schon") — eine volle Matrix
+wäre für diesen Fall unnötiger Mehraufwand (mehr UI, mehr State) ohne
+zusätzlichen Nutzen für das beschriebene Szenario.
+**Gilt:** Permanent, bis ein konkreter Nutzerfall auftritt, der eine
+Lücke MITTEN in den Standard-Denominationen beschreibt (nicht nur eine
+Obergrenze) — erst dann wäre eine Matrix gerechtfertigt.

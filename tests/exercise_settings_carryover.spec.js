@@ -177,6 +177,59 @@ test('Keine History vorhanden -> Standard-Werte wie bisher', async ({ page }) =>
   expect(added).toBeTruthy();
   expect(added.pauseSec).toBe(90);
   expect(added.metric).toBe('reps');
+  // Runde 8 (Cluster 2): unbekannter Name -> resolveMuscleGroups() liefert
+  // leeres Array, kein null/undefined.
+  expect(added.tags).toEqual([]);
+
+  expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});
+
+test('Runde 8 (Cluster 2): neue Standard-Übung ohne History bekommt Muskelgruppen-Tags', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', err => pageErrors.push(err.message));
+
+  const day = mkDay(51, 'Tag A', []);
+  await seed(page, { weeks: [mkWeek(1, todayISO(), [day])] });
+
+  // Schulterdrücken ist Bewegungsmuster 'Push' (wie Bankdrücken), muss aber
+  // primär 'Schulter' treffen, nicht 'Brust' -- Regressionsschutz gegen eine
+  // naive Push->Brust-Übernahme aus MOVEMENT_MAP.
+  await addViaSearch(page, 0, 'Schulterdrücken');
+  let st = await readState(page);
+  let added = st.weeks[0].days[0].exercises.find(e => e.name === 'Schulterdrücken');
+  expect(added.tags).toContain('Schulter');
+  expect(added.tags).not.toContain('Brust');
+
+  await addViaSearch(page, 0, 'Bankdrücken');
+  st = await readState(page);
+  added = st.weeks[0].days[0].exercises.find(e => e.name === 'Bankdrücken');
+  expect(added.tags).toContain('Brust');
+
+  await addViaSearch(page, 0, 'Rudern Maschine');
+  st = await readState(page);
+  added = st.weeks[0].days[0].exercises.find(e => e.name === 'Rudern Maschine');
+  expect(added.tags).toContain('Rücken');
+
+  expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});
+
+test('Runde 8 (Cluster 2): History-Tags (auch bewusst geleert) haben weiterhin Vorrang vor Muskelgruppen-Default', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', err => pageErrors.push(err.message));
+
+  // Bankdrücken hätte laut resolveMuscleGroups() ['Brust','Trizeps',
+  // 'Vordere Schulter'] -- History mit bewusst geleerten tags:[] muss das
+  // NICHT überschreiben (siehe B41-Diskussion: Nutzer-Anpassung/-Löschung
+  // bleibt erhalten).
+  const dayA = mkDay(61, 'Tag A', [mkExercise('Bankdrücken', { tags: [] })]);
+  const dayB = mkDay(62, 'Tag B', []);
+  await seed(page, { weeks: [mkWeek(1, todayISO(), [dayA, dayB])] });
+
+  await addViaSearch(page, 1, 'Bankdrücken');
+
+  const st = await readState(page);
+  const added = st.weeks[0].days[1].exercises.find(e => e.name === 'Bankdrücken');
+  expect(added.tags).toEqual([]);
 
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
 });

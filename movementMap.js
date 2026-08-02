@@ -197,3 +197,105 @@ export function isCompoundExercise(name, categoryMap) {
   const cat = resolveCategory(name, categoryMap);
   return cat !== 'Core' && cat !== 'Carry';
 }
+
+/**
+ * Übungsname → Muskelgruppe(n) (Runde 8, Cluster 2). Eigene Taxonomie,
+ * NICHT dasselbe wie MOVEMENT_MAP oben (Bewegungsmuster Push/Pull/Squat/
+ * Hinge/Carry/Core) — eine Übung kann mehrere Muskelgruppen gleichzeitig
+ * treffen (z.B. Bankdrücken: Brust+Trizeps+Vordere Schulter), anders als
+ * die Bewegungsmuster-Zuordnung, die pro Name nur eine Kategorie kennt.
+ * Werte ausschließlich aus state.js' AVAILABLE_TAGS.muskelgruppen, keine
+ * neuen Tag-Namen erfinden. Bewusst NICHT mechanisch aus MOVEMENT_MAP
+ * abgeleitet — z.B. ist 'Schulterdrücken' Bewegungsmuster 'Push', trifft
+ * aber primär Schulter, nicht Brust; eine naive Push→Brust-Übernahme wäre
+ * hier falsch. Deckt aktuell _STANDARD_EXERCISES (ui.js) ab, nicht die
+ * komplette MOVEMENT_MAP-Synonymliste.
+ */
+export const MUSCLE_GROUP_MAP = {
+  // Compound lower
+  'Kniebeuge': ['Quadrizeps', 'Gluteus'],
+  'Frontkniebeuge': ['Quadrizeps', 'Gluteus'],
+  'Beinpresse': ['Quadrizeps', 'Gluteus'],
+  'Rumänisches Kreuzheben': ['Beinbizeps', 'Gluteus', 'Unterer Rücken'],
+  'Kreuzheben': ['Unterer Rücken', 'Gluteus', 'Beinbizeps', 'Rücken', 'Trapez'],
+  'Sumo Kreuzheben': ['Gluteus', 'Beinbizeps', 'Unterer Rücken', 'Quadrizeps'],
+  'Bulgarische Kniebeuge': ['Quadrizeps', 'Gluteus'],
+  'Ausfallschritte': ['Quadrizeps', 'Gluteus'],
+  'Beinbeuger': ['Beinbizeps'],
+  'Beinstrecker': ['Quadrizeps'],
+  'Wadenheben': ['Waden'],
+  'Hip Thrust': ['Gluteus', 'Beinbizeps'],
+  // Compound upper push
+  'Bankdrücken': ['Brust', 'Trizeps', 'Vordere Schulter'],
+  'Schrägbankdrücken': ['Brust', 'Vordere Schulter', 'Trizeps'],
+  'Schrägbankdrücken tief': ['Brust', 'Trizeps'],
+  'Schulterdrücken': ['Schulter', 'Vordere Schulter', 'Trizeps'],
+  'Kurzhanteldrücken': ['Brust', 'Trizeps', 'Vordere Schulter'],
+  'Dips': ['Brust', 'Trizeps', 'Vordere Schulter'],
+  'Liegestütz': ['Brust', 'Trizeps', 'Vordere Schulter'],
+  'Militärpress': ['Schulter', 'Vordere Schulter', 'Trizeps'],
+  'Push Press': ['Schulter', 'Trizeps'],
+  'Landmine Press': ['Schulter', 'Vordere Schulter', 'Trizeps'],
+  // Compound upper pull
+  'Klimmzüge': ['Latissimus', 'Rücken', 'Bizeps'],
+  'Latziehen': ['Latissimus', 'Rücken', 'Bizeps'],
+  'Rudern': ['Rücken', 'Latissimus', 'Bizeps', 'Hintere Schulter'],
+  'Kabelrudern': ['Rücken', 'Latissimus', 'Bizeps'],
+  'T-Bar Rudern': ['Rücken', 'Latissimus', 'Bizeps'],
+  'Pendlay Row': ['Rücken', 'Latissimus', 'Bizeps'],
+  // Isolation push
+  'Trizepsdrücken': ['Trizeps'],
+  'Trizepsdips': ['Trizeps'],
+  'Skull Crushers': ['Trizeps'],
+  'Seitheben': ['Seitliche Schulter'],
+  'Frontheben': ['Vordere Schulter'],
+  'Butterfly': ['Brust'],
+  'Flys Kabel': ['Brust'],
+  'KH Flys': ['Brust'],
+  // Isolation pull
+  'Bizepscurls': ['Bizeps'],
+  'Hammercurls': ['Bizeps', 'Unterarme'],
+  'Konzentrationscurls': ['Bizeps'],
+  'Kabelbizeps': ['Bizeps'],
+  'Face Pulls': ['Hintere Schulter', 'Trapez'],
+  'Reverse Flys': ['Hintere Schulter'],
+  'KH Rudern': ['Rücken', 'Latissimus', 'Bizeps'],
+  'KH Shrugs': ['Trapez'],
+  // Core
+  'Plank': ['Bauch'],
+  'Crunch': ['Bauch'],
+  'Situps': ['Bauch'],
+  'Beinheben': ['Bauch'],
+  'Russian Twists': ['Bauch'],
+  'Ab-Wheel': ['Bauch'],
+  'Cable Crunches': ['Bauch'],
+  'Pallof Press': ['Bauch'],
+  'Hollow Hold': ['Bauch'],
+  // Kettlebell & functional
+  'KB Swings': ['Gluteus', 'Beinbizeps', 'Unterer Rücken'],
+  'KB Snatch': ['Schulter', 'Gluteus', 'Beinbizeps'],
+  'KB Clean': ['Schulter', 'Gluteus', 'Beinbizeps'],
+  'KB Press': ['Schulter', 'Trizeps'],
+  'KB Turkish Get-Up': ['Schulter', 'Bauch'],
+  'KB Goblet Squat': ['Quadrizeps', 'Gluteus'],
+  'KB Windmill': ['Bauch', 'Schulter'],
+  'KB Carry': ['Unterarme', 'Trapez', 'Bauch'],
+  // Plyometric / conditioning
+  'Box Jumps': ['Quadrizeps', 'Gluteus', 'Waden'],
+  'Broad Jumps': ['Quadrizeps', 'Gluteus', 'Waden'],
+  'Burpees': ['Bauch', 'Quadrizeps', 'Brust'],
+  'Kettlebell Swings': ['Gluteus', 'Beinbizeps', 'Unterer Rücken'],
+  'Battle Ropes': ['Schulter', 'Bauch', 'Unterarme'],
+  // Machine
+  'Chest Press Maschine': ['Brust', 'Trizeps', 'Vordere Schulter'],
+  'Shoulder Press Maschine': ['Schulter', 'Trizeps'],
+  'Rudern Maschine': ['Rücken', 'Latissimus', 'Bizeps'],
+  'Lat Maschine': ['Latissimus', 'Rücken', 'Bizeps'],
+  'Hack Squat': ['Quadrizeps', 'Gluteus'],
+  'Smith Maschine Kniebeuge': ['Quadrizeps', 'Gluteus'],
+};
+
+/** Löst die Muskelgruppe(n) einer Übung auf. Unbekannte/eigene Übungsnamen → leeres Array, kein null/undefined. */
+export function resolveMuscleGroups(name) {
+  return MUSCLE_GROUP_MAP[name] ?? [];
+}

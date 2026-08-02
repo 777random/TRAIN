@@ -1,17 +1,14 @@
 # TRAIN — Parallel Agent Regeln
 # Wird nach jedem Multi-Agent Sprint
 # automatisch aktualisiert.
-# Letzte Aktualisierung: 2026-08-02 / train-v228 (Runde-7-Coaching-Qualitäts-
-# Sprint, B178-B180 — erster Sprint, bei dem ALLE Cluster von vornherein
-# state.js-frei diagnostiziert wurden, siehe Muster 12 unten: keine Solo-
-# Runde nötig, alle 3 Agents liefen direkt in einer einzigen parallelen
-# Runde. Erneuter Beleg für Muster 11s Präzisierung (zwei Agents in
-# derselben Datei/denselben Nachbarfunktionen sind sicher bei disjunkten
-# Blöcken): Cluster A (buildLastSetMessage) und Cluster B (RPE-Konstanten
-# in buildSetFeedback + Pausenzeit-Staffelung) landeten beide in
-# sessionCoach.js, sowie Cluster B und C beide in plateauDetector.js —
-# beide Male ohne Kollision, da Fund-Diagnose vorab die genauen
-# Zeilenbereiche pro Cluster festgehalten hatte.)
+# Letzte Aktualisierung: 2026-08-02 / train-v229 (Runde-8-Datenkonsistenz-
+# Sprint, B181-B184 — siehe Muster 13 unten: 3 von 4 Clustern (0, 2, 4)
+# änderten state.js additiv/lokalisiert (neue Settings-Defaults+Migration,
+# ein Reducer-Guard, ein Default-Feld-Fallback in EX_ADD) — alle in EINER
+# parallelen Runde, KEINE Solo-Runde, da vorab per Diagnose bestätigt, dass
+# die 3 state.js-Regionen (buildDefaultState, migrate, 2 verschiedene
+# reduce()-Cases) sich nicht überlappen. Erstmals mehr als ein Cluster
+# gleichzeitig state.js in derselben Runde ohne Solo-Vorlauf.)
 
 ---
 
@@ -559,6 +556,45 @@ sollte IMMER explizit pruefen, ob ALLE Cluster state.js-frei sind (nicht nur
 den offensichtlichen Kandidaten identifizieren) — nur dann darf die
 Solo-Runde komplett entfallen, sonst gilt weiterhin Muster 8-10 (mindestens
 eine exklusive Runde zuerst).
+
+### Muster 13 — 3 von 4 Clustern ändern state.js additiv/lokalisiert,
+gleichzeitig in EINER Runde ohne Solo-Vorlauf (verifiziert 2026-08-02,
+train-v229, Runde-8-Datenkonsistenz-Sprint B181-B184):
+```
+Alle 4 Agents gleichzeitig, EINE Runde:
+  Agent 1 (Cluster 0): ui.js (_getDayCompletionStats, 2 Schleifen) +
+    state.js (DAY_TOGGLE_COMPLETE-Case, ein Guard ergänzt)
+  Agent 2 (Cluster 4): state.js (buildDefaultState-Default +
+    migrate()-Guard, beide additiv) + ui.js (neue Settings-Zeile +
+    PLATE_SIZES-Filter an einer Aufrufstelle)
+  Agent 3 (Cluster 3): ui.js (Picker-Vereinfachung, komplett disjunkte
+    Region von Agent 1/2/4)
+  Agent 4 (Cluster 2): movementMap.js (neue Zuordnungstabelle) + ui.js
+    (2 Zeilen, Onboarding-Erstellung) + state.js (EX_ADD-Case, ein
+    Default-Fallback ergänzt)
+→ Konsolidierungs-Agent zuletzt (Version, Docs)
+```
+Ergebnis: keine Kollision — `git diff -U2 state.js` nach allen 4 zeigte
+5 disjunkte Hunks an 5 komplett unterschiedlichen Stellen (Import-Zeile,
+`buildDefaultState()`, `migrate()`, `DAY_TOGGLE_COMPLETE`-Case,
+`EX_ADD`-Case). **Unterschied zu Muster 12:** dort waren ALLE Cluster
+state.js-frei; hier änderten DREI von vier Clustern tatsächlich state.js,
+liefen aber trotzdem ohne Solo-Runde parallel, weil jede Änderung (a)
+rein additiv war (neuer Default, neue Migrationszeile, ein einzelner
+`continue`-Guard, ein Default-Fallback-Wert) und (b) in einem klar
+unterscheidbaren Reducer-Case/einer klar unterscheidbaren Top-Level-
+Funktion lag — keine der vier Änderungen berührte dieselbe Funktion oder
+denselben Case wie eine andere. **Präzisierung:** die Muster-8-10-Regel
+"mindestens ein state.js-änderndes Cluster braucht eine exklusive
+Solo-Runde" gilt vor allem für STRUKTURELLE Änderungen an einem Reducer
+(neue Felder mit Migrations-Interaktion, geänderte Reducer-Semantik).
+Für rein ADDITIVE, lokal auf einen einzelnen Case/eine einzelne Funktion
+begrenzte Änderungen (neuer Default+Migration, ein Guard, ein
+Fallback-Wert) reicht eine vorab per Diagnose bestätigte
+Regionen-Disjunktheit, auch wenn mehrere Cluster gleichzeitig state.js
+anfassen — vorausgesetzt, die Diagnose-Phase hat JEDE betroffene
+state.js-Stelle einzeln benannt (nicht nur pauschal "state.js: ja/nein"
+beantwortet).
 
 ---
 

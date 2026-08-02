@@ -35,7 +35,7 @@ import { computeWeeklyFocus, computeStructuralSignals, isInRecoveryWindow, build
 import { findExactDuplicates, findSimilarCandidates } from './exerciseNameCleanup.js';
 import { computeErkenntnisLines, getProgressCorridorCalibration } from './progressInsights.js';
 import { buildPrShareCanvas, shareCanvas } from './shareImage.js';
-import { buildCategoryMap, resolveCategory, isCompoundExercise, MOVEMENT_MAP } from './movementMap.js';
+import { buildCategoryMap, resolveCategory, isCompoundExercise, MOVEMENT_MAP, resolveMuscleGroups } from './movementMap.js';
 import { computeQualityTrend, computeConsistencyTrend, computeVolumeTrend, computeBreadthProgress } from './overallPerformance.js';
 import { weekSuccessCounts } from './setUtils.js';
 import { getSortedWeeks, exWeightHistory, exMetricHistory, detectRecurringStep } from './insightEngine.js';
@@ -172,13 +172,8 @@ let _kgPickerKey = null;
 /** When true, the custom value input is visible inside the kg picker. */
 let _kgPickerCustom = false;
 
-/** Last-tap timestamp per exercise for +kg double-tap detection: `${di}-${ei}` → ms. */
-let _kgPickerLastTap = {};
-
 /** Key of the exercise whose +Wdh reps picker is open: `${di}-${ei}` or null. */
 let _repsPickerKey = null;
-/** Last-tap timestamp for +Wdh double-tap detection: `${di}-${ei}` → ms. */
-let _repsPickerLastTap = {};
 
 /** Set of `${di}-${ei}` keys whose advanced cfg section is expanded. */
 const _cfgAdvOpen = new Set();
@@ -561,10 +556,10 @@ const PLATE_SIZES = [25, 20, 15, 10, 5, 2.5, 1.25];
  * list of individual plates (e.g. [25, 10], not grouped), `rem` is the
  * leftover weight that couldn't be represented (0 if exact).
  */
-function _greedyPlateBreakdown(perSide) {
+function _greedyPlateBreakdown(perSide, plateSizes = PLATE_SIZES) {
   const used = [];
   let rem = perSide;
-  for (const p of PLATE_SIZES) {
+  for (const p of plateSizes) {
     while (rem >= p - 0.001) {
       used.push(p);
       rem = Math.round((rem - p) * 100) / 100;
@@ -580,17 +575,20 @@ function _greedyPlateBreakdown(perSide) {
  * rounded DOWN to the nearest 1.25kg multiple and that adjusted combination
  * is returned instead, with `exact:false` and `adjustedTotal` set.
  * Returns null if totalKg <= barKg (no plates needed/possible).
+ * `plateSizes` (Runde 8/Cluster 4): optional override of the available plate
+ * denominations, e.g. PLATE_SIZES filtered by settings.largestPlate — defaults
+ * to the full PLATE_SIZES list (unchanged behavior when not passed).
  * @returns {{ weights: number[], exact: boolean, adjustedTotal: number }|null}
  */
-function calcPlates(totalKg, barKg = 20) {
+function calcPlates(totalKg, barKg = 20, plateSizes = PLATE_SIZES) {
   const perSide = Math.round((totalKg - barKg) * 100) / 100 / 2;
   if (perSide <= 0) return null;
-  let { used, rem } = _greedyPlateBreakdown(perSide);
+  let { used, rem } = _greedyPlateBreakdown(perSide, plateSizes);
   let exact = rem <= 0.01;
   let effectivePerSide = perSide;
   if (!exact) {
     effectivePerSide = Math.floor(perSide / 1.25) * 1.25;
-    ({ used } = _greedyPlateBreakdown(effectivePerSide));
+    ({ used } = _greedyPlateBreakdown(effectivePerSide, plateSizes));
   }
   const adjustedTotal = Math.round((barKg + 2 * effectivePerSide) * 100) / 100;
   return { weights: used, exact, adjustedTotal };
@@ -624,9 +622,15 @@ function _compactPlateGroups(weights) {
 function _plateHintText(ex, dispW) {
   if (!ex?.showPlates) return '';
   if (ex.metric === 'm' || ex.metric === 'sec') return '';
-  const barKg = getState().settings.barbellWeight ?? 20;
+  const settings = getState().settings;
+  const barKg = settings.barbellWeight ?? 20;
   if (!(dispW > barKg)) return '';
-  const pl = calcPlates(dispW, barKg);
+  // Runde 8/Cluster 4: caps the plate breakdown at the gym's largest available
+  // plate (settings.largestPlate, default 25 = unchanged behavior) instead of
+  // always assuming a 25kg plate exists.
+  const largestPlate = settings.largestPlate ?? 25;
+  const plateSizes = PLATE_SIZES.filter(p => p <= largestPlate);
+  const pl = calcPlates(dispW, barKg, plateSizes);
   if (!pl || !pl.weights.length) return '';
   const compact = _compactPlateGroups(pl.weights);
   const approx  = !pl.exact ? ` · ≈ ${pl.adjustedTotal}kg möglich` : '';
@@ -2339,14 +2343,27 @@ function renderExercise(wk, di, ei, state) {
       <button
         class="btn-icon btn-icon--kg${ex.nextWeekPlan ? ' is-planned' : ''}${ex.nextWeekPlanConfirmed ? ' is-confirmed' : ''}"
         data-action="inc-weight" data-di="${di}" data-ei="${ei}"
-        aria-label="${ex.nextWeekPlanConfirmed ? `${_btnLabel} bestätigt` : `${_btnLabel} — tippen zum Bestätigen`}"
+        aria-label="${ex.nextWeekPlanConfirmed ? `${_btnLabel} bestätigt` : `${_btnLabel} — tippen zum Anpassen`}"
       >${_btnLabel}</button>
       ${!_isReps && !_isSets && _kgPickerKey === `${di}-${ei}` ? `
       <div class="ex-kg-picker" role="group" aria-label="Steigerung für nächste Woche">
-        ${[0, 1.25, 2, 2.5, 5, 7.5, 10, 15, 20].map(v =>
+        ${(() => {
+          // Runde 8 (Cluster 3): Chip-Werte aus getEffectiveWeightStep() (B167)
+          // abgeleitet statt hartcodierter Liste, damit "gängige Werte" mit dem
+          // Rest der App konsistent bleiben (siehe DECISIONS.md).
+          const _curPlan = ex.nextWeekPlan || 0;
+          const _chipVals = [...new Set([
+            0, step, _curPlan,
+            roundToPlate(_curPlan - step, step),
+            roundToPlate(_curPlan + step, step),
+            roundToPlate(_curPlan - 2 * step, step),
+            roundToPlate(_curPlan + 2 * step, step),
+          ].map(v => Math.max(0, v)))].sort((a, b) => a - b);
+          return _chipVals.map(v =>
           `<button class="ex-kg-picker-btn${ex.nextWeekPlan === v ? ' is-selected' : ''}"
             data-action="kg-picker-select" data-di="${di}" data-ei="${ei}" data-value="${v}"
-          >${v === 0 ? '0' : '+' + v}</button>`).join('')}
+          >${v === 0 ? '0' : '+' + v}</button>`).join('');
+        })()}
         ${_kgPickerCustom ? `
         <div class="ex-kg-picker-custom">
           <input type="number" inputmode="decimal" min="0" step="0.25"
@@ -5016,6 +5033,20 @@ function renderSettingsTab(state) {
     </div>
     <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:var(--sp-2)">
       <div>
+        <div class="settings-row__label">Größte verfügbare Hantelscheibe</div>
+        <div class="settings-row__desc">Für den Hantelscheiben-Rechner — manche Studios haben keine 25kg-Scheiben</div>
+      </div>
+      <div class="weight-step-opts">
+        ${[15, 20, 25].map(lp => `
+          <button type="button"
+            class="weight-step-btn${(s.largestPlate ?? 25) === lp ? ' is-selected' : ''}"
+            data-action="set-largest-plate" data-plate="${lp}"
+            aria-pressed="${(s.largestPlate ?? 25) === lp}"
+          >${lp} kg</button>`).join('')}
+      </div>
+    </div>
+    <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:var(--sp-2)">
+      <div>
         <div class="settings-row__label">Deload-Faktor</div>
         <div class="settings-row__desc">Aktuelle Einstellung: <strong>${Math.round((s.deloadFactor ?? 0.75) * 100)}%</strong></div>
       </div>
@@ -6540,45 +6571,23 @@ function _handleClick(e) {
     }
       
     case 'inc-weight': {
-      _maybeShowTip('tip-01', 'Plane deine Steigerung für nächste Woche. Einmal tippen = bestätigen · zweimal tippen = Wert wählen.');
+      // Runde 8 (Cluster 3): Doppel-Tap-Gate entfernt — ein Tap öffnet den
+      // Picker direkt (kollidierte auf Touch-Geräten gedanklich mit
+      // Zoom-Gesten, Editierbarkeit war nicht sichtbar). Der Picker selbst
+      // übernimmt bei Chip-Tap weiterhin sofort, kein zweiter Klick nötig.
+      _maybeShowTip('tip-01', 'Tippen, um die Steigerung für nächste Woche anzupassen.');
       const _iwEx    = getState().weeks[getState().curIdx]?.days[+di]?.exercises[+ei];
       const _isRepsM = (_iwEx?.progressionType ?? 'weight') === 'reps' || (_iwEx?.progressionType ?? 'weight') === 'sets';
       const _tapKey  = `${di}-${ei}`;
-      const _now     = Date.now();
       if (_isRepsM) {
-        const _last = _repsPickerLastTap[_tapKey] || 0;
-        if (_now - _last < 400) {
-          _repsPickerLastTap[_tapKey] = 0;
-          _repsPickerKey = _repsPickerKey === _tapKey ? null : _tapKey;
-          _kgPickerKey   = null;
-          scheduleRender();
-        } else {
-          _repsPickerLastTap[_tapKey] = _now;
-          setTimeout(() => {
-            if (_repsPickerLastTap[_tapKey] === _now) {
-              _repsPickerLastTap[_tapKey] = 0;
-              dispatch(A.EX_TOGGLE_NEXT_WEEK_CONFIRMED, { di: +di, ei: +ei });
-            }
-          }, 400);
-        }
+        _repsPickerKey = _repsPickerKey === _tapKey ? null : _tapKey;
+        _kgPickerKey   = null;
       } else {
-        const _last = _kgPickerLastTap[_tapKey] || 0;
-        if (_now - _last < 400) {
-          _kgPickerLastTap[_tapKey] = 0;
-          _kgPickerKey    = _kgPickerKey === _tapKey ? null : _tapKey;
-          _kgPickerCustom = false;
-          _repsPickerKey  = null;
-          scheduleRender();
-        } else {
-          _kgPickerLastTap[_tapKey] = _now;
-          setTimeout(() => {
-            if (_kgPickerLastTap[_tapKey] === _now) {
-              _kgPickerLastTap[_tapKey] = 0;
-              dispatch(A.EX_TOGGLE_NEXT_WEEK_CONFIRMED, { di: +di, ei: +ei });
-            }
-          }, 400);
-        }
+        _kgPickerKey    = _kgPickerKey === _tapKey ? null : _tapKey;
+        _kgPickerCustom = false;
+        _repsPickerKey  = null;
       }
+      scheduleRender();
       break;
     }
 
@@ -7485,6 +7494,11 @@ function _handleChange(e) {
     case 'set-barbell-weight': {
       const bw = parseFloat(el.value);
       dispatch(A.SETTING_SET, { key: 'barbellWeight', value: Number.isFinite(bw) && bw > 0 && bw <= 50 ? bw : 20 });
+      break;
+    }
+    case 'set-largest-plate': {
+      const lp = parseFloat(el.dataset.plate);
+      dispatch(A.SETTING_SET, { key: 'largestPlate', value: Number.isFinite(lp) && lp > 0 && lp <= 25 ? lp : 25 });
       break;
     }
     case 'set-deload-factor-value': {
@@ -8700,6 +8714,7 @@ function _getDayCompletionStats(di) {
   // umgekehrtem Vorzeichen (Unter- statt Überzählung). Fix: s.prBadge nutzen,
   // exakt dieselbe historisch-korrekte Quelle wie der Satz-Pokal seit B63.
   for (const ex of day.exercises ?? []) {
+    if (ex.archived) continue;
     for (const s of ex.sets ?? []) {
       if (s.deloadSkip) continue; // Sprint C2 Teil B — zählt nicht als verpasst
       totalSets++;
@@ -8729,6 +8744,7 @@ function _getDayCompletionStats(di) {
   // Arbeit und darf nicht komplett verschwinden.
   let effortAchieved = 0, effortTarget = 0;
   for (const ex of day.exercises ?? []) {
+    if (ex.archived) continue;
     if (!ex.targetReps) continue;
     const targetReps = parseFloat(ex.targetReps) || 0;
     for (const s of ex.sets ?? []) {
@@ -9704,7 +9720,7 @@ function _showOnboarding() {
           // Gewichts-Übungen (ex.m === 'reps'/undefined), nicht für
           // Distanz-/Zeit-Übungen ('m'/'sec'), analog zur progressionType-
           // Weiche direkt darunter.
-          tags: [], showPlates: (ex.m ?? 'reps') === 'reps',
+          tags: resolveMuscleGroups(ex.name), showPlates: (ex.m ?? 'reps') === 'reps',
           progressionType: (ex.m ?? 'reps') === 'reps' ? 'weight' : 'reps',
           substituteFor: null,
           progressionMode: 'weight_first', targetRepsMax: null, prRepsHistory: {},
