@@ -445,12 +445,15 @@ function nextMonday() {
   return d.toISOString().split('T')[0];
 }
 
-/** Returns "KW 18 · 2025" label for a YYYY-MM-DD date string. */
+/**
+ * Returns "KW 18 · 2025" label for a YYYY-MM-DD date string.
+ * B194 (Runde 10, Domäne A): nutzt jetzt _isoWeek() (echter
+ * ISO-8601-Algorithmus) statt der vorherigen, an Jahresgrenzen abweichenden
+ * Näherungsformel — vereinheitlicht mit allen anderen "KW N"-Anzeigen.
+ */
 function wkLabel(sd) {
-  const d   = new Date(sd + 'T12:00:00');
-  const jan = new Date(d.getFullYear(), 0, 1);
-  const kw  = Math.ceil(((d - jan) / 86_400_000 + jan.getDay() + 1) / 7);
-  return `KW ${String(kw).padStart(2, '0')} · ${d.getFullYear()}`;
+  const d = new Date(sd + 'T12:00:00');
+  return `KW ${String(_isoWeek(d)).padStart(2, '0')} · ${d.getFullYear()}`;
 }
 
 /** Returns "28. Apr – 04. Mai" */
@@ -1476,12 +1479,16 @@ function _findRecentInjurySkipExercise(di) {
     .filter(w => w.startDate <= wk.startDate)
     .sort((a, b) => b.startDate.localeCompare(a.startDate))
     .slice(0, 2);
-  const today = new Date();
+  // B195 (Runde 10, Domäne B): noon-normiert wie weeklyFocus.js'
+  // _checkInjuryReminder() (B147-Fix) — dieselbe skipDate/14-Tage-Logik,
+  // vorher aber gegen die volle aktuelle Uhrzeit statt gegen 12:00
+  // verglichen, was je nach Tageszeit zu einem ±1-Tag-Drift führen konnte.
+  const todayNoon = (() => { const d = new Date(); d.setHours(12, 0, 0, 0); return d; })();
   for (const lwk of lookbackWeeks) {
     for (const d of lwk.days ?? []) {
       for (const ex of d.exercises ?? []) {
         if (ex.skipReason !== 'injury' || !ex.skipDate || !names.has(ex.name)) continue;
-        const daysSince = Math.round((today - new Date(ex.skipDate + 'T00:00:00')) / 86400000);
+        const daysSince = Math.round((todayNoon - new Date(ex.skipDate + 'T12:00:00')) / 86400000);
         if (daysSince >= 0 && daysSince <= 14) return ex.name;
       }
     }
@@ -4115,8 +4122,7 @@ const _ERKENNTNIS_CATEGORY_ORDER = ['sleep', 'exWeekday', 'trend'];
 function _rotatedErkenntnisEntries(state, N = 8) {
   const entries = computeErkenntnisLines(state, N);
   const today = new Date();
-  const jan   = new Date(today.getFullYear(), 0, 1);
-  const todayKW = Math.ceil(((today - jan) / 86_400_000 + jan.getDay() + 1) / 7);
+  const todayKW = _isoWeek(today);
   const rotation = todayKW % 3;
   const order = [
     _ERKENNTNIS_CATEGORY_ORDER[rotation],
@@ -4452,11 +4458,7 @@ function _renderStreakChain(state) {
     const isRestOnly = streakStatus === 'attended';
     const done     = streakStatus === 'completed';
     const ss       = score.total > 0 ? score.pct : 0;
-    const wkNum = (() => {
-      const d = new Date(wk.startDate);
-      const jan1 = new Date(d.getFullYear(), 0, 1);
-      return Math.ceil(((d - jan1) / 86400000 + jan1.getDay() + 1) / 7);
-    })();
+    const wkNum = _isoWeek(new Date(wk.startDate + 'T12:00:00'));
     return { cx, done, isRestOnly, ss, wkNum, startDate: wk.startDate };
   });
   const lines = dots.slice(0, -1).map((d, i) => {
@@ -4714,11 +4716,27 @@ function drawLineChart(id, labels, data, color) {
 }
 
 // ─── Settings tab ─────────────────────────────────────────────────────────────
+// B196 (Runde 10, Domäne B): vorher `Date.now() - ts` (volle aktuelle
+// Uhrzeit gegen einen Zeitstempel beliebiger Tageszeit) — die Anzeige
+// ("Heute gesichert"/"vor N Tagen") meint aber KALENDERTAGE, nicht
+// abgelaufene 24h-Blöcke. Ein Backup um 23:59 gefolgt von "jetzt" um 00:01
+// zeigte fälschlich "Heute gesichert", obwohl kalendarisch bereits
+// "gestern". Fix: beide Seiten auf Mittag ihres jeweiligen Kalendertags
+// normieren (gleiches Muster wie weeklyFocus.js' B147-Fix).
+// B196 (Runde 10, Domäne B): vorher `Date.now() - ts` (volle aktuelle
+// Uhrzeit gegen einen Zeitstempel beliebiger Tageszeit) — die Anzeige
+// ("Heute gesichert"/"vor N Tagen") meint aber KALENDERTAGE, nicht
+// abgelaufene 24h-Blöcke. Ein Backup um 23:59 gefolgt von "jetzt" um 00:01
+// zeigte fälschlich "Heute gesichert", obwohl kalendarisch bereits
+// "gestern". Fix: beide Seiten auf Mittag ihres jeweiligen Kalendertags
+// normieren (gleiches Muster wie weeklyFocus.js' B147-Fix).
 function _backupAgeInDays(settings) {
   const lbd = settings?.lastBackupDate;
   if (!lbd) return null;
-  const ts = typeof lbd === 'number' ? lbd : new Date(lbd + 'T00:00:00').getTime();
-  return Math.max(0, Math.floor((Date.now() - ts) / 86_400_000));
+  const ts = typeof lbd === 'number' ? lbd : new Date(lbd + 'T12:00:00').getTime();
+  const backupDayNoon = new Date(ts); backupDayNoon.setHours(12, 0, 0, 0);
+  const todayNoon = new Date(); todayNoon.setHours(12, 0, 0, 0);
+  return Math.max(0, Math.round((todayNoon - backupDayNoon) / 86_400_000));
 }
 
 function _backupStatusHtml(settings) {
@@ -4764,7 +4782,14 @@ function _detectReentryPause(state) {
 
   const lastActiveStartMs = new Date(lastActiveWk.startDate + 'T00:00:00').getTime();
 
-  const ongoingPauseDays    = Math.floor((Date.now() - _reentryWeekEndMs(lastActiveWk)) / 86_400_000);
+  // B197 (Runde 10, Domäne B): vorher `Date.now()` (volle aktuelle Uhrzeit)
+  // gegen den Mitternacht-basierten `_reentryWeekEndMs()` verglichen — noon-
+  // normiert wie B147, um tageszeitabhängiges ±1-Tag-Drift zu vermeiden.
+  // `resumptionPauseDays` unten bleibt unverändert (vergleicht bereits zwei
+  // konsistent Mitternacht-basierte Zeitpunkte, kein Drift-Risiko).
+  const weekEndNoon = new Date(lastActiveWk.startDate + 'T12:00:00').getTime() + 6 * 86_400_000;
+  const todayNoonMs = (() => { const d = new Date(); d.setHours(12, 0, 0, 0); return d.getTime(); })();
+  const ongoingPauseDays    = Math.floor((todayNoonMs - weekEndNoon) / 86_400_000);
   const resumptionPauseDays = prevActiveWk
     ? Math.floor((lastActiveStartMs - _reentryWeekEndMs(prevActiveWk)) / 86_400_000)
     : -Infinity;

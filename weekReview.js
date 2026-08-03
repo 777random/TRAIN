@@ -8,10 +8,14 @@
 import { weekSuccessCounts } from './setUtils.js';
 import { isTrainingDay, calcCurrentStreak } from './state.js';
 
+// Echter ISO-8601-Algorithmus (Donnerstag-Verschiebung), B194
+// (Runde 10, Domäne A): die vorherige Näherungsformel wich an
+// Jahresgrenzen ab — vereinheitlicht mit ui.js' wkLabel()/_isoWeek().
 function _kw(sd) {
-  const d   = new Date(sd + 'T12:00:00');
-  const jan = new Date(d.getFullYear(), 0, 1);
-  return Math.ceil(((d - jan) / 86_400_000 + jan.getDay() + 1) / 7);
+  const d = new Date(sd + 'T12:00:00');
+  d.setDate(d.getDate() + 4 - (d.getDay() || 7));
+  const yearStart = new Date(d.getFullYear(), 0, 1);
+  return Math.ceil(((d - yearStart) / 86_400_000 + 1) / 7);
 }
 
 // ISO-Datum eines Tag-Slots — identische Formel zu ui.js' _dayDate() (dort

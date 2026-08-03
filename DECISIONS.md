@@ -631,6 +631,29 @@ Stacking-Context-Vorfall aufgetreten (BUGS.md B178-B190 durchgesehen) —
 Entscheidung bleibt "zurückgestellt bis zweiter Vorfall", Portal-Refactor
 weiterhin nicht umgesetzt.
 
+### 2026-08 — Gemischte T00:00:00/T12:00:00-Datumskonvention bewusst NICHT normalisiert (A2, Runde 10)
+**Entscheidung:** Die Diagnose (Runde 10, Teil 1, Domäne A) fand ~15
+Stellen (v.a. state.js Streak-/Gap-Logik, weiterhin ui.js/weeklyFocus.js),
+die ein YYYY-MM-DD-Datumsfeld via `new Date(str + 'T00:00:00')`
+(Mitternacht, lokal) parsen, während andere Stellen bewusst `'T12:00:00'`
+(Mittag) nutzen, um Tagesrand-Drift zu vermeiden (etabliertes
+todayNoon-Muster aus dem B147-Fix). Anders als die übrigen Runde-10-Funde
+(A1, B1-B3, C1) hat diese Inkonsistenz KEINEN aktuell nachweisbaren Fehler
+zur Folge — bewusst NICHT sweepend auf T12:00:00 normalisiert.
+**Begründung:** DST-Wechsel finden in Europe/Berlin nicht um Mitternacht
+statt (anders als z.B. in Teilen der USA) — `T00:00:00`-Parsing verschiebt
+dort aktuell kein Kalenderdatum. Eine vollständige Normalisierung hätte
+~15 Stellen angefasst, darunter tragende Streak-/Gap-Berechnungen in
+state.js, OHNE dass ein einziger fehlschlagender Test das Risiko einer
+stillen Verhaltensänderung (Verschiebung der exakten Grenzwert-Semantik
+um 12h) rechtfertigt hätte — anders als bei A1/B1-B3/C1, wo je ein
+Vorher/Nachher-Test die Korrektur konkret belegte.
+**Gilt:** Bis eine der beiden Bedingungen eintritt: (a) TRAIN unterstützt
+künftig Zeitzonen mit Mitternacht-DST-Wechsel, oder (b) ein konkreter Bug
+an einer der `T00:00:00`-Stellen wird gemeldet/reproduziert — erst dann
+gezielt (nicht sweepend) normalisieren, mit Test als Beleg wie bei den
+übrigen Runde-10-Funden.
+
 ## COACH-LOGIK (Fortsetzung)
 
 ### 2026-08 — Vier RPE-Schwellenwerte bleiben getrennt und werden nur benannt, nicht konsolidiert (C6, B179)

@@ -73,9 +73,15 @@ function _recommendationCore(lastValue, weekSets, progressionMode, targetRepsMax
     ? rpeSets.reduce((sum, s) => sum + s.rpe, 0) / rpeSets.length
     : null;
 
-  // Erfolgsquote über die letzten 3–4 Wochen (success / (success + fail))
+  // Erfolgsquote über die letzten 3–4 TRAININGS-Wochen dieser Übung
+  // (success / (success + fail)). B198 (Runde 10, Domäne C): vorher
+  // `weekSets.slice(-4)` ohne Filter — enthielt auch Wochen ohne jegliche
+  // Sätze dieser Übung (Deload/anderer Split-Tag), die das Fenster
+  // stillschweigend verdünnten (weniger echte Datenpunkte als die letzten
+  // 4 gemeint waren). Jetzt wie im double_progression-Zweig unten zuerst
+  // auf Wochen MIT Daten gefiltert, erst dann die letzten 4 genommen.
   let successes = 0, fails = 0;
-  for (const w of weekSets.slice(-4)) {
+  for (const w of weekSets.filter(w => w.success.length + w.fail.length > 0).slice(-4)) {
     successes += w.success.length;
     fails     += w.fail.length;
   }

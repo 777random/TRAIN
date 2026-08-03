@@ -29,7 +29,11 @@ function mondayOfWeek(daysAgoWeeks) {
   const diffToMonday = dow === 0 ? -6 : 1 - dow;
   d.setDate(d.getDate() + diffToMonday - daysAgoWeeks * 7);
   d.setHours(0, 0, 0, 0);
-  return d.toISOString().split('T')[0];
+  // B193-Fix: NICHT toISOString() für ein bereits auf lokale Mitternacht
+  // gesetztes Datum verwenden — das konvertiert nach UTC und liefert in
+  // Zeitzonen mit positivem Offset (z.B. Europe/Berlin) das FALSCHE
+  // Kalenderdatum (einen Tag zu früh). Lokale Komponenten direkt lesen.
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 function completedDay(id) {

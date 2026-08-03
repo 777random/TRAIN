@@ -189,11 +189,17 @@ function fmtDate(sd) {
   return `${d}.${m}.${y}`;
 }
 
+// B194 (Runde 10, Domäne A): echter ISO-8601-Algorithmus
+// (Donnerstag-Verschiebung) statt der vorherigen, an Jahresgrenzen
+// abweichenden Näherungsformel — vereinheitlicht mit ui.js' wkLabel()/
+// _isoWeek().
 function wkLabel(sd) {
-  const d   = new Date(sd + 'T12:00:00');
-  const jan = new Date(d.getFullYear(), 0, 1);
-  const kw  = Math.ceil(((d - jan) / 86_400_000 + jan.getDay() + 1) / 7);
-  return `KW ${String(kw).padStart(2, '0')} / ${d.getFullYear()}`;
+  const d = new Date(sd + 'T12:00:00');
+  d.setDate(d.getDate() + 4 - (d.getDay() || 7));
+  const yearStart = new Date(d.getFullYear(), 0, 1);
+  const kw = Math.ceil(((d - yearStart) / 86_400_000 + 1) / 7);
+  const original = new Date(sd + 'T12:00:00');
+  return `KW ${String(kw).padStart(2, '0')} / ${original.getFullYear()}`;
 }
 
 function wkDates(sd) {

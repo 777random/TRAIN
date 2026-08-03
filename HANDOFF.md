@@ -1,6 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-08-03 — Runde 10, Teil 2 (Aufräum-Runde), train-v231 (B191/B192 + B141/B176-Abschluss, siehe eigener Abschnitt unten). Davor: Runde-9-Audit-Folgerunde, train-v230 (B185-B190, schließt das Runde-8-Datenkonsistenz-Audit vollständig ab, siehe AUDIT-BERECHNUNGEN.md). Davor: Runde-8-Datenkonsistenz-Sprint, train-v229 (B181-B184, konkreter Bug + 5-Domänen-Audit + 3 Feedback-Punkte). Davor: Runde-7-Coaching-Qualitäts-Sprint, train-v228 (B178-B180). Davor: Runde-6-Nutzerfeedback-Fix-Sprint, train-v227 (B167-B177, inkl. einer während der Verifikation gefundenen+gefixten Regression B176). Davor: Runde-5-Fix-Sprint, train-v226 (B166, echte Regression von B152). Ältere Sprints siehe SESSION_LOG.md.*
-*Nächster Schritt: B55 Impressum (Blocker vor weiterer Nutzerwerbung — wartet weiterhin auf echte Name-/Adress-/E-Mail-Angaben des Betreibers, siehe LEGAL.md). **Runde 10, Teil 1 (Zeit/Datum-Audit) wartet auf Review mit Claude Cowork** (`diagnose-runde10-zeit-datum-audit-2026-08-03.txt`) — 6 "Verdacht auf Bug"-Funde (A1: zwei divergierende Kalenderwochen-Formeln in ui.js, bestätigt an Jahresgrenzen; A2: T00:00:00/T12:00:00 gemischt; B1: wahrscheinlicher B147-Rückfall in ui.js:1479-1485; B2/B3: asymmetrische Zeitvergleiche in `_backupAgeInDays()`/`ongoingPauseDays`; C1: gefiltertes vs. ungefiltertes 3-/4-Wochen-Fenster in weightRecommendation.js), noch NICHT gefixt — kein Fix ohne Freigabe. Runde 10/Teil 2 (Aufräum-Runde) ist fertig: B141 abgeschlossen (nicht reproduzierbar nach 3 Versuchen, kein weiterer Diagnoseversuch mehr geplant), B176-Portal-Entscheidung bestätigt (kein zweiter Vorfall seit Runde 6, Portal-Refactor weiterhin zurückgestellt), toter Code `save-week-as-template` entfernt (B191), 3 Wall-Clock-Flaky-Tests stabilisiert (`streak_inprogress_week`/`week_label_calendar`/`session_coach_active_week`, jetzt `page.clock.install()` mit festem Referenzdatum statt echtem `new Date()`), einmaliger Konsistenz-Hinweis-Toast für B185 ergänzt (B192, `tip-13`). **Neuer Nebenfund (B193, nicht behoben):** `_calcCurrentStreak()` lieferte bei der Robustheits-Verifikation von Cluster 4 mit einem Sonntagabend-Referenzdatum 0 statt der erwarteten Streak — `page.clock` selbst per Sonde als korrekt bestätigt, echte Ursache liegt in state.js, noch nicht isoliert. Aus Runde 8/9 weiterhin offen: Backfill der Muskelgruppen-Tags nur für Standard-Namen (individuell umbenannte Übungen bewusst nicht erfasst), architekturbedingte ui.js/timer.js-Pausenzeit-Duplikation (per Absicherungstest B189 geschützt, strukturell nicht aufgelöst), `weeklyFocus.js:737-739`s 5./6. eigenständige RPE-Verwendung (B179-Nebenfund), eine fehlende Trainingsziel-Einstellung (Kraft- vs. Hypertrophie-Fokus, Idee aus Runde 6/7), zwei offene Produktfragen aus Runde 9 zur B185-Rückwirkung/einem Zeit-Domänen-Audit (Letzteres jetzt durch Runde 10/Teil 1 beantwortet). Bestätigte Infra-Grenze (weiterhin gültig): volle Playwright-Suite (70 Spec-Dateien, seit Cluster 5 unten) kann `npx serve` mit `EMFILE`/Dev-Server-Kontention abstürzen lassen — Workaround ist der 3-Datei-Batch-Lauf, bei Verdacht auf Massenausfall in Isolation nachprüfen. Nicht committet: `Research/`, alle `context-exports/`-Updates + `Diagnose & Sprints/`-Exports (beide gitignored).*
+*Letzte Aktualisierung: 2026-08-03 — Runde 10 komplett (Teil 1 + Teil 2), train-v232 (B191-B198, B141/B176-Abschluss, siehe eigene Abschnitte unten). Davor: Runde-9-Audit-Folgerunde, train-v230 (B185-B190, schließt das Runde-8-Datenkonsistenz-Audit vollständig ab, siehe AUDIT-BERECHNUNGEN.md). Davor: Runde-8-Datenkonsistenz-Sprint, train-v229 (B181-B184, konkreter Bug + 5-Domänen-Audit + 3 Feedback-Punkte). Davor: Runde-7-Coaching-Qualitäts-Sprint, train-v228 (B178-B180). Davor: Runde-6-Nutzerfeedback-Fix-Sprint, train-v227 (B167-B177, inkl. einer während der Verifikation gefundenen+gefixten Regression B176). Davor: Runde-5-Fix-Sprint, train-v226 (B166, echte Regression von B152). Ältere Sprints siehe SESSION_LOG.md.*
+*Nächster Schritt: B55 Impressum (Blocker vor weiterer Nutzerwerbung — wartet weiterhin auf echte Name-/Adress-/E-Mail-Angaben des Betreibers, siehe LEGAL.md). **Runde 10 (Zeit/Datum-Audit + Aufräum-Runde) ist komplett abgeschlossen, alle Funde entweder gefixt oder bewusst dokumentiert:** A1 (zwei divergierende Kalenderwochen-Formeln) → B194 gefixt (auf ISO-8601 vereinheitlicht, 7 Fundstellen); A2 (T00:00:00/T12:00:00 gemischt) → bewusst NICHT gefixt, kein aktueller Bug, in DECISIONS.md dokumentiert; B1 (B147-Rückfall in ui.js) → B195 gefixt; B2 (`_backupAgeInDays()`) → B196 gefixt; B3 (`ongoingPauseDays`) → B197 gefixt; C1 (weightRecommendation.js-Fenster) → B198 gefixt. Alle 5 Fixes per Sabotage-Revert-Test verifiziert (Fix testweise entfernt, neuer Test schlug exakt mit dem diagnostizierten Symptom fehl, danach wiederhergestellt). **Dabei gefunden und sofort mitgefixt: B193** — ursprünglich fälschlich als App-Bug vermutet, tatsächlich ein Timezone-Bug in 2 Test-Helfern (`mondayOfWeek()`/`seedTwoWeekState()`, `.toISOString()` nach lokaler Mitternacht verschiebt in UTC+1 den Kalendertag) — korrigiert auf lokale Datumskomponenten wie `week_label_calendar.spec.js`s bereits korrektes `isoMondayOffset()`. Runde 10/Teil 2 (Aufräum-Runde) davor bereits fertig: B141 abgeschlossen, B176-Portal-Entscheidung bestätigt, toter Code `save-week-as-template` entfernt (B191), 3 Wall-Clock-Flaky-Tests stabilisiert (B192/B193-Vorarbeit), einmaliger Konsistenz-Hinweis-Toast für B185 (B192). Volle Regressionssuite (73 Spec-Dateien) in Batches gelaufen, nur die bereits bekannte `share_image.spec.js`-Baseline-Flakiness reproduziert (unverändert, nicht Teil dieses Sprints). Aus Runde 8/9 weiterhin offen: Backfill der Muskelgruppen-Tags nur für Standard-Namen (individuell umbenannte Übungen bewusst nicht erfasst), architekturbedingte ui.js/timer.js-Pausenzeit-Duplikation (per Absicherungstest B189 geschützt, strukturell nicht aufgelöst), `weeklyFocus.js:737-739`s 5./6. eigenständige RPE-Verwendung (B179-Nebenfund), eine fehlende Trainingsziel-Einstellung (Kraft- vs. Hypertrophie-Fokus, Idee aus Runde 6/7), eine offene Produktfrage aus Runde 9 zur B185-Rückwirkung (ob ein zusätzlicher In-App-Banner nötig wäre — der einmalige Toast B192 deckt das inzwischen ab, offene Frage vermutlich erledigt). Bestätigte Infra-Grenze (weiterhin gültig): volle Playwright-Suite kann `npx serve` mit `EMFILE`/Dev-Server-Kontention abstürzen lassen — Workaround ist der Batch-Lauf, bei Verdacht auf Massenausfall in Isolation nachprüfen. Nicht committet: `Research/`, alle `context-exports/`-Updates + `Diagnose & Sprints/`-Exports (beide gitignored).*
 
 ---
 
@@ -20,15 +20,22 @@ nur Domäne D floss direkt in Cluster 4 unten ein.
 - **Cluster 3 (Doku):** B176-Portal-Entscheidung bestätigt — kein zweiter
   Stacking-Context-Vorfall seit Runde 6, Entscheidung bleibt
   "zurückgestellt bis zweiter Vorfall".
-- **Cluster 4 (Test-Fix):** 3 Wall-Clock-abhängige Testdateien
+- **Cluster 4 (Test-Fix, B193):** 3 Wall-Clock-abhängige Testdateien
   (`streak_inprogress_week`, `week_label_calendar`,
   `session_coach_active_week`) auf `page.clock.install()` mit festem
   Referenzdatum umgestellt statt echtem `new Date()` zur Testlaufzeit —
   behebt den seit Runde 6 bekannten `streak_inprogress_week`-Flake
   strukturell. **Bei der Robustheits-Verifikation (Testlauf mit einem
-  anderen Referenzdatum) einen neuen, unabhängigen App-Bug gefunden, siehe
-  B193 in BUGS.md** — nicht gefixt (außerhalb des Cluster-Scopes), aber
-  mit exaktem Repro-Rezept dokumentiert.
+  anderen Referenzdatum) zunächst fälschlich als App-Bug in
+  `_calcCurrentStreak()` interpretiert — per `page.clock`-Sonde korrigiert:
+  der echte Fehler lag in 2 Test-Helfern selbst** (`mondayOfWeek()`/
+  `seedTwoWeekState()` bauten das Datum über `setHours(0,0,0,0)` dann
+  `.toISOString()` — konvertiert nach UTC, liefert in Europe/Berlin (UTC+1)
+  den falschen, einen Tag zu frühen Kalendertag). Fix: wie
+  `week_label_calendar.spec.js`s bereits korrektes `isoMondayOffset()` auf
+  lokale Datumskomponenten (`getFullYear()`/`getMonth()`/`getDate()`)
+  umgestellt. Verifiziert mit zwei unterschiedlichen Referenzdaten (Montag
+  und Sonntag/Jahresgrenze) — beide liefern jetzt das korrekte Ergebnis.
 - **Cluster 5 (Mini-Feature, B192):** einmaliger Hinweis-Toast für die
   B185-Konsistenz-%-Rückwirkung, über das bestehende
   `seenTips`/`MARK_TIP_SEEN`-Muster (`tip-13`) — kein neues
@@ -39,6 +46,49 @@ CSS-Versions-Bump (styles.css unverändert). Alle neuen/geänderten Tests
 grün (`template_management`, die 3 Cluster-4-Dateien,
 `consistency_recalc_hint` — neu, 3 Tests), keine Regression in
 `fixtures.spec.js`.
+
+---
+
+## Runde 10, Teil 1 — Zeit/Datum-Audit-Fixes (train-v232, 2026-08-03)
+
+Nach der reinen Diagnose (`diagnose-runde10-zeit-datum-audit-2026-08-03.txt`)
+hat der Nutzer alle 7 Funde zur Umsetzung freigegeben. A2 wurde nach
+Rückfrage bewusst NICHT gefixt (kein aktueller Bug, siehe DECISIONS.md).
+Die übrigen 6 (A1, B1-B3, C1 + der dabei gefundene B193) sind gefixt.
+
+- **B194 (A1):** Zwei Kalenderwochen-Formeln ("KW N") vereinheitlicht —
+  `ui.js`s `wkLabel()` nutzt jetzt `_isoWeek()` direkt, `backup.js`/
+  `progressChart.js`/`weekReviewModal.js`/`weekReview.js` sowie `ui.js`s
+  `_rotatedErkenntnisEntries()`/`wkNum` bekamen den korrigierten
+  ISO-8601-Algorithmus (dupliziert, da diese Module `_isoWeek()` nicht
+  importieren). Verifiziert per Node-Rechnung + 31 bestehenden Tests
+  (`week_label_calendar`, `progress_chart_svg`, `share_image_*`,
+  `weekreview_*`, `autobackup_toast`) weiterhin grün.
+- **B195 (B1):** `_findRecentInjurySkipExercise()` (Session-Check-in-
+  Zusatzfrage, B129) reproduzierte B147s ungefixtes Muster — auf das
+  etablierte `todayNoon`-Muster umgestellt. Neuer
+  `tests/injury_checkin_boundary.spec.js` (exakte 14-/15-Tage-Grenze,
+  Sabotage-Revert bestätigt).
+- **B196 (B2):** `_backupAgeInDays()` zeigte "Heute gesichert" statt
+  "Vor 1 Tag" bei einem Backup kurz vor Mitternacht. Beide Seiten auf
+  Mittag des jeweiligen Kalendertags normiert. Neuer
+  `tests/backup_age_calendar_day.spec.js` (Sabotage-Revert bestätigt).
+- **B197 (B3):** `_detectReentryPause()`s `ongoingPauseDays` — dieselbe
+  Asymmetrie-Klasse, gefixt. Niedrige Priorität, kein dedizierter neuer
+  Test (keine Regression in `tests/reentry_faktoren.spec.js`).
+- **B198 (C1):** `getWeightRecommendation()`/`getMetricRecommendation()`s
+  gemeinsame `_recommendationCore()` filterte das "letzte 3-4 Wochen"-
+  Erfolgsquoten-Fenster nicht auf Wochen mit tatsächlichen Daten (der
+  `double_progression`-Zweig tat das bereits) — jetzt vereinheitlicht.
+  Neuer `tests/weight_recommendation_window_filter.spec.js` (reiner
+  Unit-Test ohne Browser, Sabotage-Revert bestätigt).
+- **B193:** siehe Cluster 4 oben — beim Verifizieren dieser Fixes
+  gefunden und korrigiert (Test-Helfer-Bug, keine App-Änderung).
+
+CACHE_VERSION → `train-v232`. Volle Regressionssuite (73 Spec-Dateien) in
+Batches gelaufen — alle grün bis auf die bereits bekannte
+`share_image.spec.js`-Baseline-Flakiness (unverändert seit vorherigen
+Runden, nicht Teil dieses Sprints).
 
 ---
 

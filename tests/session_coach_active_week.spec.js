@@ -39,14 +39,19 @@ function makeDay(idx, { markedDone = false, withExercise = true } = {}) {
 
 async function seedTwoWeekState(page, { activeWeekDays, curIdx, oldWeekDone = true, autoStartPauseTimer = false }) {
   return page.evaluate(({ activeWeekDays, curIdx, oldWeekDone, autoStartPauseTimer }) => {
+    // B193-Fix: NICHT toISOString() für ein bereits auf lokale Mitternacht
+    // gesetztes Datum verwenden — das konvertiert nach UTC und liefert in
+    // Zeitzonen mit positivem Offset (z.B. Europe/Berlin) das FALSCHE
+    // Kalenderdatum (einen Tag zu früh). Lokale Komponenten direkt lesen.
+    const _ymd = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     const today = new Date();
     const dow = today.getDay();
     const monday = new Date(today);
     monday.setDate(today.getDate() + (dow === 0 ? -6 : 1 - dow));
-    const activeStart = monday.toISOString().slice(0, 10);
+    const activeStart = _ymd(monday);
     const oldMonday = new Date(monday);
     oldMonday.setDate(oldMonday.getDate() - 7);
-    const oldStart = oldMonday.toISOString().slice(0, 10);
+    const oldStart = _ymd(oldMonday);
 
     const oldWeek = {
       id: 1, startDate: oldStart, note: '', mode: 'standard',
