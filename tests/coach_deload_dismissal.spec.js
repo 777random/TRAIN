@@ -4,12 +4,20 @@ import { test, expect } from '@playwright/test';
 // das sichtbare "Weiter wie bisher" gehörte zur unabhängigen Hauptkarte
 // (computeWeeklyFocus(), type:focus.status) und hatte nie Einfluss auf
 // _checkPreventiveDeload() (weeklyFocus.js), das nie decisionLog las. Jetzt:
-// eigener Button auf der Deload-Karte selbst (data-action=
-// "decision-log-deload-stay"), dispatcht DECISION_LOG_ADD mit
+// eigener Button auf der Deload-Karte selbst, dispatcht DECISION_LOG_ADD mit
 // type:'preventive_deload', choice:'stay' — _checkPreventiveDeload()
 // unterdrückt sich selbst 4 Wochen lang, wenn ein solcher Eintrag existiert.
 // Fixture-Muster identisch zu tests/coach_deload_info_badge.spec.js (8 Wochen,
 // RPE 8.5, steigendes Gewicht -> triggert _checkPreventiveDeload()).
+//
+// Runde 14 (Council-Entscheidung, Governance Coach-Struktursignale): der
+// Button-Mechanismus wurde generalisiert (data-action jetzt
+// "coach-signal-dismiss" + data-signal-type statt dem deload-exklusiven
+// "decision-log-deload-stay", Button-Label jetzt "Verstanden" statt "Weiter
+// wie bisher") -- dieselbe Infrastruktur wird in Runde 14 auch für
+// consistency_quality/push_pull/recurring_fatigue genutzt (siehe jeweils
+// eigene Testdateien). Verhalten/Timing hier unverändert, nur die
+// Selektoren angepasst.
 
 function isoMondayWeeksAgo(n) {
   const d = new Date();
@@ -93,6 +101,61 @@ async function seed(page, weeks, decisionLog = []) {
   await page.waitForSelector('#app.is-ready', { timeout: 10000 });
 }
 
+// Runde 14 (Council-Entscheidung): Haupttext ist jetzt reine Beobachtung
+// ("... Wochen ohne Deload, Volumentrend ..."), die Empfehlung
+// ("Regenerationswoche einplanen") liegt nur noch im info-Feld/Aufklapp-Feld.
+test('Deload-Haupttext ist Beobachtung (kein "einplanen"-Imperativ), Empfehlung liegt im Aufklapp-Feld', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForSelector('#app.is-ready', { timeout: 10000 });
+  await seed(page, buildDeloadWeeks());
+
+  await page.click('[data-tab="coach"]');
+  await page.waitForTimeout(300);
+
+  const mainText = await page.locator('.coach-structural-text').first().textContent();
+  expect(mainText).toContain('Wochen ohne Deload');
+  expect(mainText).toContain('Volumentrend');
+  expect(mainText).not.toContain('einplanen');
+
+  await page.locator('.deload-info__badge').first().click();
+  const infoText = await page.locator('.deload-info__body').first().textContent();
+  expect(infoText).toContain('einplanen');
+});
+
+// Escalation-Stufenleiter (Council-Vorgabe: begrenzt, nicht wortwörtlich
+// identisch beim Re-Trigger nach Cooldown-Ablauf).
+test('Re-Trigger nach 1 vorherigem Dismiss zeigt Eskalations-Stufe 1 (nicht identischer Text)', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForSelector('#app.is-ready', { timeout: 10000 });
+  // Eintrag ist 5 Wochen alt -> Cooldown (4 Wochen) abgelaufen, Signal feuert
+  // wieder, aber tier=1 (genau 1 vorheriger 'stay'-Eintrag für diesen Typ).
+  await seed(page, buildDeloadWeeks(), [
+    { id: 1, type: 'preventive_deload', signal: 'x', choice: 'stay', decidedWeekStart: isoMondayWeeksAgo(5), outcome: null },
+  ]);
+
+  await page.click('[data-tab="coach"]');
+  await page.waitForTimeout(300);
+
+  const mainText = await page.locator('.coach-structural-text').first().textContent();
+  expect(mainText).toContain('Seit deiner letzten Entscheidung sind weitere');
+  expect(mainText).toContain('Wochen ohne Deload');
+});
+
+test('Re-Trigger nach 2 vorherigen Dismissals zeigt Eskalations-Stufe 2 (gedeckelt, nicht weiter wachsend)', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForSelector('#app.is-ready', { timeout: 10000 });
+  await seed(page, buildDeloadWeeks(), [
+    { id: 1, type: 'preventive_deload', signal: 'x', choice: 'stay', decidedWeekStart: isoMondayWeeksAgo(9), outcome: null },
+    { id: 2, type: 'preventive_deload', signal: 'x', choice: 'stay', decidedWeekStart: isoMondayWeeksAgo(5), outcome: null },
+  ]);
+
+  await page.click('[data-tab="coach"]');
+  await page.waitForTimeout(300);
+
+  const mainText = await page.locator('.coach-structural-text').first().textContent();
+  expect(mainText).toContain('Das Muster hält weiterhin an');
+});
+
 test('"Weiter wie bisher" auf der Deload-Karte loggt preventive_deload/stay und blendet die Karte aus', async ({ page }) => {
   const pageErrors = [];
   page.on('pageerror', err => pageErrors.push(err.message));
@@ -103,12 +166,12 @@ test('"Weiter wie bisher" auf der Deload-Karte loggt preventive_deload/stay und 
   await page.click('[data-tab="coach"]');
   await page.waitForTimeout(300);
 
-  const dismissBtn = page.locator('[data-action="decision-log-deload-stay"]');
+  const dismissBtn = page.locator('[data-action="coach-signal-dismiss"][data-signal-type="preventive_deload"]');
   await expect(dismissBtn).toBeVisible();
   await dismissBtn.click();
   await page.waitForTimeout(300);
 
-  await expect(page.locator('[data-action="decision-log-deload-stay"]')).toHaveCount(0);
+  await expect(page.locator('[data-action="coach-signal-dismiss"][data-signal-type="preventive_deload"]')).toHaveCount(0);
   await expect(page.locator('.deload-info__badge')).toHaveCount(0);
 
   const log = await page.evaluate(() => JSON.parse(localStorage.getItem('train_v6')).decisionLog);
@@ -130,7 +193,7 @@ test('decisionLog-Eintrag 3 Wochen alt unterdrückt das Signal weiterhin (innerh
   await page.click('[data-tab="coach"]');
   await page.waitForTimeout(300);
 
-  await expect(page.locator('[data-action="decision-log-deload-stay"]')).toHaveCount(0);
+  await expect(page.locator('[data-action="coach-signal-dismiss"][data-signal-type="preventive_deload"]')).toHaveCount(0);
   await expect(page.locator('.deload-info__badge')).toHaveCount(0);
 });
 
@@ -144,7 +207,7 @@ test('decisionLog-Eintrag 5 Wochen alt unterdrückt NICHT mehr (Fenster abgelauf
   await page.click('[data-tab="coach"]');
   await page.waitForTimeout(300);
 
-  await expect(page.locator('[data-action="decision-log-deload-stay"]')).toBeVisible();
+  await expect(page.locator('[data-action="coach-signal-dismiss"][data-signal-type="preventive_deload"]')).toBeVisible();
 });
 
 test('Nach Deload-Unterdrückung erscheint automatisch ein anderes qualifizierendes Struktursignal (push_pull)', async ({ page }) => {
@@ -166,7 +229,7 @@ test('Nach Deload-Unterdrückung erscheint automatisch ein anderes qualifizieren
   await page.click('[data-tab="coach"]');
   await page.waitForTimeout(300);
 
-  await expect(page.locator('[data-action="decision-log-deload-stay"]')).toHaveCount(0);
+  await expect(page.locator('[data-action="coach-signal-dismiss"][data-signal-type="preventive_deload"]')).toHaveCount(0);
   await expect(page.locator('.coach-structural-item', { hasText: 'Push' })).toBeVisible();
 });
 

@@ -31,7 +31,7 @@ import { getWeightRecommendation, getMetricRecommendation, roundToPlate, isReady
 import { renderProgressChart, renderBodyWeightChart, renderRelativeStrengthChart } from './progressChart.js';
 import { buildWeekReview }        from './weekReview.js';
 import { showWeekReviewModal, renderWeekReviewHtml, shareWeekReviewImage } from './weekReviewModal.js';
-import { computeWeeklyFocus, computeStructuralSignals, isInRecoveryWindow, buildDecisionalBalance } from './weeklyFocus.js';
+import { computeWeeklyFocus, computeStructuralSignals, isInRecoveryWindow, buildDecisionalBalance, _dismissCooldownDays } from './weeklyFocus.js';
 import { findExactDuplicates, findSimilarCandidates } from './exerciseNameCleanup.js';
 import { computeErkenntnisLines, getProgressCorridorCalibration } from './progressInsights.js';
 import { buildPrShareCanvas, shareCanvas } from './shareImage.js';
@@ -3484,6 +3484,26 @@ function _buildDeloadPlanRows(state) {
   return rows;
 }
 
+// Runde 14 (Council-Entscheidung, Governance Coach-Struktursignale):
+// gemeinsame Eskalations-Text-Formatierung für alle per decisionLog
+// dismissbaren Struktursignale (sig.tier/sig.cooldownDays kommen direkt aus
+// weeklyFocus.js, siehe dortiger Kopf-Kommentar zu DISMISS_COOLDOWN_DAYS).
+// Begrenzte Stufenleiter (0-2), kein unbegrenzt wachsender Text.
+function _escalationPrefix(tier, cooldownDays) {
+  if (!tier) return '';
+  const weeks = Math.round((cooldownDays ?? 0) / 7);
+  if (tier === 1) return `Seit deiner letzten Entscheidung sind weitere ${weeks} Wochen vergangen — `;
+  return 'Das Muster hält weiterhin an: ';
+}
+
+// Ein Zweig unten setzt `dismissType` im zurückgegebenen item, wenn dieses
+// Signal einen generischen "Verstanden"-Dismiss-Button bekommen soll (siehe
+// Rendering unten) -- der Wert ist der decisionLog-'type'-String, den
+// weeklyFocus.js' '_isDismissedRecently()'/'_dismissTier()' dafür erwartet
+// (i.d.R. identisch zu sig.type, AUSSER bei 'deload_preventive', siehe
+// dortiger Kommentar zu 'preventive_deload'). 'injury_reminder' setzt
+// BEWUSST kein dismissType (Council-Entscheidung, Runde 14: asymmetrisches
+// Risiko -- übersehene Verletzung wiegt schwerer als eine UI-Störung).
 function _structuralSignalHtml(sig) {
   // E1 (Transparenz Coach-Tab): evidence reicht unverändert vom weeklyFocus.js-
   // Signal durch, jeder Zweig unten fügt sie seinem Ergebnis hinzu.
@@ -3510,32 +3530,57 @@ function _structuralSignalHtml(sig) {
     };
   }
   if (sig.type === 'deload_preventive') {
+    // Runde 14 (Council-Entscheidung): Haupttext auf reine Beobachtung
+    // umgestellt (analog zum recurring_fatigue-Muster aus Runde 13) --
+    // die konkrete Empfehlung ("Regenerationswoche einplanen") wandert
+    // vollständig ins info-Feld. sig.tier/cooldownDays steuern den
+    // eskalierenden Re-Trigger-Text (_escalationPrefix() oben).
+    const richtung = sig.volTrendDirection === 'up' ? 'steigend' : sig.volTrendDirection === 'down' ? 'fallend' : 'stabil';
+    const rpeVal = sig.avgRpe != null ? sig.avgRpe.toFixed(1) : '–';
+    const prefix = _escalationPrefix(sig.tier, sig.cooldownDays);
     return {
       icon: '🔄',
-      text: `${sig.weeksSince} Wochen ohne Deload — Regenerationswoche einplanen.`,
-      info: 'Ein Deload ist eine Woche mit reduziertem Volumen (weniger Sätze). Er hilft deinem Körper sich zu erholen und verhindert Übertraining. Dein Gewicht bleibt gleich.',
+      text: `${prefix}${sig.weeksSince} Wochen ohne Deload, Volumentrend ${richtung} / Ø-RPE ${rpeVal}.`,
+      info: 'Empfehlung: eine Regenerationswoche (Deload) einplanen. Ein Deload ist eine Woche mit reduziertem Volumen (weniger Sätze) — er hilft deinem Körper sich zu erholen und verhindert Übertraining, dein Gewicht bleibt gleich.',
       evidence: sig.evidence,
+      // 'preventive_deload' ist der historische decisionLog-'type'-Wert
+      // (B131), NICHT sig.type ('deload_preventive') -- siehe weeklyFocus.js
+      // DISMISS_COOLDOWN_DAYS-Kommentar (Altbestand-Kompatibilität).
+      dismissType: 'preventive_deload',
     };
   }
   if (sig.type === 'recurring_fatigue') {
     // B140 (Runde 13, Council-Entscheidung): reine Beobachtung im Haupttext,
     // kein Ratschlag — der optionale Deload-Hinweis liegt im 'info'-Feld
     // (identisches <details>-Aufklapp-Muster wie 'deload_preventive' oben,
-    // kein neuer Action-Handler nötig).
+    // kein neuer Action-Handler nötig). Runde 14: generischer Dismiss +
+    // Eskalations-Prefix ergänzt (sig.type ist hier bereits identisch zum
+    // decisionLog-'type', keine Altbestand-Umbenennung nötig).
+    const prefix = _escalationPrefix(sig.tier, sig.cooldownDays);
     return {
       icon: '📉',
-      text: `Dir ist aufgefallen: bei ${h(sig.mostFatiguedExercise)} wirst du gegen Ende der Session zunehmend schwächer — das war in den letzten 3 Wochen so.`,
+      text: `${prefix}Dir ist aufgefallen: bei ${h(sig.mostFatiguedExercise)} wirst du gegen Ende der Session zunehmend schwächer — das war in den letzten 3 Wochen so.`,
       info: 'Wiederkehrende Erschöpfung zum Sessionende kann ein Zeichen für zu wenig Erholung sein. Eine Deload-Woche (reduziertes Volumen) oder eine andere Übungsreihenfolge können helfen.',
       evidence: sig.evidence,
+      dismissType: 'recurring_fatigue',
     };
   }
   if (sig.type === 'consistency_quality') {
-    return { icon: '📉', text: 'Häufiger trainieren hilft gerade nicht — Qualität sinkt.', evidence: sig.evidence };
+    // Runde 14: generischer Dismiss + Eskalations-Prefix ergänzt.
+    const prefix = _escalationPrefix(sig.tier, sig.cooldownDays);
+    return {
+      icon: '📉',
+      text: `${prefix}Häufiger trainieren hilft gerade nicht — Qualität sinkt.`,
+      evidence: sig.evidence,
+      dismissType: 'consistency_quality',
+    };
   }
   if (sig.type === 'push_pull') {
+    // Runde 14: generischer Dismiss + Eskalations-Prefix ergänzt.
+    const prefix = _escalationPrefix(sig.tier, sig.cooldownDays);
     return sig.dominant === 'Push'
-      ? { icon: '⚖️', text: 'Push-lastig — mehr Pull-Übungen für Schultergesundheit.', evidence: sig.evidence }
-      : { icon: '⚖️', text: 'Pull-lastig — mehr Push-Übungen für Balance.', evidence: sig.evidence };
+      ? { icon: '⚖️', text: `${prefix}Push-lastig — mehr Pull-Übungen für Schultergesundheit.`, evidence: sig.evidence, dismissType: 'push_pull' }
+      : { icon: '⚖️', text: `${prefix}Pull-lastig — mehr Push-Übungen für Balance.`, evidence: sig.evidence, dismissType: 'push_pull' };
   }
   if (sig.type === 'compound_isolation') {
     return { icon: '🏋️', text: `Du trainierst ${sig.compoundPct}% Compound — für Kraftaufbau empfiehlt sich >70%.`, evidence: sig.evidence };
@@ -3978,16 +4023,16 @@ function renderCoachTab(state) {
         <span class="coach-structural-icon">${item.icon}</span>
         <span class="coach-structural-text">${h(item.text)}</span>
         ${item.info ? `<details class="deload-info">
-          <summary class="deload-info__badge" aria-label="Was ist ein Deload?">?</summary>
+          <summary class="deload-info__badge" aria-label="Mehr erfahren">?</summary>
           <p class="deload-info__body">${h(item.info)}</p>
         </details>` : ''}
         ${Array.isArray(item.evidence) && item.evidence.length > 0 ? `<details class="coach-structural-why">
           <summary class="pr-collapse__summary">▾ Basis dieser Einschätzung</summary>
           <div class="pr-collapse__body">${_evidenceHtml(item.evidence)}</div>
         </details>` : ''}
-        ${sig.type === 'deload_preventive' ? `
+        ${item.dismissType ? `
         <button type="button" class="btn btn--ghost btn--sm coach-structural-dismiss"
-          data-action="decision-log-deload-stay" data-signal="${h(item.text)}">Weiter wie bisher</button>` : ''}
+          data-action="coach-signal-dismiss" data-signal-type="${h(item.dismissType)}" data-signal="${h(item.text)}">Verstanden</button>` : ''}
       </div>`;
     }).join('')}
   </div>` : '';
@@ -6101,23 +6146,29 @@ function _handleClick(e) {
       break;
     }
 
-    // B131: eigener Dismiss-Button auf der Deload-Strukturkarte — unabhängig
-    // vom "Weiter wie bisher" der Hauptkarte oben (die loggt type:focus.status,
-    // z.B. 'overload', nie 'preventive_deload'). _checkPreventiveDeload()
-    // (weeklyFocus.js) liest genau diesen type+choice und unterdrückt die
-    // Karte 4 Wochen.
-    case 'decision-log-deload-stay': {
+    // Runde 14 (Council-Entscheidung, Governance Coach-Struktursignale):
+    // generischer Dismiss-Button für alle Struktursignale, deren
+    // _structuralSignalHtml()-Zweig ein 'dismissType' setzt (siehe dort) —
+    // ursprünglich B131 exklusiv für 'preventive_deload' (data-action war
+    // 'decision-log-deload-stay'), jetzt über data-signal-type generisch.
+    // Unabhängig vom "Weiter wie bisher" der HAUPTkarte (die loggt
+    // type:focus.status, z.B. 'overload', nie einen Struktursignal-Typ).
+    // weeklyFocus.js '_isDismissedRecently()' liest genau diesen type+choice
+    // und unterdrückt das jeweilige Signal für dessen eigene Cooldown-Dauer.
+    case 'coach-signal-dismiss': {
+      const signalType = el.dataset.signalType;
       const _d = new Date();
       const _dow = _d.getDay();
       _d.setDate(_d.getDate() + (_dow === 0 ? -6 : 1 - _dow));
       const decidedWeekStart = _d.toISOString().slice(0, 10);
       dispatch(A.DECISION_LOG_ADD, {
-        type: 'preventive_deload',
+        type: signalType,
         signal: el.dataset.signal ?? '',
         choice: 'stay',
         decidedWeekStart,
       });
-      showToast('Entscheidung notiert — Hinweis für 4 Wochen ausgeblendet.', 'ok');
+      const cooldownWeeks = Math.round((_dismissCooldownDays(signalType) ?? 28) / 7);
+      showToast(`Entscheidung notiert — Hinweis für ${cooldownWeeks} Wochen ausgeblendet.`, 'ok');
       break;
     }
 

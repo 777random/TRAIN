@@ -281,24 +281,80 @@ const CONF_HIGH_AVG_RPE_MAX_4WK = 7.5;
 const CONF_MEDIUM_SUCCESS_RATE_MIN = 0.8;
 const CONF_MEDIUM_AVG_RPE_MAX_4WK = 8.5;
 
-function _checkPreventiveDeload(state) {
-  // B131: 4-Wochen-Unterdrückung nach explizitem "Weiter wie bisher" auf der
-  // Strukturkarte selbst (dispatcht DECISION_LOG_ADD mit
-  // type:'preventive_deload', choice:'stay' — eigener Button auf der
-  // Deload-Karte, siehe ui.js _handleClick 'decision-log-deload-stay'. Die
-  // Buttons der Hauptkarte ("Weiter wie bisher"/"Empfehlung folgen") loggen
-  // dagegen type:focus.status, nie 'preventive_deload' — vor B131 hatte
-  // diese Karte daher gar keinen Mechanismus, der sie unterdrücken konnte).
-  const fourWeeksAgoISO = new Date(Date.now() - 28 * 86_400_000).toISOString().slice(0, 10);
-  const recentRejection = (state.decisionLog ?? []).some(d =>
-    d.type === 'preventive_deload' && d.choice === 'stay' && d.decidedWeekStart >= fourWeeksAgoISO
+// Runde 14 (Council-Entscheidung, Governance Coach-Struktursignale):
+// generalisierter, aber signal-spezifisch konfigurierbarer Dismiss über
+// state.decisionLog. KEIN neues Datenmodell -- decisionLog trägt bereits
+// {type, choice, decidedWeekStart} (siehe B131/DECISION_LOG_ADD, state.js),
+// hier nur als wiederverwendbares Muster über mehrere Signal-Typen hinweg
+// statt exklusiv für 'preventive_deload'. Cooldown-Dauer ist bewusst NICHT
+// einheitlich -- jedes Signal bekommt ein inhaltlich begründetes eigenes
+// Zeitfenster (siehe DECISIONS.md für die volle Begründung):
+// - deload_preventive: 4 Wochen (unverändert seit B131).
+// - consistency_quality: 2 Wochen -- Wochenqualität kann sich schneller
+//   ändern als ein strukturelles Volumen-/Erschöpfungsmuster.
+// - push_pull: 3 Wochen -- ein muskuläres Ungleichgewicht baut sich langsam
+//   auf/ab, kürzer als Deload reicht aber, da weniger sicherheitskritisch.
+// - recurring_fatigue: 3 Wochen -- an die eigene 3-Wochen-Erkennungsbasis
+//   aus Runde 13 gekoppelt (ein neuer Zyklus braucht mindestens so lange).
+// Plateau (Hauptkarte) ist bewusst NICHT hier gelistet -- behält sein
+// eigenes, feingranulareres state.plateauActions-Modell (pro Übung,
+// 'ignored' löst sich automatisch auf sobald sich plateauWeeks ändert),
+// das strukturell mehr kann als ein einfacher Zeit-Cooldown und nicht ohne
+// Not durch ein einfacheres Modell ersetzt werden sollte, siehe DECISIONS.md.
+const DISMISS_COOLDOWN_DAYS = {
+  // Schlüssel ist der historische decisionLog-'type'-Wert aus B131
+  // ('preventive_deload', NICHT 'deload_preventive' wie sig.type in
+  // computeStructuralSignals() -- bewusst NICHT umbenannt, damit bereits
+  // live gespeicherte Dismiss-Einträge echter Nutzer weiterhin greifen).
+  preventive_deload:   28,
+  consistency_quality: 14,
+  push_pull:           21,
+  recurring_fatigue:   21,
+};
+
+// Exportiert (nicht nur intern genutzt) -- ui.js braucht die Cooldown-Dauer
+// für den Dismiss-Bestätigungs-Toast-Text (z.B. "... 3 Wochen ausgeblendet").
+export function _dismissCooldownDays(signalType) {
+  return DISMISS_COOLDOWN_DAYS[signalType] ?? null;
+}
+
+function _isDismissedRecently(state, signalType) {
+  const days = _dismissCooldownDays(signalType);
+  if (!days) return false;
+  const cutoffISO = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+  return (state.decisionLog ?? []).some(d =>
+    d.type === signalType && d.choice === 'stay' && d.decidedWeekStart >= cutoffISO
   );
-  if (recentRejection) return null;
+}
+
+// Eskalierender Re-Trigger-Text (Council-Vorgabe: begrenzte Stufenleiter,
+// 2-3 Stufen, KEIN unbegrenzt wachsender Text) -- zählt vergangene
+// 'stay'-Dismissals desselben Signal-Typs (unabhängig vom Cooldown-Fenster
+// selbst), gedeckelt auf Stufe 2. Text-Formatierung passiert in ui.js
+// (_escalationPrefix()), hier nur die reine Stufen-Zahl.
+function _dismissTier(state, signalType) {
+  const count = (state.decisionLog ?? []).filter(d => d.type === signalType && d.choice === 'stay').length;
+  return Math.min(count, 2);
+}
+
+function _checkPreventiveDeload(state) {
+  // 'preventive_deload' ist der historische decisionLog-'type'-Wert (B131),
+  // NICHT sig.type ('deload_preventive') -- siehe DISMISS_COOLDOWN_DAYS oben.
+  if (_isDismissedRecently(state, 'preventive_deload')) return null;
 
   const weeksSince = _weeksSinceLastDeload(state);
   if (weeksSince < 8) return null;
 
-  const volTrend = computeVolumeTrend(state, 4);
+  // Runde 14 (Council-Frage aus der Deload-Diagnose): Fenster von 4 auf 8
+  // verbreitert (vergleicht jetzt die letzten 4 vs. die 4 Wochen davor,
+  // statt 2-vs-2) -- die Diagnose zeigte, dass "volumeUp" bei konsequent
+  // progressiv trainierenden Nutzern mit dem alten 2-vs-2-Fenster
+  // strukturell fast dauerhaft erfüllt war (kurze Ausreißer reichten schon).
+  // computeVolumeTrend() hat nur EINEN anderen Aufrufer (ui.js
+  // _overallPerformanceParagraphs(), nutzt sein eigenes N aus
+  // settings.erkenntnisseHorizont) -- diese Änderung betrifft NUR den
+  // Deload-Trigger, siehe DECISIONS.md.
+  const volTrend = computeVolumeTrend(state, 8);
   const volumeUp = volTrend?.direction === 'up';
 
   const recentRpes = _nonDeloadWeeks(state).slice(-3).map(_avgRpeWeek).filter(v => v != null);
@@ -308,6 +364,9 @@ function _checkPreventiveDeload(state) {
   if (!volumeUp && !rpeHigh) return null;
   return {
     signal: 'deload_preventive', weeksSince, volumeUp, avgRpe,
+    volTrendDirection: volTrend?.direction ?? null,
+    tier: _dismissTier(state, 'preventive_deload'),
+    cooldownDays: _dismissCooldownDays('preventive_deload'),
     // E1 (Transparenz Coach-Tab)
     evidence: [
       { label: 'Wochen ohne Deload', value: `${weeksSince}` },
@@ -327,6 +386,10 @@ function _checkPreventiveDeload(state) {
 // reine Beobachtung) -- ein optionaler Hinweis wandert stattdessen ins
 // `info`-Feld (ui.js '_structuralSignalHtml()', bestehendes <details>-Muster).
 function _checkRecurringFatigue(state) {
+  // Runde 14 (Council-Entscheidung, Governance Coach-Struktursignale):
+  // generischer Dismiss über decisionLog, siehe DISMISS_COOLDOWN_DAYS oben.
+  if (_isDismissedRecently(state, 'recurring_fatigue')) return null;
+
   const recentWeeks = _nonDeloadWeeks(state).slice(-3);
   if (recentWeeks.length < 3) return null;
 
@@ -345,6 +408,8 @@ function _checkRecurringFatigue(state) {
     mostFatiguedExercise: last.mostFatiguedExercise,
     rpeDiff: last.rpeDiff,
     successDrop: last.successDrop,
+    tier: _dismissTier(state, 'recurring_fatigue'),
+    cooldownDays: _dismissCooldownDays('recurring_fatigue'),
     evidence: [
       { label: 'Wochen mit Muster', value: '3 von 3' },
       { label: 'Zuletzt betroffene Übung', value: last.mostFatiguedExercise },
@@ -556,6 +621,10 @@ export function _scoreWeek(week) {
 }
 
 function _checkConsistencyQuality(state) {
+  // Runde 14 (Council-Entscheidung, Governance Coach-Struktursignale):
+  // generischer Dismiss über decisionLog, siehe DISMISS_COOLDOWN_DAYS oben.
+  if (_isDismissedRecently(state, 'consistency_quality')) return null;
+
   // Historie-Gate wie _checkConsistencyGap unten (min. 6 auswertbare Wochen) —
   // dieselbe Datenbasis (_consistencyEligibleWeeks), unabhängig davon ob am
   // Ende ConsistencyQuality oder ConsistencyGap zutrifft.
@@ -584,6 +653,9 @@ function _checkConsistencyQuality(state) {
     headline: 'Qualität vor Quantität',
     reasoning: `Deine Konsistenz ist ${consistencyWord}, aber deine Satz-Erfolgsquote ist in den letzten ${quality.halfN} Wochen von ${quality.prevPct}% auf ${quality.curPct}% gesunken. Mehr Frequenz erzeugt gerade keinen Mehrwert.`,
     recommendation: 'Du trainierst regelmäßig, aber deine Erfolgsquote sinkt — weniger Einheiten, besser ausgeführt.',
+    consistencyWord, prevPct: quality.prevPct, curPct: quality.curPct, halfN: quality.halfN,
+    tier: _dismissTier(state, 'consistency_quality'),
+    cooldownDays: _dismissCooldownDays('consistency_quality'),
     // E1 (Transparenz Coach-Tab)
     evidence: [
       { label: 'Konsistenz', value: consistencyWord },
@@ -848,6 +920,10 @@ function _checkProgression(state) {
 // akuten Kaskade (dort praktisch nie sichtbar, da Progression fast immer
 // vorher zutrifft), sondern in computeStructuralSignals() unten.
 function _checkPushPullBalance(state) {
+  // Runde 14 (Council-Entscheidung, Governance Coach-Struktursignale):
+  // generischer Dismiss über decisionLog, siehe DISMISS_COOLDOWN_DAYS oben.
+  if (_isDismissedRecently(state, 'push_pull')) return null;
+
   const customCatMap = buildCategoryMap(state.customExercises);
 
   const horizont = state.settings?.erkenntnisseHorizont ?? 8;
@@ -887,7 +963,9 @@ function _checkPushPullBalance(state) {
     // Zusätzlich zur Prosa offengelegt (bereits oben berechnet, keine neue
     // Logik) — für die Strukturkarte in ui.js, die den Kurztext ohne Parsen
     // von reasoning/recommendation auswählen muss.
-    dominant,
+    dominant, pushSets, pullSets, ratio, weeksN: lastN.length,
+    tier: _dismissTier(state, 'push_pull'),
+    cooldownDays: _dismissCooldownDays('push_pull'),
     // E1 (Transparenz Coach-Tab)
     evidence: [
       { label: 'Push-Sätze', value: `${pushSets}` },

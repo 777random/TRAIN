@@ -87,7 +87,7 @@ bzw. neue Erkenntnisse eine Neubewertung erfordern.
 **Gilt:** Permanent.
 
 ### 2026-07 — Strukturkarte max. 2 Signale
-**Entscheidung:** computeStructuralSignals() gibt max. 2 Signale zurück. Priorität: deload > consistency_quality > push_pull.
+**Entscheidung:** computeStructuralSignals() gibt max. 2 Signale zurück. Priorität (Stand Runde 14): multi_exercise_failure > injury_reminder > deload_preventive > recurring_fatigue > consistency_quality > push_pull > compound_isolation.
 **Begründung:** 3+ Karten im Coach-Tab erzeugen zu viel kognitive Last. 2 ist die richtige Grenze.
 **Gilt:** Permanent. Nicht erhöhen ohne echte Nutzerdaten.
 
@@ -113,6 +113,67 @@ Einzelvorfälle nicht fälschlich als wiederkehrendes Muster zu melden.
 **Gilt:** Permanent bis echte Nutzerdaten eine Anpassung der
 3-Wochen-Schwelle oder der Priorität nahelegen. GoatCounter-Tracking
 bleibt eine offene Zukunftsoption, kein aktueller Auftrag.
+
+### 2026-08-03 — Governance-Regel: Beobachtung als Default-Ton für Coach-Struktursignale, generalisierter Dismiss, injury_reminder ausgenommen (Runde 14, Council-Entscheidung)
+**Basis:** `Diagnose & Sprints/diagnose-deload-signal-2026-08-03.txt` (Fakten
+zur alten Deload-Logik) + `Diagnose & Sprints/TRAIN-Council-Entscheidung-
+Deload-Signal-2026-08-03.md` (Chairman-Entscheidung).
+**Entscheidung:**
+1. **Beobachtung ist der Default-Ton für ALLE Coach-Struktursignale**, nicht
+   nur für `recurring_fatigue` (Runde 13) — gilt rückwirkend. Das
+   Deload-Signal (`deload_preventive`) war die Abweichung von der eigenen
+   Regel, nicht die Norm: Haupttext jetzt reine Beobachtung ("X Wochen ohne
+   Deload, Volumentrend Y / Ø-RPE Z"), die Empfehlung
+   ("Regenerationswoche einplanen") liegt nur noch im `<details>`-Aufklapp-
+   Feld.
+2. **Dismiss generalisiert, aber NICHT uniform:** `state.decisionLog`
+   bekommt ein wiederverwendbares Muster (`{type, choice:'stay',
+   decidedWeekStart}`, additiv — kein neues Datenmodell, kein
+   SCHEMA_VERSION-Bump) mit signal-spezifischer Cooldown-Dauer
+   (`DISMISS_COOLDOWN_DAYS`, weeklyFocus.js): `preventive_deload` 28 Tage
+   (unverändert seit B131), `consistency_quality` 14 Tage, `push_pull` 21
+   Tage, `recurring_fatigue` 21 Tage. Rollout auf diese 4 Signale.
+3. **`injury_reminder` bekommt BEWUSST KEINEN Dismiss** — asymmetrisches
+   Risiko (übersehene Verletzung wiegt schwerer als eine UI-Störung), vom
+   Council explizit begründet (nicht Bauchgefühl, siehe Stufe-2-Gegenkritik
+   im vollen Transkript).
+4. **Plateau (Hauptkarte) bleibt bei seinem eigenen `state.plateauActions`-
+   Modell**, wird NICHT auf decisionLog umgestellt — dieses Modell ist pro
+   Übung granularer und hat bereits eine inhaltlich klügere Selbstauflösung
+   (`'ignored'` löst sich automatisch auf, sobald sich `plateauWeeks`
+   ändert; `'implemented'` läuft nach 14 Tagen ab) als ein reiner
+   Zeit-Cooldown. Eine Migration hätte nur Risiko ohne Mehrwert bedeutet.
+5. **Root-Fix statt nur Symptom:** bei erneutem Auftreten nach
+   Cooldown-Ablauf wird der Text anhand der Anzahl bisheriger Dismissals
+   dieses Signal-Typs eskaliert (`_dismissTier()`, gedeckelt auf Stufe 2 —
+   "Seit deiner letzten Entscheidung sind weitere X Wochen vergangen —"
+   bzw. "Das Muster hält weiterhin an:"), statt wortwörtlich identisch
+   zurückzukehren. Behebt den eigentlich gemeldeten Effekt ("Coach-Tab
+   fühlt sich nutzlos an"), nicht nur die fehlende Dismiss-Taste.
+6. **Trigger-Schwellenwert-Kalibrierung (Cluster 1, technische
+   Einzelfrage, vom Council nicht explizit entschieden):**
+   `_checkPreventiveDeload()`s Volumen-Trend-Fenster wurde von 4 auf 8
+   verbreitert (`computeVolumeTrend(state, 8)` statt `(state, 4)` —
+   vergleicht jetzt die letzten 4 vs. die 4 Wochen davor statt 2-vs-2). Die
+   Diagnose hatte gezeigt, dass die "volumeUp"-Bedingung bei konsequent
+   progressiv trainierenden Nutzern mit dem alten, kurzen Fenster
+   strukturell fast dauerhaft erfüllt war. Geprüft: `computeVolumeTrend()`
+   hat nur einen anderen Aufrufer (`ui.js` `_overallPerformanceParagraphs()`,
+   nutzt sein eigenes `N` aus `settings.erkenntnisseHorizont`) — die
+   Änderung betrifft daher ausschließlich den Deload-Trigger, keine
+   Kollateralwirkung auf den Fortschritt-Tab.
+7. **Persistenz-Hinweis (Nebenfolge, bewusst in Kauf genommen):** der
+   Deload-Dismiss nutzt weiterhin den historischen decisionLog-`type`-Wert
+   `'preventive_deload'` (nicht `sig.type`/`'deload_preventive'`), damit
+   bereits live gespeicherte Dismiss-Einträge echter Nutzer (seit B131)
+   weiterhin greifen. Die 3 neu dismissbaren Signale nutzen direkt ihren
+   `sig.type`-Wert als decisionLog-`type` (kein Altbestand vorhanden).
+**Begründung:** Council-Entscheidung — Konsistenz mit der bereits in Runde
+13 etablierten Regel, plus eine begrenzte (nicht endlos wachsende)
+Eskalations-Stufenleiter als eigentliche Antwort auf das gemeldete
+"fühlt sich nutzlos an", nicht nur ein Wegklick-Button.
+**Gilt:** Permanent bis echte Nutzerdaten andere Cooldown-Werte oder eine
+andere Eskalationsstufen-Anzahl nahelegen.
 
 ### 2026-07 — RPE-Schwellen bewusst unterschiedlich
 **Entscheidung:** Progressionsbereitschaft: avgRPE ≤ 8.0. Konfidenz HIGH: ≤ 7.5. Konfidenz MEDIUM: ≤ 8.5.

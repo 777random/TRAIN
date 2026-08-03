@@ -1,6 +1,79 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-08-03 — Runde 13 (Council-Umsetzung B62+B140), train-v235 (siehe eigener Abschnitt unten). Davor: Runde 12 (Backlog-Aufräumrunde), train-v234 (B41/B42/B58/B139-Nebenfund/B179-Nebenfund abgeschlossen). Davor: Runde 11, train-v233 (B199, Update-Banner "Später"-Button). Davor: Runde 10 komplett (Teil 1 + Teil 2), train-v232 (B191-B198, B141/B176-Abschluss). Davor: Runde-9-Audit-Folgerunde, train-v230 (B185-B190, siehe AUDIT-BERECHNUNGEN.md). Davor: Runde-8-Datenkonsistenz-Sprint, train-v229. Davor: Runde-7-Coaching-Qualitäts-Sprint, train-v228. Davor: Runde-6-Nutzerfeedback-Fix-Sprint, train-v227. Davor: Runde-5-Fix-Sprint, train-v226. Ältere Sprints siehe SESSION_LOG.md.*
-*Nächster Schritt: **Runde 13 ist komplett abgeschlossen** (beide Cluster, siehe eigener Abschnitt unten). Zwei offene, NICHT code-seitig lösbare Punkte aus B62 (siehe DECISIONS.md) warten auf den Nutzer: (1) kurzer Rechts-Check vor Release zu Service-Worker-Caching (kein gefestigter Behördenstandard, Council-Vorbehalt), (2) PWA-Installierbarkeit auf einem echten Android-Gerät nach dem nächsten Release manuell verifizieren (Chrome-Homescreen-Kriterien könnten früh/einmalig prüfen, ob ein SW mit fetch-Handler bereits registriert ist). Danach: B55 Impressum bleibt der einzige echte Blocker (wartet weiterhin auf echte Name-/Adress-/E-Mail-Angaben des Betreibers, siehe LEGAL.md). Aus dem Backlog-Review weiterhin offen (siehe `backlog-review-2026-08-03.txt`): B43 (CUSTOM_EX_DELETE räumt Kategorie nicht auf), B27 (Touch-Drag auf echtem Gerät), B66 (Toast nicht reproduzierbar, Observability wartet auf nächste Beobachtung), B173-Nebenfund (Wochen-Rec-Chip ohne Wdh-Reduzierung), VACATION_PLANS-Nebenfund aus B184 (Urlaubstage ohne Muskelgruppen-Tags), B176 (Portal-Refactor, zuletzt in Runde 10 bestätigt zurückgestellt). Bestätigte Infra-Grenze (weiterhin gültig, diese Runde aber NICHT reproduziert — volle 77-Datei-Suite lief in 8 Batches à ~10 Dateien im ersten Anlauf durch): volle Playwright-Suite kann `npx serve` mit `EMFILE`/Dev-Server-Kontention abstürzen lassen — Workaround ist der Batch-Lauf, bei Verdacht auf Massenausfall in Isolation nachprüfen. Bekannte, wiederholt bestätigte Timing-Flakes (unabhängig von jeglichem Sprint-Code): `share_image.spec.js`/`share_image_v3.spec.js` (Download-Event-Timing), `deload_volumen.spec.js` (Backup-Reminder-Toast-Overlap), `plate_calculator.spec.js` (Live-Vorschau erster Tastendruck) — keiner davon trat in Runde 13 auf (alle 385 Tests grün im ersten Anlauf, kein Retry nötig). Nicht committet: `Research/`, alle `context-exports/`-Updates + `Diagnose & Sprints/`-Exports (beide gitignored).*
+*Letzte Aktualisierung: 2026-08-03 — Runde 14 (Coach-Signal-Governance: Beobachtungston + generalisierter Dismiss), train-v236 (siehe eigener Abschnitt unten). Davor: Runde 13 (Council-Umsetzung B62+B140), train-v235. Davor: Runde 12 (Backlog-Aufräumrunde), train-v234 (B41/B42/B58/B139-Nebenfund/B179-Nebenfund abgeschlossen). Davor: Runde 11, train-v233 (B199, Update-Banner "Später"-Button). Davor: Runde 10 komplett (Teil 1 + Teil 2), train-v232 (B191-B198, B141/B176-Abschluss). Davor: Runde-9-Audit-Folgerunde, train-v230 (B185-B190, siehe AUDIT-BERECHNUNGEN.md). Davor: Runde-8-Datenkonsistenz-Sprint, train-v229. Davor: Runde-7-Coaching-Qualitäts-Sprint, train-v228. Davor: Runde-6-Nutzerfeedback-Fix-Sprint, train-v227. Davor: Runde-5-Fix-Sprint, train-v226. Ältere Sprints siehe SESSION_LOG.md.*
+*Nächster Schritt: **Runde 14 ist komplett abgeschlossen** (beide Code-Cluster + Doku-Cluster, siehe eigener Abschnitt unten). Aus Runde 13 weiterhin offen (nicht Teil von Runde 14): zwei NICHT code-seitig lösbare B62-Punkte (Rechts-Check vor Release zu Service-Worker-Caching; PWA-Installierbarkeit auf echtem Android-Gerät nach nächstem Release manuell verifizieren, siehe DECISIONS.md). Danach: B55 Impressum bleibt der einzige echte Blocker (wartet weiterhin auf echte Name-/Adress-/E-Mail-Angaben des Betreibers, siehe LEGAL.md). Aus dem Backlog-Review weiterhin offen (siehe `backlog-review-2026-08-03.txt`): B43 (CUSTOM_EX_DELETE räumt Kategorie nicht auf), B27 (Touch-Drag auf echtem Gerät), B66 (Toast nicht reproduzierbar, Observability wartet auf nächste Beobachtung), B173-Nebenfund (Wochen-Rec-Chip ohne Wdh-Reduzierung), VACATION_PLANS-Nebenfund aus B184 (Urlaubstage ohne Muskelgruppen-Tags), B176 (Portal-Refactor, zuletzt in Runde 10 bestätigt zurückgestellt). Bestätigte Infra-Grenze (weiterhin gültig, seit Runde 13 nicht mehr reproduziert): volle Playwright-Suite kann `npx serve` mit `EMFILE`/Dev-Server-Kontention abstürzen lassen — Workaround ist der Batch-Lauf, bei Verdacht auf Massenausfall in Isolation nachprüfen. Bekannte, wiederholt bestätigte Timing-Flakes (unabhängig von jeglichem Sprint-Code): `share_image.spec.js`/`share_image_v3.spec.js` (Download-Event-Timing), `deload_volumen.spec.js` (Backup-Reminder-Toast-Overlap), `plate_calculator.spec.js` (Live-Vorschau erster Tastendruck). Nicht committet: `Research/`, alle `context-exports/`-Updates + `Diagnose & Sprints/`-Exports (beide gitignored).*
+
+---
+
+## Runde 14 — Coach-Signal-Governance: Beobachtungston + generalisierter Dismiss (train-v236, 2026-08-03)
+
+Basis: `Diagnose & Sprints/TRAIN-Sprint-Prompts-Runde14.md` +
+`TRAIN-Council-Entscheidung-Deload-Signal-2026-08-03.md`. Auslöser: Nutzer-
+Feedback, dass das Deload-Signal seit Wochen unverändert ansteht und den
+Coach-Tab nutzlos wirken lässt — vorab per `TRAIN-Deload-Signal-Diagnose-
+Auftrag.md` (reine Faktensammlung) diagnostiziert, dann im Council
+entschieden. 3 Cluster, sequenziell wie vorgegeben (Cluster 2 baut auf
+Cluster-1-Infrastruktur auf, erst nach dessen Verifikation gestartet).
+
+**Cluster 1 (Infrastruktur + Deload-Referenzumsetzung):** `weeklyFocus.js`
+bekommt einen generalisierten, aber signal-spezifisch konfigurierbaren
+Dismiss über das bereits bestehende `state.decisionLog` (additiv, kein
+neues Datenmodell, kein SCHEMA-Bump) — `DISMISS_COOLDOWN_DAYS`-Lookup
+(`preventive_deload`:28 Tage unverändert seit B131, `consistency_quality`:14,
+`push_pull`:21, `recurring_fatigue`:21) + `_isDismissedRecently()`/
+`_dismissTier()`. Deload-Haupttext auf reine Beobachtung umgestellt ("X
+Wochen ohne Deload, Volumentrend Y / Ø-RPE Z" statt "...einplanen") — die
+B140-Regel (Beobachtung als Default, Runde 13) gilt jetzt rückwirkend für
+alle Struktursignale, Deload war die Abweichung, nicht die Norm. Empfehlung
+wandert vollständig ins `<details>`-Aufklapp-Feld. Eskalierender
+Re-Trigger-Text bei wiederholtem Dismiss (`_escalationPrefix()`, ui.js — 3
+gedeckelte Stufen statt endlos wachsendem Text): das behebt den eigentlich
+gemeldeten Effekt, nicht nur die fehlende Dismiss-Taste. Dismiss-Button +
+Klick-Handler generisch gemacht (`item.dismissType`, `coach-signal-dismiss`
+statt dem deload-exklusiven `decision-log-deload-stay`).
+
+**Nebenentscheidung (technische Kalibrierungsfrage aus der Diagnose, vom
+Council nicht explizit vorgegeben, siehe DECISIONS.md):**
+`_checkPreventiveDeload()`s Volumen-Fenster von `computeVolumeTrend(state,4)`
+auf `computeVolumeTrend(state,8)` verbreitert (4-vs-4 statt 2-vs-2 Wochen) —
+die alte "volumeUp"-Bedingung war bei konsequent progressiv trainierenden
+Nutzern strukturell fast dauerhaft erfüllt. Geprüft: `computeVolumeTrend()`
+hat nur einen anderen Aufrufer (`ui.js` Fortschritt-Tab, eigenes `N`) — keine
+Kollateralwirkung.
+
+**Cluster 2 (Rollout, erst nach Cluster-1-Verifikation gestartet):**
+generischer Dismiss + Eskalationstext auf `consistency_quality`,
+`push_pull`, `recurring_fatigue` ausgerollt. `injury_reminder` bewusst
+NICHT angefasst (Council: asymmetrisches Risiko). Plateau (Hauptkarte)
+bewusst NICHT auf decisionLog umgestellt — behält sein granulareres,
+selbstauflösendes `state.plateauActions`-Modell (siehe DECISIONS.md, kein
+blindes Vereinheitlichen ohne Prüfung der Konsequenzen).
+
+**Cluster 3 (Doku, parallel):** DECISIONS.md-Governance-Eintrag (Beobachtung
+als Default-Ton, generalisierter Dismiss, injury_reminder-Ausnahme,
+Plateau-Ausnahme, Kalibrierungs-Nebenentscheidung).
+
+**Altbestand-Kompatibilität:** Deload nutzt weiterhin den historischen
+decisionLog-`type`-Wert `'preventive_deload'` (nicht `sig.type`/
+`'deload_preventive'`), damit bereits live gespeicherte B131-Dismiss-
+Einträge echter Nutzer weiterhin greifen — beim ersten Implementierungs-
+versuch fälschlich vereinheitlicht (Test schlug sofort fehl, da der
+Dismiss-Button dann gar nicht mehr rendert), per Test aufgedeckt und
+korrigiert, bevor es committet wurde.
+
+**Tests:** `tests/coach_deload_dismissal.spec.js` um 3 Tests erweitert
+(Beobachtungstext + kein "einplanen" im Haupttext, Empfehlung im Aufklapp-
+Feld; Eskalations-Stufe 1; Eskalations-Stufe 2, gedeckelt) + bestehende
+5 Tests an die neuen generischen Selektoren angepasst. Neuer
+`tests/coach_signal_dismiss_rollout.spec.js` (7 Tests: Happy-Path +
+Cooldown-Grenzfall je neu dismissbarem Signal + Regressionstest, dass
+`injury_reminder` weiterhin keinen Dismiss-Button hat).
+
+CACHE_VERSION → `train-v236`. Volle Regressionssuite (78 Spec-Dateien, 395
+Tests) in 8 Batches gelaufen — alle grün bis auf den bereits seit vielen
+Runden bekannten `share_image.spec.js`-Download-Event-Timing-Flake (PR-
+Teilen-Button, per Stash-Vergleich gegen den Vor-Runde-14-Stand bestätigt
+unabhängig von dieser Runde — schlägt identisch auf dem unveränderten
+Baseline-Code fehl). BUGS.md (B200) / DECISIONS.md aktualisiert.
 
 ---
 
