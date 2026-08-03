@@ -1498,7 +1498,6 @@ export const A = Object.freeze({
   BODY_LOG_WEIGHT:     'BODY_LOG_WEIGHT',     // { date: 'YYYY-MM-DD', weight: number }
   // Template
   TPL_SAVE:            'TPL_SAVE',            // { template: DayTemplate[] }
-  SAVE_WEEK_AS_TEMPLATE:'SAVE_WEEK_AS_TEMPLATE', // {}
   TPL_RESET_TO_FACTORY:'TPL_RESET_TO_FACTORY',// {}
   WEEK_RESET_TO_TPL:   'WEEK_RESET_TO_TPL',  // {}
   // Settings
@@ -2691,30 +2690,6 @@ function reduce(state, action) {
       _resortWeeksKeepingCurrent(state, _importRefWeek);
       _checkAndGrantBadges(state);
       console.log('[TRAIN] Post-import streak:', _calcCurrentStreak(state.weeks), 'badges:', state.badges);
-      break;
-    }
-
-    // ── Save current week as template ─────────────────────────────────────────
-    case A.SAVE_WEEK_AS_TEMPLATE: {
-      const wk = _currentWeek();
-      if (!wk) break;
-      const tpl = clone(wk.days);
-      // A template is a clean baseline: no "done", no locks, no pending plans.
-      tpl.forEach(day => {
-        day.locked = false;
-        day.markedDone = false;
-        (day.exercises ?? []).forEach(ex => {
-          ex._showCfg = false;
-          ex.nextWeekPlan = 0;
-          ex.nextWeekPlanConfirmed = false;
-          _resetExerciseSubstitution(ex);
-          (ex.sets ?? []).forEach(s => {
-            s.status = 'pending';
-            s.done = false;
-          });
-        });
-      });
-      state.customTemplate = tpl;
       break;
     }
 

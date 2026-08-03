@@ -13,8 +13,15 @@ import { test, expect } from '@playwright/test';
 // die alten Zwischenstufen ("Vorletzte Woche"/"Vor N Wochen"/"In N Wochen")
 // entfallen.
 
+// Runde 10/Cluster 4: fester Referenzzeitpunkt statt echtem `new Date()`,
+// per `page.clock.install()` unten auch für die Browser-Seite (ui.js'
+// _calendarCurrentWeek()/_weekLabel(), die genau hiergegen vergleichen)
+// erzwungen — sonst könnten Node-Fixture-Zeit und Browser-Zeit nahe einer
+// Tagesgrenze auseinanderlaufen.
+const FIXED_NOW = new Date('2026-01-05T12:00:00'); // Montag
+
 function isoMondayOffset(weeksOffset) {
-  const today = new Date();
+  const today = FIXED_NOW;
   const dow = today.getDay();
   const monday = new Date(today);
   monday.setDate(today.getDate() + (dow === 0 ? -6 : 1 - dow) + weeksOffset * 7);
@@ -59,8 +66,8 @@ function makeWeek(id, startDate, { markedDone = false } = {}) {
 }
 
 async function seedWeeks(page, weeks, curIdx) {
-  await page.evaluate(({ weeks, curIdx }) => {
-    const now = new Date().toISOString();
+  await page.evaluate(({ weeks, curIdx, nowIso }) => {
+    const now = nowIso;
     localStorage.setItem('train_v6', JSON.stringify({
       meta: { schemaVersion: 32, savedAt: now, createdAt: now },
       curIdx,
@@ -71,7 +78,7 @@ async function seedWeeks(page, weeks, curIdx) {
       plateauActions: {}, decisionLog: [], badges: [], onboardingDone: true,
     }));
     localStorage.setItem('train_v6_shadow', 'x');
-  }, { weeks, curIdx });
+  }, { weeks, curIdx, nowIso: FIXED_NOW.toISOString() });
   await page.reload();
   await page.waitForSelector('#app.is-ready', { timeout: 10000 });
 }
@@ -79,6 +86,7 @@ async function seedWeeks(page, weeks, curIdx) {
 test('Diese Woche im Header, auch wenn curIdx auf eine im Voraus erstellte Zukunftswoche zeigt', async ({ page }) => {
   const pageErrors = [];
   page.on('pageerror', err => pageErrors.push(err.message));
+  await page.clock.install({ time: FIXED_NOW });
   await page.goto('/');
   await page.waitForSelector('#app.is-ready', { timeout: 10000 });
 
@@ -98,6 +106,7 @@ test('Diese Woche im Header, auch wenn curIdx auf eine im Voraus erstellte Zukun
 });
 
 test('Letzte Woche + "Vor N Wochen" fuer 2-8 Wochen zurueck', async ({ page }) => {
+  await page.clock.install({ time: FIXED_NOW });
   await page.goto('/');
   await page.waitForSelector('#app.is-ready', { timeout: 10000 });
 
@@ -119,6 +128,7 @@ test('Letzte Woche + "Vor N Wochen" fuer 2-8 Wochen zurueck', async ({ page }) =
 });
 
 test('KW-Fallback ab 9 Wochen zurueck (jenseits des "Vor N Wochen"-Fensters)', async ({ page }) => {
+  await page.clock.install({ time: FIXED_NOW });
   await page.goto('/');
   await page.waitForSelector('#app.is-ready', { timeout: 10000 });
 
@@ -134,6 +144,7 @@ test('KW-Fallback ab 9 Wochen zurueck (jenseits des "Vor N Wochen"-Fensters)', a
 test('Kein Absturz und KW-Anzeige fuer alle Wochen, wenn keine Woche das heutige Datum enthaelt', async ({ page }) => {
   const pageErrors = [];
   page.on('pageerror', err => pageErrors.push(err.message));
+  await page.clock.install({ time: FIXED_NOW });
   await page.goto('/');
   await page.waitForSelector('#app.is-ready', { timeout: 10000 });
 
@@ -147,6 +158,7 @@ test('Kein Absturz und KW-Anzeige fuer alle Wochen, wenn keine Woche das heutige
 });
 
 test('Wochenrückblick-Dropdown im Fortschritt-Tab zeigt dieselben kalendarischen Bezeichnungen', async ({ page }) => {
+  await page.clock.install({ time: FIXED_NOW });
   await page.goto('/');
   await page.waitForSelector('#app.is-ready', { timeout: 10000 });
 

@@ -5771,11 +5771,6 @@ function _handleClick(e) {
       closeModal('modal-delete-week');
       showToast('Woche gelöscht', 'info'); break;
 
-    case 'save-week-as-template':
-      dispatch(A.SAVE_WEEK_AS_TEMPLATE, {});
-      showToast('Woche als Standard-Vorlage gespeichert ✓', 'ok');
-      break;
-
     // ── KI-Gewichtsempfehlung übernehmen/ablehnen (Modal-Chip) ─────────────
     case 'toggle-weight-rec': {
       const recName  = el.dataset.name;
@@ -8253,6 +8248,14 @@ function _switchToTab(tab) {
     // "4 Wochen Streak = erstes Abzeichen", aber die Abzeichen-Vergabe ist
     // eingefroren (siehe state.js' _checkAndGrantBadges()). Ein Tipp, der ein
     // nie eintretendes Ereignis ankündigt, wäre irreführend.
+    // Runde 10/Cluster 5: einmaliger Hinweis auf die B185-Rückwirkung
+    // (Konsistenz-%-Neuberechnung, siehe DECISIONS.md) — nur relevant für
+    // Nutzer mit bestehender Trainingshistorie (>=1 abgeschlossene Woche),
+    // ein frisch onboardeter Nutzer hat keine "alten" Werte, die sich
+    // geändert haben könnten.
+    if (_completedWks >= 1) {
+      _maybeShowTip('tip-13', 'Konsistenz-Berechnung leicht korrigiert — deine Werte im Fortschritt-Tab können sich etwas geändert haben.');
+    }
   }
   if (tab === 'settings') renderSettingsTab(state);
 }

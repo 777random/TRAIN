@@ -1,5 +1,12 @@
 import { test, expect } from '@playwright/test';
 
+// Runde 10/Cluster 4: fester Referenzzeitpunkt statt echtem `new Date()`.
+// `seedTwoWeekState()` unten berechnet "Montag dieser Woche" per `new Date()`
+// DIREKT IM BROWSER-KONTEXT (innerhalb page.evaluate) — `page.clock.install()`
+// vor jeder Navigation überschreibt dort `Date`, sodass dieselbe berechnete
+// Woche bei jedem Testlauf entsteht, unabhängig vom echten Kalenderdatum.
+const FIXED_NOW = new Date('2026-01-05T12:00:00'); // Montag
+
 // B82: Session Coach (Pre-Session Check-in, Intra-Session Feedback,
 // Pause-Timer-Empfehlung) erschien nie bei einem 3x/Woche-Split (z.B.
 // Mo/Mi/Fr), da _isTodayDay(wk, di) das Datum eines Tages rein aus seinem
@@ -83,6 +90,7 @@ async function seedTwoWeekState(page, { activeWeekDays, curIdx, oldWeekDone = tr
 test('Mo/Mi/Fr-Split: Session Coach erscheint für den offenen Tag an Index 2 (aktuelle Woche)', async ({ page }) => {
   const pageErrors = [];
   page.on('pageerror', err => pageErrors.push(err.message));
+  await page.clock.install({ time: FIXED_NOW });
   await page.goto('/');
   await page.waitForSelector('#app.is-ready', { timeout: 10000 });
 
@@ -105,6 +113,7 @@ test('Mo/Mi/Fr-Split: Session Coach erscheint für den offenen Tag an Index 2 (a
 });
 
 test('Abgeschlossener Tag (markedDone): kein Check-in, kein Feedback', async ({ page }) => {
+  await page.clock.install({ time: FIXED_NOW });
   await page.goto('/');
   await page.waitForSelector('#app.is-ready', { timeout: 10000 });
 
@@ -122,6 +131,7 @@ test('Abgeschlossener Tag (markedDone): kein Check-in, kein Feedback', async ({ 
 });
 
 test('Vergangene Woche (nach Zurück-Navigation): kein Session Coach, auch bei offenem Tag', async ({ page }) => {
+  await page.clock.install({ time: FIXED_NOW });
   await page.goto('/');
   await page.waitForSelector('#app.is-ready', { timeout: 10000 });
 
@@ -141,6 +151,7 @@ test('Vergangene Woche (nach Zurück-Navigation): kein Session Coach, auch bei o
 });
 
 test('Zwei gleichzeitig offene Tage in der aktuellen Woche zeigen beide Session Coach', async ({ page }) => {
+  await page.clock.install({ time: FIXED_NOW });
   await page.goto('/');
   await page.waitForSelector('#app.is-ready', { timeout: 10000 });
 
@@ -165,6 +176,7 @@ test('Zwei gleichzeitig offene Tage in der aktuellen Woche zeigen beide Session 
 test('Intra-Session Feedback erscheint nach Satz + RPE im offenen Tag der aktuellen Woche', async ({ page }) => {
   const pageErrors = [];
   page.on('pageerror', err => pageErrors.push(err.message));
+  await page.clock.install({ time: FIXED_NOW });
   await page.goto('/');
   await page.waitForSelector('#app.is-ready', { timeout: 10000 });
 
@@ -225,6 +237,7 @@ function makeVacationDay(idx) {
 test('A3: an einem Urlaubstag nutzt der manuelle ✓-Button die STATISCHE Pausenzeit, nicht die RPE-Empfehlung', async ({ page }) => {
   const pageErrors = [];
   page.on('pageerror', err => pageErrors.push(err.message));
+  await page.clock.install({ time: FIXED_NOW });
   await page.goto('/');
   await page.waitForSelector('#app.is-ready', { timeout: 10000 });
 

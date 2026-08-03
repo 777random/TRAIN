@@ -1,6 +1,44 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-08-03 — Runde-9-Audit-Folgerunde, train-v230 (B185-B190, schließt das Runde-8-Datenkonsistenz-Audit vollständig ab, siehe AUDIT-BERECHNUNGEN.md). Davor: Runde-8-Datenkonsistenz-Sprint, train-v229 (B181-B184, konkreter Bug + 5-Domänen-Audit + 3 Feedback-Punkte). Davor: Runde-7-Coaching-Qualitäts-Sprint, train-v228 (B178-B180). Davor: Runde-6-Nutzerfeedback-Fix-Sprint, train-v227 (B167-B177, inkl. einer während der Verifikation gefundenen+gefixten Regression B176). Davor: Runde-5-Fix-Sprint, train-v226 (B166, echte Regression von B152). Ältere Sprints siehe SESSION_LOG.md.*
-*Nächster Schritt: B55 Impressum (Blocker vor weiterer Nutzerwerbung — wartet weiterhin auf echte Name-/Adress-/E-Mail-Angaben des Betreibers, siehe LEGAL.md). Befund #4 (Notiz-Icon macht Satz-Tabelle unsichtbar, B141) bleibt weiterhin offen — B176 (Runde 6) hat dieselbe Sticky-Mechanik betroffen gefunden, stützt die Verdachtsdiagnose, bestätigt B141 selbst aber nicht. **Rückwirkungs-Hinweis (B185, Runde 9):** die Fortschritt-Tab-Konsistenz-% hat sich für Bestandsnutzer beim nächsten App-Öffnen nach diesem Push sichtbar geändert (reine Neuberechnung, keine Migration) — falls Nutzer-Rückfragen dazu kommen, siehe DECISIONS.md für die Begründung. Aus Runde 6 weiterhin zurückgestellt: B141 zweiter Versuch, dritter toter Code-Pfad (`save-week-as-template`, ui.js — unerreichbar, gefunden in Runde 6), Flaky-Test-Stabilisierung (streak_inprogress_week/share_image — beide bekannt, bei jedem Sprint gegen Baseline bestätigt), B176-Portal-Refactor (Dropdown an document.body statt aktueller Ancestor-z-index-Anhebung). Aus Runde 8/9 offen: Backfill der Muskelgruppen-Tags nur für Standard-Namen (individuell umbenannte Übungen bewusst nicht erfasst), architekturbedingte ui.js/timer.js-Pausenzeit-Duplikation (jetzt per Absicherungstest B189 gegen stilles Auseinanderdriften geschützt, aber strukturell nicht aufgelöst). Weitere, bisher nur in BUGS.md/den Sprint-Ergebnis-Dateien vermerkte offene Punkte (hier ergänzt, damit sie nicht nur dort auffindbar sind): `weeklyFocus.js:737-739`s 5./6. eigenständige RPE-Verwendung (Konfidenz-Klassifizierung für Übungsempfehlungen, B179-Nebenfund, Runde 7, für künftige Runde vorgemerkt, kein Fix); eine fehlende Trainingsziel-Einstellung (Kraft- vs. Hypertrophie-Fokus) — als Idee aus Runde 6/7 diskutiert (könnte künftig Pausenzeit/Ziel-Wdh-Vorbelegung/Satzzahl-Progressions-Schwelle vereinheitlichen), kein Umsetzungsbeschluss; zwei offene Produktfragen aus Runde 9 (`sprint-ergebnis-runde9-2026-08-03.txt`): ob die B185-Rückwirkung einen einmaligen In-App-Hinweis-Banner braucht statt stiller Neuberechnung, und ob sich ein zu AUDIT-BERECHNUNGEN.md analoges Audit für weitere Domänen (z.B. Zeit-/Datumsberechnungen) lohnt. Bestätigte Infra-Grenze (weiterhin gültig, seit Runde 9 auch bei bis zu 6 gleichzeitigen Implementierungs-Agents beobachtet): volle Playwright-Suite (69 Spec-Dateien, seit der Migrations-Testmatrix unten) kann `npx serve` mit `EMFILE`/Dev-Server-Kontention abstürzen lassen — Workaround ist der 3-Datei-Batch-Lauf, bei Verdacht auf Massenausfall in Isolation nachprüfen. Runde 6-9 liefen alle in derselben durchgehenden Konversation (kein separater Session-Neustart zwischen den Sprints) — Nutzer bittet jetzt um vollständige Doku-Synchronisation vor einem echten Session-Neustart. **Migrations-Testmatrix (2026-08-03, siehe eigener Abschnitt unten):** `tests/migration_matrix.spec.js` + `tests/migration-fixtures/` decken jetzt gezielt 11 historische `schemaVersion`-Sprünge in `state.js`s `migrate()` ab (vorher nur "0 uncaught errors" über `tests/fixtures.spec.js`, keine Prüfung der resultierenden Datenstruktur) — reine Testinfrastruktur, kein CACHE_VERSION-Bump, kein App-Verhalten geändert. Nicht committet: `Research/`, alle `context-exports/`-Updates + `Diagnose & Sprints/`-Exports (beide gitignored).*
+*Letzte Aktualisierung: 2026-08-03 — Runde 10, Teil 2 (Aufräum-Runde), train-v231 (B191/B192 + B141/B176-Abschluss, siehe eigener Abschnitt unten). Davor: Runde-9-Audit-Folgerunde, train-v230 (B185-B190, schließt das Runde-8-Datenkonsistenz-Audit vollständig ab, siehe AUDIT-BERECHNUNGEN.md). Davor: Runde-8-Datenkonsistenz-Sprint, train-v229 (B181-B184, konkreter Bug + 5-Domänen-Audit + 3 Feedback-Punkte). Davor: Runde-7-Coaching-Qualitäts-Sprint, train-v228 (B178-B180). Davor: Runde-6-Nutzerfeedback-Fix-Sprint, train-v227 (B167-B177, inkl. einer während der Verifikation gefundenen+gefixten Regression B176). Davor: Runde-5-Fix-Sprint, train-v226 (B166, echte Regression von B152). Ältere Sprints siehe SESSION_LOG.md.*
+*Nächster Schritt: B55 Impressum (Blocker vor weiterer Nutzerwerbung — wartet weiterhin auf echte Name-/Adress-/E-Mail-Angaben des Betreibers, siehe LEGAL.md). **Runde 10, Teil 1 (Zeit/Datum-Audit) wartet auf Review mit Claude Cowork** (`diagnose-runde10-zeit-datum-audit-2026-08-03.txt`) — 6 "Verdacht auf Bug"-Funde (A1: zwei divergierende Kalenderwochen-Formeln in ui.js, bestätigt an Jahresgrenzen; A2: T00:00:00/T12:00:00 gemischt; B1: wahrscheinlicher B147-Rückfall in ui.js:1479-1485; B2/B3: asymmetrische Zeitvergleiche in `_backupAgeInDays()`/`ongoingPauseDays`; C1: gefiltertes vs. ungefiltertes 3-/4-Wochen-Fenster in weightRecommendation.js), noch NICHT gefixt — kein Fix ohne Freigabe. Runde 10/Teil 2 (Aufräum-Runde) ist fertig: B141 abgeschlossen (nicht reproduzierbar nach 3 Versuchen, kein weiterer Diagnoseversuch mehr geplant), B176-Portal-Entscheidung bestätigt (kein zweiter Vorfall seit Runde 6, Portal-Refactor weiterhin zurückgestellt), toter Code `save-week-as-template` entfernt (B191), 3 Wall-Clock-Flaky-Tests stabilisiert (`streak_inprogress_week`/`week_label_calendar`/`session_coach_active_week`, jetzt `page.clock.install()` mit festem Referenzdatum statt echtem `new Date()`), einmaliger Konsistenz-Hinweis-Toast für B185 ergänzt (B192, `tip-13`). **Neuer Nebenfund (B193, nicht behoben):** `_calcCurrentStreak()` lieferte bei der Robustheits-Verifikation von Cluster 4 mit einem Sonntagabend-Referenzdatum 0 statt der erwarteten Streak — `page.clock` selbst per Sonde als korrekt bestätigt, echte Ursache liegt in state.js, noch nicht isoliert. Aus Runde 8/9 weiterhin offen: Backfill der Muskelgruppen-Tags nur für Standard-Namen (individuell umbenannte Übungen bewusst nicht erfasst), architekturbedingte ui.js/timer.js-Pausenzeit-Duplikation (per Absicherungstest B189 geschützt, strukturell nicht aufgelöst), `weeklyFocus.js:737-739`s 5./6. eigenständige RPE-Verwendung (B179-Nebenfund), eine fehlende Trainingsziel-Einstellung (Kraft- vs. Hypertrophie-Fokus, Idee aus Runde 6/7), zwei offene Produktfragen aus Runde 9 zur B185-Rückwirkung/einem Zeit-Domänen-Audit (Letzteres jetzt durch Runde 10/Teil 1 beantwortet). Bestätigte Infra-Grenze (weiterhin gültig): volle Playwright-Suite (70 Spec-Dateien, seit Cluster 5 unten) kann `npx serve` mit `EMFILE`/Dev-Server-Kontention abstürzen lassen — Workaround ist der 3-Datei-Batch-Lauf, bei Verdacht auf Massenausfall in Isolation nachprüfen. Nicht committet: `Research/`, alle `context-exports/`-Updates + `Diagnose & Sprints/`-Exports (beide gitignored).*
+
+---
+
+## Runde 10, Teil 2 — Aufräum-Runde (train-v231, 2026-08-03)
+
+`Diagnose & Sprints/TRAIN-Sprint-Prompts-Runde10.md`, Teil 2, 5 Cluster.
+Teil 1 (Zeit/Datum-Audit) separat dokumentiert in
+`diagnose-runde10-zeit-datum-audit-2026-08-03.txt`, wartet auf Freigabe —
+nur Domäne D floss direkt in Cluster 4 unten ein.
+
+- **Cluster 1 (Doku):** B141 abgeschlossen als "nicht reproduzierbar nach 3
+  unabhängigen Versuchen", kein weiterer Diagnoseversuch mehr geplant.
+- **Cluster 2 (Cleanup, B191):** toter Code `save-week-as-template`
+  entfernt (`ui.js`-Handler, `state.js`-Action-Konstante + Reducer-Case) —
+  bereits in B177 (Runde 6) als unerreichbar erkannt, jetzt tatsächlich
+  entfernt. Aktives `save-named-template`-Feature unberührt.
+- **Cluster 3 (Doku):** B176-Portal-Entscheidung bestätigt — kein zweiter
+  Stacking-Context-Vorfall seit Runde 6, Entscheidung bleibt
+  "zurückgestellt bis zweiter Vorfall".
+- **Cluster 4 (Test-Fix):** 3 Wall-Clock-abhängige Testdateien
+  (`streak_inprogress_week`, `week_label_calendar`,
+  `session_coach_active_week`) auf `page.clock.install()` mit festem
+  Referenzdatum umgestellt statt echtem `new Date()` zur Testlaufzeit —
+  behebt den seit Runde 6 bekannten `streak_inprogress_week`-Flake
+  strukturell. **Bei der Robustheits-Verifikation (Testlauf mit einem
+  anderen Referenzdatum) einen neuen, unabhängigen App-Bug gefunden, siehe
+  B193 in BUGS.md** — nicht gefixt (außerhalb des Cluster-Scopes), aber
+  mit exaktem Repro-Rezept dokumentiert.
+- **Cluster 5 (Mini-Feature, B192):** einmaliger Hinweis-Toast für die
+  B185-Konsistenz-%-Rückwirkung, über das bestehende
+  `seenTips`/`MARK_TIP_SEEN`-Muster (`tip-13`) — kein neues
+  Infrastruktur-Stück, keine state.js-Änderung.
+
+CACHE_VERSION → `train-v231` (JS-Änderungen in ui.js/state.js). Kein
+CSS-Versions-Bump (styles.css unverändert). Alle neuen/geänderten Tests
+grün (`template_management`, die 3 Cluster-4-Dateien,
+`consistency_recalc_hint` — neu, 3 Tests), keine Regression in
+`fixtures.spec.js`.
 
 ---
 

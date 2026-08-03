@@ -626,6 +626,10 @@ innerhalb eines Sticky-/z-index-tragenden Ancestors liegt, dieses Muster
 selbst erhöhten z-index verwenden. Kandidat für eine generischere Lösung
 (z.B. Dropdown-Portal an `document.body`), falls weitere Fälle dieser Art
 auftreten.
+**Bestätigung (2026-08-03, Runde 10):** Seit Runde 6 kein zweiter
+Stacking-Context-Vorfall aufgetreten (BUGS.md B178-B190 durchgesehen) —
+Entscheidung bleibt "zurückgestellt bis zweiter Vorfall", Portal-Refactor
+weiterhin nicht umgesetzt.
 
 ## COACH-LOGIK (Fortsetzung)
 

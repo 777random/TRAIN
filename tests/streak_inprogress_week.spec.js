@@ -15,8 +15,16 @@ import { test, expect } from '@playwright/test';
 // (weder gezählt noch bricht sie die Streak) und die dahinterliegende,
 // tatsächliche Streak wird korrekt weitergezählt.
 
+// Runde 10/Cluster 4: fester Referenzzeitpunkt statt echtem `new Date()` —
+// vorher liefen Node-seitige Fixture-Berechnung (dieser Datei) und
+// Browser-seitige Streak-Berechnung (state.js, Date.now()) unabhängig
+// voneinander zur jeweiligen Aufruf-Millisekunde, was den Test nahe einer
+// Tagesgrenze flaky machen konnte. `page.clock.install()` unten fixiert die
+// Browser-Zeit auf denselben Wert, den diese Funktion hier verwendet.
+const FIXED_NOW = new Date('2026-01-05T12:00:00'); // Montag
+
 function mondayOfWeek(daysAgoWeeks) {
-  const d = new Date();
+  const d = new Date(FIXED_NOW);
   const dow = d.getDay(); // 0 = Sonntag
   const diffToMonday = dow === 0 ? -6 : 1 - dow;
   d.setDate(d.getDate() + diffToMonday - daysAgoWeeks * 7);
@@ -69,6 +77,7 @@ test('Streak-Badge zählt 3 abgeschlossene Vorwochen weiter, obwohl die aktuelle
     { id: 4, startDate: mondayOfWeek(0), note: '', mode: 'standard', days: [emptyDay(41)],     sessionLog: [], bodyData: {}, restDays: [], isSeedWeek: false },
   ];
 
+  await page.clock.install({ time: FIXED_NOW });
   await page.goto('/');
   await page.waitForSelector('#app.is-ready', { timeout: 10000 });
   await page.evaluate((weeksArg) => {
