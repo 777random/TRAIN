@@ -1,20 +1,33 @@
 # TRAIN — CLAUDE.md
 # Vollständiger Projektkontext für Claude Code
-# Stand: train-v226 / SCHEMA 33 / August 2026
-# Letztes Update: nach train-v226, Runde-5-Fix-Sprint (2026-08-02) — B166,
-# echte Regression von B152 (SW-Update aktiviert im echten Zwei-Versionen-
-# Zyklus nicht zuverlässig), gefunden per echtem Live-Test gegen den
-# deployten Build (siehe BUGS.md/Diagnose & Sprints/sprint-ergebnis-
-# runde5-2026-08-01.txt). WICHTIG: nach dem nächsten Push erneut per echtem
-# Zwei-Versionen-Zyklus verifizieren, bevor B152/B166 endgültig als
-# geschlossen gilt. Davor train-v225, Runde-4-Nutzerfeedback-Fix-Sprint
-# (2026-08-01) — 8 von 9 Befunden aus Kategorie A behoben (B158-B165, A9
-# bewusst nur diagnostiziert für ein späteres Konzeptgespräch). Davor train-v224,
-# Runde-3-Tiefentest-Fix-Sprint (2026-08-01) — 6 von 6 Befunden behoben
-# (B152-B157, inkl. P0 Service-Worker-Update-Fix). Davor train-v223,
-# Pre-Launch-Fix-Sprint (2026-07-29) — 9 von 13 Befunden aus dem
-# Browser-Test train-v222 behoben (B141 offen/nicht reproduzierbar, B142 neue
-# Entscheidung, 4 Befunde als Doku-Only/kein Bug eingestuft)
+# Stand: train-v230 / SCHEMA 33 / August 2026
+# Letztes Update: nach train-v230, Runde-9-Audit-Folgerunde (2026-08-03) —
+# B185-B190, schließt das Runde-8-Datenkonsistenz-Audit vollständig ab
+# (siehe AUDIT-BERECHNUNGEN.md — alle 3 "Verdacht auf Bug"-Funde + 2
+# kosmetische Nebenfunde behoben). Wichtigster Einzelfund: B185
+# (`_weekConsistencyRatio()` nutzt jetzt dieselbe Anti-Gaming-Definition
+# wie die Streak-Berechnung) ändert RÜCKWIRKEND die angezeigte
+# Fortschritt-Tab-Konsistenz-% für ALLE Bestandswochen (keine Migration,
+# reine Neuberechnung — vom Nutzer vorab bestätigt, siehe DECISIONS.md).
+# Davor train-v229, Runde-8-Datenkonsistenz-Sprint (2026-08-02) — B181-B184:
+# konkreter Bug (Soll-Satzzahl nach Übungs-Archivierung veraltet) plus ein
+# bewusst breites 5-Domänen-Audit über alle Berechnungen im Projekt (NUR
+# Diagnose in dieser Runde, Fixes folgten in Runde 9) plus 3 unabhängige
+# Feedback-Punkte (Muskelgruppen-Zuordnung, Steigerungs-Picker ohne
+# Doppeltap, konfigurierbare größte Hantelscheibe). Davor train-v228,
+# Runde-7-Coaching-Qualitäts-Sprint (2026-08-02) — B178-B180: Coach-
+# "Warum"-Texte nutzen jetzt Mehrwochen-Trends, 4 RPE-Schwellenwerte benannt
+# (NICHT konsolidiert — unterschiedliche Konzepte, korrekt getrennt),
+# Volumen-/Satzzahl-Progression wird jetzt als Fortschritt erkannt. Davor
+# train-v227, Runde-6-Nutzerfeedback-Fix-Sprint (2026-08-02) — B167-B177:
+# globale Steigerungs-Einstellung endlich wirksam (`getEffectiveWeightStep()`),
+# Carry-Übungen können über Gewicht progressieren, diverse UI-Fixes, plus
+# eine während der Verifikation gefundene+gefixte Regression (B176,
+# CSS-Stacking-Context-Fallstrick). Davor train-v226, Runde-5-Fix-Sprint
+# (2026-08-02) — B166, echte Regression von B152 (SW-Update aktiviert im
+# echten Zwei-Versionen-Zyklus nicht zuverlässig), gefunden per echtem
+# Live-Test gegen den deployten Build. Ältere Sprints siehe HANDOFF.md/
+# SESSION_LOG.md.
 
 ---
 
@@ -62,7 +75,7 @@ TRAIN ist eine deutschsprachige PWA für Krafttraining. Pure Vanilla ES Modules 
   Sessions müssen aus diesem neuen Pfad heraus gestartet werden, sonst
   landet man am alten (jetzt leeren) OneDrive-Ort. Nutzer zieht den Ordner
   regelmäßig manuell auf eine externe Festplatte statt über Cloud-Sync.
-- Aktueller Stand: SCHEMA_VERSION 33 · CACHE_VERSION train-v226 · CSS ?v=212
+- Aktueller Stand: SCHEMA_VERSION 33 · CACHE_VERSION train-v230 · CSS ?v=213
 
 ---
 
@@ -85,6 +98,7 @@ Bei CSS-Änderungen: Cache-Buster in `index.html` erhöhen:
 | `BUGS.md` | Bug-Tracker: behoben / offen / bewusst kein Bug / bekannte Test-Fallstricke |
 | `DECISIONS.md` | Unveränderliche Produkt-/Architektur-Entscheidungen — nicht ohne neue explizite Entscheidung revidieren |
 | `AGENTS.md` | Parallelisierungs-Regeln für Multi-Agent Sprints |
+| `AUDIT-BERECHNUNGEN.md` | Referenzdokument: Konsistenz-Audit über alle Berechnungen im Projekt (Runde 8), alle Funde inzwischen bewertet/behoben (Runde 9) — Vorlage für künftige ähnliche Audits |
 | `SECURITY.md` | Security-Status heutiger Architektur (kein Backend) + dokumentierte Blaupause für Auth/Rate-Limiting/Access-Control, sobald ein Server (Paywall/Coaching) kommt |
 | `LEGAL.md` | Rechts-Recherche zu Impressum/Datenschutz (Name-/Adress-Pflicht, c/o-Workaround, DDG/DSGVO-Fakten) + Blaupause für AGB/Widerrufsrecht/BFSG, sobald Paywall/App-Store kommen |
 | `LOOPS.md` | Automatische Session-Loops (beim Start jeder Session ausführen) |
@@ -198,17 +212,17 @@ Bei unklarem Root Cause immer erst Diagnose → Ergebnis abwarten → dann Fix. 
 
 | Datei | Rolle |
 |-------|-------|
-| `state.js` | Single Source of Truth. Alle Writes über `dispatch()`. Subscribers synchron nach jeder Mutation. Persistenz in localStorage. |
+| `state.js` | Single Source of Truth. Alle Writes über `dispatch()`. Subscribers synchron nach jeder Mutation. Persistenz in localStorage. Seit train-v227 (B167) `getEffectiveWeightStep(ex, settings, customExercises)` — zentraler Resolver für die effektive Gewichts-Schrittweite (`ex.weightStep ?? settings.plateStep ?? categoryDefault ?? 2.5`), lückenlos an ~22 Stellen genutzt (per Runde-8-Audit verifiziert, keine übersehenen Inline-Fallbacks). Seit train-v230 (B185) `_dayEvalCounts(day)` — extrahiert aus `_weekTrainingStatus()`, gibt `{evaluated, total}` zurück, von `consistencyUtils.js`/`weeklyFocus.js` wiederverwendet statt `day.markedDone` (Anti-Streak-Faking-Definition jetzt konsistent für Streak UND Konsistenz-%). |
 | `ui.js` | Gesamtes DOM-Rendering. Einmalig gebootstrapped via `mountApp(root)`. Re-rendert Regionen bei State-Änderungen via `subscribe()`. |
 | `weeklyFocus.js` | Coach-Logik. `computeWeeklyFocus()` + `computeStructuralSignals()`. |
 | `plateauDetector.js` | Plateau-Erkennung. Verwendet `isFullSuccess()`. |
 | `weightRecommendation.js` | Gewichtsempfehlung. `isReadyForAutoSelect()`. |
 | `setUtils.js` | `isFullSuccess(s, ex)` — zentraler Helper. Seit train-v170 auch `weekSuccessCounts(week)` (success/(success+fail), archiviert-bewusst) — einzige Quelle, von ui.js UND weekReview.js genutzt. |
-| `consistencyUtils.js` | `_weekConsistencyRatio()` — Shared Module (verhindert Circular Import overallPerformance ↔ weeklyFocus). |
+| `consistencyUtils.js` | `_weekConsistencyRatio()` — Shared Module (verhindert Circular Import overallPerformance ↔ weeklyFocus). Seit train-v230 (B185) nutzt reguläre Trainingstage `state.js`s `_dayEvalCounts()` (≥50% Sätze bewertet) statt `day.markedDone` — angeglichen an die Streak-Definition, analog zum B38-Fix für Urlaubstage. **Bestätigte Rückwirkung:** ändert die angezeigte Konsistenz-% für alle Bestandswochen sofort (reine Neuberechnung, keine Migration), siehe DECISIONS.md. |
 | `overallPerformance.js` | `computeVolumeTrend/QualityTrend/ConsistencyTrend`. |
 | `progressInsights.js` | Erkenntnisse-Sektion. |
 | `insightEngine.js` | Toast-Regeln, Insights. Seit train-v173 auch `detectRecurringStep()`/`exMetricHistory()`/`detectRecurringWeightStep()` — Muster-Erkennung für Schrittweite-Vorschläge (B49), rein rückblickend, nie automatisch angewendet. |
-| `movementMap.js` | Übungsname → Kategorie (Push/Pull/Squat/Hinge/Core/Carry). 218 Übungen/Synonyme (seit train-v214/B111, davor 139 — +79 Variationen/deutsche+englische Synonyme; Zahl per `Object.keys(MOVEMENT_MAP).length`-Laufzeitzählung train-v222 verifiziert — ein früherer regex-basierter Zähler hatte fälschlich 217 ermittelt, da ein Eintrag mit Apostroph im Namen [`"Farmer's Walk"`, doppelte Anführungszeichen] übersehen wurde). Seit train-v170 auch `buildCategoryMap()`/`resolveCategory()` — einzige Quelle für den Kategorie-Override-Lookup (`state.customExercises`-Override vor `MOVEMENT_MAP`-Fallback), genutzt von ui.js, weeklyFocus.js UND overallPerformance.js. |
+| `movementMap.js` | Übungsname → Kategorie (Push/Pull/Squat/Hinge/Core/Carry). 218 Übungen/Synonyme (seit train-v214/B111, davor 139 — +79 Variationen/deutsche+englische Synonyme; Zahl per `Object.keys(MOVEMENT_MAP).length`-Laufzeitzählung train-v222 verifiziert — ein früherer regex-basierter Zähler hatte fälschlich 217 ermittelt, da ein Eintrag mit Apostroph im Namen [`"Farmer's Walk"`, doppelte Anführungszeichen] übersehen wurde). Seit train-v170 auch `buildCategoryMap()`/`resolveCategory()` — einzige Quelle für den Kategorie-Override-Lookup (`state.customExercises`-Override vor `MOVEMENT_MAP`-Fallback), genutzt von ui.js, weeklyFocus.js UND overallPerformance.js. Seit train-v229 (B184) zusätzlich `MUSCLE_GROUP_MAP`/`resolveMuscleGroups(name)` — eine ANDERE, unabhängige Taxonomie (Muskelgruppe statt Bewegungsmuster, z.B. "Schulter"/"Rücken"/"Brust"), alle 72 `_STANDARD_EXERCISES`-Einträge per-Übung kuratiert (nicht mechanisch aus dem Bewegungsmuster abgeleitet). Befüllt `ex.tags` bei Übungserstellung (Onboarding + `EX_ADD`-Fallback ohne History) und seit train-v230 (B188) auch rückwirkend für Bestandsdaten mit Standard-Namen (additiver Migrations-Guard, kein Backfill für individuell umbenannte Übungen). |
 | `exerciseAlternatives.js` | Seit train-v222 (B138). `EXERCISE_ALTERNATIVES` (24 Übungen mit je 2-5 kuratierten Alternativen) + `getAlternatives(exName, state)` (kombiniert `state.customAlternatives[exName]` mit vordefinierten Einträgen, dedupliziert). Importfrei (Tiefe 0), nur von ui.js genutzt (Chip-Reihe im "Heute anders"-Dialog, neben der bereits bestehenden historienbasierten `sub-suggestions`-Liste aus B109/D2). |
 | `progressChart.js` | Übungsfortschritt-Chart. |
 | `weekReview.js` | Wochenrückblick. |
@@ -252,6 +266,12 @@ Flux-Pattern: `dispatch(A.ACTION_TYPE, payload)` → `reduce()` → `persistStat
         targetReps, progressionType, archived,
         substituteFor,
         skipReason, skipDate,  // seit SCHEMA 33 (B129) — Grund für komplett übersprungene Übung
+        tags,  // Muskelgruppen (nicht Bewegungsmuster!), seit train-v229 (B184) bei
+               // Neuerstellung + train-v230 (B188) per Backfill für Bestandsdaten
+               // befüllt, siehe movementMap.js resolveMuscleGroups(). Feld existiert
+               // seit SCHEMA 9, war aber jahrelang tot (nirgends im UI befüllt, B41).
+        // ENTFERNT (B187, train-v230): targetSets — wurde stale, sobald Sätze
+        // manuell hinzugefügt/entfernt wurden; sets.length ist die einzige Quelle.
       }]
     }],
     sessionLog, bodyData, restDays, isSeedWeek
@@ -261,6 +281,8 @@ Flux-Pattern: `dispatch(A.ACTION_TYPE, payload)` → `reduce()` → `persistStat
     erkenntnisseHorizont: 8,  // geclampt gegen realWeeks beim Render
     autoEval, plateStep, barbellWeight, ...
     nutritionPhase: 'maintenance',  // 'bulk'|'maintenance'|'cut' — B139, additiver Default, kein SCHEMA-Bump
+    hideStopwatch: false,   // B171 (train-v229), additiver Default
+    largestPlate: 25,       // B182 (train-v229) — Hantelscheiben-Rechner-Obergrenze, additiver Default
   },
   prs: {},
   coachPerformance: { suggestions: [] },
@@ -361,9 +383,15 @@ manuellen Wochenwechsel).
 - Chart-Datenpunkte / 1RM-Schätzung
 - Daten-Anwesenheits-Gates (`.some(s => s.status === 'success' || s.status === 'fail')`)
 
-**RPE-Schwellen (bewusst unterschiedlich):**
+**RPE-Schwellen (bewusst unterschiedlich, seit Runde 7/9 als benannte Konstanten
+dokumentiert statt anonymer Zahlenliterale — siehe AUDIT-BERECHNUNGEN.md für die
+volle Klassifizierung "unterschiedliches Konzept, korrekt getrennt" pro Wert,
+NICHT konsolidieren):**
 - Progressionsbereitschaft: avgRPE ≤ 8.0
-- Konfidenz HIGH: ≤ 7.5 | Konfidenz MEDIUM: ≤ 8.5
+- Konfidenz HIGH: ≤ 7.5 (`CONF_HIGH_AVG_RPE_MAX_4WK`, weeklyFocus.js) | Konfidenz MEDIUM: ≤ 8.5 (`CONF_MEDIUM_AVG_RPE_MAX_4WK`)
+- Satz-Zone "hart": ≥ 8.5 (`RPE_SET_HARD_ZONE`, sessionCoach.js, Einzelsatz/Echtzeit)
+- Deload-Strategie-Weiche: ≥ 8.5 (`RPE_PLATEAU_DELOAD_STRATEGY_1WK_AVG`, plateauDetector.js, 1-Wochen-Ø pro Übung)
+- Präventives Deload-Signal: > 7.5 (`RPE_PREVENTIVE_DELOAD_3WK_AVG`, weeklyFocus.js, 3-Wochen-Ø fürs ganze Programm)
 
 **Datumsvergleiche:** immer `dayISO < todayISO` (nicht `<=`) — heutiger Tag gilt als noch nicht fällig.
 
@@ -390,7 +418,7 @@ manuellen Wochenwechsel).
 
 **Fortschritt-Tab:** Erkenntnisse (geclampt), Gesamtperformance, Push/Pull-Ratio, Übungsfortschritt-Chart mit Prognose, Streak (neutral), Abzeichen-Galerie, Körpergewicht-Chart, Bewegungsschaubild, Coach-Bilanz, Relative Stärke / Pound-for-Pound (`renderRelativeStrengthChart()`, progressChart.js + `_weeklyP4PSeries()`, ui.js — war fälschlich noch unter "Offen/Konzept" gelistet, Doku-Drift im Deep-Check-Audit v169 gefunden).
 
-**Technisch:** iOS Safe Area, Auto-Backup, Service Worker (user-gated Update), movementMap (+32 englische Synonyme), isFullSuccess(), consistencyUtils.js.
+**Technisch:** iOS Safe Area, Auto-Backup, Service Worker (user-gated Update), movementMap (+32 englische Synonyme), isFullSuccess(), consistencyUtils.js. Konfigurierbare größte Hantelscheibe (v229, B182 — `settings.largestPlate`, Default 25kg). Muskelgruppen-Zuordnung für die Standard-Übungsbibliothek (v229/v230, B184/B188 — `ex.tags`, separate Taxonomie zur Bewegungsmuster-Klassifizierung, revidiert 2 zuvor tote Insight-Signale P-04/W-03).
 
 ### Offen / In Arbeit:
 | Feature | Priorität |

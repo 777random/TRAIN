@@ -2,6 +2,112 @@
 # Automatisch von Claude Code
 # befüllt beim Session-Start
 
+## 2026-08-03 train-v230 (Runde-9-Audit-Folgerunde B185-B190, Audit vollständig abgeschlossen)
+Loop 1: nicht separat gelaufen (volle Suite lief batch-weise, s.u.), 0 fehlgeschlagen
+Loop 2: aktuell ✓ (CLAUDE.md/HANDOFF.md/BUGS.md/DECISIONS.md/AGENTS.md/AUDIT-BERECHNUNGEN.md auf train-v230 gebracht, alle 4 Sprints dieser Konversation — Runde 6-9 — in einem Konsolidierungsdurchgang nachgezogen, da die Konversation ohne Session-Neustart durchlief)
+Eigentliche Aufgabe: TRAIN-Sprint-Prompts-Runde9.md ausgeführt — überführt
+  die 3 vom Nutzer freigegebenen Verdachtsfälle aus dem Runde-8-Audit
+  (AUDIT-BERECHNUNGEN.md) in konkrete Fixes, plus Muskelgruppen-Backfill,
+  Absicherungstest, 2 kosmetische Nebenfunde. 6 parallele Diagnose/Design-
+  Agents (aufbauend auf Runde-8-Diagnose, keine Neu-Exploration). Plan-Mode
+  inkl. 2 Rückfragen (Cluster 1s bestätigte Rückwirkung; 2 zusätzliche
+  Agent-Funde derselben Fehlerklasse mitfixen — beide bejaht). Alle 3
+  state.js-Cluster (1/3/4) vorab auf disjunkte Zeilen-Regionen
+  diagnostiziert — alle 6 Cluster liefen in EINER parallelen Runde (neues
+  Muster 14 in AGENTS.md, inkl. mehrerer Agents die ihre Absicherungstests
+  per Sabotage-dann-Revert selbst verifizierten, und einem Agent der eine
+  echte Interferenz mit einer älteren Runde-8-Testfixture fand+fixte).
+  B185 (wichtigster Fund): _weekConsistencyRatio() nutzt jetzt dieselbe
+  Anti-Gaming-Definition wie die Streak-Berechnung statt markedDone —
+  bestätigte Rückwirkung auf alle Bestandswochen (reine Neuberechnung,
+  keine Migration), vorab mit Nutzer abgestimmt. B186 (weekReview.js
+  PR-Karte, Deload-Filter ergänzt, Bonus-Fix für _findBestGain). B187
+  (ex.targetSets entfernt, zweite state.js-Schreibstelle gefunden die
+  Runde-8-Audit übersehen hatte). B188 (Muskelgruppen-Backfill, additiver
+  Migrations-Guard). B189 (Absicherungstest ui.js/timer.js-Pausenzeit-
+  Duplikat, Sabotage-Check verifiziert). B190 (Kosmetik: weeklyFocus.js-
+  Duplikat abgesichert, Konfidenz-Konstanten benannt). Volle Suite (68
+  Spec-Dateien, 3 Batches): alle Failures aufgeklärt (1 Batch zeigte 12
+  Failures durch EMFILE-Klasse Dev-Server-Kontention bei 6 gleichzeitigen
+  Agents, isoliert 24/24 grün; share_image-Flake bekannt). CACHE_VERSION
+  train-v229→v230, kein CSS-Bump. AUDIT-BERECHNUNGEN.md aktualisiert (alle
+  Funde als behoben markiert). Sprint-Ergebnis vollständig in
+  Diagnose & Sprints/sprint-ergebnis-runde9-2026-08-03.txt. Committed +
+  gepusht (Nutzer-Bestätigung eingeholt).
+
+## 2026-08-02 train-v229 (Runde-8-Datenkonsistenz-Sprint B181-B184, konkreter Bug + 5-Domänen-Audit + 3 Feedback-Punkte)
+Loop 1: nicht separat gelaufen (volle Suite lief batch-weise, s.u.), 0 fehlgeschlagen
+Loop 2: nachgezogen im Runde-9-Konsolidierungsdurchgang (s.o.)
+Eigentliche Aufgabe: TRAIN-Sprint-Prompts-Runde8.md ausgeführt — Anlass war
+  ein konkreter, reproduzierter Bug (Soll-Satzzahl nach Übungs-Archivierung
+  mitten in der Woche blieb im Tagesabschluss-Bildschirm veraltet) plus die
+  Sorge, dass Berechnungen im Projekt zu kleinteilig/uneinheitlich geworden
+  sind. Nutzer-Leitplanke wörtlich: "Single Source of Truth" heißt NICHT
+  alles auf eine Zahl zwingen. 9 parallele Diagnose-Agents (1 Bug-Diagnose,
+  5 Audit-Domänen, 3 Feedback-Diagnosen). Nutzer bestätigte per Rückfrage:
+  Cluster-0-Root-Cause war "archivieren" nicht "löschen"; Cluster 2
+  (Muskelgruppen) bekommt die volle ~70-Übungen-Kuration.
+  B181 (Cluster 0, Anlass): _getDayCompletionStats() zählte archivierte
+  Übungen weiterhin mit (fehlender ex.archived-Filter, kein Cache-Bug wie
+  B166/B176) — Root Cause vor dem Fix aktiv reproduziert. Cluster 1
+  (5-Domänen-Audit): NUR Diagnose, wie explizit vorgegeben — 3 echte
+  Verdachtsfälle gefunden, in neuem AUDIT-BERECHNUNGEN.md dokumentiert,
+  Fixes bewusst auf eine spätere Runde verschoben. B182 (konfigurierbare
+  größte Hantelscheibe, settings.largestPlate). B183 (Steigerungs-Picker
+  ohne Doppel-Tap, Chip-Werte aus getEffectiveWeightStep()). B184
+  (Muskelgruppen-Zuordnung für alle 72 Standard-Übungen, per-Übung
+  kuratiert, belebt 2 tote Insight-Signale P-04/W-03). Volle Suite (66
+  Spec-Dateien, 3 Batches) grün. CACHE_VERSION train-v228→v229, kein
+  CSS-Bump. Sprint-Ergebnis vollständig in
+  Diagnose & Sprints/sprint-ergebnis-runde8-2026-08-02.txt. Committed +
+  gepusht (Nutzer-Bestätigung eingeholt).
+
+## 2026-08-02 train-v228 (Runde-7-Coaching-Qualitäts-Sprint B178-B180)
+Loop 1: nicht separat gelaufen (volle Suite lief batch-weise, s.u.), 0 fehlgeschlagen
+Loop 2: nachgezogen im Runde-9-Konsolidierungsdurchgang (s.o.)
+Eigentliche Aufgabe: TRAIN-Sprint-Prompts-Runde7.md ausgeführt — baut
+  direkt auf dem Cluster-4-Audit aus Runde 6 auf (dort nur diagnostiziert).
+  3 parallele Diagnose-Agents, alle 3 Cluster state.js-frei — erster Sprint
+  dieser Art, keine Solo-Runde nötig (neues Muster 12 in AGENTS.md), alle 3
+  Implementierungs-Agents liefen direkt in einer Runde. B178 (C5,
+  Coach-"Warum"-Texte nutzen jetzt Mehrwochen-Trend rec.reason statt
+  statischem Text, nur 2 von 8 geprüften Stellen hatten echten Mehrwert).
+  B179 (C6, 4 RPE-Schwellenwerte benannt statt konsolidiert — Verdict "alle
+  3 Paare unterschiedliches Konzept, korrekt getrennt", reiner Rename, 112
+  Tests unverändert grün). B180 (C3, Volumen-/Satzzahl-Progression wird
+  jetzt als Fortschritt erkannt, additive Ableitungsfunktionen, kein
+  state.js nötig). Volle Suite (64 Spec-Dateien, 3 Batches) grün.
+  CACHE_VERSION train-v227→v228, kein CSS-Bump. Sprint-Ergebnis vollständig
+  in Diagnose & Sprints/sprint-ergebnis-runde7-2026-08-02.txt. Committed +
+  gepusht (Nutzer-Bestätigung eingeholt).
+
+## 2026-08-02 train-v227 (Runde-6-Nutzerfeedback-Fix-Sprint B167-B177, größter Sprint der Serie)
+Loop 1: nicht separat gelaufen (volle Suite lief batch-weise, s.u.), 0 fehlgeschlagen
+Loop 2: nachgezogen im Runde-9-Konsolidierungsdurchgang (s.o.)
+Eigentliche Aufgabe: TRAIN-Sprint-Prompts-Runde6.md ausgeführt — 8 Cluster
+  Teil 1 (Bugfixes/Housekeeping) + Teil 2 (Onboarding-Feature, aus dieser
+  Runde ausgeklammert/nicht Teil dieses Sprint-Dokuments). 8 parallele
+  Diagnose-Agents deckten 2 wichtige Korrekturen zur Sprint-Prompt-Annahme
+  auf (Cluster 2/C12 überlappt mit Cluster 1 in state.js; B154 hat nur 2
+  von 4 Testlücken-Blockern tatsächlich behoben) — beide vor der
+  Implementierung in Plan-Mode bestätigt. 2-Runden-Muster (state.js-Solo
+  zuerst für die gekoppelten Cluster 1+2/C12, danach 5 parallele Agents auf
+  disjunkten Bereichen). B167 (globale Steigerungs-Einstellung endlich
+  wirksam, getEffectiveWeightStep()-Resolver, 16 Lesestellen umgestellt).
+  B168 (Carry-Übungen können über Gewicht progressieren, gekoppelt mit
+  B167). B169 (toter Code entfernt). B170/B171/B172 (PR-Badge, Stoppuhr-
+  Toggle, Favoriten-Übersicht). B173 (Wdh-Reduzierung, in sessionCoach.js
+  statt weightRecommendation.js wie angenommen). B174 (B141 weiterhin
+  ungeklärt). B175 (Notiz-Feld durch kontextuelles Q&A ersetzt). B176 (in
+  der Verifikation gefundene ECHTE Regression, kein Nutzerfeedback —
+  offenes Übungsmenü konnte vom nächsten Sticky-Header verdeckt werden,
+  CSS-Stacking-Context-Fallstrick, noch im selben Sprint gefunden+behoben).
+  B177 (4 neue Tests für Testlücken aus Runde 3, Korrektur: B154 hatte nur
+  2 von 4 Blockern behoben). Volle Suite (63-64 Spec-Dateien, 3 Batches)
+  grün. CACHE_VERSION train-v226→v227, kein CSS-Bump. Sprint-Ergebnis
+  vollständig in Diagnose & Sprints/sprint-ergebnis-runde6-2026-08-02.txt.
+  Committed + gepusht (Nutzer-Bestätigung eingeholt).
+
 ## 2026-08-02 train-v226 (Runde-5-Fix-Sprint B166, Regression von B152)
 Loop 1: nicht separat gelaufen (volle Suite lief batch-weise, s.u.), 0 fehlgeschlagen
 Loop 2: aktuell ✓ (CLAUDE.md/HANDOFF.md/BUGS.md/AGENTS.md auf train-v226 gebracht)

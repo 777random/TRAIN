@@ -1,6 +1,181 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-08-02 — Runde-5-Fix-Sprint, train-v226 (B166, echte Regression von B152 — SW-Update aktivierte im echten Zwei-Versionen-Zyklus weiterhin nicht zuverlässig, gefunden per echtem Live-Test gegen den deployten Build). Davor: Runde-4-Nutzerfeedback-Fix-Sprint, train-v225 (B158-B165, 8 von 9 Befunden aus Kategorie A behoben; A9 bewusst nur diagnostiziert). Davor: Runde-3-Tiefentest-Fix-Sprint, train-v224 (B152-B157, 6 von 6 Befunden behoben). Davor: B143-B151, train-v223 (9 von 13 Befunden aus dem Browser-Test train-v222 behoben) und ältere Sprints — siehe SESSION_LOG.md für die vollständige Historie.*
-*Nächster Schritt: B55 Impressum (Blocker vor weiterer Nutzerwerbung — wartet weiterhin auf echte Name-/Adress-/E-Mail-Angaben des Betreibers, siehe LEGAL.md). Befund #4 (Notiz-Icon macht Satz-Tabelle unsichtbar, B141) bleibt weiterhin offen. **Sofort nach dem Push dieser Session (siehe unten): erneuter echter Zwei-Versionen-Deploy-Test für B152/B166** (train-v225→v226) — alte Version offen lassen, Push+GitHub-Pages-Deploy abwarten, Update-Banner antippen, prüfen dass v226 sofort aktiv ist ohne manuellen Reload UND dass der Banner bei einem Reload VOR dem Klick weiterhin/erneut erscheint (genau das Szenario, das B166 verursacht hat). Erst nach einem sauberen echten Durchlauf gilt B152/B166 als wirklich geschlossen — der letzte "erfolgreiche" Test war es nachweislich nicht. Aus der Feedback-Analyse weiterhin zurückgestellt (siehe `Diagnose & Sprints/TRAIN-Feedback-Analyse.md`): Kategorie B (5 kleinere UX-Punkte), C2+C9 (Steigerungs-Regelmatrix), C5+C6 (Coaching-Text-Qualität + Abhängigkeits-Audit), C1+C8 (Onboarding-Umbau "Eigenen Plan erstellen"), C3/C4/C7/C10/C11/C12 (Backlog). Tote Code-Kandidaten weiterhin vorhanden (nicht entfernt): `renderDayCard()` (ui.js, seit Runde 3), `SET_AUTOFILL_DOWN` (state.js, seit Runde 4). Weiterhin nur als Notiz (kein Bug, aber diese Session konkret erlebt): mehrere Test-Dateien konstruieren Datums-Fixtures über lokale `Date`-Methoden — `tests/streak_inprogress_week.spec.js` schlug in dieser Session durch einen echten Datums-Rollover MITTEN in der Session (2026-08-01→2026-08-02) fehl (Streak zeigte 0 statt 3), nichts mit den B166-Änderungen zu tun, per Code-Lektüre bestätigt unrelated. Bestätigte Infra-Grenze (weiterhin gültig): volle Playwright-Suite (304 Tests) kann `npx serve` mit `EMFILE` abstürzen lassen — Workaround ist der 3-Datei-Batch-Lauf. Push dieser Session braucht noch die reguläre Session-Bestätigung (Push-Policy LOOPS.md) — **besonders wichtig**, da B166 den Update-Mechanismus selbst betrifft. Loops 7-11 aktiv. Nicht committet: `Research/TRAIN_Parameter_Review.md`, alle `context-exports/`-Updates + `Diagnose & Sprints/`-Exports (beide gitignored).*
+*Letzte Aktualisierung: 2026-08-03 — Runde-9-Audit-Folgerunde, train-v230 (B185-B190, schließt das Runde-8-Datenkonsistenz-Audit vollständig ab, siehe AUDIT-BERECHNUNGEN.md). Davor: Runde-8-Datenkonsistenz-Sprint, train-v229 (B181-B184, konkreter Bug + 5-Domänen-Audit + 3 Feedback-Punkte). Davor: Runde-7-Coaching-Qualitäts-Sprint, train-v228 (B178-B180). Davor: Runde-6-Nutzerfeedback-Fix-Sprint, train-v227 (B167-B177, inkl. einer während der Verifikation gefundenen+gefixten Regression B176). Davor: Runde-5-Fix-Sprint, train-v226 (B166, echte Regression von B152). Ältere Sprints siehe SESSION_LOG.md.*
+*Nächster Schritt: B55 Impressum (Blocker vor weiterer Nutzerwerbung — wartet weiterhin auf echte Name-/Adress-/E-Mail-Angaben des Betreibers, siehe LEGAL.md). Befund #4 (Notiz-Icon macht Satz-Tabelle unsichtbar, B141) bleibt weiterhin offen — B176 (Runde 6) hat dieselbe Sticky-Mechanik betroffen gefunden, stützt die Verdachtsdiagnose, bestätigt B141 selbst aber nicht. **Rückwirkungs-Hinweis (B185, Runde 9):** die Fortschritt-Tab-Konsistenz-% hat sich für Bestandsnutzer beim nächsten App-Öffnen nach diesem Push sichtbar geändert (reine Neuberechnung, keine Migration) — falls Nutzer-Rückfragen dazu kommen, siehe DECISIONS.md für die Begründung. Aus Runde 6 weiterhin zurückgestellt: B141 zweiter Versuch, dritter toter Code-Pfad (`save-week-as-template`, ui.js — unerreichbar, gefunden in Runde 6), Flaky-Test-Stabilisierung (streak_inprogress_week/share_image — beide bekannt, bei jedem Sprint gegen Baseline bestätigt), B176-Portal-Refactor (Dropdown an document.body statt aktueller Ancestor-z-index-Anhebung). Aus Runde 8/9 offen: Backfill der Muskelgruppen-Tags nur für Standard-Namen (individuell umbenannte Übungen bewusst nicht erfasst), architekturbedingte ui.js/timer.js-Pausenzeit-Duplikation (jetzt per Absicherungstest B189 gegen stilles Auseinanderdriften geschützt, aber strukturell nicht aufgelöst). Bestätigte Infra-Grenze (weiterhin gültig, seit Runde 9 auch bei bis zu 6 gleichzeitigen Implementierungs-Agents beobachtet): volle Playwright-Suite (68 Spec-Dateien) kann `npx serve` mit `EMFILE`/Dev-Server-Kontention abstürzen lassen — Workaround ist der 3-Datei-Batch-Lauf, bei Verdacht auf Massenausfall in Isolation nachprüfen. Runde 6-9 liefen alle in derselben durchgehenden Konversation (kein separater Session-Neustart zwischen den Sprints) — Nutzer bittet jetzt um vollständige Doku-Synchronisation vor einem echten Session-Neustart. Nicht committet: `Research/`, alle `context-exports/`-Updates + `Diagnose & Sprints/`-Exports (beide gitignored).*
+
+---
+
+## B185-B190 — Runde-9-Audit-Folgerunde: Audit vollständig abgeschlossen (train-v230, 2026-08-03)
+
+Direkte Fortsetzung von Runde 8s 5-Domänen-Audit (`AUDIT-BERECHNUNGEN.md`).
+Nutzer gab explizit alle 3 gefundenen "Verdacht auf Bug"-Fälle plus einen
+Muskelgruppen-Backfill, einen Absicherungstest und 2 kosmetische Nebenfunde
+zur Umsetzung frei. 6 parallele Diagnose/Design-Agents (aufbauend auf der
+bereits gelaufenen Runde-8-Diagnose, keine Neu-Exploration), Plan-Mode-
+Bestätigung inkl. 2 gezielter Rückfragen (Cluster 1s Rückwirkung
+bestätigen; 2 zusätzliche, von den Agents gefundene Nebenfunde derselben
+Fehlerklasse mitfixen). Alle 3 state.js-berührenden Cluster (1/3/4) wurden
+vorab auf ihre exakte Zeilen-Region diagnostiziert und disjunkt bestätigt
+— alle 6 Cluster liefen daher in EINER parallelen Runde ohne Solo-Vorlauf
+(neues Muster 14 in AGENTS.md).
+
+- **B185 (wichtigster Fund):** `_weekConsistencyRatio()` nutzte für
+  reguläre Trainingstage das manipulierbare `markedDone`-Kriterium statt
+  der Anti-Gaming-Definition der Streak-Berechnung (≥50% Sätze bewertet).
+  Fix: neue `_dayEvalCounts()`-Export-Funktion (state.js), von
+  `consistencyUtils.js` UND `weeklyFocus.js`s onTrack-Fallback-Karte
+  (Bonus-Fix) genutzt. **Bestätigte Rückwirkung:** ändert die angezeigte
+  Fortschritt-Tab-Konsistenz-% für die GESAMTE bisherige Historie sofort
+  (keine Migration, reine Neuberechnung) — vom Nutzer vorab explizit
+  bestätigt, siehe DECISIONS.md.
+- **B186:** `weekReview.js` PR-/Steigerungs-Karten zeigten "Neuer PR"/
+  "Stärkste Steigerung" auch während/gegen Deload-Wochen (im Gegensatz zu
+  3 anderen Implementierungen im Code, die das bereits korrekt filtern).
+  Deload-Filter am Aufrufer ergänzt (kein neuer Helper — etabliertes
+  Inline-Muster). Bonus-Fix: `_findBestGain`s Gate um Vorwoche-Deload-
+  Check erweitert.
+- **B187:** `ex.targetSets` komplett entfernt (gleiche Fehlerklasse wie
+  B181) — die Diagnose fand dabei eine zweite Schreibstelle in state.js
+  (`ONBOARDING_SEED`), die der Runde-8-Audit übersehen hatte.
+- **B188:** Muskelgruppen-Backfill für Bestandsdaten (additiver
+  Migrations-Guard, kein SCHEMA_VERSION-Bump). Beim Implementieren einen
+  echten Interferenz-Fall mit einer Runde-8-Testfixture gefunden+behoben
+  (die neue Migration hätte eine bewusst leere Tags-Fixture stillschweigend
+  befüllt, bevor der eigentliche Test-Reducer lief).
+- **B189:** Absicherungstest gegen künftiges Auseinanderdriften des
+  architekturbedingten ui.js/timer.js-Pausenzeit-Duplikats. Wirksamkeit
+  per Sabotage-Check verifiziert (Wert testweise verändert, Test schlug
+  korrekt fehl, danach vollständig zurückgesetzt — `git diff` zeigt 0
+  Netto-Änderung).
+- **B190:** Kosmetik — `weeklyFocus.js`/`setUtils.js`-Duplikat abgesichert
+  (Absicherungstest statt Auflösung, zirkulärer Import bleibt ein echtes
+  Hindernis), Konfidenz-Konstanten benannt (reiner Rename, 37 Tests
+  unverändert grün).
+
+Volle Suite (68 Spec-Dateien, 3 Batches): alle Failures aufgeklärt (ein
+Batch zeigte 12 Failures durch EMFILE-Klasse Dev-Server-Kontention bei 6
+gleichzeitigen Agents, in Isolation 24/24 grün bestätigt; `share_image`-
+Download-Timeout bekannter Flake). CACHE_VERSION train-v229→v230, kein
+CSS-Bump. AUDIT-BERECHNUNGEN.md aktualisiert (alle Funde als behoben
+markiert). Sprint-Ergebnis vollständig in
+`Diagnose & Sprints/sprint-ergebnis-runde9-2026-08-03.txt`.
+
+---
+
+## B181-B184 — Runde-8-Datenkonsistenz-Sprint: konkreter Bug + 5-Domänen-Audit + 3 Feedback-Punkte (train-v229, 2026-08-02)
+
+Anlass: ein konkreter, reproduzierter Bug (Übung mitten in der Woche
+archiviert → Soll-Satzzahl sank live korrekt von 24 auf 20, die
+Zusammenfassung rechnete aber weiterhin mit 24) plus die grundsätzliche
+Sorge, dass Berechnungen im Projekt zu kleinteilig/uneinheitlich geworden
+sind. Leitplanke vom Nutzer wörtlich vorgegeben: "Single Source of Truth"
+heißt NICHT alles auf eine Zahl zwingen — Runde 7 hat gezeigt, dass
+scheinbare Duplikate oft absichtlich unterschiedliche Konzepte sind.
+
+- **B181 (Cluster 0, Anlass des Sprints):** Root Cause war NICHT ein
+  Cache-/Snapshot-Bug wie B166/B176, sondern ein simpler vergessener
+  Filter — `_getDayCompletionStats()` zählte archivierte Übungen weiterhin
+  mit, im Unterschied zu ~11 anderen Stellen im Code. Fix: `if
+  (ex.archived) continue;` an beiden betroffenen Zählschleifen ergänzt.
+  Root Cause vor dem Fix aktiv reproduziert (Guards testweise entfernt,
+  Test schlug mit exakt dem gemeldeten Symptom fehl).
+- **Cluster 1 (5-Domänen-Audit, NUR Diagnose in dieser Runde):** 5
+  parallele, rein lesende Agents inventarisierten alle Berechnungen im
+  Projekt (Satz-/Ziel-Zahlen, Gewicht/PR, Streak/Konsistenz, RPE-Schwellen,
+  Pausenzeiten) und klassifizierten jeden Fund als "konsistent"/"Verdacht
+  auf Bug"/"korrekt getrennt". Ergebnis in neuem `AUDIT-BERECHNUNGEN.md` —
+  3 echte Verdachtsfälle gefunden (`ex.targetSets`, `weekReview.js` PR-Karte
+  ohne Deload-Filter, `_weekConsistencyRatio()`s markedDone-Diskrepanz),
+  bewusst NICHT in diesem Sprint gefixt (explizite Sprint-Vorgabe) — Fixes
+  folgten in Runde 9 nach separater Nutzer-Freigabe.
+- **B182 (Cluster 4):** Hantelscheiben-Rechner bekommt konfigurierbare
+  größte Scheibe (`settings.largestPlate`, Default 25kg, Preset-Buttons
+  15/20/25kg) statt fest 25kg.
+- **B183 (Cluster 3):** manuelle Steigerungs-Anpassung braucht keinen
+  Doppel-Tap mehr — der bereits vorhandene Picker (Chips + Freitext) wird
+  jetzt per einfachem Tap geöffnet, Chip-Werte aus `getEffectiveWeightStep()`
+  abgeleitet statt hartcodiert.
+- **B184 (Cluster 2):** Muskelgruppen-Zuordnung für alle 72 Standard-
+  Übungen ergänzt (`movementMap.js` `MUSCLE_GROUP_MAP`, per-Übung kuratiert
+  — z.B. Schulterdrücken korrekt Schulter statt Brust trotz Push-Muster).
+  Verdrahtet für NEU erstellte Übungen (Backfill für Bestandsdaten folgte
+  in Runde 9/B188). Bonus: 2 bereits gebaute, tote Insight-Signale
+  (P-04/W-03) greifen jetzt automatisch.
+
+Volle Suite (66 Spec-Dateien, 3 Batches) grün (bekannte Flakes bestätigt
+unrelated). CACHE_VERSION train-v228→v229, kein CSS-Bump. Neues
+Referenzdokument `AUDIT-BERECHNUNGEN.md` angelegt. Sprint-Ergebnis
+vollständig in `Diagnose & Sprints/sprint-ergebnis-runde8-2026-08-02.txt`.
+
+---
+
+## B178-B180 — Runde-7-Coaching-Qualitäts-Sprint (train-v228, 2026-08-02)
+
+Baute direkt auf dem Cluster-4-Audit aus Runde 6 auf (dort nur
+diagnostiziert, nicht umgesetzt) — 3 Cluster, alle state.js-frei (erster
+Sprint dieser Art, keine Solo-Runde nötig, neues Muster 12 in AGENTS.md).
+
+- **B178 (C5):** Coach-"Warum"-Texte beim Übungsabschluss nutzen jetzt den
+  bereits berechneten Mehrwochen-Trend (`rec.reason` aus
+  `getWeightRecommendation()`, bisher verworfen) statt eines statischen
+  Texts. Von 8 geprüften Textstellen hatten nur 2 echten Mehrwert — die
+  anderen 6 blieben bewusst unverändert (redundant mit dem bestehenden
+  `prevRpe`-Trend). Bewusst NICHT umgesetzt: Pausenzeit-Ist-vs-Empfehlung-
+  Vergleich (bräuchte eine echte state.js-Erweiterung, kein Datenfeld für
+  Ist-Pausendauer vorhanden).
+- **B179 (C6):** vier RPE-Schwellenwerte über 4 Dateien benannt (nicht
+  konsolidiert) — Verdict: alle 3 geprüften Paare sind "unterschiedliches
+  Konzept, korrekt getrennt", unterschiedliche Zeitfenster rechtfertigen
+  unterschiedliche Zahlenwerte. Reiner Rename, 112 Tests unverändert grün.
+- **B180 (C3):** Volumen-/Satzzahl-Progression wird jetzt als Fortschritt
+  erkannt — neue Ableitungsfunktionen (`exSetCountHistory()` etc., kein
+  state.js-Feld nötig) überschreiben additiv das Plateau-/Stagnations-Flag,
+  wenn die Satzzahl über dasselbe Zeitfenster wächst, das bereits für
+  Gewicht genutzt wird.
+
+Volle Suite (64 Spec-Dateien, 3 Batches) grün. CACHE_VERSION
+train-v227→v228, kein CSS-Bump. Sprint-Ergebnis vollständig in
+`Diagnose & Sprints/sprint-ergebnis-runde7-2026-08-02.txt`.
+
+---
+
+## B167-B177 — Runde-6-Nutzerfeedback-Fix-Sprint (train-v227, 2026-08-02)
+
+Größter Sprint dieser Serie: globale Steigerungs-Einstellung wirksam
+machen, mehrere kleinere UX-Punkte, Testlücken schließen, plus eine
+während der Verifikation gefundene echte Regression.
+
+- **B167:** globale Einstellung "Kleinstmögliche Steigerung" war für jede
+  real existierende Übung wirkungslos (`ex.weightStep` hatte in der
+  Fallback-Kette immer Vorrang). Neuer zentraler Resolver
+  `getEffectiveWeightStep()` (state.js), an allen 16 Lesestellen
+  durchgesetzt.
+- **B168:** Carry-Übungen (Distanz/Zeit) können jetzt über Gewicht
+  progressieren (gekoppelt mit B167 im selben Solo-Durchgang, da beide den
+  `EX_ADD`-Reducer ändern — Overlap, den das Sprint-Dokument nicht
+  vorhergesehen hatte).
+- **B169:** toter Code entfernt (`renderDayCard()`, `SET_AUTOFILL_DOWN`).
+- **B170/B171/B172:** PR-Badge kompaktiert, Stoppuhr-Toggle, Favoriten-
+  Übersicht.
+- **B173:** Wdh-Reduzierung zusätzlich zu Gewichtsreduzierung (in
+  sessionCoach.js, NICHT weightRecommendation.js wie ursprünglich
+  angenommen — dort existiert aktuell gar keine Reduktions-Branch).
+- **B174:** B141 weiterhin ungeklärt, nur dokumentiert.
+- **B175:** Notiz-Feld pro Satz durch kontextuelles Auffälligkeits-Q&A
+  ersetzt (RPE≥9/Wdh-Fehlbetrag/Gewichtsabweichung).
+- **B176 (während der Verifikation gefunden, kein Nutzerfeedback):**
+  offenes Übungsmenü konnte vom nächsten Übungs-Sticky-Header verdeckt
+  werden, Klick auf "Übung löschen" traf ins Leere. Ausgelöst durch B175s
+  Layout-Verkleinerung, Root Cause aber ein länger bestehender CSS-
+  Stacking-Context-Fallstrick (`.ex-menu-dropdown` als Nachfahre von
+  `.exercise__name-sticky`). Noch im selben Sprint gefunden UND behoben.
+- **B177:** 4 neue Playwright-Tests für Testlücken aus Runde 3. Wichtige
+  Korrektur: B154 hatte nur 2 von 4 Blockern tatsächlich behoben.
+
+Runde 6 war der erste Sprint mit einem 2-Runden-Muster (state.js-Solo
+zuerst für die gekoppelten Cluster 1+2/C12, danach 5 parallele Agents).
+Volle Suite (63→64 Spec-Dateien) grün. CACHE_VERSION train-v226→v227,
+kein CSS-Bump. Sprint-Ergebnis vollständig in
+`Diagnose & Sprints/sprint-ergebnis-runde6-2026-08-02.txt`.
 
 ---
 
