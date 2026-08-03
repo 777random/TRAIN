@@ -8588,6 +8588,7 @@ function _buildScaffold(root) {
 
 <div class="sw-update-banner" id="sw-update-banner" role="alert">
   <span>🔄 Update verfügbar</span>
+  <button class="btn btn--ghost" id="sw-update-later-btn">Später</button>
   <button class="btn" id="sw-update-btn">Jetzt aktualisieren</button>
 </div>`;
 }
@@ -8606,6 +8607,17 @@ export function mountApp(root) {
 
   document.getElementById('storage-warn-btn')?.addEventListener('click', () => {
     exportJSON(() => showToast('✓ Backup gespeichert', 'ok', 2000));
+  });
+
+  // Runde 11: "Später"-Button — blendet den Banner nur für die aktuelle
+  // Ansicht/Session aus (rein DOM-lokal, kein state.js, kein localStorage).
+  // _pendingSwRegistration bleibt unangetastet gesetzt. Beim nächsten
+  // Page-Load baut _buildScaffold() das Banner-DOM ohnehin frisch auf, und
+  // registerSW.js' Initial-Check (registration.waiting/.installing bei
+  // jedem register()-Aufruf, B166) macht es erneut sichtbar, solange ein
+  // Update weiterhin wartet — kein zusätzlicher Persistenz-Mechanismus nötig.
+  document.getElementById('sw-update-later-btn')?.addEventListener('click', () => {
+    document.getElementById('sw-update-banner')?.classList.remove('is-visible');
   });
 
   document.getElementById('sw-update-btn')?.addEventListener('click', async (e) => {

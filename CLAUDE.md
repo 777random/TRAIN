@@ -128,6 +128,12 @@ git add -A && git commit -m "fix/feat: [beschreibung] (vXXX->vYYY)"
 git push origin main
 ```
 
+**Nutzer-Anweisung (2026-08-03):** Wenn der Nutzer "commit"/"committen" sagt,
+ist damit IMMER `git commit` + `git push origin main` gemeint (nicht nur der
+lokale Commit) — außer der Nutzer sagt explizit etwas anderes (z.B. "nur
+committen, noch nicht pushen"). Nicht nach jedem Commit separat nachfragen,
+ob auch gepusht werden soll.
+
 Commit-Message Format: `type(scope): short description`
 - `feat(ui): add weight progression chart`
 - `fix(state): correct undo stack for SET_TOGGLE_DONE`

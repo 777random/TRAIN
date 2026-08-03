@@ -157,3 +157,79 @@ test('Versions-Label zeigt die per Laufzeit-Message abgefragte CACHE_VERSION sta
 
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
 });
+
+// Runde 11: das Update-Banner hatte bisher NUR den "Jetzt aktualisieren"-
+// Button, keine Möglichkeit, es bewusst für den Moment wegzuklicken (siehe
+// ui.js-Kommentar "kein Auto-Dismiss"). Neuer "Später"-Button blendet den
+// Banner rein DOM-lokal aus (kein state.js, kein localStorage) -- beim
+// nächsten Page-Load erscheint er ohnehin erneut, solange ein Update wartet
+// (bereits durch den B166-Fix oben garantiert, hier nicht erneut getestet).
+
+test('"Später"-Button blendet den Banner aus, ohne zu aktualisieren', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', err => pageErrors.push(err.message));
+
+  await seed(page);
+
+  await page.evaluate(() => {
+    const fakeRegistration = { waiting: { postMessage: () => {} } };
+    window.dispatchEvent(new CustomEvent('train:show-update-banner', {
+      detail: { registration: fakeRegistration },
+    }));
+  });
+
+  await expect(page.locator('#sw-update-banner')).toHaveClass(/is-visible/);
+
+  await page.click('#sw-update-later-btn');
+
+  await expect(page.locator('#sw-update-banner')).not.toHaveClass(/is-visible/);
+  // Kein Reload, kein SKIP_WAITING -- "Später" ist rein kosmetisch.
+  expect(page.url()).toContain('localhost');
+  expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});
+
+test('Mehrere-Deploys-Szenario: nach "Später" erscheint der Banner bei einem weiteren Update erneut und zielt auf den NEUESTEN wartenden Worker', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', err => pageErrors.push(err.message));
+
+  await seed(page);
+
+  // Deploy 1: Banner erscheint, Nutzer klickt "Später" (reagiert nicht).
+  await page.evaluate(() => {
+    window.__swTestPosted = null;
+    const staleWaiting = {
+      postMessage: (msg) => { window.__swTestPosted = { source: 'stale', msg }; },
+    };
+    window.dispatchEvent(new CustomEvent('train:show-update-banner', {
+      detail: { registration: { waiting: staleWaiting } },
+    }));
+  });
+  await expect(page.locator('#sw-update-banner')).toHaveClass(/is-visible/);
+  await page.click('#sw-update-later-btn');
+  await expect(page.locator('#sw-update-banner')).not.toHaveClass(/is-visible/);
+
+  // Deploy 2 (simuliert zwei weitere, während der Nutzer nicht reagiert hat):
+  // ein NEUER wartender Worker ersetzt den alten -- exakt das, was
+  // registerSW.js bei jedem weiteren 'updatefound' feuert.
+  await page.evaluate(() => {
+    const freshWaiting = {
+      postMessage: (msg) => { window.__swTestPosted = { source: 'fresh', msg }; },
+    };
+    window.dispatchEvent(new CustomEvent('train:show-update-banner', {
+      detail: { registration: { waiting: freshWaiting } },
+    }));
+  });
+
+  // Banner muss trotz vorherigem "Später"-Klick erneut erscheinen.
+  await expect(page.locator('#sw-update-banner')).toHaveClass(/is-visible/);
+
+  await page.click('#sw-update-btn');
+
+  // SKIP_WAITING muss an den NEUESTEN Worker gehen, nicht an den
+  // veralteten aus Deploy 1.
+  const posted = await page.evaluate(() => window.__swTestPosted);
+  expect(posted.source).toBe('fresh');
+  expect(posted.msg).toEqual({ type: 'SKIP_WAITING' });
+
+  expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});

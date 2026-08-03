@@ -1911,6 +1911,7 @@ body:has(.pause-overlay--visible) .pr-moment-toast {
 }
 .sw-update-banner.is-visible { display: flex; }
 .sw-update-banner .btn { min-height: 30px; font-size: 12px; background: rgba(14,14,16,.15); border-color: rgba(14,14,16,.4); color: #0E0E10; }
+.sw-update-banner .btn--ghost { opacity: .7; }
 
 /* ── Responsive ────────────────────────────────────────────── */
 @media (min-width: 480px) {

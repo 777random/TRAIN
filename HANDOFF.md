@@ -1,6 +1,51 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-08-03 — Runde 10 komplett (Teil 1 + Teil 2), train-v232 (B191-B198, B141/B176-Abschluss, siehe eigene Abschnitte unten). Davor: Runde-9-Audit-Folgerunde, train-v230 (B185-B190, schließt das Runde-8-Datenkonsistenz-Audit vollständig ab, siehe AUDIT-BERECHNUNGEN.md). Davor: Runde-8-Datenkonsistenz-Sprint, train-v229 (B181-B184, konkreter Bug + 5-Domänen-Audit + 3 Feedback-Punkte). Davor: Runde-7-Coaching-Qualitäts-Sprint, train-v228 (B178-B180). Davor: Runde-6-Nutzerfeedback-Fix-Sprint, train-v227 (B167-B177, inkl. einer während der Verifikation gefundenen+gefixten Regression B176). Davor: Runde-5-Fix-Sprint, train-v226 (B166, echte Regression von B152). Ältere Sprints siehe SESSION_LOG.md.*
-*Nächster Schritt: B55 Impressum (Blocker vor weiterer Nutzerwerbung — wartet weiterhin auf echte Name-/Adress-/E-Mail-Angaben des Betreibers, siehe LEGAL.md). **Runde 10 (Zeit/Datum-Audit + Aufräum-Runde) ist komplett abgeschlossen, alle Funde entweder gefixt oder bewusst dokumentiert:** A1 (zwei divergierende Kalenderwochen-Formeln) → B194 gefixt (auf ISO-8601 vereinheitlicht, 7 Fundstellen); A2 (T00:00:00/T12:00:00 gemischt) → bewusst NICHT gefixt, kein aktueller Bug, in DECISIONS.md dokumentiert; B1 (B147-Rückfall in ui.js) → B195 gefixt; B2 (`_backupAgeInDays()`) → B196 gefixt; B3 (`ongoingPauseDays`) → B197 gefixt; C1 (weightRecommendation.js-Fenster) → B198 gefixt. Alle 5 Fixes per Sabotage-Revert-Test verifiziert (Fix testweise entfernt, neuer Test schlug exakt mit dem diagnostizierten Symptom fehl, danach wiederhergestellt). **Dabei gefunden und sofort mitgefixt: B193** — ursprünglich fälschlich als App-Bug vermutet, tatsächlich ein Timezone-Bug in 2 Test-Helfern (`mondayOfWeek()`/`seedTwoWeekState()`, `.toISOString()` nach lokaler Mitternacht verschiebt in UTC+1 den Kalendertag) — korrigiert auf lokale Datumskomponenten wie `week_label_calendar.spec.js`s bereits korrektes `isoMondayOffset()`. Runde 10/Teil 2 (Aufräum-Runde) davor bereits fertig: B141 abgeschlossen, B176-Portal-Entscheidung bestätigt, toter Code `save-week-as-template` entfernt (B191), 3 Wall-Clock-Flaky-Tests stabilisiert (B192/B193-Vorarbeit), einmaliger Konsistenz-Hinweis-Toast für B185 (B192). Volle Regressionssuite (73 Spec-Dateien) in Batches gelaufen, nur die bereits bekannte `share_image.spec.js`-Baseline-Flakiness reproduziert (unverändert, nicht Teil dieses Sprints). Aus Runde 8/9 weiterhin offen: Backfill der Muskelgruppen-Tags nur für Standard-Namen (individuell umbenannte Übungen bewusst nicht erfasst), architekturbedingte ui.js/timer.js-Pausenzeit-Duplikation (per Absicherungstest B189 geschützt, strukturell nicht aufgelöst), `weeklyFocus.js:737-739`s 5./6. eigenständige RPE-Verwendung (B179-Nebenfund), eine fehlende Trainingsziel-Einstellung (Kraft- vs. Hypertrophie-Fokus, Idee aus Runde 6/7), eine offene Produktfrage aus Runde 9 zur B185-Rückwirkung (ob ein zusätzlicher In-App-Banner nötig wäre — der einmalige Toast B192 deckt das inzwischen ab, offene Frage vermutlich erledigt). Bestätigte Infra-Grenze (weiterhin gültig): volle Playwright-Suite kann `npx serve` mit `EMFILE`/Dev-Server-Kontention abstürzen lassen — Workaround ist der Batch-Lauf, bei Verdacht auf Massenausfall in Isolation nachprüfen. Nicht committet: `Research/`, alle `context-exports/`-Updates + `Diagnose & Sprints/`-Exports (beide gitignored).*
+*Letzte Aktualisierung: 2026-08-03 — Runde 11, train-v233 (B199, Update-Banner "Später"-Button, siehe eigener Abschnitt unten). Davor: Runde 10 komplett (Teil 1 + Teil 2), train-v232 (B191-B198, B141/B176-Abschluss). Davor: Runde-9-Audit-Folgerunde, train-v230 (B185-B190, schließt das Runde-8-Datenkonsistenz-Audit vollständig ab, siehe AUDIT-BERECHNUNGEN.md). Davor: Runde-8-Datenkonsistenz-Sprint, train-v229 (B181-B184, konkreter Bug + 5-Domänen-Audit + 3 Feedback-Punkte). Davor: Runde-7-Coaching-Qualitäts-Sprint, train-v228 (B178-B180). Davor: Runde-6-Nutzerfeedback-Fix-Sprint, train-v227 (B167-B177, inkl. einer während der Verifikation gefundenen+gefixten Regression B176). Davor: Runde-5-Fix-Sprint, train-v226 (B166, echte Regression von B152). Ältere Sprints siehe SESSION_LOG.md.*
+*Nächster Schritt: B55 Impressum (Blocker vor weiterer Nutzerwerbung — wartet weiterhin auf echte Name-/Adress-/E-Mail-Angaben des Betreibers, siehe LEGAL.md). **Runde 11 (Update-Banner) ist fertig:** neuer "Später"-Button (B199) blendet das Banner rein DOM-lokal für die aktuelle Session aus, kein state.js/localStorage-Bezug — der bereits korrekte B166-Persistenz-Mechanismus zeigt es beim nächsten Laden ohnehin erneut, solange ein Update wartet. Verifiziert per 2 neuen Tests (Sabotage-Revert bestätigt) + voller Regressionssuite (73 Spec-Dateien, gebatcht) — 2 bereits bekannte Timing-Flakes reproduziert (`deload_volumen.spec.js` Wochenrückblick-Klick, `share_image_v3.spec.js` Download-Event), beide unverändert seit vorherigen Runden, kein Zusammenhang zu diesem Sprint. **Runde 10 (Zeit/Datum-Audit + Aufräum-Runde) davor komplett abgeschlossen, alle Funde entweder gefixt oder bewusst dokumentiert:** A1→B194, B1→B195, B2→B196, B3→B197, C1→B198 gefixt (Sabotage-Revert-verifiziert); A2 (T00:00:00/T12:00:00 gemischt) bewusst NICHT gefixt, kein aktueller Bug, in DECISIONS.md dokumentiert. B193 (ursprünglich als App-Bug vermutet) war tatsächlich ein Timezone-Bug in 2 Test-Helfern — korrigiert. Teil 2: B141 abgeschlossen, B176-Portal-Entscheidung bestätigt, toter Code `save-week-as-template` entfernt (B191), 3 Wall-Clock-Flaky-Tests stabilisiert, einmaliger Konsistenz-Hinweis-Toast für B185 (B192). Aus Runde 8/9 weiterhin offen: Backfill der Muskelgruppen-Tags nur für Standard-Namen (individuell umbenannte Übungen bewusst nicht erfasst), architekturbedingte ui.js/timer.js-Pausenzeit-Duplikation (per Absicherungstest B189 geschützt, strukturell nicht aufgelöst), `weeklyFocus.js:737-739`s 5./6. eigenständige RPE-Verwendung (B179-Nebenfund), eine fehlende Trainingsziel-Einstellung (Kraft- vs. Hypertrophie-Fokus, Idee aus Runde 6/7). Bestätigte Infra-Grenze (weiterhin gültig): volle Playwright-Suite kann `npx serve` mit `EMFILE`/Dev-Server-Kontention abstürzen lassen — Workaround ist der Batch-Lauf (inzwischen oft in noch kleinere Sub-Batches nötig, ~10-20 Dateien), bei Verdacht auf Massenausfall in Isolation nachprüfen. Nicht committet: `Research/`, alle `context-exports/`-Updates + `Diagnose & Sprints/`-Exports (beide gitignored).*
+
+---
+
+## Runde 11 — Update-Banner "Später"-Button (train-v233, 2026-08-03)
+
+`Diagnose & Sprints/TRAIN-Sprint-Prompts-Runde11.md`. Auslöser: Live-Vorfall
+(Nutzer meldete App bleibt auf alter Version hängen) — konkreter Root Cause
+war ein nicht gepushter Deploy, unabhängig davon aber eine echte UX-Lücke
+in der Live-Diagnose gefunden.
+
+**Diagnose bestätigte:** Banner-Persistenz war bereits korrekt (B166,
+Runde 5 — `registerSW.js:32-52` prüft `registration.waiting`/`.installing`
+bei JEDEM Page-Load) und state.js ist NICHT beteiligt
+(`_pendingSwRegistration` ist eine reine ui.js-Modul-Variable). Die
+einzige echte Lücke: kein Dismiss-Mechanismus existierte überhaupt (der
+Kommentar "kein Auto-Dismiss" war wörtlich zu nehmen).
+
+**Fix (B199):** neuer `#sw-update-later-btn` ("Später") neben dem
+bestehenden Update-Button, rein DOM-lokal (`classList.remove('is-visible')`
+— kein state.js, kein localStorage, kein neuer Flag). `_pendingSwRegistration`
+bleibt unangetastet. Da `_buildScaffold()` bei jedem Page-Load ein frisches
+Banner-DOM baut und der bestehende B166-Mechanismus es erneut sichtbar
+macht, solange `registration.waiting` gesetzt ist, ist keine zusätzliche
+Persistenz nötig.
+
+**Tests:** `tests/sw_update_and_version.spec.js` um 2 Tests erweitert
+(Später-Klick blendet aus; Mehrere-Deploys-Szenario — Banner erscheint
+nach "Später" bei einem weiteren Update erneut, "Jetzt aktualisieren"
+zielt auf den NEUESTEN wartenden Worker). Beide per Sabotage-Revert
+verifiziert.
+
+CACHE_VERSION → `train-v233`. Volle Regressionssuite (73 Spec-Dateien) in
+kleineren Batches gelaufen (der bisherige 3-Datei-Batch-Workaround reichte
+diesmal nicht mehr aus, EMFILE-Grenze griff auch bei ~20-25 Dateien pro
+Batch — Sub-Batches von ~10 Dateien liefen durchgehend stabil). Alle grün
+bis auf 2 bereits bekannte Timing-Flakes (`deload_volumen.spec.js`,
+`share_image_v3.spec.js` — beide unverändert, kein Zusammenhang zu diesem
+Sprint, in Isolation/Retry bestätigt grün).
+
+**Manueller Testschritt für den Nutzer (nicht automatisierbar, siehe
+`TRAIN-Manueller-Update-Test.md`):** einen echten Deploy-Zyklus über
+mehrere Versionen testen — Update-Banner erscheint, "Später" klicken,
+warten bis ein weiterer echter Deploy live ist, App erneut öffnen: Banner
+sollte wieder erscheinen und beim Klick auf "Jetzt aktualisieren" direkt
+zur neuesten Version aktualisieren.
 
 ---
 
