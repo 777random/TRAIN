@@ -39,6 +39,38 @@ Notizen etc.).
 **Begründung:** Steigerung ist eine bewusste Entscheidung des Athleten, nie still automatisch.
 **Gilt:** Permanent. Nicht ändern ohne explizite Neuentscheidung.
 
+### 2026-08-03 — SW-Registrierung an erste Trainingsaktion gekoppelt, Precache-Scope reduziert (B62, Council-Entscheidung)
+**Entscheidung:** `registerServiceWorker()` wird nicht mehr unconditional
+beim Seitenaufruf ausgeführt (`index.html`), sondern erst wenn
+`timer.js` `_ensureSessionStart()` zum ersten Mal feuert (erste Gewichts-/
+Wiederholungs-/RPE-Eingabe oder vergleichbare Trainingsaktion) — dispatcht
+dafür ein neues `train:sw-register-trigger`-Event (Kopplungsverbot
+`ui.js`↔`timer.js` bleibt gewahrt). Zusätzlich: `datenschutz.html` + die 7
+Badge-Galerie-PNGs sind nicht mehr Teil von `sw.js`'s `PRECACHE_URLS` —
+werden bei tatsächlichem Zugriff normal per Netzwerk geladen und von der
+bestehenden `cacheFirstWithRefresh()`-Strategie automatisch nachgecacht.
+**Begründung:** Council-Entscheidung — Registrierung + volles Precachen
+aller Assets beim reinen Öffnen der App (vor jeder echten Interaktion)
+wurde als unnötig breiter Eingriff bewertet; die Trainingsausführung
+selbst braucht weder Datenschutzseite noch Badge-Bilder sofort verfügbar.
+**Offene, NICHT code-seitig abschließend lösbare Punkte (bewusst hier
+vermerkt, nicht in Code-Kommentaren):**
+1. **Rechts-Review-Vorbehalt** (vom Council selbst benannt): ob die
+   verzögerte Registrierung irgendeine rechtliche Informationspflicht
+   berührt, die eine sofortige Datenschutzseiten-Verfügbarkeit verlangen
+   könnte, wurde nicht juristisch geprüft.
+2. **PWA-Installierbarkeits-Vorbehalt**: Chromes "Zum Homescreen
+   hinzufügen"-Kriterien verlangen u.a. einen registrierten Service
+   Worker mit `fetch`-Handler. Ob Chrome diesen Check früh/einmalig
+   auswertet und ein negatives Ergebnis zwischenspeichert (was die
+   Installierbarkeit beeinträchtigen könnte, wenn die Registrierung jetzt
+   erst nach der ersten Trainingsaktion passiert statt beim Laden), lässt
+   sich ohne echtes Geräte-/Lighthouse-Testing nicht abschließend klären.
+**Empfehlung:** Nach dem nächsten Release die Installierbarkeit auf einem
+echten Android-Gerät (Chrome) manuell verifizieren.
+**Gilt:** Bis eine der beiden offenen Fragen manuell verifiziert wurde
+bzw. neue Erkenntnisse eine Neubewertung erfordern.
+
 ---
 
 ## COACH-LOGIK
@@ -58,6 +90,29 @@ Notizen etc.).
 **Entscheidung:** computeStructuralSignals() gibt max. 2 Signale zurück. Priorität: deload > consistency_quality > push_pull.
 **Begründung:** 3+ Karten im Coach-Tab erzeugen zu viel kognitive Last. 2 ist die richtige Grenze.
 **Gilt:** Permanent. Nicht erhöhen ohne echte Nutzerdaten.
+
+### 2026-08-03 — Neues Strukturkarten-Signal "recurring_fatigue" (B140, Council-Entscheidung)
+**Entscheidung:** `computeStructuralSignals()` bekommt ein neues Signal
+`recurring_fatigue`, Priorität direkt nach `deload_preventive` (vor
+`consistency_quality`) — feuert, wenn das bereits bestehende
+tagesskalierte Erschöpfungsmuster (`detectSessionFatigue()`,
+sessionSummary.js, RPE-Anstieg ≥1.5 UND Erfolgsquote sinkt ≥10pp
+zwischen erster/zweiter Sessionhälfte) in JEDER der letzten 3
+konsekutiven Nicht-Deload/Nicht-Urlaub-Wochen an mindestens einem Tag
+auftritt. Haupttext bleibt reine Beobachtung ohne Ratschlag; ein
+optionaler Deload-Hinweis liegt im bestehenden `<details>`-Aufklapp-Feld
+(`info`), das der Nutzer aktiv anfordern muss — kein automatischer
+Deload-Vorschlag, keine neue Action.
+**Bewusst NICHT umgesetzt (Scope-Entscheidung für v1):** GoatCounter-
+Tracking der Falsch-Positiv-Rate dieses Signals (Council-Vorschlag) — das
+Council selbst bezeichnete es als "nicht bindend", kein klarer MVP-Bedarf
+für zusätzliche Instrumentierung in der ersten Version.
+**Begründung:** Council-Entscheidung — 3 konsekutive (nicht nur
+"irgendwann in den letzten 4") jüngste Wochen als Schwelle, um
+Einzelvorfälle nicht fälschlich als wiederkehrendes Muster zu melden.
+**Gilt:** Permanent bis echte Nutzerdaten eine Anpassung der
+3-Wochen-Schwelle oder der Priorität nahelegen. GoatCounter-Tracking
+bleibt eine offene Zukunftsoption, kein aktueller Auftrag.
 
 ### 2026-07 — RPE-Schwellen bewusst unterschiedlich
 **Entscheidung:** Progressionsbereitschaft: avgRPE ≤ 8.0. Konfidenz HIGH: ≤ 7.5. Konfidenz MEDIUM: ≤ 8.5.

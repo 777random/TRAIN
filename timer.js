@@ -150,6 +150,10 @@ function _ensureSessionStart(di) {
   if (!day || day.sessionStartTs || day.markedDone) return;
   _clockDi = di;
   dispatch(A.SESSION_START, { di, ts: Date.now() });
+  // B62 (Runde 13): SW-Registrierung + Erstlade-Hinweis erst bei der ersten
+  // echten Trainingsaktion auslösen, nicht schon beim reinen Seitenaufruf.
+  // index.html hört dieses Event ab (timer.js darf ui.js nicht importieren).
+  window.dispatchEvent(new CustomEvent('train:sw-register-trigger'));
   if (!_sessInterval) {
     _sessInterval = setInterval(_updateClockDisplay, 1000);
   }

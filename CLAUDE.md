@@ -1,7 +1,16 @@
 # TRAIN — CLAUDE.md
 # Vollständiger Projektkontext für Claude Code
-# Stand: train-v230 / SCHEMA 33 / August 2026
-# Letztes Update: nach train-v230, Runde-9-Audit-Folgerunde (2026-08-03) —
+# Stand: train-v235 / SCHEMA 33 / August 2026
+# Letztes Update: nach train-v235, Runde 13 (2026-08-03) — Council-
+# Entscheidungen B62 (SW-Registrierung an ersten Workout-Start gekoppelt,
+# Precache-Scope reduziert) + B140 (neues Coach-Tab-Strukturkarten-Signal
+# `recurring_fatigue`, Ausbaustufe des bestehenden tagesskalierten
+# `detectSessionFatigue()`) technisch umgesetzt, siehe
+# `Diagnose & Sprints/TRAIN-Council-Entscheidung-B62-B140-2026-08-03.md`
+# und HANDOFF.md für Details. Dokumentation für Runde 10-12 (train-v231-234)
+# wurde in diesem Header nicht nachgezogen — siehe HANDOFF.md für den
+# vollständigen Verlauf dieser Zwischenrunden.
+# Davor train-v230, Runde-9-Audit-Folgerunde (2026-08-03) —
 # B185-B190, schließt das Runde-8-Datenkonsistenz-Audit vollständig ab
 # (siehe AUDIT-BERECHNUNGEN.md — alle 3 "Verdacht auf Bug"-Funde + 2
 # kosmetische Nebenfunde behoben). Wichtigster Einzelfund: B185
@@ -75,7 +84,7 @@ TRAIN ist eine deutschsprachige PWA für Krafttraining. Pure Vanilla ES Modules 
   Sessions müssen aus diesem neuen Pfad heraus gestartet werden, sonst
   landet man am alten (jetzt leeren) OneDrive-Ort. Nutzer zieht den Ordner
   regelmäßig manuell auf eine externe Festplatte statt über Cloud-Sync.
-- Aktueller Stand: SCHEMA_VERSION 33 · CACHE_VERSION train-v230 · CSS ?v=213
+- Aktueller Stand: SCHEMA_VERSION 33 · CACHE_VERSION train-v235 · CSS ?v=213
 
 ---
 
@@ -357,13 +366,19 @@ _checkMultiExerciseFailure() // seit v163 (B29): Gesamterfolgsquote ≤20% über
                               // zu _checkPersistentFailure (dort: EINE Übung
                               // bei 0%). Reiner Text, kein Aktions-Button.
 _checkPreventiveDeload()    // ≥8 Wochen ohne Deload + Volumen↑/RPE>7.5
+_checkRecurringFatigue()   // seit v235 (B140, Runde 13, Council-Entscheidung):
+                              // detectSessionFatigue() (sessionSummary.js, tages-
+                              // skaliert) trat in JEDER der letzten 3 konsekutiven
+                              // Nicht-Deload/Nicht-Urlaub-Wochen an ≥1 Tag auf.
+                              // Reine Beobachtung, optionaler Deload-Hinweis nur im
+                              // <details>-Aufklapp-Feld, kein Action-Button im Haupttext.
 _checkConsistencyQuality()  // Frequenz stabil + Qualität↓ + curPct<75%
 _checkPushPullBalance()     // Ratio >1.5 über erkenntnisseHorizont
 _checkCompoundIsolationBalance() // seit v194 (B79): Compound-Sätze
                               // (Squat/Hinge/Push/Pull) <60% über
                               // erkenntnisseHorizont, sonst kein Signal
 ```
-Max. 2 gleichzeitig (multi_exercise_failure > deload > consistency_quality > push_pull > compound_isolation).
+Max. 2 gleichzeitig (multi_exercise_failure > deload > recurring_fatigue > consistency_quality > push_pull > compound_isolation).
 Unabhängig von Hauptkarte — erscheint auch neben Progression. `deload_preventive` zeigt
 seit v194 (B79) zusätzlich eine konkrete Deload-Plan-Tabelle (alle Übungen aller Tage der
 aktuellen Woche, Gewicht × deloadFactor gerundet auf weightStep) mit
@@ -420,11 +435,11 @@ NICHT konsolidieren):**
 
 **Wochenrückblick-Modal:** Zusammenfassung/Highlights/Lowlights/Empfehlungen (weekReview.js/weekReviewModal.js), Share-Bild-Button (v186, B68; Sparkline-Redesign v187, B71; Favoriten-Kaskade v189, B73) — auch im manuellen Wochenrückblick-Dropdown im Fortschritt-Tab (v188, B72).
 
-**Coach-Tab:** Hauptkarte (8 akute Signale, seit v160 inkl. Konsistente Fehlschläge) + Strukturkarte (5 strukturelle Signale, seit v163 inkl. Mehr-Übungen-Aggregation, seit v194/B79 inkl. Compound/Isolation-Balance), Adaptive Nachfrage-Karte, Coach-Bilanz Mini, Plateau-Konsequenz (EX_SET_NEXT_WEEK_PLAN), Deload-Plan-Tabelle mit "Plan übernehmen" bei aktiver präventiver Deload-Karte (v194, B79). Seit v215 (E1): jede Haupt- UND Strukturkarte hat eine "▾ Basis dieser Einschätzung"-Disclosure (bestehende `.coach-why-collapse`-Komponente umbenannt/erweitert statt eines zweiten Toggles) mit strukturierter Evidence-Liste (`focus.evidence`/`sig.evidence`, `{label, value}[]`) — die konkreten Datenpunkte, die zur jeweiligen Einschätzung geführt haben.
+**Coach-Tab:** Hauptkarte (8 akute Signale, seit v160 inkl. Konsistente Fehlschläge) + Strukturkarte (6 strukturelle Signale, seit v163 inkl. Mehr-Übungen-Aggregation, seit v194/B79 inkl. Compound/Isolation-Balance, seit v235/B140/Runde 13 inkl. `recurring_fatigue`), Adaptive Nachfrage-Karte, Coach-Bilanz Mini, Plateau-Konsequenz (EX_SET_NEXT_WEEK_PLAN), Deload-Plan-Tabelle mit "Plan übernehmen" bei aktiver präventiver Deload-Karte (v194, B79). Seit v215 (E1): jede Haupt- UND Strukturkarte hat eine "▾ Basis dieser Einschätzung"-Disclosure (bestehende `.coach-why-collapse`-Komponente umbenannt/erweitert statt eines zweiten Toggles) mit strukturierter Evidence-Liste (`focus.evidence`/`sig.evidence`, `{label, value}[]`) — die konkreten Datenpunkte, die zur jeweiligen Einschätzung geführt haben.
 
 **Fortschritt-Tab:** Erkenntnisse (geclampt), Gesamtperformance, Push/Pull-Ratio, Übungsfortschritt-Chart mit Prognose, Streak (neutral), Abzeichen-Galerie, Körpergewicht-Chart, Bewegungsschaubild, Coach-Bilanz, Relative Stärke / Pound-for-Pound (`renderRelativeStrengthChart()`, progressChart.js + `_weeklyP4PSeries()`, ui.js — war fälschlich noch unter "Offen/Konzept" gelistet, Doku-Drift im Deep-Check-Audit v169 gefunden).
 
-**Technisch:** iOS Safe Area, Auto-Backup, Service Worker (user-gated Update), movementMap (+32 englische Synonyme), isFullSuccess(), consistencyUtils.js. Konfigurierbare größte Hantelscheibe (v229, B182 — `settings.largestPlate`, Default 25kg). Muskelgruppen-Zuordnung für die Standard-Übungsbibliothek (v229/v230, B184/B188 — `ex.tags`, separate Taxonomie zur Bewegungsmuster-Klassifizierung, revidiert 2 zuvor tote Insight-Signale P-04/W-03).
+**Technisch:** iOS Safe Area, Auto-Backup, Service Worker (user-gated Update; seit v235/B62/Runde 13: Registrierung an die erste Trainingsaktion gekoppelt statt an den Seitenaufruf, reduzierter Precache-Scope — `datenschutz.html`/Badge-PNGs nicht mehr precached), movementMap (+32 englische Synonyme), isFullSuccess(), consistencyUtils.js. Konfigurierbare größte Hantelscheibe (v229, B182 — `settings.largestPlate`, Default 25kg). Muskelgruppen-Zuordnung für die Standard-Übungsbibliothek (v229/v230, B184/B188 — `ex.tags`, separate Taxonomie zur Bewegungsmuster-Klassifizierung, revidiert 2 zuvor tote Insight-Signale P-04/W-03).
 
 ### Offen / In Arbeit:
 | Feature | Priorität |

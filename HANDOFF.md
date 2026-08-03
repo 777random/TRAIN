@@ -1,6 +1,63 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-08-03 — Runde 12 (Backlog-Aufräumrunde), train-v234 (B41/B42/B58/B139-Nebenfund/B179-Nebenfund abgeschlossen, siehe eigener Abschnitt unten). Davor: Runde 11, train-v233 (B199, Update-Banner "Später"-Button). Davor: Runde 10 komplett (Teil 1 + Teil 2), train-v232 (B191-B198, B141/B176-Abschluss). Davor: Runde-9-Audit-Folgerunde, train-v230 (B185-B190, siehe AUDIT-BERECHNUNGEN.md). Davor: Runde-8-Datenkonsistenz-Sprint, train-v229. Davor: Runde-7-Coaching-Qualitäts-Sprint, train-v228. Davor: Runde-6-Nutzerfeedback-Fix-Sprint, train-v227. Davor: Runde-5-Fix-Sprint, train-v226. Ältere Sprints siehe SESSION_LOG.md.*
-*Nächster Schritt: **Runde 13 steht an** (`TRAIN-Sprint-Prompts-Runde13.md`) — setzt die LLM-Council-Entscheidungen zu B62 (Offline-Modus-Opt-in: SW-Registrierung an ersten Workout-Start koppeln, Precache-Scope reduzieren) und B140 (neues Coach-Beobachtungssignal für wiederkehrende Intra-Session-Erschöpfung) technisch um, siehe `TRAIN-Council-Entscheidung-B62-B140-2026-08-03.md` für die vollen Chairman-Entscheidungen. Noch nicht begonnen. Danach: B55 Impressum bleibt der einzige echte Blocker (wartet weiterhin auf echte Name-/Adress-/E-Mail-Angaben des Betreibers, siehe LEGAL.md). **Runde 12 (Backlog-Aufräumrunde) ist komplett abgeschlossen**, siehe eigener Abschnitt unten für alle 7 Cluster. Aus dem Backlog-Review weiterhin offen (nicht Teil von Runde 12, siehe `backlog-review-2026-08-03.txt`): B43 (CUSTOM_EX_DELETE räumt Kategorie nicht auf), B27 (Touch-Drag auf echtem Gerät), B66 (Toast nicht reproduzierbar, Observability wartet auf nächste Beobachtung), B173-Nebenfund (Wochen-Rec-Chip ohne Wdh-Reduzierung), VACATION_PLANS-Nebenfund aus B184 (Urlaubstage ohne Muskelgruppen-Tags), B176 (Portal-Refactor, zuletzt in Runde 10 bestätigt zurückgestellt). Bestätigte Infra-Grenze (weiterhin gültig): volle Playwright-Suite kann `npx serve` mit `EMFILE`/Dev-Server-Kontention abstürzen lassen — Workaround ist der Batch-Lauf (inzwischen ~8-10 Dateien/Batch nötig), bei Verdacht auf Massenausfall in Isolation nachprüfen. Bekannte, wiederholt bestätigte Timing-Flakes (unabhängig von jeglichem Sprint-Code): `share_image.spec.js`/`share_image_v3.spec.js` (Download-Event-Timing), `deload_volumen.spec.js` (Backup-Reminder-Toast-Overlap), `plate_calculator.spec.js` (Live-Vorschau erster Tastendruck) — alle bei Retry/Isolation grün, keine echte Regression. Nicht committet: `Research/`, alle `context-exports/`-Updates + `Diagnose & Sprints/`-Exports (beide gitignored).*
+*Letzte Aktualisierung: 2026-08-03 — Runde 13 (Council-Umsetzung B62+B140), train-v235 (siehe eigener Abschnitt unten). Davor: Runde 12 (Backlog-Aufräumrunde), train-v234 (B41/B42/B58/B139-Nebenfund/B179-Nebenfund abgeschlossen). Davor: Runde 11, train-v233 (B199, Update-Banner "Später"-Button). Davor: Runde 10 komplett (Teil 1 + Teil 2), train-v232 (B191-B198, B141/B176-Abschluss). Davor: Runde-9-Audit-Folgerunde, train-v230 (B185-B190, siehe AUDIT-BERECHNUNGEN.md). Davor: Runde-8-Datenkonsistenz-Sprint, train-v229. Davor: Runde-7-Coaching-Qualitäts-Sprint, train-v228. Davor: Runde-6-Nutzerfeedback-Fix-Sprint, train-v227. Davor: Runde-5-Fix-Sprint, train-v226. Ältere Sprints siehe SESSION_LOG.md.*
+*Nächster Schritt: **Runde 13 ist komplett abgeschlossen** (beide Cluster, siehe eigener Abschnitt unten). Zwei offene, NICHT code-seitig lösbare Punkte aus B62 (siehe DECISIONS.md) warten auf den Nutzer: (1) kurzer Rechts-Check vor Release zu Service-Worker-Caching (kein gefestigter Behördenstandard, Council-Vorbehalt), (2) PWA-Installierbarkeit auf einem echten Android-Gerät nach dem nächsten Release manuell verifizieren (Chrome-Homescreen-Kriterien könnten früh/einmalig prüfen, ob ein SW mit fetch-Handler bereits registriert ist). Danach: B55 Impressum bleibt der einzige echte Blocker (wartet weiterhin auf echte Name-/Adress-/E-Mail-Angaben des Betreibers, siehe LEGAL.md). Aus dem Backlog-Review weiterhin offen (siehe `backlog-review-2026-08-03.txt`): B43 (CUSTOM_EX_DELETE räumt Kategorie nicht auf), B27 (Touch-Drag auf echtem Gerät), B66 (Toast nicht reproduzierbar, Observability wartet auf nächste Beobachtung), B173-Nebenfund (Wochen-Rec-Chip ohne Wdh-Reduzierung), VACATION_PLANS-Nebenfund aus B184 (Urlaubstage ohne Muskelgruppen-Tags), B176 (Portal-Refactor, zuletzt in Runde 10 bestätigt zurückgestellt). Bestätigte Infra-Grenze (weiterhin gültig, diese Runde aber NICHT reproduziert — volle 77-Datei-Suite lief in 8 Batches à ~10 Dateien im ersten Anlauf durch): volle Playwright-Suite kann `npx serve` mit `EMFILE`/Dev-Server-Kontention abstürzen lassen — Workaround ist der Batch-Lauf, bei Verdacht auf Massenausfall in Isolation nachprüfen. Bekannte, wiederholt bestätigte Timing-Flakes (unabhängig von jeglichem Sprint-Code): `share_image.spec.js`/`share_image_v3.spec.js` (Download-Event-Timing), `deload_volumen.spec.js` (Backup-Reminder-Toast-Overlap), `plate_calculator.spec.js` (Live-Vorschau erster Tastendruck) — keiner davon trat in Runde 13 auf (alle 385 Tests grün im ersten Anlauf, kein Retry nötig). Nicht committet: `Research/`, alle `context-exports/`-Updates + `Diagnose & Sprints/`-Exports (beide gitignored).*
+
+---
+
+## Runde 13 — Council-Umsetzung B62 (Offline-Opt-in) + B140 (Coach-Eskalationssignal) (train-v235, 2026-08-03)
+
+Basis: `TRAIN-Council-Entscheidung-B62-B140-2026-08-03.md` (volle LLM-Council-
+Transkripte + Chairman-Entscheidungen), umgesetzt nach
+`TRAIN-Sprint-Prompts-Runde13.md`. Die Produktrichtungsfrage war durch das
+Council bereits geklärt — diese Runde war reine technische Umsetzung.
+Diagnose bestätigte für beide Cluster state.js-Freiheit UND Disjunktheit
+(Cluster 1: index.html/sw.js/timer.js; Cluster 2: weeklyFocus.js/ui.js) —
+beide liefen daher ohne Solo-Vorlauf.
+
+- **Cluster 1 (B62):** `registerServiceWorker()` wird nicht mehr
+  unconditional beim Seitenaufruf ausgeführt, sondern erst wenn `timer.js`
+  `_ensureSessionStart()` zum ersten Mal feuert (erste Trainingsaktion) —
+  neues `train:sw-register-trigger`-Event, `index.html` als neutraler
+  Vermittler (Kopplungsverbot `ui.js`↔`timer.js` bleibt gewahrt). Kurzer
+  Hinweis-Toast beim ersten Auslösen ("TRAIN speichert dein Training lokal,
+  damit es auch ohne Netz läuft."). Precache-Scope reduziert:
+  `datenschutz.html` + 7 Badge-PNGs raus aus `sw.js`s `PRECACHE_URLS` (für
+  die reine Trainingsausführung entbehrlich, werden bei Zugriff normal
+  nachgecacht). **Zwei offene, nicht code-seitig lösbare Punkte in
+  DECISIONS.md vermerkt** (Council-Vorgabe): Rechts-Review-Vorbehalt
+  (keine gefestigte Behördenpraxis zu Service Workern) + neuer
+  PWA-Installierbarkeits-Vorbehalt (Chrome-Homescreen-Kriterien könnten den
+  SW-Check früh/einmalig auswerten) — beide warten auf manuelle
+  Verifikation durch den Nutzer, siehe Top-Absatz.
+- **Cluster 2 (B140):** neues Coach-Tab-Strukturkarten-Signal
+  `recurring_fatigue` in `computeStructuralSignals()` (weeklyFocus.js),
+  Priorität direkt nach `deload_preventive`. Erweitert (nicht ersetzt) das
+  bereits bestehende, tagesskalierte `detectSessionFatigue()`
+  (sessionSummary.js, seit B140/v222) — feuert neu, wenn dieses Muster in
+  JEDER der letzten 3 konsekutiven Nicht-Deload/Nicht-Urlaub-Wochen an
+  mindestens einem Tag auftritt (bewusst 3 konsekutive Wochen, nicht nur
+  "irgendwann in den letzten 4", gegen Falsch-Positive). Haupttext bleibt
+  reine Beobachtung ohne Ratschlag; optionaler Deload-Hinweis liegt im
+  bestehenden `<details>`-Aufklapp-Feld, kein neuer Action-Handler.
+  GoatCounter-Tracking der Falsch-Positiv-Rate (Council-Vorschlag) bewusst
+  NICHT gebaut — als offene Zukunftsoption in DECISIONS.md vermerkt, kein
+  MVP-Bedarf.
+
+**Tests:** 2 neue Spec-Dateien (`tests/sw_deferred_registration.spec.js`,
+2 Tests; `tests/recurring_fatigue_signal.spec.js`, 3 Tests — No-DOM-Unit-Test
+direkt gegen `computeStructuralSignals()`), 1 bestehender Test angepasst
+(`tests/sw_update_and_version.spec.js` — ein Test hing direkt an
+`navigator.serviceWorker.ready` unmittelbar nach dem Laden, feuert jetzt
+zusätzlich das Trigger-Event vorher). Zusätzlich ad-hoc per Playwright
+verifiziert (nicht Teil der committeten Suite, reine Verifikation): App
+scheitert offline VOR der ersten Trainingsaktion (kein SW registriert —
+das ist jetzt das gewünschte Verhalten), funktioniert offline NACH der
+ersten Trainingsaktion (SW aktiv, `navigator.serviceWorker.controller`
+gesetzt, App bootet aus dem Cache).
+
+CACHE_VERSION → `train-v235`. Volle Regressionssuite (77 Spec-Dateien,
+385 Tests, 8 Batches à ~10 Dateien) — alle grün im ersten Anlauf, keiner der
+sonst bekannten Timing-Flakes trat auf.
 
 ---
 

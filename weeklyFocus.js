@@ -54,6 +54,7 @@ import { isFullSuccess } from './setUtils.js';
 import { _consistencyEligibleWeeks } from './consistencyUtils.js';
 import { computeVolumeTrend, computeConsistencyTrend, computeQualityTrend } from './overallPerformance.js';
 import { buildCategoryMap, resolveCategory, isCompoundExercise } from './movementMap.js';
+import { detectSessionFatigue } from './sessionSummary.js';
 
 const DAY_MS = 86_400_000;
 
@@ -312,6 +313,43 @@ function _checkPreventiveDeload(state) {
       { label: 'Wochen ohne Deload', value: `${weeksSince}` },
       { label: 'Volumen-Trend', value: volumeUp ? 'steigend' : 'stabil/fallend' },
       { label: 'Ø RPE letzte 3 Wochen', value: avgRpe != null ? avgRpe.toFixed(1) : '–' },
+    ],
+  };
+}
+
+// B140 (Runde 13, Council-Entscheidung): reines Beobachtungssignal -- feuert,
+// wenn das bereits bestehende tagesskalierte Erschöpfungsmuster aus
+// detectSessionFatigue() (sessionSummary.js) in JEDER der letzten 3
+// konsekutiven Nicht-Deload/Nicht-Urlaub-Wochen an mindestens einem Tag
+// auftrat. Bewusst 3 KONSEKUTIVE jüngste Wochen (nicht nur "irgendwann in
+// den letzten 4") -- reduziert Falsch-Positive bei Einzelvorfällen, wie vom
+// Sprint gefordert. Kein automatischer Deload-Vorschlag im Haupttext (Council:
+// reine Beobachtung) -- ein optionaler Hinweis wandert stattdessen ins
+// `info`-Feld (ui.js '_structuralSignalHtml()', bestehendes <details>-Muster).
+function _checkRecurringFatigue(state) {
+  const recentWeeks = _nonDeloadWeeks(state).slice(-3);
+  if (recentWeeks.length < 3) return null;
+
+  const perWeekHits = recentWeeks.map(wk => {
+    for (const day of wk.days) {
+      const fatigue = detectSessionFatigue(day);
+      if (fatigue) return fatigue;
+    }
+    return null;
+  });
+  if (perWeekHits.some(hit => !hit)) return null;
+
+  const last = perWeekHits[perWeekHits.length - 1];
+  return {
+    signal: 'recurring_fatigue',
+    mostFatiguedExercise: last.mostFatiguedExercise,
+    rpeDiff: last.rpeDiff,
+    successDrop: last.successDrop,
+    evidence: [
+      { label: 'Wochen mit Muster', value: '3 von 3' },
+      { label: 'Zuletzt betroffene Übung', value: last.mostFatiguedExercise },
+      { label: 'RPE-Anstieg (2. Hälfte)', value: `+${last.rpeDiff}` },
+      { label: 'Erfolgsquote-Rückgang', value: `${last.successDrop} pp` },
     ],
   };
 }
@@ -1219,13 +1257,14 @@ function _checkInjuryReminder(state) {
  * @param {Object} state
  * @returns {Array<Object>} 0-2 strukturelle Signale, höchstens 2 gleichzeitig
  *   (Priorität Mehr-Übungen-Aggregation > Verletzungs-Erinnerung > Präventiver
- *   Deload > Konsistenz-Qualität > Push/Pull bei Überzahl — die Aggregation
- *   steht zuoberst, da ein datenbasierter breiter Totalausfall der konkreteste
- *   Befund unter den strukturellen Signalen ist, analog zur Top-Priorität von
+ *   Deload > Wiederkehrende Erschöpfung (B140, Runde 13) > Konsistenz-Qualität
+ *   > Push/Pull bei Überzahl — die Aggregation steht zuoberst, da ein
+ *   datenbasierter breiter Totalausfall der konkreteste Befund unter den
+ *   strukturellen Signalen ist, analog zur Top-Priorität von
  *   _checkPersistentFailure in der akuten Kaskade; die Verletzungs-Erinnerung
  *   direkt danach, da sicherheitsrelevant). Jedes Objekt trägt ein
  *   `type`-Feld ('multi_exercise_failure'|'injury_reminder'|'deload_preventive'|
- *   'consistency_quality'|'push_pull') als Diskriminator fürs Rendering in
+ *   'recurring_fatigue'|'consistency_quality'|'push_pull') als Diskriminator fürs Rendering in
  *   ui.js, zusätzlich zu den jeweiligen Rohdaten (weeksSince/dominant/etc.)
  *   für die dortigen Kurztexte.
  */
@@ -1240,6 +1279,9 @@ export function computeStructuralSignals(state) {
 
   const deload = _checkPreventiveDeload(state);
   if (deload) signals.push({ type: 'deload_preventive', ...deload });
+
+  const recurringFatigue = _checkRecurringFatigue(state);
+  if (recurringFatigue) signals.push({ type: 'recurring_fatigue', ...recurringFatigue });
 
   const cq = _checkConsistencyQuality(state);
   if (cq) signals.push({ type: 'consistency_quality', ...cq });

@@ -3517,6 +3517,18 @@ function _structuralSignalHtml(sig) {
       evidence: sig.evidence,
     };
   }
+  if (sig.type === 'recurring_fatigue') {
+    // B140 (Runde 13, Council-Entscheidung): reine Beobachtung im Haupttext,
+    // kein Ratschlag — der optionale Deload-Hinweis liegt im 'info'-Feld
+    // (identisches <details>-Aufklapp-Muster wie 'deload_preventive' oben,
+    // kein neuer Action-Handler nötig).
+    return {
+      icon: '📉',
+      text: `Dir ist aufgefallen: bei ${h(sig.mostFatiguedExercise)} wirst du gegen Ende der Session zunehmend schwächer — das war in den letzten 3 Wochen so.`,
+      info: 'Wiederkehrende Erschöpfung zum Sessionende kann ein Zeichen für zu wenig Erholung sein. Eine Deload-Woche (reduziertes Volumen) oder eine andere Übungsreihenfolge können helfen.',
+      evidence: sig.evidence,
+    };
+  }
   if (sig.type === 'consistency_quality') {
     return { icon: '📉', text: 'Häufiger trainieren hilft gerade nicht — Qualität sinkt.', evidence: sig.evidence };
   }
@@ -8676,6 +8688,13 @@ export function mountApp(root) {
   window.addEventListener('train:show-update-banner', (e) => {
     _pendingSwRegistration = e.detail?.registration ?? null;
     document.getElementById('sw-update-banner')?.classList.add('is-visible');
+  });
+
+  // B62 (Runde 13): index.html feuert dieses Event beim ersten Auslösen der
+  // SW-Registrierung (erste Trainingsaktion) — kurzer Hinweis-Toast statt
+  // eines blockierenden Dialogs.
+  window.addEventListener('train:show-toast', (e) => {
+    if (e.detail?.message) showToast(e.detail.message);
   });
 
   // Antwort auf das einmalige GET_VERSION-postMessage in renderSettingsTab()

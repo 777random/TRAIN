@@ -16,16 +16,23 @@
  *   asset conflicts.
  */
 
-const CACHE_VERSION  = 'train-v234';
+const CACHE_VERSION  = 'train-v235';
 
 /**
  * App shell – every file the app needs to render its first frame offline.
  * Adjust this list whenever you add/rename files in your build.
  */
+// B62 (Runde 13, Council-Entscheidung): datenschutz.html + Badge-PNGs
+// bewusst NICHT precached — für die reine Trainingsausführung entbehrlich,
+// werden bei tatsächlichem Zugriff (Datenschutz-Link in Settings,
+// Badge-Galerie) ganz normal per Netzwerk geladen und von der bestehenden
+// cacheFirstWithRefresh()-Strategie unten automatisch nachgecacht. Alle
+// JS-Module + Fonts bleiben precached (SPA-Architektur — praktisch jedes
+// Modul wird für den Kernablauf gebraucht; Fonts ohne Precache verursachen
+// einen sichtbaren FOUC beim Erstladen).
 const PRECACHE_URLS = [
   './',
   './index.html',
-  './datenschutz.html',
   './state.js',
   './backup.js',
   './ui.js',
@@ -59,13 +66,6 @@ const PRECACHE_URLS = [
   './fonts/BebasNeue-latinext.woff2',
   './fonts/DMSans-latin.woff2',
   './fonts/DMSans-latinext.woff2',
-  './badges/badge_4.png',
-  './badges/badge_8.png',
-  './badges/badge_12.png',
-  './badges/badge_26.png',
-  './badges/badge_52.png',
-  './badges/badge_104.png',
-  './badges/badge_260.png',
 ];
 
 

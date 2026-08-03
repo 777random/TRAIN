@@ -132,6 +132,15 @@ test('Versions-Label zeigt die per Laufzeit-Message abgefragte CACHE_VERSION sta
 
   await seed(page);
 
+  // B62 (Runde 13): Registrierung passiert seit diesem Sprint nicht mehr
+  // automatisch beim Laden, sondern erst nach der ersten Trainingsaktion
+  // (timer.js '_ensureSessionStart()'). seed() hier hat keine Übungen/Tage
+  // für eine echte UI-Interaktion -- das Trigger-Event direkt zu feuern
+  // simuliert exakt das, was index.html im echten Betrieb dafür abhört.
+  await page.evaluate(() => {
+    window.dispatchEvent(new CustomEvent('train:sw-register-trigger'));
+  });
+
   const hasSW = await page.evaluate(() => 'serviceWorker' in navigator);
   if (hasSW) {
     // Auf der REGISTRIERENDEN Seite selbst ist navigator.serviceWorker.controller

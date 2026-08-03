@@ -179,7 +179,17 @@
     splash.classList.add('is-hidden');
     splash.addEventListener('transitionend', () => splash.remove(), { once: true });
 
-    registerServiceWorker();
+    // B62 (Runde 13, Council-Entscheidung): Service Worker erst bei der
+    // ersten echten Trainingsaktion registrieren, nicht schon beim reinen
+    // Seitenaufruf (timer.js '_ensureSessionStart()' feuert das Trigger-
+    // Event). register() ist browser-seitig idempotent, { once: true }
+    // genügt trotzdem als zusätzliche Absicherung.
+    window.addEventListener('train:sw-register-trigger', () => {
+      registerServiceWorker();
+      window.dispatchEvent(new CustomEvent('train:show-toast', {
+        detail: { message: 'TRAIN speichert dein Training lokal, damit es auch ohne Netz läuft.' },
+      }));
+    }, { once: true });
 
     window.__trainExportJSON = exportJSON;
     onStorageError(() => {
