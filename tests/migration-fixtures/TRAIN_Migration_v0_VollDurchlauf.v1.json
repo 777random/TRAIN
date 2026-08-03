@@ -1,0 +1,35 @@
+{
+  "curIdx": 0,
+  "weeks": [
+    {
+      "startDate": "2024-01-01",
+      "note": "",
+      "days": [
+        {
+          "title": "Tag A",
+          "subtitle": "",
+          "warmup": "",
+          "cooldown": "",
+          "exercises": [
+            {
+              "name": "Kniebeuge",
+              "note": "",
+              "sets": [
+                { "weight": 60, "reps": 8, "done": true },
+                { "weight": 60, "reps": 8, "done": true }
+              ],
+              "weightStep": 2.5,
+              "nextWeekPlan": 0,
+              "targetSets": 2,
+              "targetReps": 8,
+              "setType": "straight",
+              "showPlates": false,
+              "substituteFor": null,
+              "archived": false
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

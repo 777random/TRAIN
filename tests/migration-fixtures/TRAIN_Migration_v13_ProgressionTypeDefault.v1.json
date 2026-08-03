@@ -1,0 +1,62 @@
+{
+  "meta": { "schemaVersion": 13, "savedAt": "2024-04-01T12:00:00.000Z", "createdAt": "2024-01-01T12:00:00.000Z" },
+  "curIdx": 0,
+  "weeks": [
+    {
+      "id": 1704067200001,
+      "startDate": "2024-01-01",
+      "note": "",
+      "mode": "standard",
+      "sessionLog": [],
+      "bodyData": {},
+      "restDays": [],
+      "days": [
+        {
+          "title": "Tag A",
+          "subtitle": "",
+          "warmup": "",
+          "cooldown": "",
+          "locked": true,
+          "markedDone": true,
+          "sessionNote": "",
+          "sessionRating": 4,
+          "sessionStartTs": null,
+          "sessionEndTs": null,
+          "sleepHours": 8,
+          "energyLevel": 4,
+          "exercises": [
+            {
+              "name": "Kniebeuge",
+              "note": "",
+              "pauseSec": 90,
+              "metric": "reps",
+              "sets": [
+                { "weight": 60, "reps": 8, "rpe": 6, "status": "success", "done": true, "note": "" },
+                { "weight": 60, "reps": 8, "rpe": 6, "status": "success", "done": true, "note": "" }
+              ],
+              "weightStep": 2.5,
+              "nextWeekPlan": 0,
+              "nextWeekPlanConfirmed": false,
+              "targetReps": 8,
+              "setType": "straight",
+              "tags": ["Quadrizeps", "Gluteus"],
+              "supersetId": null,
+              "showPlates": false,
+              "substituteFor": null,
+              "archived": false
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "customTemplate": [],
+  "templates": [],
+  "prs": {},
+  "settings": {
+    "swipe": true, "drag": true, "heightCm": null, "targetWeight": null,
+    "showBmi": false, "deloadFactor": 0.75, "deloadFactorCustom": null,
+    "barbellWeight": 20, "plateStep": 2.5, "lastBackupDate": null,
+    "weeksSinceLastBackupReminder": 0, "maxSessionMs": 10800000
+  }
+}

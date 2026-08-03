@@ -1,0 +1,69 @@
+{
+  "meta": { "schemaVersion": 29, "savedAt": "2024-02-01T12:00:00.000Z", "createdAt": "2024-01-01T12:00:00.000Z" },
+  "curIdx": 0,
+  "customExercises": [],
+  "badges": [],
+  "lastReentryHandled": null,
+  "longestStreakEver": 0,
+  "plateauActions": {},
+  "weeks": [
+    {
+      "id": 1704067200001, "startDate": "2024-01-01", "note": "", "mode": "standard",
+      "sessionLog": [], "bodyData": { "weightLog": [] }, "restDays": [],
+      "days": [
+        {
+          "title": "Tag A", "subtitle": "", "warmup": "", "cooldown": "",
+          "locked": true, "markedDone": true, "sessionNote": "", "sessionRating": 4,
+          "sessionStartTs": null, "sessionEndTs": null, "sleepHours": 8, "energyLevel": 4,
+          "isVacation": false, "vacationPlan": null,
+          "exercises": [
+            {
+              "name": "Rudern", "note": "", "pauseSec": 90, "metric": "m",
+              "sets": [
+                { "weight": 0, "reps": 400, "rpe": 6, "status": "success", "done": true, "note": "" }
+              ],
+              "weightStep": 2.5, "nextWeekPlan": 0, "nextWeekPlanConfirmed": false, "targetReps": 400,
+              "progressionType": "weight", "progressionMode": "weight_first", "targetRepsMax": null, "prRepsHistory": {},
+              "oneRM": null, "prWeight": null, "prRepsAtMaxWeight": null,
+              "setType": "straight", "tags": [], "supersetId": null,
+              "showPlates": false, "substituteFor": null, "archived": false
+            },
+            {
+              "name": "Plank", "note": "", "pauseSec": 90, "metric": "sec",
+              "sets": [
+                { "weight": 0, "reps": 45, "rpe": 6, "status": "success", "done": true, "note": "" }
+              ],
+              "weightStep": 2.5, "nextWeekPlan": 0, "nextWeekPlanConfirmed": false, "targetReps": 45,
+              "progressionType": "weight", "progressionMode": "weight_first", "targetRepsMax": null, "prRepsHistory": {},
+              "oneRM": null, "prWeight": null, "prRepsAtMaxWeight": null,
+              "setType": "straight", "tags": [], "supersetId": null,
+              "showPlates": false, "substituteFor": null, "archived": false
+            },
+            {
+              "name": "Wandsitz", "note": "", "pauseSec": 90, "metric": "sec",
+              "sets": [
+                { "weight": 0, "reps": 60, "rpe": 6, "status": "success", "done": true, "note": "" }
+              ],
+              "weightStep": 2.5, "nextWeekPlan": 0, "nextWeekPlanConfirmed": false, "targetReps": 60,
+              "progressionType": "sets", "progressionMode": "weight_first", "targetRepsMax": null, "prRepsHistory": {},
+              "oneRM": null, "prWeight": null, "prRepsAtMaxWeight": null,
+              "setType": "straight", "tags": [], "supersetId": null,
+              "showPlates": false, "substituteFor": null, "archived": false
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "customTemplate": [],
+  "templates": [],
+  "prs": {},
+  "settings": {
+    "swipe": true, "drag": true, "heightCm": null, "targetWeight": null,
+    "showBmi": false, "deloadFactor": 0.75, "deloadFactorCustom": null,
+    "barbellWeight": 20, "plateStep": 2.5, "lastBackupDate": null,
+    "weeksSinceLastBackupReminder": 0, "maxSessionMs": 10800000,
+    "dismissedNamePairs": [],
+    "autoWeek": { "enabled": false, "suggestProgress": true, "showReview": true }
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "meta": { "schemaVersion": 30, "savedAt": "2024-02-01T12:00:00.000Z", "createdAt": "2024-01-01T12:00:00.000Z" },
+  "curIdx": 0,
+  "customExercises": [],
+  "badges": [],
+  "lastReentryHandled": null,
+  "longestStreakEver": 0,
+  "plateauActions": {},
+  "weeks": [
+    {
+      "id": 1704067200001, "startDate": "2024-01-01", "note": "", "mode": "standard",
+      "sessionLog": [], "bodyData": { "weightLog": [] }, "restDays": [],
+      "days": [
+        {
+          "title": "Tag A", "subtitle": "", "warmup": "", "cooldown": "",
+          "locked": true, "markedDone": true, "sessionNote": "", "sessionRating": 4,
+          "sessionStartTs": null, "sessionEndTs": null, "sleepHours": 8, "energyLevel": 4,
+          "isVacation": false, "vacationPlan": null,
+          "exercises": [
+            {
+              "name": "Kniebeuge", "note": "", "pauseSec": 90, "metric": "reps",
+              "sets": [ { "weight": 60, "reps": 8, "rpe": 6, "status": "success", "done": true, "note": "" } ],
+              "nextWeekPlan": 0, "nextWeekPlanConfirmed": false, "targetReps": 8,
+              "progressionType": "weight", "progressionMode": "weight_first", "targetRepsMax": null, "prRepsHistory": {},
+              "oneRM": null, "prWeight": null, "prRepsAtMaxWeight": null,
+              "setType": "straight", "tags": ["Quadrizeps", "Gluteus"], "supersetId": null,
+              "showPlates": false, "substituteFor": null, "archived": false
+            },
+            {
+              "name": "Kreuzheben", "note": "", "pauseSec": 90, "metric": "reps",
+              "sets": [ { "weight": 80, "reps": 6, "rpe": 7, "status": "success", "done": true, "note": "" } ],
+              "weightStep": 2.5, "nextWeekPlan": 0, "nextWeekPlanConfirmed": false, "targetReps": 6,
+              "progressionType": "weight", "progressionMode": "weight_first", "targetRepsMax": null, "prRepsHistory": {},
+              "oneRM": null, "prWeight": null, "prRepsAtMaxWeight": null,
+              "setType": "straight", "tags": ["Unterer Rücken", "Gluteus", "Beinbizeps", "Rücken", "Trapez"], "supersetId": null,
+              "showPlates": false, "substituteFor": null, "archived": false
+            },
+            {
+              "name": "Frontkniebeuge", "note": "", "pauseSec": 90, "metric": "reps",
+              "sets": [ { "weight": 40, "reps": 8, "rpe": 7, "status": "success", "done": true, "note": "" } ],
+              "weightStep": 1.25, "nextWeekPlan": 0, "nextWeekPlanConfirmed": false, "targetReps": 8,
+              "progressionType": "weight", "progressionMode": "weight_first", "targetRepsMax": null, "prRepsHistory": {},
+              "oneRM": null, "prWeight": null, "prRepsAtMaxWeight": null,
+              "setType": "straight", "tags": [], "supersetId": null,
+              "showPlates": false, "substituteFor": null, "archived": false
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "customTemplate": [],
+  "templates": [],
+  "prs": {},
+  "settings": {
+    "swipe": true, "drag": true, "heightCm": null, "targetWeight": null,
+    "showBmi": false, "deloadFactor": 0.75, "deloadFactorCustom": null,
+    "barbellWeight": 20, "plateStep": 2.5, "lastBackupDate": null,
+    "weeksSinceLastBackupReminder": 0, "maxSessionMs": 10800000,
+    "dismissedNamePairs": [],
+    "autoWeek": { "enabled": false, "suggestProgress": true, "showReview": true }
+  }
+}
