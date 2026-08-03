@@ -781,3 +781,37 @@ früheren Runde sind ein guter Startpunkt, aber vor der eigentlichen
 Umsetzung sollte jede Fundstelle mit einer frischen, gezielten Suche
 erneut bestätigt werden — nicht nur die im Dokument genannten Zeilen
 direkt anfassen.
+
+---
+
+## PROZESS
+
+### 2026-08-03 — LLM-Council-Einbeziehung als dauerhafte Prozessregel eingerichtet
+**Entscheidung:** Bestimmte Entscheidungsklassen (mehrere gleichwertige
+Optionen ohne klaren Gewinner, rückwirkende Änderungen an bereits
+gespeicherten/angezeigten Nutzerdaten, größere schwer umkehrbare
+Architektur-Schritte, umfangreiche neue Features mit Produktrichtungs-
+Bezug, mögliche Aufweichung von "einfach nur trainieren, nicht mehr
+nachdenken" oder der 2-Tap-Onboarding-Regel) laufen künftig nicht mehr
+nur durch die normale Plan-Mode-Bestätigung, sondern werden explizit als
+"COUNCIL-EMPFEHLUNG" im Diagnose-/Sprint-Ergebnis geflaggt, mit
+kopierbereiter Council-Frage — Umsetzung erst nach einer Rückmeldung, die
+auf einer Antwort aus dem separaten LLM-Council-Chat-Setup basiert (oder
+nach expliziter Nutzer-Entscheidung, das Council für den Einzelfall zu
+überspringen). Volle Regel siehe `AGENTS.md`, Abschnitt
+"LLM-Council-Einbeziehung", Hintergrund siehe `docs/LLM-COUNCIL.md`.
+**Begründung:** Ein einzelnes Modell im normalen Plan-Mode-Vorgehen neigt
+dazu, der eigenen ersten Idee zuzustimmen statt sie aus einer echten
+zweiten, unabhängigen Perspektive kritisch zu hinterfragen — besonders
+riskant bei genau den oben genannten Entscheidungsklassen, die entweder
+schwer umkehrbar sind oder das dokumentierte Kernprinzip der App berühren.
+Karpathys LLM-Council-Konzept (unabhängige Perspektiven → blinde
+Gegenprüfung → Chairman-Synthese) adressiert genau dieses Risiko, wird
+aber bewusst als separates, vom Nutzer manuell bedientes Chat-Setup
+außerhalb von Claude Code genutzt, nicht als von Claude Code selbst
+ausgeführter Prozess.
+**Gilt:** Permanent. Reguläre Bugfixes, klar umrissene
+Feedback-Einzel-Fixes und Cleanup/Housekeeping bleiben ausdrücklich davon
+ausgenommen (siehe AGENTS.md für die vollständige Abgrenzung) — die Regel
+soll nicht jede Plan-Mode-Bestätigung ersetzen, nur die Fälle mit
+echtem Fehlentscheidungs-Risiko zusätzlich absichern.

@@ -664,6 +664,52 @@ Parallel-Sprint erstmals befüllt.)
 
 ---
 
+## LLM-Council-Einbeziehung
+
+Für bestimmte Entscheidungen reicht die normale Plan-Mode-Bestätigung NICHT
+aus — sie sollten stattdessen (oder zusätzlich) durch das separate
+LLM-Council-Chat-Setup laufen, bevor umgesetzt wird. Erkenne diese Fälle
+selbst und flagge sie explizit, statt einfach eine normale
+Diagnose/Plan-Empfehlung abzugeben.
+
+WANN Council-würdig (mindestens eines muss zutreffen):
+1. Mehrere echte, technisch gleichwertig vertretbare Optionen ohne
+   klaren Gewinner (z.B. "state.js-Feld ergänzen vs. Auswahlmuster
+   wiederverwenden", "trennen vs. konsolidieren" bei divergierenden
+   Berechnungen).
+2. Die Änderung wirkt sich RÜCKWIRKEND auf bereits gespeicherte/angezeigte
+   Nutzerdaten aus (nicht nur künftiges Verhalten).
+3. Größerer, schwer umkehrbarer Architektur-Schritt (z.B. ein Refactor,
+   der mehrere Dateien/Konzepte neu strukturiert, nicht nur ein additiver
+   Fix).
+4. Neues Feature mit echtem Umfang, das eine Grundsatzentscheidung zur
+   Produktrichtung berührt (nicht: ein zusätzlicher Button oder Toggle).
+5. Eine Entscheidung, die dem dokumentierten Kernprinzip "einfach nur
+   trainieren, nicht mehr nachdenken" oder der 2-Tap-Onboarding-Regel
+   (train-v132) möglicherweise widerspricht oder sie aufweicht.
+
+WANN NICHT Council-würdig (normale Plan-Mode-Bestätigung reicht):
+- Reguläre Bugfixes mit klarem, durch Diagnose bestätigtem Befund.
+- Kategorie-A/B-artige Punkte aus der Feedback-Analyse (klar umrissene
+  Einzel-Fixes).
+- Cleanup/Housekeeping (toter Code, Umbenennungen, Testabsicherung).
+- Alles, das leicht reversibel ist (Code-Änderung, kein Datenmigrations-
+  Risiko, kein Nutzer-sichtbarer Vertrauensverlust bei Fehlentscheidung).
+
+WAS TUN, wenn ein Punkt Council-würdig ist:
+Nicht selbst entscheiden und nicht nur normal im Plan-Mode nachfragen.
+Stattdessen explizit im Sprint-Ergebnis/Diagnose-Dokument vermerken, z.B.:
+"COUNCIL-EMPFEHLUNG: [Entscheidung] sollte vor Umsetzung durch das
+LLM-Council-Chat-Setup laufen, weil [welches der 5 Kriterien zutrifft].
+Vorschlag für die Council-Frage: [kompakt formulierte Frage mit den
+relevanten Optionen/Kontext, kopierbereit]." Umsetzung erst nach
+Rückmeldung, die auf einer Council-Antwort basiert (oder auf expliziter
+Nutzer-Entscheidung, das Council für diesen Fall zu überspringen).
+
+Hintergrund/Details siehe `docs/LLM-COUNCIL.md`.
+
+---
+
 ## AUTO-UPDATE REGEL
 
 Claude Code aktualisiert diese Datei nach jedem Multi-Agent Sprint:
