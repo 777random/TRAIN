@@ -736,3 +736,48 @@ zusätzlichen Nutzen für das beschriebene Szenario.
 **Gilt:** Permanent, bis ein konkreter Nutzerfall auftritt, der eine
 Lücke MITTEN in den Standard-Denominationen beschreibt (nicht nur eine
 Obergrenze) — erst dann wäre eine Matrix gerechtfertigt.
+
+### 2026-08 — `_weekConsistencyRatio()`-Angleichung: bewusst akzeptierte Rückwirkung auf Bestandsdaten-Anzeigen (B185)
+**Entscheidung:** Reguläre Trainingstage zählen für die Fortschritt-Tab-
+Konsistenz-% jetzt als "erledigt", wenn ≥50% der Sätze bewertet wurden
+(dieselbe Definition wie die Streak-Berechnung), NICHT mehr wenn nur
+`day.markedDone` gesetzt ist. Da `_weekConsistencyRatio()` und alle
+nachgelagerten Funktionen (`computeConsistencyTrend`,
+`_checkConsistencyGap`, `_checkConsistencyQuality`, die onTrack-
+Fallback-Karte) reine, bei jedem Aufruf frisch berechnete Funktionen sind
+(nichts wird zwischengespeichert oder migriert), ändert sich die
+angezeigte Konsistenz-% für JEDE bereits gespeicherte Woche sofort nach
+diesem Update.
+**Begründung:** Die alte `markedDone`-Definition war manipulierbar (ein
+Nutzer konnte den "Tag abschließen"-Button tippen, ohne tatsächlich
+trainiert zu haben) — die Streak-Berechnung hatte dieses Problem bereits
+bewusst gelöst (Kommentar in state.js, "Anti-Streak-Faking"), die
+Konsistenz-Berechnung war seit B38 nur für Urlaubstage nachgezogen worden,
+reguläre Trainingstage blieben zurück. Die Rückwirkung wurde VOR der
+Umsetzung explizit mit dem Nutzer besprochen und bestätigt — es handelt
+sich nicht um einen Datenverlust oder eine Migration, sondern um eine
+Neuberechnung nach einer nun einheitlichen Definition. Die Richtung ist
+nicht einheitlich: manche Wochen zählen neu als "erledigt" (Sätze wurden
+bewertet, aber nie explizit abgeschlossen), andere nicht mehr
+(abgeschlossen getippt, aber <50% der Sätze bewertet).
+**Gilt:** Permanent. Jede künftige Änderung an dieser Definition sollte
+denselben Rückwirkungs-Hinweis in einer Nutzer-Bestätigung vorab
+einholen, bevor Code geändert wird — nicht erst nach der Umsetzung
+kommunizieren.
+
+### 2026-08 — Korrektur: `ex.targetSets`-Entfernung betraf entgegen der Audit-Annahme auch state.js (B187)
+**Entscheidung:** Keine inhaltliche Entscheidung, sondern eine
+Prozess-Notiz: der Runde-8-Audit hatte `ex.targetSets`s Schreibstellen
+nur in `ui.js` vermutet — die Runde-9-Diagnose fand eine zweite
+Schreibstelle direkt in `state.js` (`ONBOARDING_SEED`-Reducer-Case) sowie
+eine zu entfernende Mutation in `_applyPlannedProgression()`.
+**Begründung:** Ein Audit-Dokument beschreibt den Stand zum Diagnose-
+Zeitpunkt, nicht garantiert den vollständigen Blast-Radius — eine
+erneute, gezielte Verifikation direkt vor der Umsetzung (statt blindem
+Vertrauen auf die alte Charakterisierung) deckte den zusätzlichen
+state.js-Bezug auf.
+**Gilt:** Permanent als Arbeitsweise: Audit-/Diagnose-Dokumente aus einer
+früheren Runde sind ein guter Startpunkt, aber vor der eigentlichen
+Umsetzung sollte jede Fundstelle mit einer frischen, gezielten Suche
+erneut bestätigt werden — nicht nur die im Dokument genannten Zeilen
+direkt anfassen.

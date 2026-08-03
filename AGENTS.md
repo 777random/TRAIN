@@ -1,14 +1,16 @@
 # TRAIN — Parallel Agent Regeln
 # Wird nach jedem Multi-Agent Sprint
 # automatisch aktualisiert.
-# Letzte Aktualisierung: 2026-08-02 / train-v229 (Runde-8-Datenkonsistenz-
-# Sprint, B181-B184 — siehe Muster 13 unten: 3 von 4 Clustern (0, 2, 4)
-# änderten state.js additiv/lokalisiert (neue Settings-Defaults+Migration,
-# ein Reducer-Guard, ein Default-Feld-Fallback in EX_ADD) — alle in EINER
-# parallelen Runde, KEINE Solo-Runde, da vorab per Diagnose bestätigt, dass
-# die 3 state.js-Regionen (buildDefaultState, migrate, 2 verschiedene
-# reduce()-Cases) sich nicht überlappen. Erstmals mehr als ein Cluster
-# gleichzeitig state.js in derselben Runde ohne Solo-Vorlauf.)
+# Letzte Aktualisierung: 2026-08-03 / train-v230 (Runde-9-Audit-Folgerunde,
+# B185-B190 — siehe Muster 14 unten: 6 Cluster (3 mit state.js-Beteiligung)
+# liefen komplett in EINER parallelen Runde, alle Regionen vorab einzeln
+# diagnostiziert. Bemerkenswert diesmal: mehrere Agents haben ihre eigene
+# Absicherungstest-Wirksamkeit per Sabotage-dann-Revert selbst verifiziert
+# (Wert testweise verändert, Testschlag bestätigt, dann sauber
+# zurückgesetzt — git diff zeigt am Ende null Netto-Änderung an der
+# sabotierten Datei), und ein Agent fand+fixte eine echte Interferenz
+# zwischen seiner eigenen additiven Migration und einer bestehenden
+# Test-Fixture aus einer FRÜHEREN Runde, bevor sie zum Problem wurde.)
 
 ---
 
@@ -595,6 +597,55 @@ Regionen-Disjunktheit, auch wenn mehrere Cluster gleichzeitig state.js
 anfassen — vorausgesetzt, die Diagnose-Phase hat JEDE betroffene
 state.js-Stelle einzeln benannt (nicht nur pauschal "state.js: ja/nein"
 beantwortet).
+
+### Muster 14 — 6 Cluster (3 mit state.js-Beteiligung), alle in EINER
+Runde, mit Sabotage-Selbstverifikation mehrerer Agents (verifiziert
+2026-08-03, train-v230, Runde-9-Audit-Folgerunde B185-B190):
+```
+Alle 6 Agents gleichzeitig, EINE Runde:
+  Agent 1: state.js (~394-414, neue _dayEvalCounts-Export-Funktion) +
+    consistencyUtils.js + weeklyFocus.js (~935, onTrack-Karte)
+  Agent 2: weekReview.js (komplett andere Datei)
+  Agent 3: ui.js (~9717/~1647) + state.js (~1613 + ~2905, zwei disjunkte
+    Reducer-Stellen)
+  Agent 4: state.js (~985-1039, Always-apply-Defaults-Abschnitt)
+  Agent 5: nur tests/ (Absicherungstest fürs ui.js/timer.js-Duplikat)
+  Agent 6: weeklyFocus.js (~265/~487/~749, drei andere Regionen als
+    Agent 1s ~935) + tests/
+→ Konsolidierungs-Agent zuletzt
+```
+Ergebnis: keine Kollision — `git diff -U2 state.js` zeigte 5 disjunkte
+Hunks an 5 verschiedenen Stellen, `git diff weeklyFocus.js` zeigte 5
+disjunkte Hunks zwischen Agent 1 und Agent 6. **Zwei neue Beobachtungen,
+die über reine Regionen-Disjunktheit hinausgehen:**
+
+1. **Sabotage-dann-Revert als Selbstverifikations-Muster:** mehrere Agents
+   (Cluster 2, 5, 6) haben ihre eigene neue Absicherungstest-Wirksamkeit
+   demonstriert, indem sie den zu schützenden Wert/die Logik testweise
+   selbst kaputt gemacht haben (z.B. `timer.js`s Pausenzeit-Fallback um +5
+   verändert, oder einen Filter in `_scoreWeek()` deaktiviert), bestätigt
+   haben dass der neue Test dabei tatsächlich fehlschlägt, und den
+   Sabotage-Schritt danach vollständig zurückgenommen haben (verifiziert
+   per `git diff` = keine Netto-Änderung an der sabotierten Datei). Das ist
+   striktere Evidenz als "Test ist grün" — ein Test, der nie rot werden
+   kann, beweist nichts. Empfehlung: dieses Muster bei jedem
+   Absicherungstest-Cluster (nicht nur bei echten Fixes) zur Standard-
+   Vorgabe machen.
+2. **Ein additiver Migrations-Guard kann eine ÄLTERE Test-Fixture aus einer
+   FRÜHEREN Runde brechen, ohne dass beide Runden sich der Datei-Ebene nach
+   überschneiden:** Cluster 4s neue Muskelgruppen-Backfill-Migration hätte
+   eine in Runde 8 angelegte Test-Fixture (bewusst leeres `tags:[]` bei
+   einem kuratierten Übungsnamen, um `EX_ADD`s History-Carryover-Priorität
+   zu testen) stillschweigend vor dem eigentlichen Test-Reducer befüllt.
+   Der Agent fand dies selbst beim Testlauf und fixte die Fixture (Umstieg
+   auf einen nicht-kuratierten Namen), statt es zu übersehen. **Lehre:**
+   additive, unconditional "Always-apply defaults"-Migrationen (wie in
+   Muster 13 etabliert) sind mächtig genug, um bestehende Test-Fixtures aus
+   VORHERIGEN Runden zu berühren, auch wenn die aktuelle Runde deren Datei
+   nicht direkt anfässt — nach jeder neuen Migrations-Guard-Ergänzung
+   lohnt sich ein gezielter Blick auf ältere Fixtures, die genau das Feld
+   absichtlich leer/besonders gesetzt hatten, das die neue Migration jetzt
+   befüllt.
 
 ---
 

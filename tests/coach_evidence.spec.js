@@ -110,6 +110,28 @@ test('onTrack (steady-state): Einheiten + Erfolgsquote sichtbar (AC6)', async ({
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
 });
 
+test('onTrack (Runde 9/Cluster 1): "Einheiten"-Zaehler nutzt Auswertungs-Anteil statt markedDone', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', err => pageErrors.push(err.message));
+  // Beide Tage haben markedDone:false (nie "Tag abschliessen" angetippt),
+  // aber vollstaendig bewertete Saetze -> muessen unter der neuen Regel
+  // trotzdem als "erledigt" in der Einheiten-Zahl auftauchen (vorher haette
+  // dieser Fall faelschlich 0/Y gezeigt).
+  const weeks = [1, 0].map((n, i) => ({
+    id: i + 1, startDate: isoWeeksAgo(n), note: '', mode: 'standard',
+    days: [mkDay(i * 10 + 1, [mkExercise('Bankdrücken', 80, 'success', 8.5)], { markedDone: false, locked: false })],
+    sessionLog: [], bodyData: {}, restDays: [], isSeedWeek: false,
+  }));
+  await seed(page, weeks);
+  await expect(page.locator('.coach-focus-status')).toContainText('Auf Kurs');
+  const texts = await evidenceTexts(page);
+  const unitLine = texts.find(t => /\d+\/\d+/.test(t));
+  expect(unitLine).toBeTruthy();
+  const [done] = unitLine.match(/\d+\/\d+/)[0].split('/').map(Number);
+  expect(done).toBeGreaterThan(0); // vorher waere dies 0 gewesen (markedDone: false)
+  expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});
+
 test('Progression: Uebungsname + Empfehlung + Konfidenz sichtbar (AC5)', async ({ page }) => {
   const pageErrors = [];
   page.on('pageerror', err => pageErrors.push(err.message));

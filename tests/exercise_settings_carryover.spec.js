@@ -217,19 +217,73 @@ test('Runde 8 (Cluster 2): History-Tags (auch bewusst geleert) haben weiterhin V
   const pageErrors = [];
   page.on('pageerror', err => pageErrors.push(err.message));
 
-  // Bankdrücken hätte laut resolveMuscleGroups() ['Brust','Trizeps',
-  // 'Vordere Schulter'] -- History mit bewusst geleerten tags:[] muss das
-  // NICHT überschreiben (siehe B41-Diskussion: Nutzer-Anpassung/-Löschung
-  // bleibt erhalten).
-  const dayA = mkDay(61, 'Tag A', [mkExercise('Bankdrücken', { tags: [] })]);
+  // Seit Runde 9 (Cluster 4) backfillt eine Migration JEDE Übung mit
+  // exakt-passendem Standardnamen und leerem tags-Array beim Laden --
+  // ein kuratierter Name (z.B. 'Bankdrücken') mit tags:[] würde daher
+  // bereits VOR diesem Test-Schritt durch die Migration befüllt und könnte
+  // die hier geprüfte EX_ADD-History-Priorität nicht mehr isoliert zeigen.
+  // Nicht-kuratierter Name verwendet, damit der Default (resolveMuscleGroups
+  // liefert []) mit der Migration übereinstimmt und die History-Priorität
+  // von EX_ADD selbst (nicht die Migration) geprüft wird (siehe
+  // B41-Diskussion: Nutzer-Anpassung/-Löschung bleibt erhalten).
+  const dayA = mkDay(61, 'Tag A', [mkExercise('Ganz Eigene Uebung XY', { tags: [] })]);
   const dayB = mkDay(62, 'Tag B', []);
   await seed(page, { weeks: [mkWeek(1, todayISO(), [dayA, dayB])] });
 
-  await addViaSearch(page, 1, 'Bankdrücken');
+  await addViaSearch(page, 1, 'Ganz Eigene Uebung XY');
 
   const st = await readState(page);
-  const added = st.weeks[0].days[1].exercises.find(e => e.name === 'Bankdrücken');
+  const added = st.weeks[0].days[1].exercises.find(e => e.name === 'Ganz Eigene Uebung XY');
   expect(added.tags).toEqual([]);
+
+  expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});
+
+test('Runde 9 (Cluster 4): Muskelgruppen-Backfill für Bestandsdaten -- Standard-Name mit leerem tags-Array wird beim Laden befüllt', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', err => pageErrors.push(err.message));
+
+  // Simuliert eine VOR B184 gespeicherte Übung: Standard-Name, tags:[] --
+  // muss nach dem Laden (Migration) automatisch die kuratierten
+  // Muskelgruppen bekommen, ohne dass EX_ADD/Onboarding involviert ist.
+  const day = mkDay(71, 'Tag A', [mkExercise('Bankdrücken', { tags: [] })]);
+  await seed(page, { weeks: [mkWeek(1, todayISO(), [day])] });
+
+  const st = await readState(page);
+  const ex = st.weeks[0].days[0].exercises.find(e => e.name === 'Bankdrücken');
+  expect(ex.tags).toEqual(expect.arrayContaining(['Brust', 'Trizeps', 'Vordere Schulter']));
+
+  expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});
+
+test('Runde 9 (Cluster 4): Muskelgruppen-Backfill überspringt individuell/nicht-kuratierte Übungsnamen', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', err => pageErrors.push(err.message));
+
+  const day = mkDay(72, 'Tag A', [mkExercise('Meine Spezialübung', { tags: [] })]);
+  await seed(page, { weeks: [mkWeek(1, todayISO(), [day])] });
+
+  const st = await readState(page);
+  const ex = st.weeks[0].days[0].exercises.find(e => e.name === 'Meine Spezialübung');
+  expect(ex.tags).toEqual([]);
+
+  expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});
+
+test('Runde 9 (Cluster 4): Muskelgruppen-Backfill überschreibt bereits vorhandene (nicht-leere) Tags nicht', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', err => pageErrors.push(err.message));
+
+  // Bankdrücken hätte laut resolveMuscleGroups() ['Brust','Trizeps',
+  // 'Vordere Schulter'] -- ein bereits gesetzter, abweichender Tag-Wert
+  // (z.B. durch eine künftige manuelle Anpassung) darf vom Backfill nicht
+  // überschrieben werden, da der Guard nur auf leere Arrays triggert.
+  const day = mkDay(73, 'Tag A', [mkExercise('Bankdrücken', { tags: ['CustomTag'] })]);
+  await seed(page, { weeks: [mkWeek(1, todayISO(), [day])] });
+
+  const st = await readState(page);
+  const ex = st.weeks[0].days[0].exercises.find(e => e.name === 'Bankdrücken');
+  expect(ex.tags).toEqual(['CustomTag']);
 
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
 });

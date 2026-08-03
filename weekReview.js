@@ -260,11 +260,17 @@ export function buildWeekReview(week, allWeeks, favoriteExercises = []) {
   const summary = { streak, totalSets, completedDays, plannedDays, avgSessionDuration, goalFulfillment };
 
   // ── Highlights ────────────────────────────────────────────────────────────────
+  // Runde 9/Cluster 2: Deload-Wochen fließen weder als aktuelle Woche noch
+  // als Vergleichs-Baseline in PR-/Steigerungs-Erkennung ein — analog zum
+  // bereits etablierten Muster in insightEngine.js/ui.js/state.js (Gewicht
+  // ist in einer Deload-Woche absichtlich reduziert, kein echter PR/Fortschritt).
   const highlights  = [];
-  const prevWeeks   = weekIdx > 0 ? sorted.slice(0, weekIdx) : [];
-  const prH         = _findPR(week, prevWeeks);
-  if (prH) highlights.push(prH);
-  if (!isDeload && prevWeek) {
+  const prevWeeks   = weekIdx > 0 ? sorted.slice(0, weekIdx).filter(w => w.mode !== 'deload') : [];
+  if (!isDeload) {
+    const prH = _findPR(week, prevWeeks);
+    if (prH) highlights.push(prH);
+  }
+  if (!isDeload && prevWeek && prevWeek.mode !== 'deload') {
     const gainH = _findBestGain(week, prevWeek);
     if (gainH && highlights.length < 3) highlights.push(gainH);
   }

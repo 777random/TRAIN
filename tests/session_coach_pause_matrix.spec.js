@@ -32,23 +32,25 @@ function mkDay(exercises) {
   };
 }
 
-async function seed(page, { exercises, goal = null } = {}) {
+async function seed(page, { exercises, goal = null, autoStartPauseTimer = false, sessionCoach = true, isVacation = false } = {}) {
+  const day = mkDay(exercises);
+  day.isVacation = isVacation;
   const weeks = [{
     id: 1, startDate: todayISO(), note: '', mode: 'standard',
-    days: [mkDay(exercises)], sessionLog: [], bodyData: {}, restDays: [], isSeedWeek: false,
+    days: [day], sessionLog: [], bodyData: {}, restDays: [], isSeedWeek: false,
   }];
-  await page.evaluate(({ weeksArg, goal }) => {
+  await page.evaluate(({ weeksArg, goal, autoStartPauseTimer, sessionCoach }) => {
     localStorage.setItem('train_v6', JSON.stringify({
       meta: { schemaVersion: 32, savedAt: Date.now(), createdAt: Date.now() },
       curIdx: 0,
       weeks: weeksArg,
-      customTemplate: [], settings: { sessionCoach: true, autoStartPauseTimer: false, rpeEnabled: true, goal },
+      customTemplate: [], settings: { sessionCoach, autoStartPauseTimer, rpeEnabled: true, goal },
       favoriteExercises: [],
       prs: {}, coachPerformance: { suggestions: [] }, coachQuestion: null, coachQuestionHistory: [],
       lastReentryHandled: null, plateauActions: {}, decisionLog: [], badges: [], onboardingDone: true,
       longestStreakEver: 0,
     }));
-  }, { weeksArg: weeks, goal });
+  }, { weeksArg: weeks, goal, autoStartPauseTimer, sessionCoach });
   await page.reload();
   await page.waitForSelector('#app.is-ready', { timeout: 10000 });
 }
@@ -60,6 +62,22 @@ async function setRpe(page, di, ei, si, val) {
 
 async function toggleDone(page, di, ei, si) {
   await page.click(`[data-action="toggle-done"][data-di="${di}"][data-ei="${ei}"][data-si="${si}"]`);
+}
+
+async function confirmSet(page, di, ei) {
+  await page.click(`[data-action="confirm-set"][data-di="${di}"][data-ei="${ei}"]`);
+}
+
+// #pause-ring-num is a LIVE countdown (ticks down via rAF) -- an exact
+// string match races against real elapsed time between the triggering
+// action and the read (worse under concurrent test-suite load). Same
+// tolerance-window convention as the existing B78 tests above (117-120 for
+// an expected 120s).
+async function expectPauseNum(page, expected) {
+  await expect(page.locator('#pause-overlay')).toHaveClass(/pause-overlay--visible/);
+  const num = Number(await page.locator('#pause-ring-num').textContent());
+  expect(num).toBeGreaterThanOrEqual(expected - 3);
+  expect(num).toBeLessThanOrEqual(expected);
 }
 
 // AC1: Kraft + Compound + RPE 8 -> 180s
@@ -264,4 +282,83 @@ test('Settings: Trainingsziel-Zeile vorhanden, Auswahl persistiert und toggelt a
   const stored2 = await page.evaluate(() => JSON.parse(localStorage.getItem('train_v6')).settings.goal);
   expect(stored2).toBe(null);
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});
+
+// Runde 9 (Cluster 5, Domain E): Pausenzeit-Entscheidungslogik existiert
+// architekturbedingt doppelt (ui.js' confirm-set-Pfad, timer.js' toggle-done-
+// Pfad + _isCoachEligibleDay()) -- ui.js kann timer.js nicht importieren und
+// umgekehrt (CLAUDE.md). B78 musste beide bereits einmal synchronisieren.
+// Diese Sektion sichert ab, dass beide Pfade für denselben Input weiterhin
+// dieselbe Pausendauer erzeugen -- ein künftiges stilles Auseinanderdriften
+// (z.B. eine der beiden Gating-Bedingungen wird nur an einer Stelle
+// geändert) fällt hier automatisch auf, statt erst manuell wiederentdeckt
+// zu werden. Jede Zeile prüft BEIDE Pfade gegen denselben, aus der
+// (unabhängig als "single source" bestätigten) _pauseSecForRpe()-Tabelle
+// erwarteten Wert -- das ist äquivalent zu "beide Pfade liefern denselben
+// Wert", robuster als ein direkter Pfad-zu-Pfad-DOM-Vergleich. Nutzt
+// dieselbe Toleranzfenster-Konvention wie die B78-Tests oben (das
+// #pause-ring-num-Element ist ein LIVE-Countdown, ein exakter String-Match
+// würde gegen die real vergangene Zeit zwischen Aktion und Read racen).
+test.describe('Cross-path consistency (drift guard for B78/Domain E)', () => {
+  const RPE_TIER_ROWS = [
+    { rpe: 6,   goal: null,            compound: true,  expected: 90  }, // Hyp-Compound
+    { rpe: 7,   goal: 'kraftaufbau',   compound: false, expected: 90  }, // Kraft-Isolation
+    { rpe: 8,   goal: 'kraftaufbau',   compound: true,  expected: 180 }, // Kraft-Compound
+    { rpe: 8.5, goal: null,            compound: false, expected: 120 }, // Hyp-Isolation, RPE_PAUSE_TIER_HIGH-Grenze
+    { rpe: 9.5, goal: 'kraftaufbau',   compound: true,  expected: 300 }, // Kraft-Compound, hohe Grenze
+    { rpe: 10,  goal: null,            compound: false, expected: 180 }, // Hyp-Isolation, terminaler Zweig
+  ];
+
+  for (const { rpe, goal, compound, expected } of RPE_TIER_ROWS) {
+    test(`RPE ${rpe} / goal=${goal ?? 'null'} / ${compound ? 'Compound' : 'Isolation'}: confirm-set UND toggle-done liefern ${expected}s`, async ({ page }) => {
+      const pageErrors = [];
+      page.on('pageerror', err => pageErrors.push(err.message));
+      await page.goto('/');
+      await page.waitForSelector('#app.is-ready', { timeout: 10000 });
+      const exA = mkEx({ name: compound ? 'Bankdrücken' : 'Bizepscurls', nSets: 2, targetReps: 5 });
+      const exB = mkEx({ name: compound ? 'Kniebeuge' : 'Trizepsdrücken', nSets: 2, targetReps: 5 });
+      await seed(page, { exercises: [exA, exB], goal, autoStartPauseTimer: true });
+
+      // Pfad A: confirm-set (Übung 0, Satz 0 -- nicht der letzte Satz).
+      await setRpe(page, 0, 0, 0, rpe);
+      await confirmSet(page, 0, 0);
+      await expectPauseNum(page, expected);
+
+      // Pfad B: toggle-done (Übung 1, Satz 0 -- identischer RPE/goal/Kategorie).
+      await setRpe(page, 0, 1, 0, rpe);
+      await toggleDone(page, 0, 1, 0);
+      await expectPauseNum(page, expected);
+
+      expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+    });
+  }
+
+  // Wichtigste Zeile: Eligibility-Gate deliberately false (sessionCoach
+  // deaktiviert) -- beide Pfade müssen identisch auf den statischen
+  // ex.pauseSec zurückfallen, statt die RPE-Empfehlung zu verwenden. Das ist
+  // exakt die Gating-Logik, die B78 einmal auseinanderlaufen ließ (nicht die
+  // RPE-Tabelle selbst, die bereits als echte single source bestätigt ist).
+  test('Eligibility-Gate=false (sessionCoach aus): confirm-set UND toggle-done fallen beide auf ex.pauseSec zurück', async ({ page }) => {
+    const pageErrors = [];
+    page.on('pageerror', err => pageErrors.push(err.message));
+    await page.goto('/');
+    await page.waitForSelector('#app.is-ready', { timeout: 10000 });
+    // Bewusst untypischer pauseSec-Wert (77), um eine zufällige Übereinstimmung
+    // mit einem RPE-Tabellenwert auszuschließen.
+    const exA = mkEx({ name: 'Bankdrücken', nSets: 2, targetReps: 5 });
+    exA.pauseSec = 77;
+    const exB = mkEx({ name: 'Kniebeuge', nSets: 2, targetReps: 5 });
+    exB.pauseSec = 77;
+    await seed(page, { exercises: [exA, exB], goal: 'kraftaufbau', autoStartPauseTimer: true, sessionCoach: false });
+
+    await setRpe(page, 0, 0, 0, 8); // würde ohne Gate 180s ergeben (Kraft-Compound)
+    await confirmSet(page, 0, 0);
+    await expectPauseNum(page, 77);
+
+    await setRpe(page, 0, 1, 0, 8);
+    await toggleDone(page, 0, 1, 0);
+    await expectPauseNum(page, 77);
+
+    expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+  });
 });

@@ -47,7 +47,7 @@
  * Beide Funktionen sind pure, keine Seiteneffekte.
  */
 
-import { getLatestWeek, getEffectiveWeightStep } from './state.js';
+import { getLatestWeek, getEffectiveWeightStep, _dayEvalCounts } from './state.js';
 import { detectPlateaus } from './plateauDetector.js';
 import { getWeightRecommendation, isReadyForAutoSelect, roundToPlate } from './weightRecommendation.js';
 import { isFullSuccess } from './setUtils.js';
@@ -264,6 +264,21 @@ function _avgRpeWeek(wk) {
 // rechtfertigen hier den anderen Zahlenwert, siehe
 // diagnose-runde7-2026-08-02.txt — bewusst NICHT vereinheitlicht.
 const RPE_PREVENTIVE_DELOAD_3WK_AVG = 7.5;
+
+// Runde 9 (Domäne D, Nebenfund aus Runde 7): Konfidenz-Einstufung für eine
+// Steigerungs-Empfehlung in _checkProgression() unten (4-Wochen-Fenster,
+// Erfolgsquote + Ø RPE kombiniert). Die Zahlenwerte 0.9/7.5/0.8/8.5
+// stimmen zufällig mit RPE_PREVENTIVE_DELOAD_3WK_AVG (oben) bzw.
+// sessionCoach.js' RPE_SET_HARD_ZONE / plateauDetector.js'
+// RPE_PLATEAU_DELOAD_STRATEGY_1WK_AVG (beide 8.5) überein — das ist reiner
+// Zufall, kein gemeinsames Konzept: hier geht es um eine 4-Wochen-
+// Konfidenz-Einstufung für EINE Übungs-Empfehlung, nicht um ein
+// Deload-/Hart-Satz-Signal. NICHT vereinheitlichen, siehe
+// diagnose-runde9-2026-08-03.txt.
+const CONF_HIGH_SUCCESS_RATE_MIN = 0.9;
+const CONF_HIGH_AVG_RPE_MAX_4WK = 7.5;
+const CONF_MEDIUM_SUCCESS_RATE_MIN = 0.8;
+const CONF_MEDIUM_AVG_RPE_MAX_4WK = 8.5;
 
 function _checkPreventiveDeload(state) {
   // B131: 4-Wochen-Unterdrückung nach explizitem "Weiter wie bisher" auf der
@@ -484,7 +499,11 @@ function _checkPrePlateau(state) {
 // ausgeschlossen), hier bewusst dupliziert statt importiert — ui.js
 // importiert bereits weeklyFocus.js, ein Reimport wäre zirkulär (identisches
 // Muster zu _trueVol()/_weightVolume() in overallPerformance.js).
-function _scoreWeek(week) {
+// Runde 9 (Cluster 6): `export` nur ergänzt, damit ein Test sie direkt
+// gegen setUtils.js' weekSuccessCounts() auf Übereinstimmung prüfen kann
+// (Absicherung gegen künftiges stilles Auseinanderlaufen) — keine
+// Logikänderung, weiterhin nirgends produktiv importiert.
+export function _scoreWeek(week) {
   let succ = 0, fail = 0;
   for (const d of week.days)
     for (const ex of d.exercises) {
@@ -746,8 +765,8 @@ function _checkProgression(state) {
   const confTotal = succ + fail;
   const confSuccessRate = confTotal > 0 ? succ / confTotal : 1;
   const confAvgRpe = rpeCount > 0 ? rpeSum / rpeCount : null;
-  const confidence = (confSuccessRate >= 0.9 && (confAvgRpe === null || confAvgRpe <= 7.5)) ? 'high'
-    : (confSuccessRate >= 0.8 && (confAvgRpe === null || confAvgRpe <= 8.5))               ? 'medium'
+  const confidence = (confSuccessRate >= CONF_HIGH_SUCCESS_RATE_MIN && (confAvgRpe === null || confAvgRpe <= CONF_HIGH_AVG_RPE_MAX_4WK)) ? 'high'
+    : (confSuccessRate >= CONF_MEDIUM_SUCCESS_RATE_MIN && (confAvgRpe === null || confAvgRpe <= CONF_MEDIUM_AVG_RPE_MAX_4WK))               ? 'medium'
     : 'low';
 
   const cq = state.coachQuestion;
@@ -932,7 +951,14 @@ function _fallback(state) {
   // Datei für _checkConsistencyQuality verwendet), keine neue Berechnungsart.
   const recentReal = _realWeeks.slice(-4);
   const latestWk = recentReal[recentReal.length - 1] ?? null;
-  const daysDone  = latestWk ? latestWk.days.filter(d => d.markedDone).length : 0;
+  // Runde 9 (Cluster 1): dieselbe Anti-Gaming-Definition wie
+  // consistencyUtils.js/_weekTrainingStatus() (state.js) statt des
+  // gameable markedDone-Toggles — sonst zeigt diese Karte einen anderen
+  // "Tage erledigt"-Wert als der Fortschritt-Tab für dieselbe Woche.
+  const daysDone  = latestWk ? latestWk.days.filter(d => {
+    const { evaluated, total } = _dayEvalCounts(d);
+    return total > 0 && evaluated / total >= 0.5;
+  }).length : 0;
   const daysTotal = latestWk ? latestWk.days.length : 0;
   const scored = recentReal.map(_scoreWeek).filter(s => s.total > 0);
   const avgPct = scored.length ? Math.round(scored.reduce((s, w) => s + w.pct, 0) / scored.length) : null;

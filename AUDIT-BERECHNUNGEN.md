@@ -1,5 +1,12 @@
 # TRAIN — Audit: Berechnungs-Konsistenz (Runde 8, Cluster 1)
 *Erstellt: 2026-08-02, Basis train-v228/v229*
+*Aktualisiert: 2026-08-03 (Runde 9) — die 3 "VERDACHT AUF BUG"-Funde wurden
+vom Nutzer freigegeben und in Runde 9 gefixt (B185/B186/B187), siehe
+BUGS.md und die Update-Vermerke unten bei den jeweiligen Domänen. Die 2
+kosmetischen Nebenfunde (weeklyFocus.js-Duplikat, Konfidenz-Konstanten)
+wurden ebenfalls in Runde 9 erledigt (B190). Dieses Dokument bleibt als
+historisches Diagnose-Referenzdokument bestehen — der Status pro Fund ist
+jetzt bei jedem "VERDACHT AUF BUG"-Eintrag unten vermerkt.*
 *Anlass: Nutzer-Sorge, dass Berechnungen im Projekt zu kleinteilig/uneinheitlich
 geworden sind, ausgelöst durch den konkreten B181-Bug (Soll-Satzzahl nach
 Übungs-Archivierung veraltet).*
@@ -32,7 +39,7 @@ expliziter Freigabe durch den Nutzer in einer künftigen Runde.
 | `weekReview.js:59-66` `_countSuccessSets()` | "✓ X Sätze" über die ganze Woche | unterschiedliches Konzept, korrekt getrennt (anderes Zeitfenster/Nenner) |
 | `weekReview.js:239-260` `_reachableDays` | "Tage abgeschlossen/erreichbar" | unterschiedliches Konzept, korrekt getrennt (Tage- statt Satz-Ebene) |
 | `overallPerformance.js`/`weeklyFocus.js` Trend-/Verhältnis-% | Mehrwochen-Trends, Push/Pull-Ratio etc. | unterschiedliches Konzept, korrekt getrennt |
-| **`ex.targetSets`** (`ui.js:9701` Onboarding, `state.js` Deep-Clone über WEEK_CREATE/AUTO_WEEK_CREATE, gelesen von `ui.js:1643` "Fokus heute"-Karte) | Soll-Satzzahl EINER einzelnen Fokus-Übung vor Sessionstart | **VERDACHT AUF BUG** — einmalig bei Onboarding gesetzt, NIE aktualisiert bei manuellem Satz-Hinzufügen/-Entfernen (SET_ADD/SET_REMOVE ändern nur `ex.sets`, nie `ex.targetSets`). Eine v9→v10-Migration hat das Feld für Bestandsdaten bereits mit der Begründung "replaced by ex.sets.length" entfernt — der Onboarding-Pfad erzeugt es bei jedem neuen Nutzer wieder frisch. **Empfehlung:** Feld entfernen, Lesestelle auf `sets.length` umstellen (konsistent mit der bereits dokumentierten Migrations-Absicht). |
+| **`ex.targetSets`** (`ui.js:9701` Onboarding, `state.js` Deep-Clone über WEEK_CREATE/AUTO_WEEK_CREATE, gelesen von `ui.js:1643` "Fokus heute"-Karte) | Soll-Satzzahl EINER einzelnen Fokus-Übung vor Sessionstart | **VERDACHT AUF BUG — BEHOBEN in Runde 9 (B187).** Feld komplett entfernt (beide Schreibstellen, inkl. einer zweiten in state.js/ONBOARDING_SEED, die dieser Audit übersehen hatte), Lesestelle auf `sets.length` umgestellt. |
 
 ## Domäne B — Gewicht-/PR-Berechnungen
 
@@ -43,7 +50,7 @@ expliziter Freigabe durch den Nutzer in einer künftigen Runde.
 | `getEffectiveWeightStep()` (B167) | effektive Gewichts-Schrittweite | gleiche Quelle, konsistent — ~22 Aufrufstellen geprüft, lückenlos durchgesetzt, kein übersehener Inline-Fallback gefunden |
 | `sessionSummary.js:52-63,79-92` `_weeksSincePreviousIncrease()` | "+Xkg seit letztem Mal" | unterschiedliches Konzept, korrekt getrennt (dokumentierte B79-Entscheidung) |
 | `ui.js:3376` `_renderAnalysis1RM()` Epley-Fallback | 1RM-Schätzung bei fehlendem `state.prs` | unterschiedliches Konzept, korrekt getrennt (deckt eine dokumentierte B31-Lücke) |
-| **`weekReview.js:68-114` `_maxWeightPerExercise()`/`_findPR()`** (→ Wochenrückblick-Modal "Neuer PR"/"Stärkste Steigerung") | "hat diese Übung gerade einen echten PR?" | **VERDACHT AUF BUG** — dritte unabhängige Neuimplementierung, filtert im Gegensatz zu `exWeightHistory()`-Aufrufern UND `_applyPrTracking()` KEINE Deload-Wochen heraus. Könnte "Neuer PR" während/gegen eine Deload-Woche zeigen. Gleiche Bug-Klasse, die B73/B79 bereits an anderer Stelle gefixt haben. **Empfehlung:** Deload-Filter ergänzen (wie bei den anderen beiden Implementierungen), langfristig auf `exWeightHistory()` umstellen. |
+| **`weekReview.js:68-114` `_maxWeightPerExercise()`/`_findPR()`** (→ Wochenrückblick-Modal "Neuer PR"/"Stärkste Steigerung") | "hat diese Übung gerade einen echten PR?" | **VERDACHT AUF BUG — BEHOBEN in Runde 9 (B186).** Deload-Filter am Aufrufer (`buildWeekReview()`) ergänzt, exakt das etablierte Inline-Muster der anderen 3 Implementierungen. Bonus mitgefixt: `_findBestGain`s Gate prüfte auch die Vorwoche nicht auf Deload. |
 | `ui.js:2929-2983` `_weeklyP4PSeries()`/`_allTimePRSeries()` | "Max. Gewicht pro Woche" fürs Relative-Stärke-Chart | VERDACHT AUF BUG (geringer) — dritter Code-Pfad für dieselbe Kernberechnung wie `exWeightHistory()`, aktuell funktional gleichwertig (filtert Deload korrekt), aber Duplikations-Risiko bei künftigen Änderungen an `exWeightHistory()`. |
 
 ## Domäne C — Streak-/Konsistenz-Berechnungen
@@ -55,8 +62,8 @@ expliziter Freigabe durch den Nutzer in einer künftigen Runde.
 | `setUtils.js:41` `weekSuccessCounts()` | Wochen-Erfolgsquote | gleiche Quelle, konsistent (seit B38 einzige Quelle) |
 | `plateauDetector.js`/`weightRecommendation.js` `_exSuccessRate`/`isFullSuccess` | Pro-Übung-Erfolgsquote für Plateau/Progression | unterschiedliches Konzept, korrekt getrennt (strengerer Maßstab, bewusst dokumentiert) |
 | `consistencyUtils.js` `_weekConsistencyRatio()` | Tages-Konsistenz-Ratio | gleiche Quelle, konsistent untereinander (overallPerformance.js/weeklyFocus.js importieren dieselbe Funktion) |
-| **`consistencyUtils.js`s "Tag erledigt" = `day.markedDone`** vs. **`state.js` `_weekTrainingStatus()`s "Tag erledigt" = ≥50% Sätze bewertet** | beide beantworten "war der Tag erledigt?" | **VERDACHT AUF BUG (wichtigster Fund dieser Runde)** — `markedDone` ist ein expliziter Nutzer-Toggle, wird NICHT automatisch gesetzt, wenn der Nutzer alle Sätze bewertet ohne den Button zu drücken. Die Streak-Basis verwendet bewusst NICHT `markedDone` (Anti-Streak-Faking, dokumentiert). B38 hat exakt diese Diskrepanz bereits für URLAUBSTAGE gefixt — der reguläre Trainingstag-Zweig von `_weekConsistencyRatio()` scheint weiterhin betroffen. Praktische Konsequenz: Trainings-Tab-Streak und Fortschritt-Tab-Konsistenz-%/Coach-Signale können denselben Tag unterschiedlich bewerten. **Empfehlung:** gleiche Fix-Formel wie B38, diesmal auf den Nicht-Urlaubs-Zweig angewendet (z.B. "erledigt" = `markedDone` ODER ≥50% Sätze bewertet). |
-| `weeklyFocus.js` `_scoreWeek()` | dupliziert `weekSuccessCounts()` 1:1 | kleinerer Nebenfund — bewusst dokumentiertes Duplikat (zirkulären Import vermeiden), aktuell konsistent, aber ungeschützt vor künftigem stillen Auseinanderlaufen (gleiche Ursache wie der historische B38-Bug). |
+| **`consistencyUtils.js`s "Tag erledigt" = `day.markedDone`** vs. **`state.js` `_weekTrainingStatus()`s "Tag erledigt" = ≥50% Sätze bewertet** | beide beantworten "war der Tag erledigt?" | **VERDACHT AUF BUG (wichtigster Fund dieser Runde) — BEHOBEN in Runde 9 (B185).** `_dayEvalCounts()` aus `_weekTrainingStatus()` extrahiert, `consistencyUtils.js` nutzt sie jetzt statt `markedDone` für reguläre Tage. Bonus mitgefixt: `weeklyFocus.js`s onTrack-Karte las `markedDone` ebenfalls unabhängig. **Bestätigte Rückwirkung:** ändert die angezeigte Konsistenz-% für alle Bestandswochen sofort (siehe DECISIONS.md), vom Nutzer vorab bestätigt. |
+| `weeklyFocus.js` `_scoreWeek()` | dupliziert `weekSuccessCounts()` 1:1 | kleinerer Nebenfund — **BEHOBEN in Runde 9 (B190)** durch einen Absicherungstest (Deep-Equality-Vergleich), NICHT durch Auflösen der Duplikation (zirkulärer Import bleibt ein echtes Hindernis, bewusst nicht angegangen). |
 
 ## Domäne D — RPE-/Coaching-Schwellen
 
@@ -66,7 +73,7 @@ Runde 7 vertieft:
 
 | Fundstelle | Konzept | Klassifizierung |
 |---|---|---|
-| `weeklyFocus.js:737-751` `_checkProgression()` Konfidenz-Klassifizierung | 4-Wochen-Fenster, kombiniert RPE+Erfolgsquote zu high/medium/low-Konfidenz für eine Steigerungs-Empfehlung | unterschiedliches Konzept, korrekt getrennt — 4-Wochen-Fenster einzigartig unter allen 6 Funden, Zweck (Empfehlungs-Konfidenz labeln) grundlegend anders als Deload-Erkennung. **Achtung:** die Werte 7.5/8.5 sind rohe Inline-Literale, NICHT Referenzen auf `RPE_PREVENTIVE_DELOAD_3WK_AVG`/`RPE_SET_HARD_ZONE` (Runde 7) — Verwechslungsrisiko. Vorschlag (kosmetisch): eigene Konstanten `CONF_HIGH_AVG_RPE_MAX_4WK`/`CONF_MEDIUM_AVG_RPE_MAX_4WK` mit Kommentar zur zufälligen Zahlen-Übereinstimmung. |
+| `weeklyFocus.js:737-751` `_checkProgression()` Konfidenz-Klassifizierung | 4-Wochen-Fenster, kombiniert RPE+Erfolgsquote zu high/medium/low-Konfidenz für eine Steigerungs-Empfehlung | unterschiedliches Konzept, korrekt getrennt — 4-Wochen-Fenster einzigartig unter allen 6 Funden, Zweck (Empfehlungs-Konfidenz labeln) grundlegend anders als Deload-Erkennung. **BEHOBEN in Runde 9 (B190):** benannte Konstanten `CONF_HIGH_SUCCESS_RATE_MIN`/`CONF_HIGH_AVG_RPE_MAX_4WK`/`CONF_MEDIUM_SUCCESS_RATE_MIN`/`CONF_MEDIUM_AVG_RPE_MAX_4WK` mit Kommentar zur zufälligen Zahlen-Übereinstimmung mit den Runde-7-Konstanten. Reiner Rename. |
 
 ## Domäne E — Pausenzeiten-Berechnungen
 
@@ -82,18 +89,21 @@ Kopfkommentar in `timer.js:26` (rein kosmetisch, keine funktionale Wirkung).
 
 ---
 
-## Zusammenfassung: 3 Verdachtsfälle für eine künftige Runde
+## Zusammenfassung: 3 Verdachtsfälle — ALLE in Runde 9 behoben
 
 1. **`ex.targetSets`** (Domäne A) — gleiche Fehlerklasse wie B181, kleinerer
-   Blast-Radius. Empfehlung: Feld entfernen.
+   Blast-Radius. **Behoben: B187 (Runde 9).**
 2. **`weekReview.js` PR-Karte ohne Deload-Filter** (Domäne B) — gleiche
-   Fehlerklasse wie B73/B79. Empfehlung: Deload-Filter ergänzen.
+   Fehlerklasse wie B73/B79. **Behoben: B186 (Runde 9).**
 3. **`_weekConsistencyRatio()` markedDone-Diskrepanz** (Domäne C, wichtigster
    Fund) — gleiche Fehlerklasse wie B38 (dort nur für Urlaubstage gefixt).
-   Empfehlung: dieselbe Fix-Formel auf reguläre Trainingstage anwenden.
+   **Behoben: B185 (Runde 9), mit bestätigter Rückwirkung auf
+   Bestandsdaten-Anzeigen, siehe DECISIONS.md.**
 
 Plus 2 kleinere kosmetische Nebenfunde (Domäne C: `_scoreWeek()`-Duplikat;
-Domäne D: unbenannte Konfidenz-Konstanten in `weeklyFocus.js:737-751`).
+Domäne D: unbenannte Konfidenz-Konstanten in `weeklyFocus.js:737-751`) —
+**beide behoben: B190 (Runde 9).**
 
-**Kein Fix in Runde 8.** Nutzer entscheidet (ggf. mit Claude Cowork), welche
-dieser Punkte in einer künftigen Runde freigegeben werden.
+**Runde 8:** kein Fix, nur Diagnose (wie vorgegeben). **Runde 9:** alle 5
+Funde nach Nutzer-Freigabe umgesetzt — siehe BUGS.md B185-B190 und
+`sprint-ergebnis-runde9-2026-08-03.txt` für Details.

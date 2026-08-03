@@ -391,6 +391,21 @@ export function isTrainingDay(d) {
  *
  * Urlaubs- und Deload-Wochen sind immer 'attended' (neutral, wie zuvor).
  */
+/**
+ * Runde 9 (Cluster 1): extrahiert aus _weekTrainingStatus()'s Inline-Zähl-
+ * schleife, damit consistencyUtils.js/weeklyFocus.js dieselbe Anti-Gaming-
+ * Definition ("Tag erledigt" = >=50% der Sätze bewertet, nicht markedDone)
+ * wiederverwenden können, statt sie unabhängig zu duplizieren.
+ */
+export function _dayEvalCounts(day) {
+  let evaluated = 0, total = 0;
+  for (const ex of day.exercises) for (const s of ex.sets) {
+    total++;
+    if (s.status === 'success' || s.status === 'fail') evaluated++;
+  }
+  return { evaluated, total };
+}
+
 function _weekTrainingStatus(wk) {
   if (wk.mode === 'deload') return 'attended';
   if (wk.mode === 'vacation' || (wk.days.length > 0 && wk.days.every(d => d.isVacation))) return 'attended';
@@ -400,11 +415,7 @@ function _weekTrainingStatus(wk) {
 
   let daysDone = 0, anyEvaluated = false;
   for (const day of trainingDays) {
-    let evaluated = 0, total = 0;
-    for (const ex of day.exercises) for (const s of ex.sets) {
-      total++;
-      if (s.status === 'success' || s.status === 'fail') evaluated++;
-    }
+    const { evaluated, total } = _dayEvalCounts(day);
     if (evaluated > 0) anyEvaluated = true;
     if (total > 0 && evaluated / total >= 0.5) daysDone++;
   }
@@ -1029,6 +1040,23 @@ function migrate(raw) {
   (raw.weeks ?? []).forEach(wk => (wk.days ?? []).forEach(day => (day.exercises ?? []).forEach(_normSetType)));
   (raw.customTemplate ?? []).forEach(day => (day.exercises ?? []).forEach(_normSetType));
 
+  // Runde 9 (Cluster 4): Muskelgruppen-Backfill für Bestandsdaten — B184
+  // (Runde 8) hat resolveMuscleGroups() nur für NEU erstellte Übungen
+  // verdrahtet. Additiver Default, kein SCHEMA_VERSION-Bump (Präzedenzfall
+  // exerciseNotes/customAlternatives) — ex.tags existiert als Feld bereits
+  // seit einer älteren Migration, hier wird nur ein bereits leeres Feld
+  // befüllt, keine neue Form eingeführt. Bewusst schlank: nur exakte
+  // Namenstreffer in der B184-Kuration, individuell umbenannte/eigene
+  // Übungen bleiben unangetastet (akzeptierte Lücke, wie in B184 entschieden).
+  // Idempotent: einmal befüllte tags sind nicht mehr leer, Guard no-opt danach.
+  const _backfillMuscleGroupTags = ex => {
+    if (!Array.isArray(ex.tags) || ex.tags.length) return;
+    const resolved = resolveMuscleGroups(ex.name);
+    if (resolved.length) ex.tags = resolved;
+  };
+  (raw.weeks ?? []).forEach(wk => (wk.days ?? []).forEach(day => (day.exercises ?? []).forEach(_backfillMuscleGroupTags)));
+  (raw.customTemplate ?? []).forEach(day => (day.exercises ?? []).forEach(_backfillMuscleGroupTags));
+
   // Always-apply, rein subtraktiv (Sprint "Framework-Audit Cleanup", Fix 1+2):
   // streakFreeze (Fix 2) und surpriseLog (Fix 1) entfernt — kein neuer
   // Schema-Bump, da nur Löschung, keine neue Struktur. Absichtlich NICHT im
@@ -1610,7 +1638,6 @@ function _applyPlannedProgression(days, state) {
           for (let i = 0; i < toAdd; i++) {
             ex.sets.push(mkSet(last?.weight ?? 0, last?.reps ?? ex.targetReps ?? 10));
           }
-          if (ex.targetSets !== undefined) ex.targetSets += toAdd;
           console.log(`[TRAIN] sets-progression: "${ex.name}" nachher: ${ex.sets.length} Sätze`);
         } else {
           const step = getEffectiveWeightStep(ex, state?.settings, state?.customExercises);
@@ -2902,7 +2929,7 @@ function reduce(state, action) {
         sets: [{ weight: sw.weight, reps: sw.reps ?? 5, rpe: sw.rpe ?? null, status: 'success', done: true }],
         weightStep: defaultWeightStepForExercise(sw.name, state.customExercises), nextWeekPlan: 0, nextWeekPlanConfirmed: false, nextWeekPlanAutoReviewed: true,
         skipReason: null, skipDate: null,
-        targetSets: 1, targetReps: sw.reps ?? 5,
+        targetReps: sw.reps ?? 5,
         // Befund #3: Hantelscheiben-Rechner-Default an. Unconditional true
         // hier korrekt (nicht nur "meist"), weil metric oben in diesem
         // Reducer bereits hart auf 'reps' (Gewichts-Metrik) gesetzt ist —

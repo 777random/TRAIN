@@ -109,3 +109,56 @@ test('Coach-Tab "Fokus der Woche": Favorit wird trotz kleinerem Delta bevorzugt'
 
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
 });
+
+// Runde 9 (Cluster 3): ex.targetSets wurde entfernt (nur noch von
+// Onboarding geschrieben, nie bei manuellem Satz-Hinzufügen/-Entfernen
+// aktualisiert -- gleiche Fehlerklasse wie B181). Die "Fokus heute"-Karte
+// muss jetzt IMMER die tatsächliche Satzzahl (sets.length) zeigen, auch
+// wenn ein (simuliertes) veraltetes targetSets-Feld auf dem Datensatz noch
+// vorhanden ist (z.B. aus Alt-Daten vor diesem Fix).
+test('Session-Briefing: "Fokus heute"-Karte zeigt echte Satzzahl (sets.length), nicht ein veraltetes ex.targetSets', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', err => pageErrors.push(err.message));
+  await page.goto('/');
+  await page.waitForSelector('#app.is-ready', { timeout: 10000 });
+
+  const ex = mkEx('Kniebeuge', { n: 4 });
+  // Simuliert eine Alt-Übung mit veraltetem targetSets (z.B. 2, aus einer
+  // frueheren Onboarding-Erstellung), waehrend tatsaechlich 4 Saetze
+  // vorhanden sind (Nutzer hat manuell 2 Saetze hinzugefuegt, was
+  // targetSets frueher nie mitgezaehlt hat).
+  ex.targetSets = 2;
+
+  const week = {
+    id: 1, startDate: todayISO(), note: '', mode: 'standard',
+    days: [{
+      id: 11, title: 'Tag A', subtitle: '', warmup: '', cooldown: '',
+      locked: false, markedDone: false, isVacation: false,
+      sleepHours: null, energyLevel: null,
+      sessionCheckIn: { sleep: 'medium', energyPre: 'medium' },
+      exercises: [ex],
+      sessionLog: [], bodyData: {}, restDays: [], isSeedWeek: false,
+    }],
+    sessionLog: [], bodyData: {}, restDays: [], isSeedWeek: false,
+  };
+
+  await page.evaluate((weekArg) => {
+    localStorage.setItem('train_v6', JSON.stringify({
+      meta: { schemaVersion: 32, savedAt: Date.now(), createdAt: Date.now() },
+      curIdx: 0, weeks: [weekArg], onboardingDone: true,
+      customTemplate: [], settings: { sessionCoach: true, rpeEnabled: true },
+      favoriteExercises: [], customExercises: [],
+      prs: {}, coachPerformance: { suggestions: [] }, coachQuestion: null, coachQuestionHistory: [],
+      lastReentryHandled: null, plateauActions: {}, decisionLog: [], badges: [],
+      longestStreakEver: 0, seenTips: ['tip-11'],
+    }));
+  }, week);
+  await page.reload();
+  await page.waitForSelector('#app.is-ready', { timeout: 10000 });
+
+  const focusText = page.locator('.session-briefing-card__focus');
+  await expect(focusText).toContainText('4×8'); // sets.length=4, targetReps=8 -- NICHT "2×8"
+  await expect(focusText).not.toContainText('2×8');
+
+  expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});

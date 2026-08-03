@@ -69,6 +69,60 @@ test('Streak bei Teil-Abschluss: Wochenrückblick stimmt mit Training-Tab-Badge 
   expect(result.badgeStreak).toBe(2);
 });
 
+// Runde 9 (Cluster 1): _weekConsistencyRatio() (consistencyUtils.js) nutzte
+// für reguläre Trainingstage bislang day.markedDone (ein gameable Toggle) statt
+// der Anti-Gaming-Definition aus _weekTrainingStatus() (state.js, >=50% der
+// Sätze bewertet) — dieselbe Fehlerklasse, die B38 bereits für Urlaubstage
+// gefixt hatte. Fix: beide Funktionen nutzen jetzt _dayEvalCounts() (state.js).
+// Wichtig: das ist eine bewusste, RÜCKWIRKENDE Verhaltensänderung für
+// Bestandsdaten (siehe DECISIONS.md) — dieser Test beweist genau die neue
+// Regel an einer Woche, die komplett in der Vergangenheit liegt (damit die
+// "ist der Tag schon fällig?"-Prüfung in _weekConsistencyRatio() nicht
+// dazwischenfunkt).
+test('Konsistenz-Ratio (Runde 9): bewertete Sätze zählen jetzt als "erledigt", auch ohne markedDone — umgekehrt zählt ein bloß angetippter, unbewerteter Tag nicht mehr', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', err => pageErrors.push(err.message));
+
+  // Woche 1: alle 4 Tage NIE "Tag abschließen" angetippt, aber alle Sätze
+  // bewertet -> muss unter der neuen Regel als 100% erledigt zählen.
+  const gamedGoodWeek = partialWeek(10, mondayOffset(-3), 0);
+  gamedGoodWeek.days.forEach(d => { d.markedDone = false; d.exercises[0].sets[0].status = 'success'; d.exercises[0].sets[0].done = true; });
+
+  // Woche 2: alle 4 Tage "Tag abschließen" angetippt, aber KEIN Satz bewertet
+  // (reines Antippen ohne echtes Training) -> darf unter der neuen Regel
+  // NICHT mehr als erledigt zählen (der eigentliche Anti-Gaming-Zweck).
+  const gamedBadWeek = partialWeek(11, mondayOffset(-2), 0);
+  gamedBadWeek.days.forEach(d => { d.markedDone = true; d.exercises[0].sets[0].status = 'pending'; d.exercises[0].sets[0].done = false; });
+
+  await page.goto('/');
+  await page.waitForSelector('#app.is-ready', { timeout: 10000 });
+  await page.evaluate((weeksArg) => {
+    localStorage.setItem('train_v6', JSON.stringify({
+      meta: { schemaVersion: 31, savedAt: Date.now(), createdAt: Date.now() }, curIdx: 1,
+      weeks: weeksArg, customTemplate: [], settings: {},
+      prs: {}, coachPerformance: { suggestions: [] }, coachQuestion: null, coachQuestionHistory: [],
+      lastReentryHandled: null, plateauActions: {}, decisionLog: [], badges: [], onboardingDone: true,
+      longestStreakEver: 0, favoriteExercises: [],
+    }));
+  }, [gamedGoodWeek, gamedBadWeek]);
+  await page.reload();
+  await page.waitForSelector('#app.is-ready', { timeout: 10000 });
+
+  const result = await page.evaluate(async () => {
+    const consistencyMod = await import('./consistencyUtils.js');
+    const stateMod = await import('./state.js');
+    const st = stateMod.getState();
+    return {
+      gamedGoodRatio: consistencyMod._weekConsistencyRatio(st.weeks[0]),
+      gamedBadRatio: consistencyMod._weekConsistencyRatio(st.weeks[1]),
+    };
+  });
+
+  expect(result.gamedGoodRatio).toBe(1);
+  expect(result.gamedBadRatio).toBe(0);
+  expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});
+
 // B-A8: DAY_RESET_SETS ("Sätze zurücksetzen") war zu breit — resettete neben
 // der Satz-Bewertung auch s.weight sowie Tag-Ebene-Felder (markedDone,
 // locked, sessionStartTs, sessionRating, sleepHours, energyLevel), obwohl das

@@ -16,7 +16,7 @@
  * auf den future-Tage-Fix in _weekConsistencyRatio() (siehe dort).
  */
 
-import { isTrainingDay } from './state.js';
+import { isTrainingDay, _dayEvalCounts } from './state.js';
 import { getSortedWeeks } from './insightEngine.js';
 
 // Lokale Kopie der Tag-Index→ISO-Datum-Formel — identisch zu weekReview.js'
@@ -50,7 +50,6 @@ export function _weekConsistencyRatio(wk) {
     .filter(({ day, di }) => day.markedDone || _dayISODate(wk, di) < todayISO);
   if (due.length === 0) return null; // reine Ruhewoche ODER noch kein Tag fällig
   const done = due.filter(({ day }) => {
-    if (day.markedDone) return true;
     // Urlaubstage zählen nur als erledigt, wenn tatsächlich bewertete Sätze
     // vorliegen — ein nie absolvierter "leichter" Urlaubstag darf nicht
     // automatisch als 100% erledigt zählen, im Widerspruch zu
@@ -59,7 +58,13 @@ export function _weekConsistencyRatio(wk) {
     if (day.isVacation) {
       return day.exercises.some(ex => ex.sets.some(s => s.status === 'success' || s.status === 'fail'));
     }
-    return false;
+    // Runde 9 (Cluster 1): reguläre Trainingstage nutzen jetzt dieselbe
+    // Anti-Gaming-Definition wie _weekTrainingStatus() (state.js) — >=50%
+    // der Sätze bewertet, statt des gameable markedDone-Toggles. Vorher
+    // driftete diese Datei von der Streak-Basis ab (B38 hatte das nur für
+    // Urlaubstage gefixt, siehe diagnose-runde8/AUDIT-BERECHNUNGEN.md).
+    const { evaluated, total } = _dayEvalCounts(day);
+    return total > 0 && evaluated / total >= 0.5;
   }).length;
   return done / due.length;
 }

@@ -1644,7 +1644,7 @@ function _renderSessionBriefing(di, day, wk, state) {
     }
     const w = focusEx.sets?.[0]?.weight;
     const weightText = w != null ? `${w} kg × ` : '';
-    const setsReps = `${focusEx.targetSets ?? focusEx.sets?.length ?? '–'}×${focusEx.targetReps ?? '–'}`;
+    const setsReps = `${focusEx.sets?.length ?? '–'}×${focusEx.targetReps ?? '–'}`;
     focusHtml = `<div class="session-briefing-card__focus">Fokus heute: ${h(focusEx.name)}<br>Ziel: ${weightText}${setsReps}${rpeText}${pauseText}</div>`;
   }
   const defaultExpanded = !day.sessionStartTs;
@@ -9714,7 +9714,7 @@ function _showOnboarding() {
           })),
           weightStep: defaultWeightStepForExercise(ex.name, getState().customExercises), nextWeekPlan: 0, nextWeekPlanConfirmed: false,
           metricStep: ex.m === 'm' ? 50 : ex.m === 'sec' ? 10 : undefined,
-          targetSets: n, targetReps: tr,
+          targetReps: tr,
           _showCfg: false, setType: 'standard',
           // Befund #3: Hantelscheiben-Rechner-Default an — NUR für
           // Gewichts-Übungen (ex.m === 'reps'/undefined), nicht für
