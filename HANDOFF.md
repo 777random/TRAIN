@@ -1,6 +1,44 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-08-03 — Runde 11, train-v233 (B199, Update-Banner "Später"-Button, siehe eigener Abschnitt unten). Davor: Runde 10 komplett (Teil 1 + Teil 2), train-v232 (B191-B198, B141/B176-Abschluss). Davor: Runde-9-Audit-Folgerunde, train-v230 (B185-B190, schließt das Runde-8-Datenkonsistenz-Audit vollständig ab, siehe AUDIT-BERECHNUNGEN.md). Davor: Runde-8-Datenkonsistenz-Sprint, train-v229 (B181-B184, konkreter Bug + 5-Domänen-Audit + 3 Feedback-Punkte). Davor: Runde-7-Coaching-Qualitäts-Sprint, train-v228 (B178-B180). Davor: Runde-6-Nutzerfeedback-Fix-Sprint, train-v227 (B167-B177, inkl. einer während der Verifikation gefundenen+gefixten Regression B176). Davor: Runde-5-Fix-Sprint, train-v226 (B166, echte Regression von B152). Ältere Sprints siehe SESSION_LOG.md.*
-*Nächster Schritt: B55 Impressum (Blocker vor weiterer Nutzerwerbung — wartet weiterhin auf echte Name-/Adress-/E-Mail-Angaben des Betreibers, siehe LEGAL.md). **Runde 11 (Update-Banner) ist fertig:** neuer "Später"-Button (B199) blendet das Banner rein DOM-lokal für die aktuelle Session aus, kein state.js/localStorage-Bezug — der bereits korrekte B166-Persistenz-Mechanismus zeigt es beim nächsten Laden ohnehin erneut, solange ein Update wartet. Verifiziert per 2 neuen Tests (Sabotage-Revert bestätigt) + voller Regressionssuite (73 Spec-Dateien, gebatcht) — 2 bereits bekannte Timing-Flakes reproduziert (`deload_volumen.spec.js` Wochenrückblick-Klick, `share_image_v3.spec.js` Download-Event), beide unverändert seit vorherigen Runden, kein Zusammenhang zu diesem Sprint. **Runde 10 (Zeit/Datum-Audit + Aufräum-Runde) davor komplett abgeschlossen, alle Funde entweder gefixt oder bewusst dokumentiert:** A1→B194, B1→B195, B2→B196, B3→B197, C1→B198 gefixt (Sabotage-Revert-verifiziert); A2 (T00:00:00/T12:00:00 gemischt) bewusst NICHT gefixt, kein aktueller Bug, in DECISIONS.md dokumentiert. B193 (ursprünglich als App-Bug vermutet) war tatsächlich ein Timezone-Bug in 2 Test-Helfern — korrigiert. Teil 2: B141 abgeschlossen, B176-Portal-Entscheidung bestätigt, toter Code `save-week-as-template` entfernt (B191), 3 Wall-Clock-Flaky-Tests stabilisiert, einmaliger Konsistenz-Hinweis-Toast für B185 (B192). Aus Runde 8/9 weiterhin offen: Backfill der Muskelgruppen-Tags nur für Standard-Namen (individuell umbenannte Übungen bewusst nicht erfasst), architekturbedingte ui.js/timer.js-Pausenzeit-Duplikation (per Absicherungstest B189 geschützt, strukturell nicht aufgelöst), `weeklyFocus.js:737-739`s 5./6. eigenständige RPE-Verwendung (B179-Nebenfund), eine fehlende Trainingsziel-Einstellung (Kraft- vs. Hypertrophie-Fokus, Idee aus Runde 6/7). Bestätigte Infra-Grenze (weiterhin gültig): volle Playwright-Suite kann `npx serve` mit `EMFILE`/Dev-Server-Kontention abstürzen lassen — Workaround ist der Batch-Lauf (inzwischen oft in noch kleinere Sub-Batches nötig, ~10-20 Dateien), bei Verdacht auf Massenausfall in Isolation nachprüfen. Nicht committet: `Research/`, alle `context-exports/`-Updates + `Diagnose & Sprints/`-Exports (beide gitignored).*
+*Letzte Aktualisierung: 2026-08-03 — Runde 12 (Backlog-Aufräumrunde), train-v234 (B41/B42/B58/B139-Nebenfund/B179-Nebenfund abgeschlossen, siehe eigener Abschnitt unten). Davor: Runde 11, train-v233 (B199, Update-Banner "Später"-Button). Davor: Runde 10 komplett (Teil 1 + Teil 2), train-v232 (B191-B198, B141/B176-Abschluss). Davor: Runde-9-Audit-Folgerunde, train-v230 (B185-B190, siehe AUDIT-BERECHNUNGEN.md). Davor: Runde-8-Datenkonsistenz-Sprint, train-v229. Davor: Runde-7-Coaching-Qualitäts-Sprint, train-v228. Davor: Runde-6-Nutzerfeedback-Fix-Sprint, train-v227. Davor: Runde-5-Fix-Sprint, train-v226. Ältere Sprints siehe SESSION_LOG.md.*
+*Nächster Schritt: **Runde 13 steht an** (`TRAIN-Sprint-Prompts-Runde13.md`) — setzt die LLM-Council-Entscheidungen zu B62 (Offline-Modus-Opt-in: SW-Registrierung an ersten Workout-Start koppeln, Precache-Scope reduzieren) und B140 (neues Coach-Beobachtungssignal für wiederkehrende Intra-Session-Erschöpfung) technisch um, siehe `TRAIN-Council-Entscheidung-B62-B140-2026-08-03.md` für die vollen Chairman-Entscheidungen. Noch nicht begonnen. Danach: B55 Impressum bleibt der einzige echte Blocker (wartet weiterhin auf echte Name-/Adress-/E-Mail-Angaben des Betreibers, siehe LEGAL.md). **Runde 12 (Backlog-Aufräumrunde) ist komplett abgeschlossen**, siehe eigener Abschnitt unten für alle 7 Cluster. Aus dem Backlog-Review weiterhin offen (nicht Teil von Runde 12, siehe `backlog-review-2026-08-03.txt`): B43 (CUSTOM_EX_DELETE räumt Kategorie nicht auf), B27 (Touch-Drag auf echtem Gerät), B66 (Toast nicht reproduzierbar, Observability wartet auf nächste Beobachtung), B173-Nebenfund (Wochen-Rec-Chip ohne Wdh-Reduzierung), VACATION_PLANS-Nebenfund aus B184 (Urlaubstage ohne Muskelgruppen-Tags), B176 (Portal-Refactor, zuletzt in Runde 10 bestätigt zurückgestellt). Bestätigte Infra-Grenze (weiterhin gültig): volle Playwright-Suite kann `npx serve` mit `EMFILE`/Dev-Server-Kontention abstürzen lassen — Workaround ist der Batch-Lauf (inzwischen ~8-10 Dateien/Batch nötig), bei Verdacht auf Massenausfall in Isolation nachprüfen. Bekannte, wiederholt bestätigte Timing-Flakes (unabhängig von jeglichem Sprint-Code): `share_image.spec.js`/`share_image_v3.spec.js` (Download-Event-Timing), `deload_volumen.spec.js` (Backup-Reminder-Toast-Overlap), `plate_calculator.spec.js` (Live-Vorschau erster Tastendruck) — alle bei Retry/Isolation grün, keine echte Regression. Nicht committet: `Research/`, alle `context-exports/`-Updates + `Diagnose & Sprints/`-Exports (beide gitignored).*
+
+---
+
+## Runde 12 — Backlog-Aufräumrunde (train-v234, 2026-08-03)
+
+Basis: `backlog-review-2026-08-03.txt`. 7 Cluster, alle abgeschlossen.
+
+- **Cluster 1 (Doku-Hygiene):** B56/B141 aus `## OFFEN` nach `## BEHOBEN`
+  verschoben (waren bereits gelöst, standen aber noch als offen da); B19/B20
+  als Duplikate von bereits woanders dokumentierten Entscheidungen entfernt.
+- **Cluster 2 (B42, obsolet):** repo-weiter Grep bestätigt alle 3
+  `lastBackupDate`-Schreibstellen (`backup.js:48/70/331`) nutzen
+  konsistent `Date.now()` — die ursprüngliche Typ-Inkonsistenz existiert
+  nicht mehr, geschlossen.
+- **Cluster 3 (B58):** `fonts/OFL.txt` ergänzt, Copyright-Text für Bebas
+  Neue + DM Sans direkt aus dem offiziellen `google/fonts`-GitHub-Repo
+  geholt (`gh api`), nicht aus dem Gedächtnis rekonstruiert.
+- **Cluster 4 (B179-Nebenfund):** war bereits durch B190 (Runde 9)
+  vollständig gelöst — nur eine stale BUGS.md-Notiz korrigiert, kein
+  Code-Fix nötig.
+- **Cluster 5 (B139-Nebenfund):** `getMetricRecommendation()` (Distanz/
+  Zeit-Übungen) respektierte `nutritionPhase` nicht — Signatur + Aufruf
+  um `isCompound`/`nutritionPhase` ergänzt (identisches Muster wie
+  `getWeightRecommendation()`), beide `ui.js`-Aufrufstellen reichen jetzt
+  die bereits berechneten Werte durch. Neuer Test, Sabotage-Revert
+  bestätigt.
+- **Cluster 6 (B41):** die `'variation'`-Plateau-Strategie war seit
+  B184/B188 tatsächlich erreichbar geworden — per echter Test-Fixture
+  verifiziert (nicht nur Code gelesen), liefert sinnvollen Text, kein
+  neuer Folgefehler. Neuer Regressionstest sperrt das jetzt aktive
+  Verhalten fest.
+- **Cluster 7 (B21, NUR Bericht):** Aufwandsschätzung Media-Session-API-
+  Integration dokumentiert (Mittel, state.js-frei, 3 konkrete
+  Fallstricke) — keine Umsetzung, wie vorgegeben.
+
+CACHE_VERSION → `train-v234`. Volle Regressionssuite (75 Spec-Dateien) in
+8 kleinen Batches gelaufen — alle grün bis auf die 3 bereits bekannten
+Timing-Flakes (siehe Top-Absatz), keine davon durch diese Runde verursacht.
 
 ---
 

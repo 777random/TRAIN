@@ -270,9 +270,15 @@ export function getWeightRecommendation(exerciseName, weeks, plateStep = 2.5, pr
  * @param {number} metricStep  – Rundungsschritt in m bzw. Sekunden (aus ex.metricStep)
  * @param {string} progressionMode
  * @param {number|null} targetRepsMax
+ * @param {boolean} isCompound – B121-Pendant, siehe _recommendationCore(). Default true.
+ * @param {string} nutritionPhase – B139-Nebenfund (Runde 12, Cluster 5): war hier
+ *   bisher NICHT durchgereicht (Default 'maintenance' immer erzwungen), obwohl
+ *   getWeightRecommendation() es bereits seit B139 respektiert — reine
+ *   Parameter-Durchreichungs-Lücke, siehe _recommendationCore(). Default
+ *   'maintenance'.
  * @returns {{ recommendedWeight: number, reason: string, delta: number, lastWeight: number } | null}
  */
-export function getMetricRecommendation(exerciseName, weeks, metricStep = 10, progressionMode = 'weight_first', targetRepsMax = null) {
+export function getMetricRecommendation(exerciseName, weeks, metricStep = 10, progressionMode = 'weight_first', targetRepsMax = null, isCompound = true, nutritionPhase = 'maintenance') {
   if (weeks.length < 2) return null;
 
   const weekSets = weeks.map(wk => {
@@ -299,7 +305,7 @@ export function getMetricRecommendation(exerciseName, weeks, metricStep = 10, pr
   const lastValue = Math.max(...lastSets.map(s => parseFloat(s.reps) || 0));
   if (lastValue <= 0) return null;
 
-  const core = _recommendationCore(lastValue, weekSets, progressionMode, targetRepsMax, metricStep, metricStep, metricStep / 2);
+  const core = _recommendationCore(lastValue, weekSets, progressionMode, targetRepsMax, metricStep, metricStep, metricStep / 2, isCompound, nutritionPhase);
   return {
     recommendedWeight: core.recommendedValue,
     reason: core.reason,

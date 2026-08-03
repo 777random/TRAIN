@@ -8011,7 +8011,7 @@ function _prepNewWeekModal() {
             : (ex.metricStep || (exMetric === 'm' ? 50 : 10));
           const rec = progressesByWeight
             ? getWeightRecommendation(ex.name, calcWeeks, step, exProgressionMode, exTargetRepsMax, isCompoundExercise(ex.name, buildCategoryMap(state.customExercises)), state.settings?.nutritionPhase ?? 'maintenance')
-            : getMetricRecommendation(ex.name, calcWeeks, step, exProgressionMode, exTargetRepsMax);
+            : getMetricRecommendation(ex.name, calcWeeks, step, exProgressionMode, exTargetRepsMax, isCompoundExercise(ex.name, buildCategoryMap(state.customExercises)), state.settings?.nutritionPhase ?? 'maintenance');
           if (rec) {
             if (inRecoveryWindow && rec.delta > 0) {
               rec.delta = rec.delta * 1.5;
@@ -8966,7 +8966,7 @@ function _autoSetNextWeekPlanForDay(di, skippedNames) {
       : (ex.metricStep || (exMetric === 'm' ? 50 : 10));
     const rec = progressesByWeight
       ? getWeightRecommendation(ex.name, calcWeeks, step, exProgressionMode, exTargetRepsMax, isCompoundExercise(ex.name, buildCategoryMap(state.customExercises)), state.settings?.nutritionPhase ?? 'maintenance')
-      : getMetricRecommendation(ex.name, calcWeeks, step, exProgressionMode, exTargetRepsMax);
+      : getMetricRecommendation(ex.name, calcWeeks, step, exProgressionMode, exTargetRepsMax, isCompoundExercise(ex.name, buildCategoryMap(state.customExercises)), state.settings?.nutritionPhase ?? 'maintenance');
     if (!rec || !(rec.delta > 0)) return; // kein Plan bei X->X bzw. keiner Steigerung
     if (!isReadyForAutoSelect(ex.name, calcWeeks, exProgressionMode, exTargetRepsMax)) return;
     selections.push({ di, ei, value: rec.delta });
