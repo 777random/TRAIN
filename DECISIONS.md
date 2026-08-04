@@ -977,3 +977,19 @@ Feedback-Einzel-Fixes und Cleanup/Housekeeping bleiben ausdrücklich davon
 ausgenommen (siehe AGENTS.md für die vollständige Abgrenzung) — die Regel
 soll nicht jede Plan-Mode-Bestätigung ersetzen, nur die Fälle mit
 echtem Fehlentscheidungs-Risiko zusätzlich absichern.
+
+### 2026-08-04 — Test-Konvention: echte Interaktionspfade für Validierungs-/Gatekeeper-Logik
+**Entscheidung:** Jede Validierungs-/Gatekeeper-Logik (Klick-Handler, die
+einen State-Dispatch auslösen; Import-/Restore-Validierung) bekommt
+mindestens einen Test, der den echten Interaktionspfad ausübt (echter
+Klick, echte Datei-Upload-Simulation), nicht nur einen, der das Ergebnis
+direkt in State/localStorage injiziert. Volle Regel siehe `AGENTS.md`,
+Abschnitt "TEST-KONVENTION: Echte Interaktionspfade".
+**Begründung:** Aus B202 (Runde 15, largestPlate-Picker) und B205
+(Launch-Roadmap Phase B, Backup-Restore) abgeleitet — beide Bugs blieben
+trotz durchgehend grüner, direkt-injizierender Tests unentdeckt, weil
+keiner davon den tatsächlichen UI-Pfad (Klick-Handler-Routing bzw.
+Datei-Upload-Validierung) je ausübte.
+**Gilt:** Permanent, für jeden neuen Sprint mit Klick-Handlern oder
+Import-/Restore-Validierung. Direkt-injizierende Tests bleiben für alles
+andere weiterhin das richtige Werkzeug.

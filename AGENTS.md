@@ -11,6 +11,10 @@
 # sabotierten Datei), und ein Agent fand+fixte eine echte Interferenz
 # zwischen seiner eigenen additiven Migration und einer bestehenden
 # Test-Fixture aus einer FRÜHEREN Runde, bevor sie zum Problem wurde.)
+# 2026-08-04 (train-v239, Phase-C-Inventar-Auftrag Teil 1): neue dauerhafte
+# Test-Konvention ergänzt (siehe "TEST-KONVENTION" weiter unten) — aus B202
+# (Runde 15) + B205 (Launch-Roadmap Phase B) abgeleitet, kein Multi-Agent-
+# Sprint (Rundenhistorie zwischen train-v230 und hier siehe HANDOFF.md).
 
 ---
 
@@ -646,6 +650,39 @@ die über reine Regionen-Disjunktheit hinausgehen:**
    lohnt sich ein gezielter Blick auf ältere Fixtures, die genau das Feld
    absichtlich leer/besonders gesetzt hatten, das die neue Migration jetzt
    befüllt.
+
+---
+
+## TEST-KONVENTION: Echte Interaktionspfade für Validierungs-/Gatekeeper-Logik
+
+Hergeleitet aus zwei unabhängigen Funden, die beide NUR auffielen, weil
+ein Test den echten UI-Interaktionspfad ausübte statt Daten direkt in
+State/localStorage zu injizieren (beide Male hatten die bestehenden,
+direkt-injizierenden Tests durchgehend grün gemeldet, obwohl der jeweilige
+Pfad komplett unwirksam war):
+
+- **B202 (Runde 15):** der `largestPlate`-Settings-Picker-Klick landete im
+  falschen Event-Handler (`_handleChange` statt `_handleClick`) — nur ein
+  Test mit echtem `.click()` deckte das auf, alle bisherigen Tests hatten
+  `settings.largestPlate` direkt in `localStorage` gesetzt.
+- **B205 (Launch-Roadmap Phase B):** `backup.js`s Restore-Validierung
+  lehnte legitime alte Backups ab — nur ein Test mit echtem
+  `page.setInputFiles(...)` auf `[data-action="import-json"]` deckte das
+  auf, alle bisherigen Migrations-Tests hatten `localStorage` direkt
+  gesetzt und `backup.js` komplett umgangen.
+
+**Regel:** Jede Validierungs-/Gatekeeper-Logik — Klick-Handler, die einen
+State-Dispatch auslösen; Import-/Restore-Validierung; generell alles, das
+eine echte Nutzer-Interaktion voraussetzt, um überhaupt erreicht zu werden
+— bekommt MINDESTENS einen Test, der den echten Interaktionspfad ausübt
+(echter `.click()`/echte Datei-Upload-Simulation via `setInputFiles`),
+nicht nur einen, der das erwartete Ergebnis direkt in State/localStorage
+injiziert. Direkt-injizierende Tests bleiben für alles andere weiterhin
+das richtige, schnellere Werkzeug — die Regel gilt gezielt für Stellen, an
+denen die Interaktion SELBST Teil dessen ist, was getestet werden soll.
+
+**Gilt:** Permanent, ab sofort für jeden neuen Sprint mit Klick-Handlern
+oder Import-/Restore-Validierung verpflichtend zu prüfen.
 
 ---
 

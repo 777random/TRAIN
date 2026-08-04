@@ -1,7 +1,22 @@
 # TRAIN — CLAUDE.md
 # Vollständiger Projektkontext für Claude Code
 # Stand: train-v239 / SCHEMA 33 / August 2026
-# Letztes Update: nach train-v239, Launch-Roadmap Phase B (2026-08-04) —
+# Letztes Update: nach train-v239, Launch-Roadmap Phase C, Inventar-Teil
+# (2026-08-04) -- reine UX-/Feature-Bestandsaufnahme (KEIN Redesign, KEINE
+# Umsetzung), wartet jetzt auf Coworks Platzierungs-Entscheidungen. Settings-
+# Tab vollständig kartiert (18 Settings/4 Gruppen in einer Karte + 6
+# separate Karten), alle 4 weiteren Tabs auf gleicher Flughöhe. Hauptfund:
+# Übungs-Einstellungen (⚙️) liegen zweistufig hinter einem Kontextmenü
+# (⋮-Menü -> Einstellungen -> "Erweitert"). Systematische Redundanz-/Tote-
+# Code-Prüfung: keine neue Mehrfach-Trigger-Redundanz über "Tag löschen"
+# (B201) hinaus, aber 6 tote/verwaiste Case-Handler in ui.js identifiziert
+# (edit-day-field, autofill-rpe, toggle-day-menu/_dayMenuOpenKey voll tot;
+# set-session-rating, day-edit-note verwaist mit lebendigem Alternativpfad;
+# create-week-prev/-template harmlos tot). Bereinigung bewusst nicht Teil
+# dieses Auftrags. Separat (Teil 1): neue dauerhafte AGENTS.md-Testkonvention
+# "echte Interaktionspfade für Validierungs-/Gatekeeper-Logik", abgeleitet
+# aus B202+B205. Siehe HANDOFF.md für Details.
+# Davor train-v239, Launch-Roadmap Phase B (2026-08-04) —
 # 25 Stabilitäts-Testszenarien (7 Kategorien, von Claude Cowork) gegen den
 # aktuellen Code-Stand geprüft (Baseline vor dem Phase-C-Redesign). 1
 # echter Bug gefunden+gefixt (B205): backup.js importJSON() lehnte sehr

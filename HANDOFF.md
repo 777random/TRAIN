@@ -1,6 +1,48 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-08-04 — Launch-Roadmap Phase B (Stabilitäts-Baseline), train-v239 (siehe eigener Abschnitt unten). Davor: Launch-Roadmap Phase A (Verifikation), train-v238. Davor: Runde 15 (Nutzerfeedback: Tag löschen, Plate-Setting, Körper-Tab), train-v237. Davor: Runde 14 (Coach-Signal-Governance), train-v236. Davor: Runde 13 (Council-Umsetzung B62+B140), train-v235. Davor: Runde 12 (Backlog-Aufräumrunde), train-v234 (B41/B42/B58/B139-Nebenfund/B179-Nebenfund abgeschlossen). Davor: Runde 11, train-v233 (B199, Update-Banner "Später"-Button). Davor: Runde 10 komplett (Teil 1 + Teil 2), train-v232 (B191-B198, B141/B176-Abschluss). Davor: Runde-9-Audit-Folgerunde, train-v230 (B185-B190, siehe AUDIT-BERECHNUNGEN.md). Davor: Runde-8-Datenkonsistenz-Sprint, train-v229. Davor: Runde-7-Coaching-Qualitäts-Sprint, train-v228. Davor: Runde-6-Nutzerfeedback-Fix-Sprint, train-v227. Davor: Runde-5-Fix-Sprint, train-v226. Ältere Sprints siehe SESSION_LOG.md.*
-*Nächster Schritt: **Launch-Roadmap Phase B ist abgeschlossen** (siehe `Diagnose & Sprints/TRAIN-Launch-Roadmap.md` + eigener Abschnitt unten). Nächste Phase laut Roadmap: **Phase C — UX-/Feature-Redesign-Review** (Startpunkt laut Roadmap: Einstellungen wirken unübersichtlich; größere strukturelle Änderungen dort einzeln auf Council-Würdigkeit prüfen). Aus Runde 13 weiterhin offen: zwei NICHT code-seitig lösbare B62-Punkte (Rechts-Check vor Release zu Service-Worker-Caching; PWA-Installierbarkeit auf echtem Android-Gerät nach nächstem Release manuell verifizieren, siehe DECISIONS.md). Danach: B55 Impressum bleibt der einzige echte Blocker (wartet weiterhin auf echte Name-/Adress-/E-Mail-Angaben des Betreibers, siehe LEGAL.md). Aus dem Backlog-Review weiterhin offen (siehe `backlog-review-2026-08-03.txt`): B43 (CUSTOM_EX_DELETE räumt Kategorie nicht auf), B27 (Touch-Drag auf echtem Gerät), B66 (Toast nicht reproduzierbar, Observability wartet auf nächste Beobachtung), B173-Nebenfund (Wochen-Rec-Chip ohne Wdh-Reduzierung), VACATION_PLANS-Nebenfund aus B184 (Urlaubstage ohne Muskelgruppen-Tags), B176 (Portal-Refactor, zuletzt in Runde 10 bestätigt zurückgestellt). Bestätigte Infra-Grenze (weiterhin gültig, seit Runde 13 nicht mehr reproduziert): volle Playwright-Suite kann `npx serve` mit `EMFILE`/Dev-Server-Kontention abstürzen lassen — Workaround ist der Batch-Lauf, bei Verdacht auf Massenausfall in Isolation nachprüfen. Bekannte, wiederholt bestätigte Timing-Flakes (unabhängig von jeglichem Sprint-Code, alle bei Retry/Isolation grün): `share_image.spec.js`/`share_image_v3.spec.js` (Download-Event-Timing), `deload_volumen.spec.js` (Backup-Reminder-Toast-Overlap), `plate_calculator.spec.js` (Live-Vorschau erster Tastendruck), NEU seit Phase B: `settings_combination_smoke.spec.js` Szenario 20 (Timing unter Batch-Parallel-Last, 3x in Isolation bestätigt grün). Nicht committet: `Research/`, alle `context-exports/`-Updates + `Diagnose & Sprints/`-Exports (beide gitignored).*
+*Letzte Aktualisierung: 2026-08-04 — Launch-Roadmap Phase C, Inventar-Teil (UX-/Feature-Bestandsaufnahme, keine Umsetzung) + kleine AGENTS.md-Testkonvention-Ergänzung, train-v239 (siehe eigener Abschnitt unten). Davor: Launch-Roadmap Phase B (Stabilitäts-Baseline), train-v239. Davor: Launch-Roadmap Phase A (Verifikation), train-v238. Davor: Runde 15 (Nutzerfeedback: Tag löschen, Plate-Setting, Körper-Tab), train-v237. Davor: Runde 14 (Coach-Signal-Governance), train-v236. Davor: Runde 13 (Council-Umsetzung B62+B140), train-v235. Davor: Runde 12 (Backlog-Aufräumrunde), train-v234 (B41/B42/B58/B139-Nebenfund/B179-Nebenfund abgeschlossen). Davor: Runde 11, train-v233 (B199, Update-Banner "Später"-Button). Davor: Runde 10 komplett (Teil 1 + Teil 2), train-v232 (B191-B198, B141/B176-Abschluss). Davor: Runde-9-Audit-Folgerunde, train-v230 (B185-B190, siehe AUDIT-BERECHNUNGEN.md). Davor: Runde-8-Datenkonsistenz-Sprint, train-v229. Davor: Runde-7-Coaching-Qualitäts-Sprint, train-v228. Davor: Runde-6-Nutzerfeedback-Fix-Sprint, train-v227. Davor: Runde-5-Fix-Sprint, train-v226. Ältere Sprints siehe SESSION_LOG.md.*
+*Nächster Schritt: **Launch-Roadmap Phase C, Inventar-Teil ist abgeschlossen** (reine Bestandsaufnahme, keine Redesign-Umsetzung — siehe `Diagnose & Sprints/TRAIN-Launch-Roadmap.md` + eigener Abschnitt unten). Wartet jetzt auf konkrete Platzierungs-/UX-Entscheidungen von Cowork, BEVOR Claude Code irgendetwas am Settings-Tab/den anderen Tabs umsetzt. Danach folgt Phase D (gezielter Stabilitäts-Re-Check nur für die dann tatsächlich geänderten Bereiche). Aus Runde 13 weiterhin offen: zwei NICHT code-seitig lösbare B62-Punkte (Rechts-Check vor Release zu Service-Worker-Caching; PWA-Installierbarkeit auf echtem Android-Gerät nach nächstem Release manuell verifizieren, siehe DECISIONS.md). Danach: B55 Impressum bleibt der einzige echte Blocker (wartet weiterhin auf echte Name-/Adress-/E-Mail-Angaben des Betreibers, siehe LEGAL.md). Aus dem Backlog-Review weiterhin offen (siehe `backlog-review-2026-08-03.txt`): B43 (CUSTOM_EX_DELETE räumt Kategorie nicht auf), B27 (Touch-Drag auf echtem Gerät), B66 (Toast nicht reproduzierbar, Observability wartet auf nächste Beobachtung), B173-Nebenfund (Wochen-Rec-Chip ohne Wdh-Reduzierung), VACATION_PLANS-Nebenfund aus B184 (Urlaubstage ohne Muskelgruppen-Tags), B176 (Portal-Refactor, zuletzt in Runde 10 bestätigt zurückgestellt). Bestätigte Infra-Grenze (weiterhin gültig, seit Runde 13 nicht mehr reproduziert): volle Playwright-Suite kann `npx serve` mit `EMFILE`/Dev-Server-Kontention abstürzen lassen — Workaround ist der Batch-Lauf, bei Verdacht auf Massenausfall in Isolation nachprüfen. Bekannte, wiederholt bestätigte Timing-Flakes (unabhängig von jeglichem Sprint-Code, alle bei Retry/Isolation grün): `share_image.spec.js`/`share_image_v3.spec.js` (Download-Event-Timing), `deload_volumen.spec.js` (Backup-Reminder-Toast-Overlap), `plate_calculator.spec.js` (Live-Vorschau erster Tastendruck), NEU seit Phase B: `settings_combination_smoke.spec.js` Szenario 20 (Timing unter Batch-Parallel-Last, 3x in Isolation bestätigt grün). Nicht committet: `Research/`, alle `context-exports/`-Updates + `Diagnose & Sprints/`-Exports (beide gitignored).*
+
+---
+
+## Launch-Roadmap Phase C — Inventar-Teil + AGENTS.md-Testkonvention (train-v239, 2026-08-04)
+
+Basis: `Diagnose & Sprints/TRAIN-Phase-C-Inventar-Auftrag.md`. Zwei
+unabhängige Teile, keine Code-Änderung außer AGENTS.md/DECISIONS.md.
+
+**Teil 1 (klein):** neue dauerhafte AGENTS.md-Regel ("TEST-KONVENTION:
+Echte Interaktionspfade für Validierungs-/Gatekeeper-Logik"), abgeleitet
+aus B202 (Runde 15) + B205 (Phase B) — beide Bugs wurden ausschließlich
+gefunden, weil ein Test den echten Interaktionspfad (echter Klick, echter
+Datei-Upload) ausübte statt Daten direkt in State/localStorage zu
+injizieren. Kurzer Vermerk zusätzlich in DECISIONS.md unter PROZESS.
+
+**Teil 2 (Hauptauftrag, reine Bestandsaufnahme):** vollständiger
+Ist-Zustand-Bericht in `diagnose-phase-c-inventar-2026-08-04.txt` —
+explizit KEIN Redesign-Vorschlag, KEINE Umsetzung (das ist Coworks
+nächster Schritt). Settings-Tab vollständig kartiert (18 Settings in
+einer Karte über 4 Gruppen, plus 6 separate Karten). Die anderen 4 Tabs
+auf gleicher Flughöhe kartiert. Hauptfund zur Auffindbarkeit: Übungs-
+Einstellungen (⚙️) liegen zweistufig verschachtelt hinter einem
+Kontextmenü (⋮-Menü → Einstellungen → "Erweitert"), bewusst so gebaut.
+Systematische Redundanz-Prüfung (nicht nur bereits gemeldete Fälle, alle
+`data-action`-Werte gegen alle `case`-Handler abgeglichen): keine neue
+Mehrfach-Trigger-Redundanz über den bekannten "Tag löschen"-Fall (B201)
+hinaus, aber 6 tote/verwaiste Case-Handler in ui.js gefunden und
+klassifiziert — 3 vollständig unerreichbare Funktionen ohne Alternativpfad
+(`edit-day-field`: Tag-Titel-Inline-Umbenennung; `autofill-rpe`:
+RPE-Wert-Übernahme, Pendant zum weiterhin lebendigen `autofill-down`;
+`toggle-day-menu`+`_dayMenuOpenKey`: komplettes totes Kontextmenü-System),
+2 verwaiste Setter mit weiterhin lebendigem Alternativpfad
+(`set-session-rating` → ersetzt durch die Tagesabschluss-Modal-Bewertung;
+`day-edit-note` → das Notizfeld ist ohnehin direkt sichtbar/editierbar),
+1 harmloses totes Case-Label-Paar (`create-week-prev`/`create-week-
+template`, fallen auf dieselbe Implementierung wie das aktive
+`create-week` durch). Bereinigung dieser Fundstellen bewusst NICHT Teil
+dieses Auftrags.
+
+Keine CACHE_VERSION-Bump nötig für den Inventar-Teil selbst (reine
+Dokumentation) — CACHE_VERSION bleibt bei `train-v239` (letzter
+Code-tragender Stand aus Phase B).
 
 ---
 
