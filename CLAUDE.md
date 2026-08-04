@@ -1,7 +1,17 @@
 # TRAIN — CLAUDE.md
 # Vollständiger Projektkontext für Claude Code
-# Stand: train-v237 / SCHEMA 33 / August 2026
-# Letztes Update: nach train-v237, Runde 15 (2026-08-04) — 3 unabhängige
+# Stand: train-v238 / SCHEMA 33 / August 2026
+# Letztes Update: nach train-v238, Launch-Roadmap Phase A (2026-08-04) —
+# neues lebendes Master-Dokument `Diagnose & Sprints/TRAIN-Launch-
+# Roadmap.md` (8 Phasen bis Launch) angelegt, Phase A (Verifikation
+# Runde 13-15 gegen tatsächliches Verhalten) abgeschlossen. Fund (B204):
+# Deload-Struktursignals "▾ Basis dieser Einschätzung"-Aufklapp-Feld
+# wiederholte seit Runde 14 dieselben 3 Rohwerte, die der Haupttext
+# bereits zeigte (E1-Feature v215 wurde bei der Runde-14-Textänderung
+# nicht mitgezogen) — zeigt jetzt stattdessen den Auslösegrund
+# (Volumen/RPE). Alle übrigen geprüften Runde-13/14/15-Punkte bestätigt,
+# keine weiteren Abweichungen. Siehe HANDOFF.md für Details.
+# Davor train-v237, Runde 15 (2026-08-04) — 3 unabhängige
 # Live-Nutzerfeedback-Punkte (B201-B203): Settings-Tab "Tag löschen" zeigte
 # den Button nur beim letzten Tag + verschwand bei nur 1 Tag komplett statt
 # disabled (jetzt: jeder Tag, disabled+Tooltip bei 1 Tag); largestPlate-
@@ -101,7 +111,7 @@ TRAIN ist eine deutschsprachige PWA für Krafttraining. Pure Vanilla ES Modules 
   Sessions müssen aus diesem neuen Pfad heraus gestartet werden, sonst
   landet man am alten (jetzt leeren) OneDrive-Ort. Nutzer zieht den Ordner
   regelmäßig manuell auf eine externe Festplatte statt über Cloud-Sync.
-- Aktueller Stand: SCHEMA_VERSION 33 · CACHE_VERSION train-v237 · CSS ?v=213
+- Aktueller Stand: SCHEMA_VERSION 33 · CACHE_VERSION train-v238 · CSS ?v=213
 
 ---
 
@@ -121,6 +131,7 @@ Bei CSS-Änderungen: Cache-Buster in `index.html` erhöhen:
 | Datei | Inhalt |
 |-------|--------|
 | `HANDOFF.md` | Session-Übergabe: aktueller Stand, zuletzt geänderte Files, nächster Schritt |
+| `Diagnose & Sprints/TRAIN-Launch-Roadmap.md` | **Lebendes Master-Dokument für den Weg zum Launch** (8 Phasen A-H, Status-Tabelle). Bei jeder Sitzung zum Launch-Thema ZUERST lesen, nach jedem abgeschlossenen Schritt die Status-Tabelle darin aktualisieren — ersetzt nicht die einzelnen Sprint-Runden, jede Code-Phase bekommt ihre eigene Runde. |
 | `BUGS.md` | Bug-Tracker: behoben / offen / bewusst kein Bug / bekannte Test-Fallstricke |
 | `DECISIONS.md` | Unveränderliche Produkt-/Architektur-Entscheidungen — nicht ohne neue explizite Entscheidung revidieren |
 | `AGENTS.md` | Parallelisierungs-Regeln für Multi-Agent Sprints |

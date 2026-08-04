@@ -1,6 +1,42 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-08-04 — Runde 15 (Nutzerfeedback: Tag löschen, Plate-Setting, Körper-Tab), train-v237 (siehe eigener Abschnitt unten). Davor: Runde 14 (Coach-Signal-Governance), train-v236. Davor: Runde 13 (Council-Umsetzung B62+B140), train-v235. Davor: Runde 12 (Backlog-Aufräumrunde), train-v234 (B41/B42/B58/B139-Nebenfund/B179-Nebenfund abgeschlossen). Davor: Runde 11, train-v233 (B199, Update-Banner "Später"-Button). Davor: Runde 10 komplett (Teil 1 + Teil 2), train-v232 (B191-B198, B141/B176-Abschluss). Davor: Runde-9-Audit-Folgerunde, train-v230 (B185-B190, siehe AUDIT-BERECHNUNGEN.md). Davor: Runde-8-Datenkonsistenz-Sprint, train-v229. Davor: Runde-7-Coaching-Qualitäts-Sprint, train-v228. Davor: Runde-6-Nutzerfeedback-Fix-Sprint, train-v227. Davor: Runde-5-Fix-Sprint, train-v226. Ältere Sprints siehe SESSION_LOG.md.*
-*Nächster Schritt: **Runde 15 ist komplett abgeschlossen** (alle 3 Cluster, siehe eigener Abschnitt unten). Aus Runde 13 weiterhin offen: zwei NICHT code-seitig lösbare B62-Punkte (Rechts-Check vor Release zu Service-Worker-Caching; PWA-Installierbarkeit auf echtem Android-Gerät nach nächstem Release manuell verifizieren, siehe DECISIONS.md). Danach: B55 Impressum bleibt der einzige echte Blocker (wartet weiterhin auf echte Name-/Adress-/E-Mail-Angaben des Betreibers, siehe LEGAL.md). Aus dem Backlog-Review weiterhin offen (siehe `backlog-review-2026-08-03.txt`): B43 (CUSTOM_EX_DELETE räumt Kategorie nicht auf), B27 (Touch-Drag auf echtem Gerät), B66 (Toast nicht reproduzierbar, Observability wartet auf nächste Beobachtung), B173-Nebenfund (Wochen-Rec-Chip ohne Wdh-Reduzierung), VACATION_PLANS-Nebenfund aus B184 (Urlaubstage ohne Muskelgruppen-Tags), B176 (Portal-Refactor, zuletzt in Runde 10 bestätigt zurückgestellt). Bestätigte Infra-Grenze (weiterhin gültig, seit Runde 13 nicht mehr reproduziert): volle Playwright-Suite kann `npx serve` mit `EMFILE`/Dev-Server-Kontention abstürzen lassen — Workaround ist der Batch-Lauf, bei Verdacht auf Massenausfall in Isolation nachprüfen. Bekannte, wiederholt bestätigte Timing-Flakes (unabhängig von jeglichem Sprint-Code): `share_image.spec.js`/`share_image_v3.spec.js` (Download-Event-Timing, in Runde 15 wieder einmal als Flake bestätigt — 1 Retry, dann grün), `deload_volumen.spec.js` (Backup-Reminder-Toast-Overlap), `plate_calculator.spec.js` (Live-Vorschau erster Tastendruck). Nicht committet: `Research/`, alle `context-exports/`-Updates + `Diagnose & Sprints/`-Exports (beide gitignored).*
+*Letzte Aktualisierung: 2026-08-04 — Launch-Roadmap Phase A (Verifikation), train-v238 (siehe eigener Abschnitt unten). Davor: Runde 15 (Nutzerfeedback: Tag löschen, Plate-Setting, Körper-Tab), train-v237. Davor: Runde 14 (Coach-Signal-Governance), train-v236. Davor: Runde 13 (Council-Umsetzung B62+B140), train-v235. Davor: Runde 12 (Backlog-Aufräumrunde), train-v234 (B41/B42/B58/B139-Nebenfund/B179-Nebenfund abgeschlossen). Davor: Runde 11, train-v233 (B199, Update-Banner "Später"-Button). Davor: Runde 10 komplett (Teil 1 + Teil 2), train-v232 (B191-B198, B141/B176-Abschluss). Davor: Runde-9-Audit-Folgerunde, train-v230 (B185-B190, siehe AUDIT-BERECHNUNGEN.md). Davor: Runde-8-Datenkonsistenz-Sprint, train-v229. Davor: Runde-7-Coaching-Qualitäts-Sprint, train-v228. Davor: Runde-6-Nutzerfeedback-Fix-Sprint, train-v227. Davor: Runde-5-Fix-Sprint, train-v226. Ältere Sprints siehe SESSION_LOG.md.*
+*Nächster Schritt: **Launch-Roadmap Phase A ist abgeschlossen** (siehe `Diagnose & Sprints/TRAIN-Launch-Roadmap.md` + eigener Abschnitt unten). Nächste Phase laut Roadmap: **Phase B — Stabilitäts-Baseline** (wartet auf konkrete Testszenarien von Claude Cowork). Aus Runde 13 weiterhin offen: zwei NICHT code-seitig lösbare B62-Punkte (Rechts-Check vor Release zu Service-Worker-Caching; PWA-Installierbarkeit auf echtem Android-Gerät nach nächstem Release manuell verifizieren, siehe DECISIONS.md). Danach: B55 Impressum bleibt der einzige echte Blocker (wartet weiterhin auf echte Name-/Adress-/E-Mail-Angaben des Betreibers, siehe LEGAL.md). Aus dem Backlog-Review weiterhin offen (siehe `backlog-review-2026-08-03.txt`): B43 (CUSTOM_EX_DELETE räumt Kategorie nicht auf), B27 (Touch-Drag auf echtem Gerät), B66 (Toast nicht reproduzierbar, Observability wartet auf nächste Beobachtung), B173-Nebenfund (Wochen-Rec-Chip ohne Wdh-Reduzierung), VACATION_PLANS-Nebenfund aus B184 (Urlaubstage ohne Muskelgruppen-Tags), B176 (Portal-Refactor, zuletzt in Runde 10 bestätigt zurückgestellt). Bestätigte Infra-Grenze (weiterhin gültig, seit Runde 13 nicht mehr reproduziert): volle Playwright-Suite kann `npx serve` mit `EMFILE`/Dev-Server-Kontention abstürzen lassen — Workaround ist der Batch-Lauf, bei Verdacht auf Massenausfall in Isolation nachprüfen. Bekannte, wiederholt bestätigte Timing-Flakes (unabhängig von jeglichem Sprint-Code): `share_image.spec.js`/`share_image_v3.spec.js` (Download-Event-Timing, erneut bestätigt — 1 Retry/Isolation, dann grün), `deload_volumen.spec.js` (Backup-Reminder-Toast-Overlap), `plate_calculator.spec.js` (Live-Vorschau erster Tastendruck). Nicht committet: `Research/`, alle `context-exports/`-Updates + `Diagnose & Sprints/`-Exports (beide gitignored).*
+
+---
+
+## Launch-Roadmap Phase A — Verifikation (train-v238, 2026-08-04)
+
+Basis: `Diagnose & Sprints/TRAIN-Launch-Roadmap.md` (neues lebendes
+Master-Dokument für den Weg zum Launch, 8 Phasen) +
+`TRAIN-Phase-A-Verifikations-Auftrag.md`. Voller Bericht in
+`diagnose-phase-a-verifikation-2026-08-04.txt`.
+
+**Teil 1 (Prioritäts-Fund, ausnahmsweise direkt gefixt, B204):** Nutzer
+meldete, das "Warum"-Aufklapp-Feld eines Coach-Struktursignals zeige
+denselben Text wie der Haupttext. Bestätigt per systematischer Prüfung
+ALLER 6 Struktursignale (nicht nur des gemeldeten) + `git blame`: eine
+echte, aber ISOLIERTE Regression aus dem Runde-14-Commit — der
+Deload-Haupttext bekam damals alle 3 Rohwerte (weeksSince/Volumentrend/
+Ø-RPE) wörtlich, ohne dass die seit v215 (E1-Feature) bestehende
+`evidence`-Liste angepasst wurde, die exakt dieselben 3 Werte zeigt. Fix:
+`evidence` zeigt jetzt stattdessen den Auslösegrund (welche Bedingung —
+Volumen und/oder RPE — den Trigger auslöste), eine echte Zusatzinfo statt
+Wiederholung. Bestehendes AC7 (E1-Feature, "Disclosure muss vorhanden
+sein") bewusst NICHT gebrochen — Disclosure bleibt, Inhalt wurde
+korrigiert statt entfernt.
+
+**Teil 2 (systematischer Verifikations-Pass, reiner Bericht):** alle 8
+übrigen geprüften DECISIONS.md-Punkte aus Runde 13-15 bestätigt wie
+dokumentiert — B62-Registrierungstrigger + Precache-Scope, B140-Beobachtungston,
+B200-Cooldown-Werte (28/14/21/21) + 3-stufige Eskalation +
+injury_reminder-/Plateau-Ausnahmen, B201-B203 — jeweils nicht nur per
+Codelesen, sondern per aktiv laufenden Tests gegen echtes
+Rendering-Verhalten gegengeprüft. Keine weiteren Abweichungen gefunden.
+
+CACHE_VERSION → `train-v238`. Volle Regressionssuite (78 Spec-Dateien,
+~402 Tests) grün bis auf den bereits mehrfach unabhängig bestätigten
+`share_image.spec.js`-Flake (in Isolation sofort grün). BUGS.md (B204) /
+Launch-Roadmap-Statustabelle aktualisiert.
 
 ---
 

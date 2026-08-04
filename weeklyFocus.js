@@ -363,15 +363,22 @@ function _checkPreventiveDeload(state) {
 
   if (!volumeUp && !rpeHigh) return null;
   return {
-    signal: 'deload_preventive', weeksSince, volumeUp, avgRpe,
+    signal: 'deload_preventive', weeksSince, volumeUp, avgRpe, rpeHigh,
     volTrendDirection: volTrend?.direction ?? null,
     tier: _dismissTier(state, 'preventive_deload'),
     cooldownDays: _dismissCooldownDays('preventive_deload'),
-    // E1 (Transparenz Coach-Tab)
+    // Phase A/Launch-Roadmap (2026-08-04, Regressionsfund): VOR Runde 14
+    // enthielt der Haupttext nur weeksSince, evidence ergänzte hier 2 echte
+    // Zusatzwerte (Volumen-Trend, Ø RPE). Seit Runde 14 enthält der
+    // Haupttext (ui.js) bereits alle 3 Rohwerte wörtlich -- ein Evidence-
+    // Feld mit denselben 3 Werten wäre jetzt reine Wiederholung der "▾
+    // Basis dieser Einschätzung"-Disclosure (E1, v215). Stattdessen: EIN
+    // neuer Punkt, der tatsächlich NICHT im Haupttext steht -- welche der
+    // beiden Bedingungen (Volumen ODER RPE) den Trigger auslöste (beide
+    // Rohwerte stehen zwar im Haupttext, aber nicht, WELCHE davon die
+    // auslösende Schwelle überschritten hat).
     evidence: [
-      { label: 'Wochen ohne Deload', value: `${weeksSince}` },
-      { label: 'Volumen-Trend', value: volumeUp ? 'steigend' : 'stabil/fallend' },
-      { label: 'Ø RPE letzte 3 Wochen', value: avgRpe != null ? avgRpe.toFixed(1) : '–' },
+      { label: 'Auslöser', value: volumeUp && rpeHigh ? 'Volumen steigend + Ø RPE hoch' : volumeUp ? 'Volumen steigend' : 'Ø RPE hoch' },
     ],
   };
 }

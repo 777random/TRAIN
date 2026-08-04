@@ -3575,6 +3575,15 @@ function _structuralSignalHtml(sig) {
       icon: '🔄',
       text: `${prefix}${sig.weeksSince} Wochen ohne Deload, Volumentrend ${richtung} / Ø-RPE ${rpeVal}.`,
       info: 'Empfehlung: eine Regenerationswoche (Deload) einplanen. Ein Deload ist eine Woche mit reduziertem Volumen (weniger Sätze) — er hilft deinem Körper sich zu erholen und verhindert Übertraining, dein Gewicht bleibt gleich.',
+      // Phase A/Launch-Roadmap (2026-08-04, Regressionsfund): vor diesem
+      // Fix enthielt sig.evidence dieselben 3 Rohwerte (weeksSince/
+      // volTrendDirection/avgRpe), die der Haupttext seit Runde 14 bereits
+      // wörtlich zeigt -- die "▾ Basis dieser Einschätzung"-Disclosure
+      // (E1, v215, AC7) war dadurch reine Wiederholung, ohne Mehrwert.
+      // weeklyFocus.js liefert jetzt stattdessen NUR den Auslösegrund
+      // (Volumen und/oder RPE), der NICHT im Haupttext steht -- Disclosure
+      // bleibt vorhanden (AC7 weiterhin erfüllt), zeigt aber echte
+      // Zusatzinfo statt einer Wiederholung.
       evidence: sig.evidence,
       // 'preventive_deload' ist der historische decisionLog-'type'-Wert
       // (B131), NICHT sig.type ('deload_preventive') -- siehe weeklyFocus.js

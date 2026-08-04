@@ -149,7 +149,18 @@ test('Progression: Uebungsname + Empfehlung + Konfidenz sichtbar (AC5)', async (
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
 });
 
-test('Strukturkarte (Praeventiver Deload): "▾ Basis dieser Einschaetzung" vorhanden (AC7)', async ({ page }) => {
+// Phase A/Launch-Roadmap (2026-08-04, Regressionsfund): ursprünglich prüfte
+// AC7 nur, dass die Disclosure ein "Woche"-Wort enthält -- das galt vor
+// Runde 14, als der Haupttext nur weeksSince zeigte und evidence 2 echte
+// Zusatzwerte ergänzte. Seit Runde 14 zeigt der Haupttext bereits alle 3
+// Rohwerte (weeksSince/Volumentrend/Ø-RPE) wörtlich -- ein Evidence-Feld
+// mit denselben 3 Werten wäre nur noch Wiederholung, kein Mehrwert mehr
+// (Nutzer-Feedback: "'Warum'-Aufklappen-Feld zeigt denselben Text wie der
+// Haupttext"). Fix: evidence liefert jetzt den Auslösegrund (Volumen und/
+// oder RPE), NICHT die bereits im Haupttext stehenden Rohwerte. AC7 bleibt
+// erfüllt (Disclosure weiterhin vorhanden, zeigt echte Zusatzinfo) -- Test
+// entsprechend aktualisiert statt nur den alten Regex-Treffer zu retten.
+test('Strukturkarte (Praeventiver Deload): "▾ Basis dieser Einschaetzung" vorhanden (AC7), zeigt ECHTE Zusatzinfo statt Haupttext-Wiederholung', async ({ page }) => {
   const pageErrors = [];
   page.on('pageerror', err => pageErrors.push(err.message));
   const weeks = [];
@@ -163,12 +174,64 @@ test('Strukturkarte (Praeventiver Deload): "▾ Basis dieser Einschaetzung" vorh
   await seed(page, weeks);
   const badge = page.locator('.deload-info__badge');
   await expect(badge).toBeVisible();
+
+  const mainText = await page.locator('.coach-structural-text').first().textContent();
+
   const structWhy = page.locator('.coach-structural-why summary');
   await expect(structWhy).toContainText('Basis dieser Einschätzung');
   await structWhy.click();
   const evText = await page.locator('.coach-structural-why .coach-evidence-list').innerText();
-  expect(evText).toMatch(/Woche/);
+
+  // AC7: Disclosure vorhanden mit echtem Inhalt.
+  expect(evText.trim().length).toBeGreaterThan(0);
+  // Regressionsschutz: Aufklapp-Text darf den Haupttext nicht 1:1
+  // enthalten (die konkrete Nutzer-Beschwerde) -- prüft konkret, dass die
+  // 3 Rohwerte aus dem Haupttext NICHT nochmal wortgleich in evidence
+  // auftauchen, sondern etwas qualitativ anderes (Auslösegrund) zeigen.
+  expect(evText).not.toBe(mainText);
+  expect(evText).toMatch(/Auslöser/);
+
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});
+
+// Phase A/Launch-Roadmap (2026-08-04): Spot-Check des anderen Signals mit
+// einem 'info'-Feld ("?"-Badge, identisches <details>-Muster wie Deload) --
+// recurring_fatigue war von der Deload-Regression selbst nicht betroffen
+// (sein Haupttext enthält weiterhin nur die Übung + "letzte 3 Wochen", das
+// info-Feld ergänzt eine eigene Erklärung), aber derselbe strukturelle
+// Fallstrick (Haupttext-Erweiterung macht info/evidence redundant) könnte
+// hier künftig genauso auftreten -- Regressionsschutz für beide Felder.
+test('recurring_fatigue: "?"-Info-Text und Haupttext sind unterschiedlich (kein Duplikat)', async ({ page }) => {
+  function weeksAgoISO(n) {
+    const d = new Date();
+    d.setDate(d.getDate() - n * 7);
+    return d.toISOString().split('T')[0];
+  }
+  function fatigueDay(id) {
+    return mkDay(id, [
+      mkExercise('Bankdrücken', 80, 'success', 7.0, 2),
+      mkExercise('OHP', 40, 'success', 8.0, 2),
+      mkExercise('Dips', 0, 'fail', 9.5, 1),
+    ]);
+  }
+  const weeks = [
+    { id: 1, startDate: weeksAgoISO(2), note: '', mode: 'standard', days: [fatigueDay(11)], sessionLog: [], bodyData: {}, restDays: [], isSeedWeek: false },
+    { id: 2, startDate: weeksAgoISO(1), note: '', mode: 'standard', days: [fatigueDay(12)], sessionLog: [], bodyData: {}, restDays: [], isSeedWeek: false },
+    { id: 3, startDate: weeksAgoISO(0), note: '', mode: 'standard', days: [fatigueDay(13)], sessionLog: [], bodyData: {}, restDays: [], isSeedWeek: false },
+  ];
+  await seed(page, weeks);
+
+  const item = page.locator('.coach-structural-item', { hasText: 'aufgefallen' });
+  await expect(item).toBeVisible();
+  const mainText = await item.locator('.coach-structural-text').textContent();
+
+  const badge = item.locator('.deload-info__badge');
+  await expect(badge).toBeVisible();
+  await badge.click();
+  const infoText = await item.locator('.deload-info__body').textContent();
+
+  expect(infoText).not.toBe(mainText);
+  expect(mainText).not.toContain(infoText);
 });
 
 test('Zweiter Tap schliesst die Evidence-Box wieder (AC2/AC3)', async ({ page }) => {
