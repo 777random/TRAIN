@@ -1,6 +1,64 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-08-04 — Launch-Roadmap Phase C, Inventar-Teil (UX-/Feature-Bestandsaufnahme, keine Umsetzung) + kleine AGENTS.md-Testkonvention-Ergänzung, train-v239 (siehe eigener Abschnitt unten). Davor: Launch-Roadmap Phase B (Stabilitäts-Baseline), train-v239. Davor: Launch-Roadmap Phase A (Verifikation), train-v238. Davor: Runde 15 (Nutzerfeedback: Tag löschen, Plate-Setting, Körper-Tab), train-v237. Davor: Runde 14 (Coach-Signal-Governance), train-v236. Davor: Runde 13 (Council-Umsetzung B62+B140), train-v235. Davor: Runde 12 (Backlog-Aufräumrunde), train-v234 (B41/B42/B58/B139-Nebenfund/B179-Nebenfund abgeschlossen). Davor: Runde 11, train-v233 (B199, Update-Banner "Später"-Button). Davor: Runde 10 komplett (Teil 1 + Teil 2), train-v232 (B191-B198, B141/B176-Abschluss). Davor: Runde-9-Audit-Folgerunde, train-v230 (B185-B190, siehe AUDIT-BERECHNUNGEN.md). Davor: Runde-8-Datenkonsistenz-Sprint, train-v229. Davor: Runde-7-Coaching-Qualitäts-Sprint, train-v228. Davor: Runde-6-Nutzerfeedback-Fix-Sprint, train-v227. Davor: Runde-5-Fix-Sprint, train-v226. Ältere Sprints siehe SESSION_LOG.md.*
-*Nächster Schritt: **Launch-Roadmap Phase C, Inventar-Teil ist abgeschlossen** (reine Bestandsaufnahme, keine Redesign-Umsetzung — siehe `Diagnose & Sprints/TRAIN-Launch-Roadmap.md` + eigener Abschnitt unten). Wartet jetzt auf konkrete Platzierungs-/UX-Entscheidungen von Cowork, BEVOR Claude Code irgendetwas am Settings-Tab/den anderen Tabs umsetzt. Danach folgt Phase D (gezielter Stabilitäts-Re-Check nur für die dann tatsächlich geänderten Bereiche). Aus Runde 13 weiterhin offen: zwei NICHT code-seitig lösbare B62-Punkte (Rechts-Check vor Release zu Service-Worker-Caching; PWA-Installierbarkeit auf echtem Android-Gerät nach nächstem Release manuell verifizieren, siehe DECISIONS.md). Danach: B55 Impressum bleibt der einzige echte Blocker (wartet weiterhin auf echte Name-/Adress-/E-Mail-Angaben des Betreibers, siehe LEGAL.md). Aus dem Backlog-Review weiterhin offen (siehe `backlog-review-2026-08-03.txt`): B43 (CUSTOM_EX_DELETE räumt Kategorie nicht auf), B27 (Touch-Drag auf echtem Gerät), B66 (Toast nicht reproduzierbar, Observability wartet auf nächste Beobachtung), B173-Nebenfund (Wochen-Rec-Chip ohne Wdh-Reduzierung), VACATION_PLANS-Nebenfund aus B184 (Urlaubstage ohne Muskelgruppen-Tags), B176 (Portal-Refactor, zuletzt in Runde 10 bestätigt zurückgestellt). Bestätigte Infra-Grenze (weiterhin gültig, seit Runde 13 nicht mehr reproduziert): volle Playwright-Suite kann `npx serve` mit `EMFILE`/Dev-Server-Kontention abstürzen lassen — Workaround ist der Batch-Lauf, bei Verdacht auf Massenausfall in Isolation nachprüfen. Bekannte, wiederholt bestätigte Timing-Flakes (unabhängig von jeglichem Sprint-Code, alle bei Retry/Isolation grün): `share_image.spec.js`/`share_image_v3.spec.js` (Download-Event-Timing), `deload_volumen.spec.js` (Backup-Reminder-Toast-Overlap), `plate_calculator.spec.js` (Live-Vorschau erster Tastendruck), NEU seit Phase B: `settings_combination_smoke.spec.js` Szenario 20 (Timing unter Batch-Parallel-Last, 3x in Isolation bestätigt grün). Nicht committet: `Research/`, alle `context-exports/`-Updates + `Diagnose & Sprints/`-Exports (beide gitignored).*
+*Letzte Aktualisierung: 2026-08-04 — Runde 16 (Launch-Roadmap Phase C, Umsetzung): Settings-Restrukturierung (Ziele-Karte, 3 native Dialoge auf In-App-Panels umgestellt, Datenschutz/Impressum-Collapse vereinheitlicht), 2 seit Runde 6 tote Funktionen wiederhergestellt (edit-day-field, autofill-rpe) inkl. Entfernung einer dabei entdeckten neuen Redundanz (day-rename), 6 tote Case-Handler entfernt, train-v240 (siehe eigener Abschnitt unten, B206-B208). Davor: Launch-Roadmap Phase C, Inventar-Teil (UX-/Feature-Bestandsaufnahme, keine Umsetzung) + kleine AGENTS.md-Testkonvention-Ergänzung, train-v239. Davor: Launch-Roadmap Phase B (Stabilitäts-Baseline), train-v239. Davor: Launch-Roadmap Phase A (Verifikation), train-v238. Davor: Runde 15 (Nutzerfeedback: Tag löschen, Plate-Setting, Körper-Tab), train-v237. Davor: Runde 14 (Coach-Signal-Governance), train-v236. Davor: Runde 13 (Council-Umsetzung B62+B140), train-v235. Davor: Runde 12 (Backlog-Aufräumrunde), train-v234 (B41/B42/B58/B139-Nebenfund/B179-Nebenfund abgeschlossen). Davor: Runde 11, train-v233 (B199, Update-Banner "Später"-Button). Davor: Runde 10 komplett (Teil 1 + Teil 2), train-v232 (B191-B198, B141/B176-Abschluss). Davor: Runde-9-Audit-Folgerunde, train-v230 (B185-B190, siehe AUDIT-BERECHNUNGEN.md). Davor: Runde-8-Datenkonsistenz-Sprint, train-v229. Davor: Runde-7-Coaching-Qualitäts-Sprint, train-v228. Davor: Runde-6-Nutzerfeedback-Fix-Sprint, train-v227. Davor: Runde-5-Fix-Sprint, train-v226. Ältere Sprints siehe SESSION_LOG.md.*
+*Nächster Schritt: **Launch-Roadmap Phase C ist vollständig abgeschlossen** (Inventar + Umsetzung, siehe `Diagnose & Sprints/TRAIN-Launch-Roadmap.md` + eigener Abschnitt unten). Nächste Phase laut Roadmap: **Phase D — Stabilitäts-Re-Check**, gezielt NUR für die durch Runde 16 tatsächlich geänderten Bereiche (Settings-Tab-Struktur, Tag-Titel/-Subtitle-Bearbeitung, RPE-Autofill) — keine komplette Wiederholung von Phase B. Aus Runde 13 weiterhin offen: zwei NICHT code-seitig lösbare B62-Punkte (Rechts-Check vor Release zu Service-Worker-Caching; PWA-Installierbarkeit auf echtem Android-Gerät nach nächstem Release manuell verifizieren, siehe DECISIONS.md). Danach: B55 Impressum bleibt der einzige echte Blocker (wartet weiterhin auf echte Name-/Adress-/E-Mail-Angaben des Betreibers, siehe LEGAL.md). Aus dem Backlog-Review weiterhin offen (siehe `backlog-review-2026-08-03.txt`): B43 (CUSTOM_EX_DELETE räumt Kategorie nicht auf), B27 (Touch-Drag auf echtem Gerät), B66 (Toast nicht reproduzierbar, Observability wartet auf nächste Beobachtung), B173-Nebenfund (Wochen-Rec-Chip ohne Wdh-Reduzierung), VACATION_PLANS-Nebenfund aus B184 (Urlaubstage ohne Muskelgruppen-Tags), B176 (Portal-Refactor, zuletzt in Runde 10 bestätigt zurückgestellt). Bestätigte Infra-Grenze (weiterhin gültig, seit Runde 13 nicht mehr reproduziert): volle Playwright-Suite kann `npx serve` mit `EMFILE`/Dev-Server-Kontention abstürzen lassen — Workaround ist der Batch-Lauf, bei Verdacht auf Massenausfall in Isolation nachprüfen. Bekannte, wiederholt bestätigte Timing-Flakes (unabhängig von jeglichem Sprint-Code, alle bei Retry/Isolation grün): `share_image.spec.js`/`share_image_v3.spec.js` (Download-Event-Timing), `deload_volumen.spec.js` (Backup-Reminder-Toast-Overlap), `plate_calculator.spec.js` (Live-Vorschau erster Tastendruck), NEU seit Phase B: `settings_combination_smoke.spec.js` Szenario 20 (Timing unter Batch-Parallel-Last, 3x in Isolation bestätigt grün). Nicht committet: `Research/`, alle `context-exports/`-Updates + `Diagnose & Sprints/`-Exports (beide gitignored).*
+
+---
+
+## Runde 16 — Launch-Roadmap Phase C, Umsetzung (train-v240, 2026-08-04)
+
+Basis: `Diagnose & Sprints/TRAIN-Sprint-Prompts-Runde16.md`, aufbauend auf
+`diagnose-phase-c-inventar-2026-08-04.txt`. Zwei bereits getroffene
+Nutzer-Entscheidungen vorab: verlorene Funktionen wiederherstellen statt
+entfernen; Trainingsziel/Ernährungsphase bekommen eine eigene Settings-Karte
+(Option A — bewusst KEIN Coach-Tab-Duplikat).
+
+**Kickoff-Klärung (per git blame, nicht geraten):** `toggle-day-menu`,
+`day-edit-note` und der ursprüngliche `edit-day-field`-Trigger waren alle
+Teil derselben, in Runde 6 (B169) entfernten `renderDayCard()`-Komponente —
+die Case-Handler blieben dabei unbereinigt zurück. Cluster 2 und 3 waren
+dadurch NICHT voneinander abhängig (Cluster 2 lehnt sich an den
+ursprünglichen 2.3-Ansatz an, keine Wiederbelebung des alten Menüs).
+Zusätzlicher Fund: die offene Tagesansicht zeigte Titel/Subtitle seit B169
+gar nicht mehr an — Wiederherstellung brauchte daher einen neuen Header in
+`renderDayBody()`, nicht nur einen zurückgehängten Klick-Handler.
+
+**Cluster 1 (Settings-Restrukturierung, B206):** Trainingsziel/
+Ernährungsphase in eigene "Ziele"-Karte vor der Training-Karte verschoben.
+"Woche zurücksetzen"/"Original wiederherstellen"/"Als Vorlage speichern"
+von nativen `confirm()`/`prompt()` auf das etablierte In-App-Inline-Panel-
+Muster umgestellt (wie "Alle Daten löschen"). Datenschutz/Impressum-Collapse
+von eigenem `onclick`-Toggle auf `<details>` umgestellt, analog zum
+Deload-Faktor-Abschnitt.
+
+**Cluster 2 (tote Funktionen wiederhergestellt, B207):** `edit-day-field`
+(Tag-Titel/-Subtitle-Inline-Umbenennung) und `autofill-rpe` (Pendant zum
+weiterhin aktiven `autofill-down`) über echte, sichtbare Trigger wieder
+erreichbar gemacht — beide Reducer existierten unverändert. **Ungeplante
+Redundanz entdeckt und per Rückfrage aufgelöst:** das Wochen-Menü hatte
+bereits ein live funktionierendes "Tag umbenennen" (`day-rename`, natives
+`prompt()`, nur Titel) — entfernt zugunsten der neuen Inline-Bearbeitung
+(deckt Titel+Subtitle ab, kein natives `prompt()`), inkl. `A.DAY_RENAME`-
+Reducer (state.js). Siehe DECISIONS.md, Eintrag 2026-08-04.
+
+**Cluster 3 (toter Code entfernt, B208):** `toggle-day-menu` +
+`_dayMenuOpenKey` (komplettes System, inkl. 6 defensiver Rücksetzungen in
+anderen, weiterhin aktiven Case-Handlern + verwaiste CSS-Klasse
+`.day-menu-wrap`), `set-session-rating` (superseded durch
+Tagesabschluss-Modal), `day-edit-note` (Notizfeld bereits direkt
+editierbar), `create-week-prev`/`create-week-template` (fielen bereits auf
+`_createWeek()` durch), `set-rpe` ohne Suffix (abgelöst von `set-rpe-val`).
+
+**Tests:** 9 neue Tests (`tests/runde16_phase_c_umsetzung.spec.js`) über
+den echten Klick-Pfad (AGENTS.md-Realpfad-Regel — beide wiederhergestellten
+Funktionen waren vorher unerreichbar). 6 bestehende Tests in
+`tests/template_management.spec.js` auf die neuen Inline-Panels umgestellt,
+inkl. Regressionswächter dass native Dialoge nicht mehr feuern. Volle
+Regressionssuite (84 Spec-Dateien, gebatcht wegen EMFILE-Grenze) durchgehend
+grün, keine Nebenwirkungen gefunden.
+
+CACHE_VERSION → `train-v240`. styles.css `?v=213→214`. Launch-Roadmap
+Phase C vollständig abgeschlossen (Status-Tabelle + Abschnitt in
+`Diagnose & Sprints/TRAIN-Launch-Roadmap.md` aktualisiert).
 
 ---
 

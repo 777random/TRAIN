@@ -1,21 +1,22 @@
 # TRAIN — CLAUDE.md
 # Vollständiger Projektkontext für Claude Code
-# Stand: train-v239 / SCHEMA 33 / August 2026
-# Letztes Update: nach train-v239, Launch-Roadmap Phase C, Inventar-Teil
-# (2026-08-04) -- reine UX-/Feature-Bestandsaufnahme (KEIN Redesign, KEINE
-# Umsetzung), wartet jetzt auf Coworks Platzierungs-Entscheidungen. Settings-
-# Tab vollständig kartiert (18 Settings/4 Gruppen in einer Karte + 6
-# separate Karten), alle 4 weiteren Tabs auf gleicher Flughöhe. Hauptfund:
-# Übungs-Einstellungen (⚙️) liegen zweistufig hinter einem Kontextmenü
-# (⋮-Menü -> Einstellungen -> "Erweitert"). Systematische Redundanz-/Tote-
-# Code-Prüfung: keine neue Mehrfach-Trigger-Redundanz über "Tag löschen"
-# (B201) hinaus, aber 6 tote/verwaiste Case-Handler in ui.js identifiziert
-# (edit-day-field, autofill-rpe, toggle-day-menu/_dayMenuOpenKey voll tot;
-# set-session-rating, day-edit-note verwaist mit lebendigem Alternativpfad;
-# create-week-prev/-template harmlos tot). Bereinigung bewusst nicht Teil
-# dieses Auftrags. Separat (Teil 1): neue dauerhafte AGENTS.md-Testkonvention
-# "echte Interaktionspfade für Validierungs-/Gatekeeper-Logik", abgeleitet
-# aus B202+B205. Siehe HANDOFF.md für Details.
+# Stand: train-v240 / SCHEMA 33 / August 2026
+# Letztes Update: nach train-v240, Runde 16 (Launch-Roadmap Phase C,
+# Umsetzung, 2026-08-04) -- B206: Settings-Tab restrukturiert (Trainingsziel/
+# Ernährungsphase in eigener "Ziele"-Karte, "Woche zurücksetzen"/"Original
+# wiederherstellen"/"Als Vorlage speichern" von nativen confirm()/prompt()
+# auf In-App-Inline-Panels umgestellt, Datenschutz/Impressum-Collapse auf
+# <details> vereinheitlicht). B207: zwei seit Runde 6 (B169) tote Funktionen
+# wiederhergestellt (edit-day-field: Tag-Titel/-Subtitle-Inline-Umbenennung;
+# autofill-rpe: Pendant zum aktiven autofill-down) -- dabei eine NEUE,
+# ungeplante Redundanz entdeckt (Wochen-Menü hatte bereits ein live
+# "Tag umbenennen" per prompt()) und per Rückfrage entfernt zugunsten der
+# Inline-Bearbeitung. B208: 6 tote Case-Handler in ui.js entfernt
+# (toggle-day-menu-System, set-session-rating, day-edit-note,
+# create-week-prev/-template, set-rpe). 9 neue Real-Path-Tests +
+# 6 aktualisierte Tests, volle Suite grün. Siehe HANDOFF.md für Details.
+# Davor train-v239, Launch-Roadmap Phase C, Inventar-Teil (2026-08-04) --
+# reine UX-/Feature-Bestandsaufnahme, siehe HANDOFF.md.
 # Davor train-v239, Launch-Roadmap Phase B (2026-08-04) —
 # 25 Stabilitäts-Testszenarien (7 Kategorien, von Claude Cowork) gegen den
 # aktuellen Code-Stand geprüft (Baseline vor dem Phase-C-Redesign). 1

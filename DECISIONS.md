@@ -993,3 +993,20 @@ Datei-Upload-Validierung) je ausübte.
 **Gilt:** Permanent, für jeden neuen Sprint mit Klick-Handlern oder
 Import-/Restore-Validierung. Direkt-injizierende Tests bleiben für alles
 andere weiterhin das richtige Werkzeug.
+
+### 2026-08-04 — Runde 16: "Tag umbenennen" im Wochen-Menü entfernt zugunsten der wiederhergestellten Inline-Bearbeitung (B207)
+**Entscheidung:** Der Wochen-Menü-Eintrag "✏️ Tag umbenennen" (`day-rename`,
+natives `prompt()`, nur Titel) wurde entfernt, inklusive des dedizierten
+`A.DAY_RENAME`-Reducers (state.js) — die im selben Sprint wiederhergestellte
+Inline-Bearbeitung (`edit-day-field`) deckt Titel UND Subtitle ab, ohne
+natives `prompt()`.
+**Begründung:** Beim Entfernen des toten `toggle-day-menu`-Systems (Cluster
+3) wurde entdeckt, dass `day-rename` im WOCHEN-Menü (separates, weiterhin
+aktives System) bereits eine live funktionierende Tag-Umbenennung war — das
+Wiederherstellen von `edit-day-field` (Cluster 2) hätte dadurch eine neue,
+im Phase-C-Inventar noch nicht existente Zwei-Implementierungen-Redundanz
+geschaffen (analog zum "Tag löschen"-Präzedenzfall, B201). Per Rückfrage
+entschieden, statt beide Pfade stillschweigend nebeneinander zu behalten.
+**Gilt:** Präzedenzfall für zukünftige Funktions-Wiederherstellungen — vor
+dem Wiederbeleben eines toten Triggers immer prüfen, ob in der Zwischenzeit
+ein LIVE, unabhängiger Ersatzpfad für dieselbe Funktion entstanden ist.

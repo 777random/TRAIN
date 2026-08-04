@@ -140,8 +140,17 @@ let _removeDayConfirmKey = null;
 /** Key of the exercise with the open remove-confirm panel: `${di}-${ei}` or null. */
 let _removeExConfirmKey = null;
 
-/** Whether the "Alle Daten löschen" confirm panel (Settings-Tab, Abschnitt "Deine Daten") offen ist. */
+/** Whether die "Alle Daten löschen" confirm panel (Settings-Tab, Abschnitt "Deine Daten") offen ist. */
 let _deleteAllDataConfirmOpen = false;
+
+/** Whether das "Woche zurücksetzen"-Inline-Confirm-Panel (Settings-Tab, Abschnitt "Vorlagen") offen ist. Runde 16: ersetzt natives confirm(). */
+let _resetToTplConfirmOpen = false;
+
+/** Whether das "Original wiederherstellen"-Inline-Confirm-Panel (Settings-Tab, Abschnitt "Vorlagen") offen ist. Runde 16: ersetzt natives confirm(). */
+let _resetFactoryConfirmOpen = false;
+
+/** Whether das Inline-Textfeld für "Als Vorlage speichern" (Settings-Tab, Abschnitt "Vorlagen") offen ist. Runde 16: ersetzt natives prompt(). */
+let _savingTemplateOpen = false;
 
 /** Pending auto-evaluation after blur (cancelled if user manually confirms/fails before setTimeout fires). */
 let _pendingAutoEval = null;
@@ -156,9 +165,6 @@ let _exNoteActiveTab = 'heute';
 
 /** B125: Key der Übung, für die der "Zu anderem Tag verschieben"-Dialog vorbereitet wird: `${di}-${ei}` oder null. */
 let _moveExDayKey = null;
-
-/** Index of the day whose ⋮ context menu is open: String(di) or null. */
-let _dayMenuOpenKey = null;
 
 /** Whether the week-level ⋮ menu is open. */
 let _weekMenuOpen = false;
@@ -977,9 +983,6 @@ function renderDayList(state) {
           data-action="toggle-day-vacation" data-di="${_activeDayIdx}">
           🏖 Urlaubstag${_ad.isVacation ? ' ✓' : ''}
         </button>
-        <button class="ex-menu-item" role="menuitem" data-action="day-rename" data-di="${_activeDayIdx}">
-          ✏️ Tag umbenennen
-        </button>
         <button class="ex-menu-item" role="menuitem" data-action="day-duplicate" data-di="${_activeDayIdx}">
           📋 Tag duplizieren
         </button>
@@ -1709,6 +1712,29 @@ function renderDayBody(wk, di, state) {
   const locked   = !!day.locked;
   const done     = !!day.markedDone;
   const isVacDay = !!day.isVacation;
+  const isDl     = wk.mode === 'deload';
+
+  // Runde 16 (Phase-C-Cluster-2a): Titel/Subtitle-Header wiederhergestellt.
+  // Seit B169 (Runde 6, train-v227) zeigte die offene Tagesansicht
+  // day.title/day.subtitle gar nicht mehr an -- die alte renderDayCard()
+  // wurde als toter Code entfernt, dabei ging auch die einzige Stelle
+  // verloren, an der Titel/Subtitle innerhalb der offenen Ansicht sichtbar
+  // waren. 2.3-Inline-Edit-Muster (data-action="edit-day-field",
+  // Case-Handler bereits vorhanden) fortgeführt statt neu erfunden.
+  const titleBlock = `
+<div class="day-body-header">
+  <div class="day-card__title day-editable-wrap">
+    <span class="day-editable" data-action="edit-day-field" data-di="${di}" data-field="title"
+      aria-label="${h(day.title)} bearbeiten"
+    >${h(day.title)}</span>
+    ${isDl ? '<span class="deload-badge">Deload</span>' : ''}
+  </div>
+  <div class="day-card__subtitle day-editable-wrap">
+    <span class="day-editable" data-action="edit-day-field" data-di="${di}" data-field="subtitle"
+      aria-label="${h(day.subtitle || 'Schwerpunkt')} bearbeiten"
+    >${day.subtitle ? h(day.subtitle) : '<span class="day-subtitle-placeholder">Schwerpunkt …</span>'}</span>
+  </div>
+</div>`;
 
   const exHtml       = day.exercises.map((ex, ei) => ex.archived ? '' : renderExercise(wk, di, ei, state)).join('');
   const lockBtnLabel = done ? 'Tag entsperren' : 'Tag als abgeschlossen markieren und sperren';
@@ -1818,6 +1844,7 @@ function renderDayBody(wk, di, state) {
   }
 
   return `
+    ${titleBlock}
     ${_renderRitualAnchor(state, wk, di)}
     ${isVacDay ? '<div class="day-vacation-banner">🏖 Urlaubstag — unterbricht deinen Trainingsrhythmus nicht</div>' : ''}
     ${sessionCoachHtml}
@@ -2838,6 +2865,13 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
             aria-label="RPE für Satz ${si + 1}: ${label}. Tippen zum Auswählen."
             aria-expanded="${isOpen}"
           >${label}</button>
+          ${hasAutofill && cur !== null ? `
+          <button
+            type="button"
+            class="btn-autofill"
+            data-action="autofill-rpe" data-di="${di}" data-ei="${ei}" data-si="${si}"
+            aria-label="RPE ${cur} von Satz ${si + 1} auf den nächsten Satz übernehmen"
+          >${ic.autofillDown()}</button>` : ''}
           ${isOpen ? `<div class="rpe-popover">
             <div class="rpe-popover__grid">
               ${['–', 6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10].map(v => {
@@ -5074,21 +5108,17 @@ function renderSettingsTab(state) {
   const curMaxMs  = s.maxSessionMs ?? 10800000;
 
   container.innerHTML = `
-  <!-- Training (B3: in 4 Zwischenüberschriften gegliedert, siehe HANDOFF.md/BUGS.md B113 —
-       eine Karte bleibt erhalten, kein Trennstrich zwischen den Gruppen, nur Whitespace) -->
+  <!-- Ziele (Runde 16: Trainingsziel/Ernährungsphase aus der langen Training-
+       Gruppe herausgelöst -- laut Phase-C-Inventar die beiden regelmäßig
+       geänderten Werte, verdient eine eigene, prominente Karte statt zwischen
+       16 überwiegend einmaligen Settings zu stehen. Bewusst KEIN Duplikat im
+       Coach-Tab, siehe Runde-16-Entscheidung -- nur ein Deep-Link. ) -->
   <div class="settings-section">
-    <div class="settings-group-title">Training</div>
-    ${tog('sessionCoach', 'Session Coach', 'Echtzeit-Feedback während des Trainings (Pre-Session Check-in + Briefing)')}
-    ${tog('rpeEnabled', 'RPE anzeigen', 'Rate of Perceived Exertion — Anstrengungsgrad pro Satz')}
-    ${tog('autoEval', 'Automatische Satz-Bewertung', 'Satz wird bewertet sobald du die Wdh-Zahl einträgst und das Feld verlässt.')}
-    ${tog('autoStartPauseTimer', 'Pausentimer automatisch', 'Timer startet automatisch nach jedem bestätigten Satz (außer dem letzten)')}
-    ${tog('hideStopwatch', 'Stoppuhr ausblenden', 'Session-Timer oben in der Toolbar verstecken')}
-    ${tog('vibrationEnabled', 'Vibration nach Pause', 'Funktioniert nur auf Android — iOS unterstützt Vibration in PWAs technisch nicht.')}
-    ${tog('swipe', 'Swipe-Navigation', 'Wischen zum Wochenwechsel')}
+    <div class="settings-section__title">Ziele</div>
     <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:var(--sp-2)">
       <div>
         <div class="settings-row__label">Trainingsziel</div>
-        <div class="settings-row__desc">Bestimmt die empfohlene Pausendauer im Session Coach, sobald ein Satz mit RPE bewertet wurde (Sprint C1) — ohne RPE bzw. bei deaktiviertem Session Coach gilt die feste Pausenzeit der jeweiligen Übung (⚙️ Übungseinstellungen)</div>
+        <div class="settings-row__desc">Bestimmt die empfohlene Pausendauer im Session Coach, sobald ein Satz mit RPE bewertet wurde (Sprint C1) — ohne RPE bzw. bei deaktiviertem Session Coach gilt die feste Pausenzeit der jeweiligen Übung. <button type="button" class="settings-row__inline-link" data-action="goto-ex-settings">⚙️ zu den Übungseinstellungen →</button></div>
       </div>
       <div class="weight-step-opts">
         ${[['kraftaufbau', 'Stärker werden'], ['muskelaufbau', 'Mehr Muskeln'], ['fitness', 'Fitter werden']].map(([val, label]) => `
@@ -5113,6 +5143,19 @@ function renderSettingsTab(state) {
           >${label}</button>`).join('')}
       </div>
     </div>
+  </div>
+
+  <!-- Training (B3: in 4 Zwischenüberschriften gegliedert, siehe HANDOFF.md/BUGS.md B113 —
+       eine Karte bleibt erhalten, kein Trennstrich zwischen den Gruppen, nur Whitespace) -->
+  <div class="settings-section">
+    <div class="settings-group-title">Training</div>
+    ${tog('sessionCoach', 'Session Coach', 'Echtzeit-Feedback während des Trainings (Pre-Session Check-in + Briefing)')}
+    ${tog('rpeEnabled', 'RPE anzeigen', 'Rate of Perceived Exertion — Anstrengungsgrad pro Satz')}
+    ${tog('autoEval', 'Automatische Satz-Bewertung', 'Satz wird bewertet sobald du die Wdh-Zahl einträgst und das Feld verlässt.')}
+    ${tog('autoStartPauseTimer', 'Pausentimer automatisch', 'Timer startet automatisch nach jedem bestätigten Satz (außer dem letzten)')}
+    ${tog('hideStopwatch', 'Stoppuhr ausblenden', 'Session-Timer oben in der Toolbar verstecken')}
+    ${tog('vibrationEnabled', 'Vibration nach Pause', 'Funktioniert nur auf Android — iOS unterstützt Vibration in PWAs technisch nicht.')}
+    ${tog('swipe', 'Swipe-Navigation', 'Wischen zum Wochenwechsel')}
     <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:var(--sp-2)">
       <div>
         <div class="settings-row__label">Max. Sitzungsdauer</div>
@@ -5333,6 +5376,14 @@ function renderSettingsTab(state) {
       </div>
       <div class="settings-row__action">${ic.chevronRight()}</div>
     </div>
+    ${_resetToTplConfirmOpen ? `
+    <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:var(--sp-3)">
+      <p style="font-size:13px;color:var(--c-text-2);margin:0">Aktuelle Woche mit Custom-Template überschreiben?</p>
+      <div style="display:flex;gap:var(--sp-2);justify-content:center">
+        <button class="btn btn--danger btn--sm" data-action="confirm-reset-to-tpl">Überschreiben</button>
+        <button class="btn btn--sm" data-action="cancel-reset-to-tpl">Abbrechen</button>
+      </div>
+    </div>` : ''}
     <div class="settings-row settings-row--clickable" data-action="save-named-template">
       <div>
         <div class="settings-row__label">${ic.plus()} Aktuelle Woche als Vorlage speichern</div>
@@ -5340,6 +5391,19 @@ function renderSettingsTab(state) {
       </div>
       <div class="settings-row__action">${ic.chevronRight()}</div>
     </div>
+    ${_savingTemplateOpen ? `
+    <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:var(--sp-3)">
+      <div style="display:flex;align-items:center;gap:var(--sp-2)">
+        <input class="body-input" type="text" maxlength="60" placeholder="Name der Vorlage"
+          data-action="save-named-template-name" style="flex:1"
+          aria-label="Name für diese Vorlage"
+        />
+      </div>
+      <div style="display:flex;gap:var(--sp-2);justify-content:center">
+        <button class="btn btn--accent btn--sm" data-action="confirm-save-named-template">Speichern</button>
+        <button class="btn btn--sm" data-action="cancel-save-named-template">Abbrechen</button>
+      </div>
+    </div>` : ''}
     ${(state.templates ?? []).length > 0 ? `
     <div class="settings-row__label" style="padding:8px 16px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--c-text-3)">Gespeicherte Vorlagen</div>
     ${state.templates.map((t, i) => `
@@ -5356,6 +5420,14 @@ function renderSettingsTab(state) {
       </div>
       <div class="settings-row__action">${ic.chevronRight()}</div>
     </div>
+    ${_resetFactoryConfirmOpen ? `
+    <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:var(--sp-3)">
+      <p style="font-size:13px;color:var(--c-text-2);margin:0">Custom-Template auf Werkseinstellung zurücksetzen?</p>
+      <div style="display:flex;gap:var(--sp-2);justify-content:center">
+        <button class="btn btn--danger btn--sm" data-action="confirm-reset-factory">Zurücksetzen</button>
+        <button class="btn btn--sm" data-action="cancel-reset-factory">Abbrechen</button>
+      </div>
+    </div>` : ''}
   </div>
 
   <!-- CSV-Export (Erweitert) -->
@@ -5405,12 +5477,10 @@ function renderSettingsTab(state) {
         <div class="settings-row__desc">Bug gefunden oder Idee? <a href="mailto:DEINE-EMAIL@beispiel.de?subject=TRAIN%20Feedback" style="color:var(--c-accent)">Schreib mir</a></div>
       </div>
     </div>
-    <div class="session-note-block">
-      <button class="session-note-toggle" onclick="this.nextElementSibling.classList.toggle('is-open'); this.classList.toggle('is-expanded')">
-        <span>Datenschutz</span>
-      </button>
-      <div class="session-note-body">
-        <div class="settings-row__desc" style="padding:var(--sp-2) 0">
+    <details class="deload-details">
+      <summary class="deload-details__summary">Datenschutz</summary>
+      <div class="deload-details__body">
+        <div class="settings-row__desc">
           <strong>Kurz gesagt:</strong> Deine Trainingsdaten bleiben
           ausschließlich auf deinem Gerät — TRAIN hat kein Konto, keinen
           Server und überträgt deine Workout-Daten nie an irgendwen.<br><br>
@@ -5476,13 +5546,11 @@ function renderSettingsTab(state) {
           echten Angaben ausgefüllt ist.</span>
         </div>
       </div>
-    </div>
-    <div class="session-note-block">
-      <button class="session-note-toggle" onclick="this.nextElementSibling.classList.toggle('is-open'); this.classList.toggle('is-expanded')">
-        <span>Impressum</span>
-      </button>
-      <div class="session-note-body">
-        <div class="settings-row__desc" style="padding:var(--sp-2) 0">
+    </details>
+    <details class="deload-details">
+      <summary class="deload-details__summary">Impressum</summary>
+      <div class="deload-details__body">
+        <div class="settings-row__desc">
           Angaben gemäß § 5 TMG/DDG:<br><br>
           [DEIN VOLLER NAME]<br>
           [DEINE STRASSE UND HAUSNUMMER]<br>
@@ -5502,7 +5570,7 @@ function renderSettingsTab(state) {
           MStV), siehe LEGAL.md.</span>
         </div>
       </div>
-    </div>
+    </details>
   </div>`;
 }
 
@@ -5614,12 +5682,6 @@ function _handleClick(e) {
     scheduleRender();
   }
 
-  // Close day ⋮ menu when clicking outside the toggle button
-  if (_dayMenuOpenKey !== null && !e.target.closest('[data-action="toggle-day-menu"]')) {
-    _dayMenuOpenKey = null;
-    scheduleRender();
-  }
-
   // Close week ⋮ menu (Timer-Höhe, day-tab-bar__toolbar) when clicking
   // outside the toggle button — Fix 3, train-v106. Selecting an item also
   // closes it via this same check, same pattern as the ex-/day-menu above.
@@ -5726,15 +5788,6 @@ function _handleClick(e) {
       break;
     }
 
-    // ── Session rating / fatigue indicator (3.5) ───────────────────────────
-    case 'set-session-rating': {
-      const cur = getState().weeks[getState().curIdx]?.days?.[+el.dataset.di]?.sessionRating;
-      const val = +el.dataset.val;
-      // Toggle off if clicking the already-selected rating
-      dispatch(A.DAY_SET_FIELD, { di: +el.dataset.di, field: 'sessionRating', value: cur === val ? null : val });
-      break;
-    }
-
     case 'overview-open-day': {
       _overviewMode  = false;
       _activeDayIdx  = +el.dataset.di;
@@ -5747,6 +5800,15 @@ function _handleClick(e) {
     // ── TRAIN logo home button (5.1) ───────────────────────────────────────
     case 'go-home':
       _switchToTab('workout');
+      break;
+
+    // Runde 16 (Phase-C-Cross-Reference-Fix): Deep-Link von der Settings-
+    // "Ziele"-Karte zu den Übungseinstellungen -- kein direktes Springen zu
+    // einer bestimmten Übung möglich (keine "aktuelle Übung" im Settings-
+    // Kontext), daher pragmatisch nur der Tab-Wechsel.
+    case 'goto-ex-settings':
+      _switchToTab('workout');
+      showToast('⚙️ bei der jeweiligen Übung öffnen', 'info');
       break;
 
     // ── Week navigation ────────────────────────────────────────────────────
@@ -5828,12 +5890,10 @@ function _handleClick(e) {
       const _di  = +di;
       const _day = getState().weeks[getState().curIdx]?.days[_di];
       if (_day?.isVacation) {
-        _dayMenuOpenKey = null;
         _weekMenuOpen = false;
         dispatch(A.DAY_TOGGLE_VACATION, { di: _di });
       } else {
         _maybeShowTip('tip-09', 'Urlaubstage unterbrechen deinen Trainingsrhythmus nicht. Markiere sie damit TRAIN deine Analyse korrekt berechnet.');
-        _dayMenuOpenKey = null;
         _weekMenuOpen = false;
         scheduleRender();
         _showVacationPlanModal(_di);
@@ -5892,8 +5952,6 @@ function _handleClick(e) {
     }
 
     case 'create-week':
-    case 'create-week-prev':
-    case 'create-week-template':
       _createWeek(); break;
 
     case 'confirm-delete-week':
@@ -6267,7 +6325,6 @@ function _handleClick(e) {
       // "Trainingstage verwalten") gerendert -- gleiche Aktion, zwei Trigger-Orte.
       const _di = +el.dataset.di;
       _removeDayConfirmKey = String(_di);
-      _dayMenuOpenKey = null;
       _weekMenuOpen = false;
       scheduleRender();
       break;
@@ -6573,27 +6630,8 @@ function _handleClick(e) {
       break;
     }
 
-    case 'toggle-day-menu': {
-      _dayMenuOpenKey = _dayMenuOpenKey === di ? null : di;
-      scheduleRender();
-      break;
-    }
-
-    case 'day-rename': {
-      const _rDay = getState().weeks[getState().curIdx]?.days[+di];
-      const _newTitle = prompt('Tag umbenennen (max. 20 Zeichen):', _rDay?.title ?? '');
-      if (_newTitle === null) break;
-      const _trimmed = _newTitle.trim().slice(0, 20);
-      if (!_trimmed) break;
-      dispatch(A.DAY_RENAME, { di: +di, title: _trimmed });
-      _dayMenuOpenKey = null;
-      _weekMenuOpen = false;
-      break;
-    }
-
     case 'day-duplicate': {
       dispatch(A.DAY_DUPLICATE, { di: +di });
-      _dayMenuOpenKey = null;
       _weekMenuOpen = false;
       showToast('Tag dupliziert — Undo möglich', 'info');
       if (_activeTab === 'settings') renderSettingsTab(getState());
@@ -6604,21 +6642,8 @@ function _handleClick(e) {
       const _rsDay = getState().weeks[getState().curIdx]?.days[+di];
       if (!confirm(`Alle Sätze von "${_rsDay?.title ?? 'Tag'}" zurücksetzen? Wdh/RPE/Status werden gelöscht, Gewichte bleiben erhalten.`)) break;
       dispatch(A.DAY_RESET_SETS, { di: +di });
-      _dayMenuOpenKey = null;
       _weekMenuOpen = false;
       showToast('Sätze zurückgesetzt — Undo möglich', 'info');
-      break;
-    }
-
-    case 'day-edit-note': {
-      _dayMenuOpenKey = null;
-      _activeDayIdx = +di;
-      scheduleRender();
-      setTimeout(() => {
-        const _noteArea = document.querySelector(`[data-action="day-field"][data-di="${di}"][data-field="sessionNote"]`);
-        _noteArea?.focus();
-        _noteArea?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }, 80);
       break;
     }
 
@@ -7166,17 +7191,41 @@ function _handleClick(e) {
       openModal('modal-template'); break;
 
     case 'reset-to-tpl':
-      if (confirm('Aktuelle Woche mit Custom-Template überschreiben?')) {
-        dispatch(A.WEEK_RESET_TO_TPL, {});
-        showToast('Woche zurückgesetzt ✓', 'ok');
-      }
+      // Runde 16 (Phase-C-Cluster-1b): natives confirm() ersetzt durch
+      // Inline-Panel-Muster, analog 'delete-all-data'.
+      _resetToTplConfirmOpen = true;
+      if (_activeTab === 'settings') renderSettingsTab(getState());
+      break;
+
+    case 'confirm-reset-to-tpl':
+      _resetToTplConfirmOpen = false;
+      dispatch(A.WEEK_RESET_TO_TPL, {});
+      showToast('Woche zurückgesetzt ✓', 'ok');
+      if (_activeTab === 'settings') renderSettingsTab(getState());
+      break;
+
+    case 'cancel-reset-to-tpl':
+      _resetToTplConfirmOpen = false;
+      if (_activeTab === 'settings') renderSettingsTab(getState());
       break;
 
     case 'reset-factory':
-      if (confirm('Custom-Template auf Werkseinstellung zurücksetzen?')) {
-        dispatch(A.TPL_RESET_TO_FACTORY, {});
-        showToast('Original-Template wiederhergestellt ✓', 'ok');
-      }
+      // Runde 16 (Phase-C-Cluster-1b): natives confirm() ersetzt durch
+      // Inline-Panel-Muster, analog 'delete-all-data'.
+      _resetFactoryConfirmOpen = true;
+      if (_activeTab === 'settings') renderSettingsTab(getState());
+      break;
+
+    case 'confirm-reset-factory':
+      _resetFactoryConfirmOpen = false;
+      dispatch(A.TPL_RESET_TO_FACTORY, {});
+      showToast('Original-Template wiederhergestellt ✓', 'ok');
+      if (_activeTab === 'settings') renderSettingsTab(getState());
+      break;
+
+    case 'cancel-reset-factory':
+      _resetFactoryConfirmOpen = false;
+      if (_activeTab === 'settings') renderSettingsTab(getState());
       break;
 
     case 'delete-all-data':
@@ -7200,15 +7249,35 @@ function _handleClick(e) {
       break;
 
     // Named templates (3.4)
-    case 'save-named-template': {
-      const name = prompt('Name für diese Vorlage:');
-      if (!name?.trim()) break;
+    case 'save-named-template':
+      // Runde 16 (Phase-C-Cluster-1b): natives prompt() ersetzt durch
+      // Inline-Textfeld, analog 'set-deload-factor-custom' (echte
+      // Texteingabe statt reinem Confirm, daher eigenes Pattern).
+      _savingTemplateOpen = true;
+      if (_activeTab === 'settings') renderSettingsTab(getState());
+      setTimeout(() => {
+        const inp = document.querySelector('[data-action="save-named-template-name"]');
+        inp?.focus();
+      }, 30);
+      break;
+
+    case 'confirm-save-named-template': {
+      const inp  = document.querySelector('[data-action="save-named-template-name"]');
+      const name = inp?.value ?? '';
+      if (!name.trim()) break;
       const wk = getState().weeks[getState().curIdx];
       if (!wk) break;
       dispatch(A.TEMPLATE_ADD, { name: name.trim(), days: wk.days });
       showToast(`Vorlage "${name.trim()}" gespeichert ✓`, 'ok');
+      _savingTemplateOpen = false;
+      if (_activeTab === 'settings') renderSettingsTab(getState());
       break;
     }
+
+    case 'cancel-save-named-template':
+      _savingTemplateOpen = false;
+      if (_activeTab === 'settings') renderSettingsTab(getState());
+      break;
 
     case 'delete-named-template': {
       const id = +el.dataset.tplId;
@@ -7613,8 +7682,6 @@ function _handleChange(e) {
       dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'weight', value: el.value }); break;
     case 'set-reps':
       dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'reps',   value: el.value }); break;
-    case 'set-rpe':
-      dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'rpe',    value: el.value }); break;
     case 'set-note':   dispatch(A.SET_UPDATE, { di:+di, ei:+ei, si:+si, field:'note',   value: el.value }); break;
     case 'ex-note-heute':
       dispatch(A.EX_UPDATE, { di: +di, ei: +ei, field: 'note', value: el.value }); break;
@@ -8429,15 +8496,6 @@ function _positionFloating() {
       dropdown.style.right = `${window.innerWidth - r.right}px`;
     }
   }
-  if (_dayMenuOpenKey !== null) {
-    const btn = document.querySelector(`[data-action="toggle-day-menu"][data-di="${_dayMenuOpenKey}"]`);
-    const dropdown = btn?.closest('.day-menu-wrap')?.querySelector('.ex-menu-dropdown');
-    if (btn && dropdown) {
-      const r = btn.getBoundingClientRect();
-      dropdown.style.top   = `${r.bottom + 2}px`;
-      dropdown.style.right = `${window.innerWidth - r.right}px`;
-    }
-  }
   if (_weekMenuOpen) {
     const btn = document.querySelector('[data-action="toggle-week-menu"]');
     const dropdown = btn?.closest('.week-menu-wrap')?.querySelector('.ex-menu-dropdown');
@@ -8773,9 +8831,8 @@ export function mountApp(root) {
 
   // Close floating menus/pickers when user scrolls the day panel
   root.addEventListener('scroll', () => {
-    if (_exMenuOpenKey || _dayMenuOpenKey || _kgPickerKey || _repsPickerKey) {
+    if (_exMenuOpenKey || _kgPickerKey || _repsPickerKey) {
       _exMenuOpenKey  = null;
-      _dayMenuOpenKey = null;
       _kgPickerKey    = null;
       _repsPickerKey  = null;
       scheduleRender();

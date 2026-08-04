@@ -5,14 +5,14 @@ import { test, expect } from '@playwright/test';
 // "Woche zuruecksetzen", "Original wiederherstellen"), die dort wegen des
 // damaligen nativen-confirm()-Blockers vorsichtshalber uebersprungen wurden.
 //
-// Korrektur zur urspruenglichen Annahme (siehe diagnose-runde6-2026-08-02.txt):
-// B154 hat nur remove-day/remove-ex/delete-all-data auf In-App-Panels
-// umgestellt. "Woche zuruecksetzen" (reset-to-tpl) und "Original
-// wiederherstellen" (reset-factory) nutzen weiterhin natives confirm() —
-// hier direkt ueber page.on('dialog', ...) getestet (Muster wie in
-// intra_session_coach.spec.js), keine Produktivcode-Aenderung noetig.
-// "Standard-Template bearbeiten" hat nie einen Dialog gehabt. "Woche als
-// Vorlage speichern" nutzt ein natives prompt() (dialog.accept(text)).
+// Update Runde 16 (Phase-C-Cluster-1b): "Woche zuruecksetzen"
+// (reset-to-tpl), "Original wiederherstellen" (reset-factory) und "Woche
+// als Vorlage speichern" (save-named-template) nutzten bis dahin native
+// confirm()/prompt()-Dialoge -- jetzt auf dasselbe In-App-Inline-Panel-
+// Muster umgestellt wie "Alle Daten loeschen"/"Tag entfernen". Tests unten
+// entsprechend auf echte Klicks auf die Inline-Panels umgestellt, inkl.
+// page.on('dialog', ...)-Regressionswaechter (darf nie feuern).
+// "Standard-Template bearbeiten" hatte nie einen Dialog.
 
 const CUSTOM_TEMPLATE = [
   {
@@ -108,15 +108,20 @@ test('Standard-Template bearbeiten: Saetze-Anzahl wird beim Speichern auf 8 gekl
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
 });
 
-// ─── 2. Woche als Vorlage speichern (natives prompt()) ─────────────────────
+// ─── 2. Woche als Vorlage speichern (Runde 16: Inline-Textfeld statt prompt()) ─
 
-test('Woche als Vorlage speichern: Prompt mit Namen bestaetigen legt Vorlage an (Happy Path)', async ({ page }) => {
+test('Woche als Vorlage speichern: Name eingeben + Speichern legt Vorlage an (Happy Path)', async ({ page }) => {
   const pageErrors = [];
+  const unexpectedDialogs = [];
   page.on('pageerror', err => pageErrors.push(err.message));
-  page.on('dialog', dialog => dialog.accept('Mein Split'));
+  page.on('dialog', dialog => { unexpectedDialogs.push(dialog.message()); dialog.dismiss(); });
   await seed(page);
 
   await page.click('[data-action="save-named-template"]');
+  const nameInput = page.locator('[data-action="save-named-template-name"]');
+  await expect(nameInput).toBeVisible({ timeout: 3000 });
+  await nameInput.fill('Mein Split');
+  await page.click('[data-action="confirm-save-named-template"]');
   await page.waitForTimeout(150);
 
   const st = await page.evaluate(() => JSON.parse(localStorage.getItem('train_v6')));
@@ -124,16 +129,35 @@ test('Woche als Vorlage speichern: Prompt mit Namen bestaetigen legt Vorlage an 
   expect(st.templates[0].name).toBe('Mein Split');
   expect(st.templates[0].days[0].exercises[0].name).toBe('Bankdruecken');
 
+  expect(unexpectedDialogs, unexpectedDialogs.join('; ')).toHaveLength(0);
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
 });
 
-test('Woche als Vorlage speichern: abgebrochener Prompt legt keine Vorlage an (Edge Case)', async ({ page }) => {
+test('Woche als Vorlage speichern: Abbrechen im Inline-Panel legt keine Vorlage an (Edge Case)', async ({ page }) => {
   const pageErrors = [];
   page.on('pageerror', err => pageErrors.push(err.message));
-  page.on('dialog', dialog => dialog.dismiss());
   await seed(page);
 
   await page.click('[data-action="save-named-template"]');
+  const nameInput = page.locator('[data-action="save-named-template-name"]');
+  await expect(nameInput).toBeVisible({ timeout: 3000 });
+  await nameInput.fill('Wird verworfen');
+  await page.click('[data-action="cancel-save-named-template"]');
+  await expect(page.locator('[data-action="save-named-template-name"]')).toHaveCount(0);
+
+  const st = await page.evaluate(() => JSON.parse(localStorage.getItem('train_v6')));
+  expect(st.templates).toHaveLength(0);
+
+  expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});
+
+test('Woche als Vorlage speichern: leerer Name legt keine Vorlage an (Edge Case)', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', err => pageErrors.push(err.message));
+  await seed(page);
+
+  await page.click('[data-action="save-named-template"]');
+  await page.click('[data-action="confirm-save-named-template"]');
   await page.waitForTimeout(150);
 
   const st = await page.evaluate(() => JSON.parse(localStorage.getItem('train_v6')));
@@ -142,16 +166,18 @@ test('Woche als Vorlage speichern: abgebrochener Prompt legt keine Vorlage an (E
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
 });
 
-// ─── 3. Woche zuruecksetzen (natives confirm(), von B154 NICHT konvertiert) ─
+// ─── 3. Woche zuruecksetzen (Runde 16: Inline-Panel statt nativem confirm()) ─
 
-test('Woche zuruecksetzen: Bestaetigen ueberschreibt die Woche mit dem Custom-Template (Happy Path)', async ({ page }) => {
+test('Woche zuruecksetzen: Bestaetigen im Inline-Panel ueberschreibt die Woche mit dem Custom-Template (Happy Path)', async ({ page }) => {
   const pageErrors = [];
   const unexpectedDialogs = [];
   page.on('pageerror', err => pageErrors.push(err.message));
-  page.on('dialog', dialog => { unexpectedDialogs.push(dialog.message()); dialog.accept(); });
+  page.on('dialog', dialog => { unexpectedDialogs.push(dialog.message()); dialog.dismiss(); });
   await seed(page, { weekOverrides: { locked: true, markedDone: true } });
 
   await page.click('[data-action="reset-to-tpl"]');
+  await expect(page.locator('[data-action="confirm-reset-to-tpl"]')).toBeVisible({ timeout: 3000 });
+  await page.click('[data-action="confirm-reset-to-tpl"]');
   await page.waitForTimeout(150);
 
   const st = await page.evaluate(() => JSON.parse(localStorage.getItem('train_v6')));
@@ -162,18 +188,19 @@ test('Woche zuruecksetzen: Bestaetigen ueberschreibt die Woche mit dem Custom-Te
   expect(day.exercises[0].sets[0].status).toBe('pending');
   expect(day.exercises[0].sets[0].done).toBe(false);
 
-  expect(unexpectedDialogs).toHaveLength(1); // erwarteter natives confirm()
+  expect(unexpectedDialogs, unexpectedDialogs.join('; ')).toHaveLength(0); // kein natives confirm() mehr
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
 });
 
-test('Woche zuruecksetzen: Abbrechen im nativen Dialog laesst die Woche unangetastet (Edge Case)', async ({ page }) => {
+test('Woche zuruecksetzen: Abbrechen im Inline-Panel laesst die Woche unangetastet (Edge Case)', async ({ page }) => {
   const pageErrors = [];
   page.on('pageerror', err => pageErrors.push(err.message));
-  page.on('dialog', dialog => dialog.dismiss());
   await seed(page, { weekOverrides: { locked: true, markedDone: true } });
 
   await page.click('[data-action="reset-to-tpl"]');
-  await page.waitForTimeout(150);
+  await expect(page.locator('[data-action="confirm-reset-to-tpl"]')).toBeVisible({ timeout: 3000 });
+  await page.click('[data-action="cancel-reset-to-tpl"]');
+  await expect(page.locator('[data-action="confirm-reset-to-tpl"]')).toHaveCount(0);
 
   const st = await page.evaluate(() => JSON.parse(localStorage.getItem('train_v6')));
   const day = st.weeks[0].days[0];
@@ -185,34 +212,37 @@ test('Woche zuruecksetzen: Abbrechen im nativen Dialog laesst die Woche unangeta
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
 });
 
-// ─── 4. Original wiederherstellen (natives confirm(), von B154 NICHT konvertiert) ─
+// ─── 4. Original wiederherstellen (Runde 16: Inline-Panel statt nativem confirm()) ─
 
-test('Original wiederherstellen: Bestaetigen setzt das Custom-Template auf FACTORY_TEMPLATE zurueck (Happy Path)', async ({ page }) => {
+test('Original wiederherstellen: Bestaetigen im Inline-Panel setzt das Custom-Template auf FACTORY_TEMPLATE zurueck (Happy Path)', async ({ page }) => {
   const pageErrors = [];
   const unexpectedDialogs = [];
   page.on('pageerror', err => pageErrors.push(err.message));
-  page.on('dialog', dialog => { unexpectedDialogs.push(dialog.message()); dialog.accept(); });
+  page.on('dialog', dialog => { unexpectedDialogs.push(dialog.message()); dialog.dismiss(); });
   await seed(page);
 
   await page.click('[data-action="reset-factory"]');
+  await expect(page.locator('[data-action="confirm-reset-factory"]')).toBeVisible({ timeout: 3000 });
+  await page.click('[data-action="confirm-reset-factory"]');
   await page.waitForTimeout(150);
 
   const st = await page.evaluate(() => JSON.parse(localStorage.getItem('train_v6')));
   expect(st.customTemplate.map(d => d.id)).toEqual(['A', 'B', 'C']);
   expect(st.customTemplate.map(d => d.title)).toEqual(['Tag A', 'Tag B', 'Tag C']);
 
-  expect(unexpectedDialogs).toHaveLength(1); // erwarteter natives confirm()
+  expect(unexpectedDialogs, unexpectedDialogs.join('; ')).toHaveLength(0); // kein natives confirm() mehr
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
 });
 
-test('Original wiederherstellen: Abbrechen im nativen Dialog laesst das Custom-Template unangetastet (Edge Case)', async ({ page }) => {
+test('Original wiederherstellen: Abbrechen im Inline-Panel laesst das Custom-Template unangetastet (Edge Case)', async ({ page }) => {
   const pageErrors = [];
   page.on('pageerror', err => pageErrors.push(err.message));
-  page.on('dialog', dialog => dialog.dismiss());
   await seed(page);
 
   await page.click('[data-action="reset-factory"]');
-  await page.waitForTimeout(150);
+  await expect(page.locator('[data-action="confirm-reset-factory"]')).toBeVisible({ timeout: 3000 });
+  await page.click('[data-action="cancel-reset-factory"]');
+  await expect(page.locator('[data-action="confirm-reset-factory"]')).toHaveCount(0);
 
   const st = await page.evaluate(() => JSON.parse(localStorage.getItem('train_v6')));
   expect(st.customTemplate).toEqual(CUSTOM_TEMPLATE);

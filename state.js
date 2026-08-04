@@ -1438,7 +1438,6 @@ export const A = Object.freeze({
   DAY_ADD:             'DAY_ADD',             // {}
   DAY_ADD_CLONE:       'DAY_ADD_CLONE',       // { sourceDi: number|null } – null = empty
   DAY_REMOVE:          'DAY_REMOVE',          // { di }
-  DAY_RENAME:          'DAY_RENAME',          // { di, title }
   DAY_DUPLICATE:       'DAY_DUPLICATE',       // { di }
   DAY_RESET_SETS:      'DAY_RESET_SETS',      // { di }
   DAY_TOGGLE_COMPLETE:       'DAY_TOGGLE_COMPLETE',       // { di }
@@ -2000,11 +1999,6 @@ function reduce(state, action) {
       const wk = _currentWeek(); if (!wk) break;
       if (wk.days.length <= 1) break;
       wk.days.splice(p.di, 1);
-      break;
-    }
-    case A.DAY_RENAME: {
-      const day = _currentWeek()?.days[p.di]; if (!day) break;
-      day.title = String(p.title).trim().slice(0, 20);
       break;
     }
     case A.DAY_DUPLICATE: {
