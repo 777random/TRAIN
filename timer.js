@@ -82,6 +82,11 @@ let _pauseSec     = 90;     // current pause duration in seconds
 let _goTimer      = null;   // setTimeout handle for "WEITER!" popup auto-hide
 let _lastWeekIdx  = null;   // detect week navigation to reset clock
 
+// Runde 17 (Cluster 2, soundEnabled): einziger AudioContext der App, lazy
+// erzeugt. Absichtlich erst beim Pausenstart (echter Klick-Kontext) erzeugt/
+// resumed statt beim Sound selbst (Timer-Callback) -- siehe _unlockAudioContext().
+let _audioCtx     = null;
+
 // ─── DOM element references (set in mountTimer) ───────────────────────────────
 
 let _clockEl      = null;   // <button> displaying "00:00" in toolbar
@@ -209,6 +214,7 @@ function _tickPause() {
     if (_st.settings.vibrationEnabled && navigator.vibrate) {
       navigator.vibrate([200, 100, 200]);
     }
+    if (_st.settings.soundEnabled) _playPauseEndSound();
     _showGoPopup();
     return;
   }
@@ -216,11 +222,54 @@ function _tickPause() {
   _pauseRAF = requestAnimationFrame(_tickPause);
 }
 
+// Runde 17 (Cluster 2, B209): Vibration nach Pause scheiterte auf manchen
+// Android-Geräten strukturell -- navigator.vibrate() feuert aus _tickPause()
+// (ein rAF-Loop), Sekunden bis Minuten nach der letzten echten Nutzer-Geste;
+// moderne Chrome-Versionen verlangen dafür noch aktive ("transiente")
+// User-Activation, die längst abgelaufen ist. Kein Implementierungsfehler,
+// keine zuverlässige Reparatur möglich (siehe BUGS.md B209). Web Audios
+// Autoplay-Policy basiert dagegen auf "sticky activation" (hält für die
+// gesamte Seiten-Session) -- deshalb hier proaktiv beim Pausenstart
+// (garantiert noch im Aktivierungsfenster des Klicks, der die Pause
+// ausgelöst hat) erzeugt/resumed, nicht erst beim eigentlichen Sound.
+function _unlockAudioContext() {
+  if (!_audioCtx) {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    _audioCtx = new Ctx();
+  }
+  if (_audioCtx.state === 'suspended') _audioCtx.resume().catch(() => {});
+}
+
+// Kurzer Zwei-Ton-Beep als Vibrations-Alternative -- kein neues Audio-Asset
+// (kein Service-Worker-Precache-Eintrag nötig), reine Web-Audio-Synthese.
+// Bekannte, nicht umgehbare Einschränkung: Browser können den System-
+// Stumm-Modus (z.B. iOS-Stummschalter) nicht zuverlässig erkennen: der Ton
+// kann lautlos "spielen", ohne dass die App das erkennen könnte.
+function _playPauseEndSound() {
+  if (!_audioCtx || _audioCtx.state !== 'running') return;
+  const now = _audioCtx.currentTime;
+  [0, 0.18].forEach(offset => {
+    const osc  = _audioCtx.createOscillator();
+    const gain = _audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = 880;
+    gain.gain.setValueAtTime(0, now + offset);
+    gain.gain.linearRampToValueAtTime(0.2, now + offset + 0.01);
+    gain.gain.linearRampToValueAtTime(0, now + offset + 0.15);
+    osc.connect(gain);
+    gain.connect(_audioCtx.destination);
+    osc.start(now + offset);
+    osc.stop(now + offset + 0.16);
+  });
+}
+
 function _startPause(seconds) {
   // Cancel any existing pause
   cancelAnimationFrame(_pauseRAF);
   clearTimeout(_goTimer);
   _goPopup?.classList?.remove('go-popup--visible');
+  if (getState().settings.soundEnabled) _unlockAudioContext();
 
   _pauseSec = seconds;
   _pauseEnd = Date.now() + seconds * 1000;

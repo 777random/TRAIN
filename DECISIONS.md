@@ -1010,3 +1010,33 @@ entschieden, statt beide Pfade stillschweigend nebeneinander zu behalten.
 **Gilt:** Präzedenzfall für zukünftige Funktions-Wiederherstellungen — vor
 dem Wiederbeleben eines toten Triggers immer prüfen, ob in der Zwischenzeit
 ein LIVE, unabhängiger Ersatzpfad für dieselbe Funktion entstanden ist.
+
+### 2026-08-04 — Runde 17: "Plain Mode" lässt die automatische Wochenerstellung (Master) an, deaktiviert nur die Subs (B209)
+**Entscheidung:** Der "Plain Mode"-Preset setzt `autoWeek.suggestProgress`
+und `autoWeek.showReview` auf `false`, lässt `autoWeek.enabled` (Master)
+aber unangetastet.
+**Begründung:** Plain Mode soll Rauschen reduzieren (Zusatz-Dialoge,
+Anzeigen), nicht die eigentliche Automatisierung abschalten — bei Master
+AUS müsste die Woche künftig manuell angelegt werden, das wäre ein
+Funktionsverlust statt einer Vereinfachung. Mit Master AN + Subs AUS
+entsteht die Woche weiterhin automatisch, nur die zwei Zusatz-Modals
+(Steigerungs-Vorschlag, Rückblick-zuerst) erscheinen nicht mehr.
+**Gilt:** Präzedenzfall für künftige Preset-/Bündel-Settings — bei
+Master/Sub-Beziehungen den Master nur mitnehmen, wenn das Bündel
+explizit auf Kern-Funktionalität abzielt, nicht nur auf UI-Rauschen.
+
+### 2026-08-04 — Runde 17: AudioContext proaktiv beim Pausenstart unlocken, nicht erst beim Sound (B210)
+**Entscheidung:** `_unlockAudioContext()` (timer.js) wird in `_startPause()`
+aufgerufen (also beim Start der Pause, aus einem echten Klick-Kontext
+heraus), nicht erst in `_playPauseEndSound()` beim tatsächlichen Abspielen
+am Pausenende.
+**Begründung:** Genau dieses Timing-Problem (API-Aufruf weit außerhalb
+jedes User-Activation-Fensters) war die Root Cause von B210 (Vibration).
+Chromes Autoplay-/AudioContext-Policy basiert auf "sticky activation"
+(hält für die gesamte Seiten-Session, nicht nur Sekunden) — ein beim
+Pausenstart erzeugter/resumeter Context bleibt bis zum Pausenende
+"unlocked", der eigentliche Sound-Aufruf selbst braucht dann keine eigene
+Aktivierung mehr.
+**Gilt:** Präzedenzfall für jede künftige Web-API mit Autoplay-/Activation-
+Beschränkungen — die Aktivierung so früh wie möglich im echten Klick-
+Kontext anstoßen, nicht erst dort, wo die API tatsächlich gebraucht wird.

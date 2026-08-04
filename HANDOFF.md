@@ -1,6 +1,54 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-08-04 — Runde 16 (Launch-Roadmap Phase C, Umsetzung): Settings-Restrukturierung (Ziele-Karte, 3 native Dialoge auf In-App-Panels umgestellt, Datenschutz/Impressum-Collapse vereinheitlicht), 2 seit Runde 6 tote Funktionen wiederhergestellt (edit-day-field, autofill-rpe) inkl. Entfernung einer dabei entdeckten neuen Redundanz (day-rename), 6 tote Case-Handler entfernt, train-v240 (siehe eigener Abschnitt unten, B206-B208). Davor: Launch-Roadmap Phase C, Inventar-Teil (UX-/Feature-Bestandsaufnahme, keine Umsetzung) + kleine AGENTS.md-Testkonvention-Ergänzung, train-v239. Davor: Launch-Roadmap Phase B (Stabilitäts-Baseline), train-v239. Davor: Launch-Roadmap Phase A (Verifikation), train-v238. Davor: Runde 15 (Nutzerfeedback: Tag löschen, Plate-Setting, Körper-Tab), train-v237. Davor: Runde 14 (Coach-Signal-Governance), train-v236. Davor: Runde 13 (Council-Umsetzung B62+B140), train-v235. Davor: Runde 12 (Backlog-Aufräumrunde), train-v234 (B41/B42/B58/B139-Nebenfund/B179-Nebenfund abgeschlossen). Davor: Runde 11, train-v233 (B199, Update-Banner "Später"-Button). Davor: Runde 10 komplett (Teil 1 + Teil 2), train-v232 (B191-B198, B141/B176-Abschluss). Davor: Runde-9-Audit-Folgerunde, train-v230 (B185-B190, siehe AUDIT-BERECHNUNGEN.md). Davor: Runde-8-Datenkonsistenz-Sprint, train-v229. Davor: Runde-7-Coaching-Qualitäts-Sprint, train-v228. Davor: Runde-6-Nutzerfeedback-Fix-Sprint, train-v227. Davor: Runde-5-Fix-Sprint, train-v226. Ältere Sprints siehe SESSION_LOG.md.*
-*Nächster Schritt: **Launch-Roadmap Phase C ist vollständig abgeschlossen** (Inventar + Umsetzung, siehe `Diagnose & Sprints/TRAIN-Launch-Roadmap.md` + eigener Abschnitt unten). Nächste Phase laut Roadmap: **Phase D — Stabilitäts-Re-Check**, gezielt NUR für die durch Runde 16 tatsächlich geänderten Bereiche (Settings-Tab-Struktur, Tag-Titel/-Subtitle-Bearbeitung, RPE-Autofill) — keine komplette Wiederholung von Phase B. Aus Runde 13 weiterhin offen: zwei NICHT code-seitig lösbare B62-Punkte (Rechts-Check vor Release zu Service-Worker-Caching; PWA-Installierbarkeit auf echtem Android-Gerät nach nächstem Release manuell verifizieren, siehe DECISIONS.md). Danach: B55 Impressum bleibt der einzige echte Blocker (wartet weiterhin auf echte Name-/Adress-/E-Mail-Angaben des Betreibers, siehe LEGAL.md). Aus dem Backlog-Review weiterhin offen (siehe `backlog-review-2026-08-03.txt`): B43 (CUSTOM_EX_DELETE räumt Kategorie nicht auf), B27 (Touch-Drag auf echtem Gerät), B66 (Toast nicht reproduzierbar, Observability wartet auf nächste Beobachtung), B173-Nebenfund (Wochen-Rec-Chip ohne Wdh-Reduzierung), VACATION_PLANS-Nebenfund aus B184 (Urlaubstage ohne Muskelgruppen-Tags), B176 (Portal-Refactor, zuletzt in Runde 10 bestätigt zurückgestellt). Bestätigte Infra-Grenze (weiterhin gültig, seit Runde 13 nicht mehr reproduziert): volle Playwright-Suite kann `npx serve` mit `EMFILE`/Dev-Server-Kontention abstürzen lassen — Workaround ist der Batch-Lauf, bei Verdacht auf Massenausfall in Isolation nachprüfen. Bekannte, wiederholt bestätigte Timing-Flakes (unabhängig von jeglichem Sprint-Code, alle bei Retry/Isolation grün): `share_image.spec.js`/`share_image_v3.spec.js` (Download-Event-Timing), `deload_volumen.spec.js` (Backup-Reminder-Toast-Overlap), `plate_calculator.spec.js` (Live-Vorschau erster Tastendruck), NEU seit Phase B: `settings_combination_smoke.spec.js` Szenario 20 (Timing unter Batch-Parallel-Last, 3x in Isolation bestätigt grün). Nicht committet: `Research/`, alle `context-exports/`-Updates + `Diagnose & Sprints/`-Exports (beide gitignored).*
+*Letzte Aktualisierung: 2026-08-04 — Runde 17 (vier unabhängige Live-Nutzerfeedback-Punkte): "Plain Mode"-Preset (6 Settings auf einen Klick), Vibrations-Bug als strukturelle Browser-Einschränkung eingeordnet + neue Sound-Alternative ("Ton nach Pause"), Plate-Settings (Stangengewicht/Größte Hantelscheibe) nebeneinander statt untereinander, Onboarding-Plan wird automatisch zur Standard-Vorlage, train-v241 (siehe eigener Abschnitt unten, B209-B212). Davor: Runde 16 (Launch-Roadmap Phase C, Umsetzung): Settings-Restrukturierung (Ziele-Karte, 3 native Dialoge auf In-App-Panels umgestellt, Datenschutz/Impressum-Collapse vereinheitlicht), 2 seit Runde 6 tote Funktionen wiederhergestellt (edit-day-field, autofill-rpe) inkl. Entfernung einer dabei entdeckten neuen Redundanz (day-rename), 6 tote Case-Handler entfernt, train-v240 (B206-B208). Davor: Launch-Roadmap Phase C, Inventar-Teil (UX-/Feature-Bestandsaufnahme, keine Umsetzung) + kleine AGENTS.md-Testkonvention-Ergänzung, train-v239. Davor: Launch-Roadmap Phase B (Stabilitäts-Baseline), train-v239. Davor: Launch-Roadmap Phase A (Verifikation), train-v238. Davor: Runde 15 (Nutzerfeedback: Tag löschen, Plate-Setting, Körper-Tab), train-v237. Davor: Runde 14 (Coach-Signal-Governance), train-v236. Davor: Runde 13 (Council-Umsetzung B62+B140), train-v235. Davor: Runde 12 (Backlog-Aufräumrunde), train-v234 (B41/B42/B58/B139-Nebenfund/B179-Nebenfund abgeschlossen). Davor: Runde 11, train-v233 (B199, Update-Banner "Später"-Button). Davor: Runde 10 komplett (Teil 1 + Teil 2), train-v232 (B191-B198, B141/B176-Abschluss). Davor: Runde-9-Audit-Folgerunde, train-v230 (B185-B190, siehe AUDIT-BERECHNUNGEN.md). Davor: Runde-8-Datenkonsistenz-Sprint, train-v229. Davor: Runde-7-Coaching-Qualitäts-Sprint, train-v228. Davor: Runde-6-Nutzerfeedback-Fix-Sprint, train-v227. Davor: Runde-5-Fix-Sprint, train-v226. Ältere Sprints siehe SESSION_LOG.md.*
+*Nächster Schritt: Runde 17 ist abgeschlossen, keine offenen Punkte aus diesem Sprint. **Launch-Roadmap Phase C + Phase D sind laut `Diagnose & Sprints/TRAIN-Launch-Roadmap.md` vollständig abgeschlossen** (Phase D von Cowork als durch Runde 16s eigene Verifikation abgedeckt markiert — Runde 17 ist reines neues Live-Feedback, keiner Roadmap-Phase zugeordnet). Aus Runde 13 weiterhin offen: zwei NICHT code-seitig lösbare B62-Punkte (Rechts-Check vor Release zu Service-Worker-Caching; PWA-Installierbarkeit auf echtem Android-Gerät nach nächstem Release manuell verifizieren, siehe DECISIONS.md). Danach: B55 Impressum bleibt der einzige echte Blocker (wartet weiterhin auf echte Name-/Adress-/E-Mail-Angaben des Betreibers, siehe LEGAL.md). Aus dem Backlog-Review weiterhin offen (siehe `backlog-review-2026-08-03.txt`): B43 (CUSTOM_EX_DELETE räumt Kategorie nicht auf), B27 (Touch-Drag auf echtem Gerät), B66 (Toast nicht reproduzierbar, Observability wartet auf nächste Beobachtung), B173-Nebenfund (Wochen-Rec-Chip ohne Wdh-Reduzierung), VACATION_PLANS-Nebenfund aus B184 (Urlaubstage ohne Muskelgruppen-Tags), B176 (Portal-Refactor, zuletzt in Runde 10 bestätigt zurückgestellt). Bestätigte Infra-Grenze (weiterhin gültig, seit Runde 13 nicht mehr reproduziert): volle Playwright-Suite kann `npx serve` mit `EMFILE`/Dev-Server-Kontention abstürzen lassen — Workaround ist der Batch-Lauf, bei Verdacht auf Massenausfall in Isolation nachprüfen. Bekannte, wiederholt bestätigte Timing-Flakes (unabhängig von jeglichem Sprint-Code, alle bei Retry/Isolation grün): `share_image.spec.js`/`share_image_v3.spec.js` (Download-Event-Timing), `deload_volumen.spec.js` (Backup-Reminder-Toast-Overlap), `plate_calculator.spec.js` (Live-Vorschau erster Tastendruck), NEU seit Phase B: `settings_combination_smoke.spec.js` Szenario 20 (Timing unter Batch-Parallel-Last, 3x in Isolation bestätigt grün). Nicht committet: `Research/`, alle `context-exports/`-Updates + `Diagnose & Sprints/`-Exports (beide gitignored).*
+
+---
+
+## Runde 17 — Vier Live-Nutzerfeedback-Punkte (train-v241, 2026-08-04)
+
+Basis: `Diagnose & Sprints/TRAIN-Sprint-Prompts-Runde17.md`. Vier
+unabhängige, parallelisierbare Cluster, Diagnose+Plan im Plan-Mode
+präsentiert und vom Nutzer bestätigt vor der Umsetzung.
+
+**Cluster 1 (B209) — "Plain Mode"-Preset:** neue Karte im Settings-Tab
+(vor der "Training"-Gruppe), Klick dispatcht 6 bestehende Settings auf
+einmal (Session Coach/RPE-Anzeige/Streak-Anzeige/Stoppuhr AUS, "Steigerungen
+vorschlagen"/"Wochenrückblick zuerst zeigen" AUS) — kein neuer Modus-Flag,
+Einzel-Toggles bleiben danach änderbar. Master "Automatische
+Wochenerstellung" bleibt bewusst AN (nur die Subs werden deaktiviert,
+siehe DECISIONS.md für die Begründung). Rein abgeleiteter "aktiv"-Indikator,
+keine Persistenz.
+
+**Cluster 2 (B210) — Vibrations-Bug + Sound-Alternative:** Root Cause
+diagnostiziert und als strukturelle Browser-Einschränkung eingeordnet
+(`navigator.vibrate()` feuert aus einem `requestAnimationFrame`-Loop weit
+außerhalb jedes User-Activation-Fensters) — bewusst NICHT "repariert", da
+technisch nicht zuverlässig lösbar. Stattdessen neue Sound-Alternative
+("Ton nach Pause", additives `soundEnabled`-Setting): Web-Audio-Beep via
+`_playPauseEndSound()` (timer.js), `AudioContext` wird proaktiv beim
+Pausenstart (echter Klick-Kontext) unlocked statt erst beim Sound selbst —
+umgeht damit genau das Aktivierungsproblem der Vibration.
+
+**Cluster 3 (B211) — Plate-Settings nebeneinander:** "Stangengewicht" +
+"Größte verfügbare Hantelscheibe" in einen gemeinsamen `.body-grid`-Wrapper
+(bestehendes, bis dahin ungenutztes CSS-Muster) — ab 480px zweispaltig,
+darunter weiterhin gestapelt (Platz reicht sonst nicht für die 3er-Pill-
+Reihe).
+
+**Cluster 4 (B212) — Onboarding-Autosave:** der beim Onboarding gewählte
+Plan wird jetzt automatisch zur Standard-Vorlage (`A.TPL_SAVE`, NICHT
+`save-named-template` — letzteres hätte nur einen zusätzlichen benannten
+Eintrag angelegt, nicht die für automatische Wochenerstellung/"Woche
+zurücksetzen" tatsächlich verwendete `state.customTemplate` geändert).
+Bewusst NUR beim "Vorlage laden"-Pfad, nicht bei "Ohne Vorlage starten".
+
+**Tests:** 9 neue Tests (`tests/runde17_live_feedback.spec.js`), Cluster 2/4
+über echte Klick-Pfade (AGENTS.md-Realpfad-Regel), Web-Audio-API für den
+Sound-Test via `page.addInitScript()` gemockt (kein echtes Audio-Hardware-
+Erfordernis). Volle Regressionssuite (85 Spec-Dateien, gebatcht) grün.
+
+CACHE_VERSION → `train-v241`. styles.css `?v=214→215`. Kein
+Launch-Roadmap-Bezug (reines Live-Feedback).
 
 ---
 

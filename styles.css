@@ -1372,7 +1372,7 @@ exercise { position: unset; }
 }
 .body-section__body.is-open { grid-template-rows: 1fr; }
 .body-section__body-inner { overflow: hidden; padding-bottom: var(--sp-4); }
-.body-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); margin-bottom: var(--sp-3); }
+.body-grid { display: grid; grid-template-columns: 1fr; gap: var(--sp-3); margin-bottom: var(--sp-3); }
 .body-field label {
   font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
   color: var(--c-text-3); display: block; margin-bottom: var(--sp-1);
@@ -1922,6 +1922,7 @@ body:has(.pause-overlay--visible) .pr-moment-toast {
 @media (min-width: 480px) {
   .week-nav__label { font-size: 28px; }
   .day-card__title { font-size: 22px; }
+  .body-grid { grid-template-columns: 1fr 1fr; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }

@@ -5069,6 +5069,24 @@ function _renderNameCleanupSections(state) {
   return dupHtml + candHtml;
 }
 
+// Runde 17 (Cluster 1): "Plain Mode"-Preset -- bündelt 6 bestehende
+// Settings auf einen Klick, KEIN eigener Modus-Flag (siehe case
+// 'apply-plain-mode', ui.js). _PLAIN_MODE_PRESET ist die einzige
+// Quelle der Wahrheit für Anwenden UND "aktiv"-Erkennung, damit beide
+// nie auseinanderlaufen können.
+const _PLAIN_MODE_PRESET = {
+  sessionCoach: false,
+  rpeEnabled: false,
+  hideStreakBadge: true,
+  hideStopwatch: true,
+};
+function _isPlainModeActive(s) {
+  const autoWeek = s.autoWeek ?? { enabled: false, suggestProgress: true, showReview: true };
+  return Object.entries(_PLAIN_MODE_PRESET).every(([k, v]) => (s[k] ?? false) === v)
+    && autoWeek.suggestProgress === false
+    && autoWeek.showReview === false;
+}
+
 function renderSettingsTab(state) {
   const container = document.getElementById('settings-tab-content');
   if (!container) return;
@@ -5145,6 +5163,24 @@ function renderSettingsTab(state) {
     </div>
   </div>
 
+  <!-- Plain Mode (Runde 17, Cluster 1): Preset-Button, bündelt 6 bestehende
+       Settings -- kein neuer Modus-Flag, Einzel-Toggles bleiben danach
+       normal änderbar. Vor der Training-Gruppe, als Kurzeinstieg vor der
+       langen Einzel-Liste (analog Runde 16: häufig Relevantes nach oben). -->
+  <div class="settings-section">
+    <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:var(--sp-2)">
+      <div>
+        <div class="settings-row__label">Plain Mode</div>
+        <div class="settings-row__desc">Reduziert die App auf das Nötigste: Session Coach, RPE-Anzeige, Streak- und Stoppuhr-Anzeige sowie die beiden Zusatz-Dialoge bei der Wochenerstellung werden auf einen Klick deaktiviert. Einzelne Einstellungen bleiben danach normal änderbar.</div>
+      </div>
+      <button type="button"
+        class="weight-step-btn${_isPlainModeActive(s) ? ' is-selected' : ''}"
+        data-action="apply-plain-mode"
+        aria-pressed="${_isPlainModeActive(s)}"
+      >${_isPlainModeActive(s) ? '✓ Plain Mode aktiv' : 'Plain Mode anwenden'}</button>
+    </div>
+  </div>
+
   <!-- Training (B3: in 4 Zwischenüberschriften gegliedert, siehe HANDOFF.md/BUGS.md B113 —
        eine Karte bleibt erhalten, kein Trennstrich zwischen den Gruppen, nur Whitespace) -->
   <div class="settings-section">
@@ -5154,7 +5190,8 @@ function renderSettingsTab(state) {
     ${tog('autoEval', 'Automatische Satz-Bewertung', 'Satz wird bewertet sobald du die Wdh-Zahl einträgst und das Feld verlässt.')}
     ${tog('autoStartPauseTimer', 'Pausentimer automatisch', 'Timer startet automatisch nach jedem bestätigten Satz (außer dem letzten)')}
     ${tog('hideStopwatch', 'Stoppuhr ausblenden', 'Session-Timer oben in der Toolbar verstecken')}
-    ${tog('vibrationEnabled', 'Vibration nach Pause', 'Funktioniert nur auf Android — iOS unterstützt Vibration in PWAs technisch nicht.')}
+    ${tog('vibrationEnabled', 'Vibration nach Pause', 'Funktioniert nur auf Android — iOS unterstützt Vibration in PWAs technisch nicht. Manche Android-/Chrome-Versionen unterdrücken die Vibration zusätzlich strukturell, wenn die Pause zu lange nach der letzten Berührung endet — dagegen hilft "Ton nach Pause" unten.')}
+    ${tog('soundEnabled', 'Ton nach Pause', 'Kurzer Signalton, sobald die Pause endet — Alternative/Ergänzung zur Vibration. Kann bei aktiviertem Stumm-Modus des Geräts lautlos bleiben, ohne dass die App das erkennen kann.')}
     ${tog('swipe', 'Swipe-Navigation', 'Wischen zum Wochenwechsel')}
     <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:var(--sp-2)">
       <div>
@@ -5189,27 +5226,35 @@ function renderSettingsTab(state) {
           >${String(ps).replace('.', ',')} kg</button>`).join('')}
       </div>
     </div>
-    <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:var(--sp-1)">
-      <div class="settings-row__label">Stangengewicht (kg)</div>
-      <input class="body-input" type="number" step="0.5" min="5" max="50" inputmode="decimal"
-        value="${s.barbellWeight ?? 20}" placeholder="20"
-        data-action="set-barbell-weight"
-        style="margin-top:var(--sp-1);width:120px"
-        aria-label="Stangengewicht in kg"
-      />
-    </div>
-    <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:var(--sp-2)">
-      <div>
-        <div class="settings-row__label">Größte verfügbare Hantelscheibe</div>
-        <div class="settings-row__desc">Für den Hantelscheiben-Rechner — manche Studios haben keine 25kg-Scheiben</div>
+    <!-- Runde 17 (Cluster 3): nebeneinander statt untereinander --
+         thematisch zusammengehörig (beide fließen in den Plate-Rechner
+         ein). Bestehendes .body-grid-Muster (styles.css) wiederverwendet,
+         kein neues Layout erfunden -- ab 480px 2-spaltig, darunter
+         weiterhin gestapelt wie bisher (Platz reicht sonst nicht für die
+         3er-Pill-Reihe, siehe styles.css). -->
+    <div class="body-grid">
+      <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:var(--sp-1)">
+        <div class="settings-row__label">Stangengewicht (kg)</div>
+        <input class="body-input" type="number" step="0.5" min="5" max="50" inputmode="decimal"
+          value="${s.barbellWeight ?? 20}" placeholder="20"
+          data-action="set-barbell-weight"
+          style="margin-top:var(--sp-1);width:120px"
+          aria-label="Stangengewicht in kg"
+        />
       </div>
-      <div class="weight-step-opts">
-        ${[15, 20, 25].map(lp => `
-          <button type="button"
-            class="weight-step-btn${(s.largestPlate ?? 25) === lp ? ' is-selected' : ''}"
-            data-action="set-largest-plate" data-plate="${lp}"
-            aria-pressed="${(s.largestPlate ?? 25) === lp}"
-          >${lp} kg</button>`).join('')}
+      <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:var(--sp-2)">
+        <div>
+          <div class="settings-row__label">Größte verfügbare Hantelscheibe</div>
+          <div class="settings-row__desc">Für den Hantelscheiben-Rechner — manche Studios haben keine 25kg-Scheiben</div>
+        </div>
+        <div class="weight-step-opts">
+          ${[15, 20, 25].map(lp => `
+            <button type="button"
+              class="weight-step-btn${(s.largestPlate ?? 25) === lp ? ' is-selected' : ''}"
+              data-action="set-largest-plate" data-plate="${lp}"
+              aria-pressed="${(s.largestPlate ?? 25) === lp}"
+            >${lp} kg</button>`).join('')}
+        </div>
       </div>
     </div>
     <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:var(--sp-2)">
@@ -7163,6 +7208,20 @@ function _handleClick(e) {
       const subKey = el.dataset.key;
       const cur = getState().settings?.autoWeek?.[subKey] ?? false;
       dispatch(A.AUTOWEEK_SET, { key: subKey, value: !cur });
+      break;
+    }
+
+    // Runde 17 (Cluster 1): Preset -- dispatcht mehrere bestehende Settings
+    // auf einmal, kein eigener Modus-Flag. Master 'autoWeek.enabled' bleibt
+    // bewusst unangetastet (nur die beiden Subs werden deaktiviert) -- siehe
+    // DECISIONS.md für die Begründung.
+    case 'apply-plain-mode': {
+      Object.entries(_PLAIN_MODE_PRESET).forEach(([sKey, value]) => {
+        dispatch(A.SETTING_SET, { key: sKey, value });
+      });
+      dispatch(A.AUTOWEEK_SET, { key: 'suggestProgress', value: false });
+      dispatch(A.AUTOWEEK_SET, { key: 'showReview', value: false });
+      showToast('Plain Mode aktiviert', 'ok');
       break;
     }
 
@@ -9984,6 +10043,18 @@ function _showOnboarding() {
     // (vorher nur lokale Variable, siehe DECISIONS.md) — für die
     // Pausenzeiten-Empfehlung des Session Coach.
     if (_mainGoal) dispatch(A.SETTING_SET, { key: 'goal', value: _mainGoal });
+    // Runde 17 (Cluster 4, B211): der im Onboarding gewählte Plan wurde
+    // bisher nur in state.weeks[0] geschrieben (ONBOARDING_WEEK_CREATE),
+    // NICHT als Standard-Vorlage (state.customTemplate) übernommen -- neue
+    // Wochen/"Woche zurücksetzen" griffen danach weiterhin auf das
+    // generische FACTORY_TEMPLATE zurück. Bewusst NUR beim "Vorlage laden"-
+    // Pfad (_selTpl !== null), nicht bei "Ohne Vorlage starten" -- ein
+    // leerer Ein-Tag-Platzhalter als neue Standard-Vorlage wäre ein
+    // Fußangel für jede künftige automatische Wochenerstellung.
+    if (_selTpl !== null) {
+      const wk = getState().weeks[0];
+      if (wk) dispatch(A.TPL_SAVE, { template: wk.days });
+    }
     _onboardingActive = false;
     dispatch(A.ONBOARDING_DONE, {});
     _gcEvent('Onboarding abgeschlossen');

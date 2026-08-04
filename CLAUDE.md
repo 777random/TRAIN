@@ -1,7 +1,20 @@
 # TRAIN — CLAUDE.md
 # Vollständiger Projektkontext für Claude Code
-# Stand: train-v240 / SCHEMA 33 / August 2026
-# Letztes Update: nach train-v240, Runde 16 (Launch-Roadmap Phase C,
+# Stand: train-v241 / SCHEMA 33 / August 2026
+# Letztes Update: nach train-v241, Runde 17 (2026-08-04) -- vier unabhängige
+# Live-Nutzerfeedback-Punkte. B209: "Plain Mode"-Preset (neue Settings-
+# Karte, buendelt 6 bestehende Settings auf einen Klick, Master
+# "Automatische Wochenerstellung" bleibt bewusst an). B210: Vibrations-Bug
+# als strukturelle Browser-Einschraenkung eingeordnet (navigator.vibrate()
+# feuert aus einem rAF-Loop weit ausserhalb jedes User-Activation-Fensters,
+# nicht zuverlaessig fixbar) -- neue Sound-Alternative ("Ton nach Pause",
+# soundEnabled) via Web Audio, AudioContext wird proaktiv beim Pausenstart
+# unlocked. B211: Stangengewicht + Groesste Hantelscheibe im Settings-Tab
+# nebeneinander (bestehendes .body-grid-Muster wiederverwendet, ab 480px
+# zweispaltig). B212: Onboarding-Plan wird jetzt automatisch zur Standard-
+# Vorlage (A.TPL_SAVE, nur beim "Vorlage laden"-Pfad). 9 neue Real-Path-
+# Tests, volle Suite gruen. Siehe HANDOFF.md für Details.
+# Davor train-v240, Runde 16 (Launch-Roadmap Phase C,
 # Umsetzung, 2026-08-04) -- B206: Settings-Tab restrukturiert (Trainingsziel/
 # Ernährungsphase in eigener "Ziele"-Karte, "Woche zurücksetzen"/"Original
 # wiederherstellen"/"Als Vorlage speichern" von nativen confirm()/prompt()
