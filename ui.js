@@ -57,6 +57,12 @@ let _activeTab = 'workout';
 /** Insights visible in body tab (2.2). */
 let _showBodyInsights = false;
 
+/** Runde 15 (Cluster 3): Schlafqualität-vs-Erfolgsquote-Beobachtung im
+ * Körper-Tab (calcSleepCorrelation(), sessionSummary.js) -- eigener Toggle,
+ * unabhängig von _showBodyInsights (Volumen-Korrelation), da beide
+ * gleichzeitig sichtbar sein können. */
+let _showSleepQualityInsight = false;
+
 /** Relative-Stärke Chart-Modus: 'woche' (Standard) | 'alltime'. Ein Switch für die ganze Sektion. */
 let _p4pMode = 'woche';
 
@@ -3228,6 +3234,32 @@ function renderBodyTab(state) {
     }
   }
 
+  // Runde 15 (Cluster 3, Nutzerfeedback): Schlafqualität-vs-Erfolgsquote --
+  // dieselbe Berechnung wie im einmaligen Session-Summary-Hinweis (B79,
+  // calcSleepCorrelation()), hier aber PERSISTENT im Körper-Tab statt nur
+  // einmalig per localStorage-Flag ausgeblendet. Additiv NEBEN der
+  // bestehenden Volumen-Korrelation oben (andere Datenquelle:
+  // sessionCheckIn.sleep [Pre-Session-Check-in, nur bei aktiviertem Session
+  // Coach] statt sleepHours [Tagesabschluss, immer erfasst] -- wer Session
+  // Coach deaktiviert hat, sieht weiterhin die Volumen-Korrelation oben,
+  // kein Datenverlust für diese Nutzergruppe).
+  const sleepQualityCorr = calcSleepCorrelation(getSortedWeeks(state));
+  let sleepQualityInsightHtml = '';
+  if (sleepQualityCorr.hasSig && sleepQualityCorr.totalDaysWithSleep >= 6) {
+    const qMsg = `An Tagen nach besserem Schlaf lag deine Satz-Erfolgsquote im Schnitt ${sleepQualityCorr.diff} Prozentpunkte höher (${sleepQualityCorr.goodAvg}% vs. ${sleepQualityCorr.poorAvg}%).`;
+    sleepQualityInsightHtml = `
+      <div style="margin-top:var(--sp-3)">
+        <button class="insight-toggle${_showSleepQualityInsight ? ' is-active' : ''}"
+          data-action="toggle-sleep-quality-insight"
+          aria-pressed="${_showSleepQualityInsight}"
+          style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--c-text-3);background:none;border:none;cursor:pointer;padding:0"
+        >
+          ${ic.lightbulb()} Schlaf & Erfolgsquote
+        </button>
+        ${_showSleepQualityInsight ? `<div class="insight-card" style="margin-top:var(--sp-2)">${ic.lightbulb()}<span>${qMsg}</span></div>` : ''}
+      </div>`;
+  }
+
   const sleepEnergyHtml = `
   <div class="chart-card">
     <div class="chart-card__title">Schlaf & Energie</div>
@@ -3239,6 +3271,7 @@ function renderBodyTab(state) {
       ${avgEnergy !== null ? `<div class="body-metric"><div class="body-metric__val">⚡ Ø ${avgEnergy.toFixed(1)}/5</div><div class="body-metric__lbl">Energie</div></div>` : ''}
     </div>`}
     ${bodyInsightHtml}
+    ${sleepQualityInsightHtml}
   </div>`;
 
   container.innerHTML = bodyweightSectionHtml + relativeStrengthHtml + sleepEnergyHtml;
@@ -5257,11 +5290,11 @@ function renderSettingsTab(state) {
       <div style="display:flex;align-items:center;justify-content:space-between;width:100%;gap:var(--sp-2)">
         <span style="font-size:13px;font-weight:600;color:var(--c-accent);font-family:var(--font-display);letter-spacing:.08em">${h(day.title)}</span>
         <span style="font-size:11px;color:var(--c-text-3)">${day.exercises.length} Übungen</span>
-        ${di === wk.days.length - 1 && wk.days.length > 1 ? `
         <button class="btn btn--sm" style="border-color:var(--c-danger);color:var(--c-danger);padding:0 var(--sp-2)"
-          data-action="remove-day" data-di="${di}"
+          data-action="remove-day" data-di="${di}"${wk.days.length <= 1 ? ' disabled' : ''}
           aria-label="${h(day.title)} entfernen"
-        >${ic.minus()}</button>` : '<div style="width:52px"></div>'}
+          title="${wk.days.length <= 1 ? 'Mindestens ein Trainingstag pro Woche ist nötig' : `${h(day.title)} entfernen`}"
+        >${ic.minus()}</button>
       </div>
       ${_removeDayConfirmKey === String(di) ? `
       <div class="sub-form" style="width:100%;text-align:center;padding:var(--sp-3)">
@@ -5666,6 +5699,13 @@ function _handleClick(e) {
     // ── Body correlation insight toggle (2.2) ──────────────────────────────
     case 'toggle-body-insights':
       _showBodyInsights = !_showBodyInsights;
+      scheduleRender();
+      break;
+
+    // Runde 15 (Cluster 3): Schlaf-Erfolgsquote-Beobachtung, unabhängiger
+    // Toggle von toggle-body-insights (Volumen-Korrelation), siehe oben.
+    case 'toggle-sleep-quality-insight':
+      _showSleepQualityInsight = !_showSleepQualityInsight;
       scheduleRender();
       break;
 
@@ -7244,6 +7284,17 @@ function _handleClick(e) {
       break;
     }
 
+    // Runde 15 (Nutzerfeedback: largestPlate-Setting griff nicht): war
+    // fälschlich in _handleChange() (reagiert auf 'change', nicht 'click')
+    // platziert -- der Picker ist aber ein <button>, feuert also nie
+    // 'change'. Verschoben neben das strukturell identische
+    // 'set-plate-step' oben, das schon immer korrekt hier lag.
+    case 'set-largest-plate': {
+      const lp = parseFloat(el.dataset.plate);
+      dispatch(A.SETTING_SET, { key: 'largestPlate', value: Number.isFinite(lp) && lp > 0 && lp <= 25 ? lp : 25 });
+      break;
+    }
+
     case 'set-goal': {
       const g = el.dataset.goal;
       const cur = getState().settings?.goal ?? null;
@@ -7577,11 +7628,6 @@ function _handleChange(e) {
     case 'set-barbell-weight': {
       const bw = parseFloat(el.value);
       dispatch(A.SETTING_SET, { key: 'barbellWeight', value: Number.isFinite(bw) && bw > 0 && bw <= 50 ? bw : 20 });
-      break;
-    }
-    case 'set-largest-plate': {
-      const lp = parseFloat(el.dataset.plate);
-      dispatch(A.SETTING_SET, { key: 'largestPlate', value: Number.isFinite(lp) && lp > 0 && lp <= 25 ? lp : 25 });
       break;
     }
     case 'set-deload-factor-value': {

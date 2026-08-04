@@ -1,7 +1,17 @@
 # TRAIN — CLAUDE.md
 # Vollständiger Projektkontext für Claude Code
-# Stand: train-v236 / SCHEMA 33 / August 2026
-# Letztes Update: nach train-v236, Runde 14 (2026-08-03) — Council-
+# Stand: train-v237 / SCHEMA 33 / August 2026
+# Letztes Update: nach train-v237, Runde 15 (2026-08-04) — 3 unabhängige
+# Live-Nutzerfeedback-Punkte (B201-B203): Settings-Tab "Tag löschen" zeigte
+# den Button nur beim letzten Tag + verschwand bei nur 1 Tag komplett statt
+# disabled (jetzt: jeder Tag, disabled+Tooltip bei 1 Tag); largestPlate-
+# Picker speicherte nie einen Wert (case lag in _handleChange() statt
+# _handleClick() -- Picker ist ein <button>, feuert nie 'change'); Körper-
+# Tab "Schlaf & Energie" zeigt jetzt zusätzlich persistent
+# calcSleepCorrelation() (bisher nur einmalig im Session-Summary), Nutzer-
+# entschieden (Eingabe behalten, Anzeige aufwerten). Siehe HANDOFF.md für
+# Details.
+# Davor train-v236, Runde 14 (2026-08-03) — Council-
 # Entscheidung "Coach-Signal-Governance": Beobachtungston jetzt Default für
 # ALLE Coach-Struktursignale (nicht nur recurring_fatigue, gilt rückwirkend
 # fürs Deload-Signal), generalisierter aber signal-spezifisch
@@ -91,7 +101,7 @@ TRAIN ist eine deutschsprachige PWA für Krafttraining. Pure Vanilla ES Modules 
   Sessions müssen aus diesem neuen Pfad heraus gestartet werden, sonst
   landet man am alten (jetzt leeren) OneDrive-Ort. Nutzer zieht den Ordner
   regelmäßig manuell auf eine externe Festplatte statt über Cloud-Sync.
-- Aktueller Stand: SCHEMA_VERSION 33 · CACHE_VERSION train-v236 · CSS ?v=213
+- Aktueller Stand: SCHEMA_VERSION 33 · CACHE_VERSION train-v237 · CSS ?v=213
 
 ---
 

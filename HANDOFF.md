@@ -1,6 +1,51 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-08-03 — Runde 14 (Coach-Signal-Governance: Beobachtungston + generalisierter Dismiss), train-v236 (siehe eigener Abschnitt unten). Davor: Runde 13 (Council-Umsetzung B62+B140), train-v235. Davor: Runde 12 (Backlog-Aufräumrunde), train-v234 (B41/B42/B58/B139-Nebenfund/B179-Nebenfund abgeschlossen). Davor: Runde 11, train-v233 (B199, Update-Banner "Später"-Button). Davor: Runde 10 komplett (Teil 1 + Teil 2), train-v232 (B191-B198, B141/B176-Abschluss). Davor: Runde-9-Audit-Folgerunde, train-v230 (B185-B190, siehe AUDIT-BERECHNUNGEN.md). Davor: Runde-8-Datenkonsistenz-Sprint, train-v229. Davor: Runde-7-Coaching-Qualitäts-Sprint, train-v228. Davor: Runde-6-Nutzerfeedback-Fix-Sprint, train-v227. Davor: Runde-5-Fix-Sprint, train-v226. Ältere Sprints siehe SESSION_LOG.md.*
-*Nächster Schritt: **Runde 14 ist komplett abgeschlossen** (beide Code-Cluster + Doku-Cluster, siehe eigener Abschnitt unten). Aus Runde 13 weiterhin offen (nicht Teil von Runde 14): zwei NICHT code-seitig lösbare B62-Punkte (Rechts-Check vor Release zu Service-Worker-Caching; PWA-Installierbarkeit auf echtem Android-Gerät nach nächstem Release manuell verifizieren, siehe DECISIONS.md). Danach: B55 Impressum bleibt der einzige echte Blocker (wartet weiterhin auf echte Name-/Adress-/E-Mail-Angaben des Betreibers, siehe LEGAL.md). Aus dem Backlog-Review weiterhin offen (siehe `backlog-review-2026-08-03.txt`): B43 (CUSTOM_EX_DELETE räumt Kategorie nicht auf), B27 (Touch-Drag auf echtem Gerät), B66 (Toast nicht reproduzierbar, Observability wartet auf nächste Beobachtung), B173-Nebenfund (Wochen-Rec-Chip ohne Wdh-Reduzierung), VACATION_PLANS-Nebenfund aus B184 (Urlaubstage ohne Muskelgruppen-Tags), B176 (Portal-Refactor, zuletzt in Runde 10 bestätigt zurückgestellt). Bestätigte Infra-Grenze (weiterhin gültig, seit Runde 13 nicht mehr reproduziert): volle Playwright-Suite kann `npx serve` mit `EMFILE`/Dev-Server-Kontention abstürzen lassen — Workaround ist der Batch-Lauf, bei Verdacht auf Massenausfall in Isolation nachprüfen. Bekannte, wiederholt bestätigte Timing-Flakes (unabhängig von jeglichem Sprint-Code): `share_image.spec.js`/`share_image_v3.spec.js` (Download-Event-Timing), `deload_volumen.spec.js` (Backup-Reminder-Toast-Overlap), `plate_calculator.spec.js` (Live-Vorschau erster Tastendruck). Nicht committet: `Research/`, alle `context-exports/`-Updates + `Diagnose & Sprints/`-Exports (beide gitignored).*
+*Letzte Aktualisierung: 2026-08-04 — Runde 15 (Nutzerfeedback: Tag löschen, Plate-Setting, Körper-Tab), train-v237 (siehe eigener Abschnitt unten). Davor: Runde 14 (Coach-Signal-Governance), train-v236. Davor: Runde 13 (Council-Umsetzung B62+B140), train-v235. Davor: Runde 12 (Backlog-Aufräumrunde), train-v234 (B41/B42/B58/B139-Nebenfund/B179-Nebenfund abgeschlossen). Davor: Runde 11, train-v233 (B199, Update-Banner "Später"-Button). Davor: Runde 10 komplett (Teil 1 + Teil 2), train-v232 (B191-B198, B141/B176-Abschluss). Davor: Runde-9-Audit-Folgerunde, train-v230 (B185-B190, siehe AUDIT-BERECHNUNGEN.md). Davor: Runde-8-Datenkonsistenz-Sprint, train-v229. Davor: Runde-7-Coaching-Qualitäts-Sprint, train-v228. Davor: Runde-6-Nutzerfeedback-Fix-Sprint, train-v227. Davor: Runde-5-Fix-Sprint, train-v226. Ältere Sprints siehe SESSION_LOG.md.*
+*Nächster Schritt: **Runde 15 ist komplett abgeschlossen** (alle 3 Cluster, siehe eigener Abschnitt unten). Aus Runde 13 weiterhin offen: zwei NICHT code-seitig lösbare B62-Punkte (Rechts-Check vor Release zu Service-Worker-Caching; PWA-Installierbarkeit auf echtem Android-Gerät nach nächstem Release manuell verifizieren, siehe DECISIONS.md). Danach: B55 Impressum bleibt der einzige echte Blocker (wartet weiterhin auf echte Name-/Adress-/E-Mail-Angaben des Betreibers, siehe LEGAL.md). Aus dem Backlog-Review weiterhin offen (siehe `backlog-review-2026-08-03.txt`): B43 (CUSTOM_EX_DELETE räumt Kategorie nicht auf), B27 (Touch-Drag auf echtem Gerät), B66 (Toast nicht reproduzierbar, Observability wartet auf nächste Beobachtung), B173-Nebenfund (Wochen-Rec-Chip ohne Wdh-Reduzierung), VACATION_PLANS-Nebenfund aus B184 (Urlaubstage ohne Muskelgruppen-Tags), B176 (Portal-Refactor, zuletzt in Runde 10 bestätigt zurückgestellt). Bestätigte Infra-Grenze (weiterhin gültig, seit Runde 13 nicht mehr reproduziert): volle Playwright-Suite kann `npx serve` mit `EMFILE`/Dev-Server-Kontention abstürzen lassen — Workaround ist der Batch-Lauf, bei Verdacht auf Massenausfall in Isolation nachprüfen. Bekannte, wiederholt bestätigte Timing-Flakes (unabhängig von jeglichem Sprint-Code): `share_image.spec.js`/`share_image_v3.spec.js` (Download-Event-Timing, in Runde 15 wieder einmal als Flake bestätigt — 1 Retry, dann grün), `deload_volumen.spec.js` (Backup-Reminder-Toast-Overlap), `plate_calculator.spec.js` (Live-Vorschau erster Tastendruck). Nicht committet: `Research/`, alle `context-exports/`-Updates + `Diagnose & Sprints/`-Exports (beide gitignored).*
+
+---
+
+## Runde 15 — Nutzerfeedback: Tag löschen, Plate-Setting, Körper-Tab (train-v237, 2026-08-04)
+
+Basis: `Diagnose & Sprints/TRAIN-Sprint-Prompts-Runde15.md`, drei
+unabhängige Live-Nutzerfeedback-Punkte (2026-08-03). Keiner war vorab als
+Bug bestätigt — alle drei zuerst diagnostiziert, Cluster 3 zusätzlich per
+Rückfrage an den Nutzer entschieden (Sprint-Vorgabe: keine autonome
+Entscheidung bei einer echten Datenerhaltungs-Frage).
+
+- **Cluster 1 (B201):** "Tag löschen" war bereits EINE gemeinsame
+  Implementierung (Wochen-Menü-Dropdown + Settings-Tab, beide über
+  `remove-day`/`DAY_REMOVE`) — keine Konsolidierung zweier echter
+  Implementierungen nötig. Der `wk.days.length<=1`-Guard ist bewusst
+  korrekt. Echter Bug: Settings-Tab zeigte den Löschen-Button nur für den
+  jeweils LETZTEN Tag und ließ ihn bei nur noch 1 Tag komplett
+  verschwinden (statt disabled+erklärt wie im Dropdown) — genau das
+  gemeldete "konnte den letzten Tag nicht löschen". Fix: Button erscheint
+  jetzt bei jedem Tag, disabled+Tooltip statt Verschwinden bei 1 Tag.
+- **Cluster 2 (B202):** `largestPlate`-Picker speicherte nie einen Wert.
+  Root Cause per gezieltem Playwright-Repro + Kontrollvergleich gefunden:
+  `case 'set-largest-plate'` lag in `_handleChange()` (reagiert nur auf
+  `'change'`) statt `_handleClick()` — der Picker ist aber ein `<button>`,
+  feuert nie `'change'`. Die `calcPlates()`-Filterlogik selbst war immer
+  korrekt (bestehende Tests injizierten die Einstellung direkt in
+  `localStorage`, übten den echten Klick-Pfad nie aus). Fix: Case-Block
+  verschoben.
+- **Cluster 3 (B203):** Körper-Tab "Schlaf & Energie" ist reine Anzeige
+  (kein Eingabefeld — die Abfrage passiert beim Tagesabschluss). Nutzer
+  wählte nach Vorlage von 2 Optionen explizit: Eingabe behalten, Anzeige
+  aufwerten. Die bereits bestehende `calcSleepCorrelation()` (bisher nur
+  einmalig im Session-Summary) läuft jetzt zusätzlich persistent im
+  Körper-Tab, additiv neben der bestehenden Volumen-Korrelation — kein
+  Datenverlust, auch nicht für Nutzer ohne aktivierten Session Coach.
+
+**Tests:** 2 neue Tests in `tests/settings_reorg.spec.js` (Cluster 1), 1
+neuer Test in `tests/plate_calculator.spec.js` (Cluster 2, echter Klick-Pfad
+statt direkter State-Injektion), neue Datei
+`tests/body_tab_sleep_quality_insight.spec.js` (3 Tests, Cluster 3).
+
+CACHE_VERSION → `train-v237`. Volle Regressionssuite (80 Spec-Dateien, 400
+Tests) in 8 Batches — alle grün, ein bereits bekannter
+`share_image.spec.js`-Flake erholte sich im eingebauten Retry. BUGS.md
+(B201-B203) / DECISIONS.md (Cluster-3-Produktentscheidung) aktualisiert.
 
 ---
 

@@ -87,6 +87,27 @@ test('Runde 8/Cluster 4: largestPlate unset (Default 25) -> unverändertes Verha
   await expect(page.locator('.plate-hint')).toHaveText('+ 25+10  pro Seite · Stange 20kg');
 });
 
+// Runde 15 (Nutzerfeedback: "largestPlate-Setting wird nicht übernommen").
+// Root Cause: case 'set-largest-plate' lag fälschlich in _handleChange()
+// (reagiert auf das 'change'-DOM-Event) statt in _handleClick() -- der
+// Picker ist aber ein <button>, das nie 'change' feuert, nur 'click'. Die
+// beiden obigen Tests injizieren largestPlate direkt in localStorage und
+// hätten diesen Bug NIE gefangen, da sie den Klick-Pfad selbst nie
+// ausüben -- dieser Test tut genau das (echter Klick auf den Picker in
+// den Einstellungen).
+test('Runde 15: largestPlate-Picker in den Einstellungen (echter Klick) wirkt sich auf den Plate-Rechner aus', async ({ page }) => {
+  await seed(page, mkEx('Bankdrücken', { sets: [{ weight: 90, reps: 8, rpe: null, status: 'pending', done: false, note: '' }] }), 20, {}, undefined);
+  await expect(page.locator('.plate-hint')).toHaveText('+ 25+10  pro Seite · Stange 20kg');
+
+  await page.click('[data-tab="settings"]');
+  const btn15 = page.locator('[data-action="set-largest-plate"][data-plate="15"]');
+  await btn15.click();
+  await expect(btn15).toHaveAttribute('aria-pressed', 'true');
+
+  await page.click('[data-tab="workout"]');
+  await expect(page.locator('.plate-hint')).toHaveText('+ 2×15+5  pro Seite · Stange 20kg');
+});
+
 test('100kg / 20kg-Stange: "+ 25+15  pro Seite · Stange 20kg"', async ({ page }) => {
   await seed(page, mkEx('Kniebeuge', { sets: [{ weight: 100, reps: 5, rpe: null, status: 'pending', done: false, note: '' }] }));
   await expect(page.locator('.plate-hint')).toHaveText('+ 25+15  pro Seite · Stange 20kg');

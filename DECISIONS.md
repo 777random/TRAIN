@@ -282,6 +282,25 @@ Priorität innerhalb der Strukturkarte: Mehr-Übungen-Aggregation > Präventiver
 **Begründung:** Lineare ??-Kaskade kann nicht gleichzeitig "wichtigstes akutes Problem" und "wichtigstes strukturelles Problem" transportieren.
 **Gilt:** Permanent.
 
+### 2026-08-04 — Körper-Tab Schlaf/Energie: Eingabe behalten, Anzeige aufwerten statt ersetzen (Runde 15, B203)
+**Entscheidung:** Auf Nutzer-Feedback, die Körper-Tab-Fläche "Schlaf & Energie"
+wirke wenig wertvoll, wurden zwei Optionen mit Kosten/Nutzen vorgelegt:
+(A) Eingabe behalten + Anzeige um die bereits bestehende, aussagekräftigere
+`calcSleepCorrelation()` ergänzen, oder (B) die zugrunde liegende
+Tagesabschluss-Abfrage (`sleepHours`/`energyLevel`) selbst entfernen. Der
+Nutzer entschied sich explizit für (A). `calcSleepCorrelation()` läuft
+seither zusätzlich PERSISTENT im Körper-Tab (vorher nur einmalig im
+Session-Summary-Screen), additiv neben der bestehenden Volumen-Korrelation.
+**Begründung:** Option (B) hätte zwei bestehende Features gleichzeitig
+gekappt (die Körper-Tab-eigene Volumen-Korrelation UND
+`calcSleepCorrelation()` im Session-Summary, B79) — beide hängen an
+derselben Tagesabschluss-Eingabe. Kein Nutzerdaten-Vorteil hätte diesen
+Verlust aufgewogen, solange die reine Anzeige-Aufwertung (A) dasselbe
+Kernproblem ("Fläche fühlt sich wertlos an") ohne Datenverlust löst.
+**Gilt:** Bis neue Nutzerdaten zeigen, dass auch die aufgewertete Anzeige
+nicht überzeugt — dann wäre Option (B) erneut zu prüfen, diesmal mit vollem
+Bewusstsein über den Feature-Verlust.
+
 ---
 
 ## SICHERHEIT

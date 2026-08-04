@@ -139,7 +139,8 @@ test('Tag entfernen (roter Minus-Button): Inline-Panel statt nativem Dialog, Bes
   await seedWithTwoDays(page);
   const settingsScope = page.locator('#settings-tab-content');
 
-  // Nur der letzte Tag (di=1, "Tag B") zeigt den roten Minus-Button.
+  // Runde 15: der rote Minus-Button erscheint jetzt bei JEDEM Tag (vorher
+  // nur beim jeweils letzten) -- hier weiterhin gezielt der letzte Tag.
   await settingsScope.locator('[data-action="remove-day"][data-di="1"]').click();
 
   await expect(settingsScope.locator('[data-action="confirm-remove-day"][data-di="1"]')).toBeVisible({ timeout: 3000 });
@@ -173,6 +174,64 @@ test('Tag entfernen: Abbrechen im Inline-Panel laesst beide Tage unangetastet', 
   expect(titles).toEqual(['Tag A', 'Tag B']);
 
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});
+
+// Runde 15 (Nutzerfeedback: Tag löschen wirkte "kompliziert und nicht
+// intuitiv"): der rote Minus-Button war im Settings-Tab bisher NUR beim
+// jeweils letzten Tag der Liste sichtbar (di === days.length-1) -- ein
+// Nutzer, der einen ANDEREN Tag entfernen wollte, fand dort keine
+// Möglichkeit dazu, obwohl DAY_REMOVE (state.js) jeden Index unterstützt.
+// Fix: Button erscheint jetzt bei jedem Tag.
+test('Tag entfernen: roter Minus-Button erscheint jetzt bei JEDEM Tag, nicht nur beim letzten', async ({ page }) => {
+  await seedWithTwoDays(page);
+  const settingsScope = page.locator('#settings-tab-content');
+
+  await expect(settingsScope.locator('[data-action="remove-day"][data-di="0"]')).toBeVisible();
+  await settingsScope.locator('[data-action="remove-day"][data-di="0"]').click();
+  await expect(settingsScope.locator('[data-action="confirm-remove-day"][data-di="0"]')).toBeVisible({ timeout: 3000 });
+  await settingsScope.locator('[data-action="confirm-remove-day"][data-di="0"]').click();
+  await page.waitForTimeout(150);
+
+  const st = await page.evaluate(() => JSON.parse(localStorage.getItem('train_v6')));
+  const titles = st.weeks[0].days.map(d => d.title);
+  expect(titles).toEqual(['Tag B']);
+});
+
+// Zweiter Teil desselben Befunds: bei genau 1 verbleibendem Tag verschwand
+// der Button bisher komplett (kein disabled-Zustand, keine Erklärung) --
+// identisch verwirrend wie das gemeldete "konnte den letzten Tag nicht
+// löschen". Fix: Button bleibt sichtbar, aber disabled + Tooltip, analog
+// zum bereits bestehenden Guard im Wochen-Menü-Dropdown.
+test('Tag entfernen: bei nur noch 1 Tag ist der Button sichtbar aber disabled (nicht mehr unsichtbar)', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForSelector('#app.is-ready', { timeout: 10000 });
+  await page.evaluate(() => {
+    const todayISO = new Date().toISOString().split('T')[0];
+    localStorage.setItem('train_v6', JSON.stringify({
+      meta: { schemaVersion: 32, savedAt: Date.now(), createdAt: Date.now() },
+      curIdx: 0,
+      weeks: [{
+        id: 1, startDate: todayISO, note: '', mode: 'standard',
+        days: [{ id: 11, title: 'Tag A', subtitle: '', warmup: '', cooldown: '',
+          locked: false, markedDone: false, isVacation: false,
+          sleepHours: null, energyLevel: null, exercises: [] }],
+        sessionLog: [], bodyData: {}, restDays: [], isSeedWeek: false,
+      }],
+      onboardingDone: true,
+      customTemplate: [], settings: { sessionCoach: true, rpeEnabled: true },
+      favoriteExercises: [], customExercises: [], prs: {}, coachPerformance: { suggestions: [] },
+      coachQuestion: null, coachQuestionHistory: [], lastReentryHandled: null,
+      plateauActions: {}, decisionLog: [], badges: [], longestStreakEver: 0, seenTips: [],
+    }));
+  });
+  await page.reload();
+  await page.waitForSelector('#app.is-ready', { timeout: 10000 });
+  await page.click('[data-tab="settings"]');
+
+  const btn = page.locator('#settings-tab-content [data-action="remove-day"][data-di="0"]');
+  await expect(btn).toBeVisible();
+  await expect(btn).toBeDisabled();
+  await expect(btn).toHaveAttribute('title', /Mindestens ein Trainingstag/);
 });
 
 // Befund (Minor): Stangengewicht-Feld akzeptierte unrealistisch hohe Werte
