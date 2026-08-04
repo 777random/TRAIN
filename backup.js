@@ -147,13 +147,25 @@ export function importJSON(file) {
       if (!parsed || !Array.isArray(parsed.weeks)) {
         reject(new Error('Keine Trainingsdaten gefunden (weeks-Array fehlt).')); return;
       }
-      if (!parsed.meta?.schemaVersion) {
-        reject(new Error('⚠️ Ungültige Backup-Datei. Import abgebrochen.')); return;
-      }
-      if (!parsed.settings || typeof parsed.settings !== 'object') {
-        reject(new Error('⚠️ Ungültige Backup-Datei. Import abgebrochen.')); return;
-      }
-      const importedVersion = parsed.meta.schemaVersion;
+      // Phase B/Launch-Roadmap (2026-08-04, Szenario 22 -- Regressionsfund):
+      // bis hierhin erforderten meta.schemaVersion + settings hart vorhanden
+      // zu sein, sonst "Ungültiges Backup" -- das lehnte echte, sehr alte
+      // Backups ab (vor SCHEMA 6 hatten Exporte weder meta noch settings),
+      // obwohl migrate() (state.js) genau das längst robust abfängt
+      // (`v = raw?.meta?.schemaVersion ?? 0`, siehe auch
+      // tests/migration_matrix.spec.js "v0 -> v33"-Test, der exakt so eine
+      // Fixture erfolgreich über den localStorage-Boot-Pfad migriert). Diese
+      // Strenge kam erst nachträglich dazu (Commit ccd22d5, 2026-06-19) --
+      // der ursprüngliche Kommentar davor lautete wörtlich "warn but still
+      // import (migrate() will handle it)". Zurück zu dieser Philosophie:
+      // fehlendes/ungültiges settings wird defensiv auf {} normiert (wie
+      // migrate() es sonst täte), fehlende schemaVersion gilt als v0 --
+      // STATE_IMPORT (state.js) ruft ohnehin migrate() auf den importierten
+      // State auf, bevor irgendetwas übernommen wird. Die `weeks`-Array-
+      // Prüfung oben bleibt die eigentliche "ist das überhaupt ein
+      // TRAIN-Backup"-Hürde.
+      if (!parsed.settings || typeof parsed.settings !== 'object') parsed.settings = {};
+      const importedVersion = parsed.meta?.schemaVersion ?? 0;
       if (importedVersion > SCHEMA_VERSION) {
         console.warn(`[TRAIN] Importing from newer schema (${importedVersion} > ${SCHEMA_VERSION}).`);
       }

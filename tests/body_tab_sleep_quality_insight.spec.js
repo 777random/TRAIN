@@ -63,20 +63,20 @@ function buildSleepQualityWeeks() {
   return weeks;
 }
 
-async function seed(page, weeks) {
+async function seed(page, weeks, settingsOverride = { sessionCoach: true, rpeEnabled: true }) {
   await page.goto('/');
   await page.waitForSelector('#app.is-ready', { timeout: 10000 });
-  await page.evaluate((weeksArg) => {
+  await page.evaluate(({ weeksArg, settingsArg }) => {
     localStorage.setItem('train_v6', JSON.stringify({
       meta: { schemaVersion: 33, savedAt: Date.now(), createdAt: Date.now() },
       curIdx: weeksArg.length - 1, weeks: weeksArg,
-      customTemplate: [], settings: { sessionCoach: true, rpeEnabled: true },
+      customTemplate: [], settings: settingsArg,
       favoriteExercises: [], customExercises: [], prs: {}, coachPerformance: { suggestions: [] },
       coachQuestion: null, coachQuestionHistory: [], lastReentryHandled: null,
       plateauActions: {}, decisionLog: [], badges: [], onboardingDone: true,
       longestStreakEver: 0, seenTips: [],
     }));
-  }, weeks);
+  }, { weeksArg: weeks, settingsArg: settingsOverride });
   await page.reload();
   await page.waitForSelector('#app.is-ready', { timeout: 10000 });
 }
@@ -136,4 +136,20 @@ test('Körper-Tab: bestehende Volumen-Korrelation bleibt unverändert neben der 
   await expect(page.locator('#body-tab-content .insight-card')).toHaveCount(1);
   await page.locator('[data-action="toggle-sleep-quality-insight"]').click();
   await expect(page.locator('#body-tab-content .insight-card')).toHaveCount(2);
+});
+
+// Launch-Roadmap Phase B, Kategorie 5, Szenario 21: Session Coach AKTUELL
+// deaktiviert, aber der Nutzer hat HISTORISCHE sessionCheckIn-Daten aus
+// einer Zeit, als der Toggle noch aktiv war (nachträglich umgeschaltet).
+// calcSleepCorrelation() wird in renderBodyTab() UNBEDINGT aufgerufen (kein
+// `if (settings.sessionCoach)`-Gate) -- die Erkenntnis muss also weiterhin
+// auf Basis der alten Daten erscheinen, nicht durch den aktuellen
+// Toggle-Zustand verschwinden.
+test('Körper-Tab zeigt die Schlaf-Erfolgsquote-Beobachtung weiterhin, wenn Session Coach AKTUELL deaktiviert ist (historische Daten)', async ({ page }) => {
+  await seed(page, buildSleepQualityWeeks(), { sessionCoach: false, rpeEnabled: true });
+
+  await page.click('[data-tab="body"]');
+  await page.waitForTimeout(300);
+
+  await expect(page.locator('[data-action="toggle-sleep-quality-insight"]')).toBeVisible();
 });

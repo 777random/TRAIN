@@ -1,7 +1,18 @@
 # TRAIN — CLAUDE.md
 # Vollständiger Projektkontext für Claude Code
-# Stand: train-v238 / SCHEMA 33 / August 2026
-# Letztes Update: nach train-v238, Launch-Roadmap Phase A (2026-08-04) —
+# Stand: train-v239 / SCHEMA 33 / August 2026
+# Letztes Update: nach train-v239, Launch-Roadmap Phase B (2026-08-04) —
+# 25 Stabilitäts-Testszenarien (7 Kategorien, von Claude Cowork) gegen den
+# aktuellen Code-Stand geprüft (Baseline vor dem Phase-C-Redesign). 1
+# echter Bug gefunden+gefixt (B205): backup.js importJSON() lehnte sehr
+# alte, legitime Backups (vor SCHEMA 6) über den ECHTEN Restore-Pfad
+# fälschlich ab, obwohl migrate() sie längst korrekt verarbeitet -- alle
+# bisherigen Migrations-Tests hatten localStorage direkt injiziert statt
+# den echten Restore-UI-Pfad zu prüfen. 4 echte Test-Lücken geschlossen
+# (Mehr-Signal-Kollision, Alle-Settings-AUS/AN, Negativ-Gewicht-Reducer-
+# Floor, Session-Coach-Historie), kein weiterer Bug gefunden. Siehe
+# HANDOFF.md für Details.
+# Davor train-v238, Launch-Roadmap Phase A (2026-08-04) —
 # neues lebendes Master-Dokument `Diagnose & Sprints/TRAIN-Launch-
 # Roadmap.md` (8 Phasen bis Launch) angelegt, Phase A (Verifikation
 # Runde 13-15 gegen tatsächliches Verhalten) abgeschlossen. Fund (B204):
@@ -111,7 +122,7 @@ TRAIN ist eine deutschsprachige PWA für Krafttraining. Pure Vanilla ES Modules 
   Sessions müssen aus diesem neuen Pfad heraus gestartet werden, sonst
   landet man am alten (jetzt leeren) OneDrive-Ort. Nutzer zieht den Ordner
   regelmäßig manuell auf eine externe Festplatte statt über Cloud-Sync.
-- Aktueller Stand: SCHEMA_VERSION 33 · CACHE_VERSION train-v238 · CSS ?v=213
+- Aktueller Stand: SCHEMA_VERSION 33 · CACHE_VERSION train-v239 · CSS ?v=213
 
 ---
 

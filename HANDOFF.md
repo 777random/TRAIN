@@ -1,6 +1,47 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-08-04 — Launch-Roadmap Phase A (Verifikation), train-v238 (siehe eigener Abschnitt unten). Davor: Runde 15 (Nutzerfeedback: Tag löschen, Plate-Setting, Körper-Tab), train-v237. Davor: Runde 14 (Coach-Signal-Governance), train-v236. Davor: Runde 13 (Council-Umsetzung B62+B140), train-v235. Davor: Runde 12 (Backlog-Aufräumrunde), train-v234 (B41/B42/B58/B139-Nebenfund/B179-Nebenfund abgeschlossen). Davor: Runde 11, train-v233 (B199, Update-Banner "Später"-Button). Davor: Runde 10 komplett (Teil 1 + Teil 2), train-v232 (B191-B198, B141/B176-Abschluss). Davor: Runde-9-Audit-Folgerunde, train-v230 (B185-B190, siehe AUDIT-BERECHNUNGEN.md). Davor: Runde-8-Datenkonsistenz-Sprint, train-v229. Davor: Runde-7-Coaching-Qualitäts-Sprint, train-v228. Davor: Runde-6-Nutzerfeedback-Fix-Sprint, train-v227. Davor: Runde-5-Fix-Sprint, train-v226. Ältere Sprints siehe SESSION_LOG.md.*
-*Nächster Schritt: **Launch-Roadmap Phase A ist abgeschlossen** (siehe `Diagnose & Sprints/TRAIN-Launch-Roadmap.md` + eigener Abschnitt unten). Nächste Phase laut Roadmap: **Phase B — Stabilitäts-Baseline** (wartet auf konkrete Testszenarien von Claude Cowork). Aus Runde 13 weiterhin offen: zwei NICHT code-seitig lösbare B62-Punkte (Rechts-Check vor Release zu Service-Worker-Caching; PWA-Installierbarkeit auf echtem Android-Gerät nach nächstem Release manuell verifizieren, siehe DECISIONS.md). Danach: B55 Impressum bleibt der einzige echte Blocker (wartet weiterhin auf echte Name-/Adress-/E-Mail-Angaben des Betreibers, siehe LEGAL.md). Aus dem Backlog-Review weiterhin offen (siehe `backlog-review-2026-08-03.txt`): B43 (CUSTOM_EX_DELETE räumt Kategorie nicht auf), B27 (Touch-Drag auf echtem Gerät), B66 (Toast nicht reproduzierbar, Observability wartet auf nächste Beobachtung), B173-Nebenfund (Wochen-Rec-Chip ohne Wdh-Reduzierung), VACATION_PLANS-Nebenfund aus B184 (Urlaubstage ohne Muskelgruppen-Tags), B176 (Portal-Refactor, zuletzt in Runde 10 bestätigt zurückgestellt). Bestätigte Infra-Grenze (weiterhin gültig, seit Runde 13 nicht mehr reproduziert): volle Playwright-Suite kann `npx serve` mit `EMFILE`/Dev-Server-Kontention abstürzen lassen — Workaround ist der Batch-Lauf, bei Verdacht auf Massenausfall in Isolation nachprüfen. Bekannte, wiederholt bestätigte Timing-Flakes (unabhängig von jeglichem Sprint-Code): `share_image.spec.js`/`share_image_v3.spec.js` (Download-Event-Timing, erneut bestätigt — 1 Retry/Isolation, dann grün), `deload_volumen.spec.js` (Backup-Reminder-Toast-Overlap), `plate_calculator.spec.js` (Live-Vorschau erster Tastendruck). Nicht committet: `Research/`, alle `context-exports/`-Updates + `Diagnose & Sprints/`-Exports (beide gitignored).*
+*Letzte Aktualisierung: 2026-08-04 — Launch-Roadmap Phase B (Stabilitäts-Baseline), train-v239 (siehe eigener Abschnitt unten). Davor: Launch-Roadmap Phase A (Verifikation), train-v238. Davor: Runde 15 (Nutzerfeedback: Tag löschen, Plate-Setting, Körper-Tab), train-v237. Davor: Runde 14 (Coach-Signal-Governance), train-v236. Davor: Runde 13 (Council-Umsetzung B62+B140), train-v235. Davor: Runde 12 (Backlog-Aufräumrunde), train-v234 (B41/B42/B58/B139-Nebenfund/B179-Nebenfund abgeschlossen). Davor: Runde 11, train-v233 (B199, Update-Banner "Später"-Button). Davor: Runde 10 komplett (Teil 1 + Teil 2), train-v232 (B191-B198, B141/B176-Abschluss). Davor: Runde-9-Audit-Folgerunde, train-v230 (B185-B190, siehe AUDIT-BERECHNUNGEN.md). Davor: Runde-8-Datenkonsistenz-Sprint, train-v229. Davor: Runde-7-Coaching-Qualitäts-Sprint, train-v228. Davor: Runde-6-Nutzerfeedback-Fix-Sprint, train-v227. Davor: Runde-5-Fix-Sprint, train-v226. Ältere Sprints siehe SESSION_LOG.md.*
+*Nächster Schritt: **Launch-Roadmap Phase B ist abgeschlossen** (siehe `Diagnose & Sprints/TRAIN-Launch-Roadmap.md` + eigener Abschnitt unten). Nächste Phase laut Roadmap: **Phase C — UX-/Feature-Redesign-Review** (Startpunkt laut Roadmap: Einstellungen wirken unübersichtlich; größere strukturelle Änderungen dort einzeln auf Council-Würdigkeit prüfen). Aus Runde 13 weiterhin offen: zwei NICHT code-seitig lösbare B62-Punkte (Rechts-Check vor Release zu Service-Worker-Caching; PWA-Installierbarkeit auf echtem Android-Gerät nach nächstem Release manuell verifizieren, siehe DECISIONS.md). Danach: B55 Impressum bleibt der einzige echte Blocker (wartet weiterhin auf echte Name-/Adress-/E-Mail-Angaben des Betreibers, siehe LEGAL.md). Aus dem Backlog-Review weiterhin offen (siehe `backlog-review-2026-08-03.txt`): B43 (CUSTOM_EX_DELETE räumt Kategorie nicht auf), B27 (Touch-Drag auf echtem Gerät), B66 (Toast nicht reproduzierbar, Observability wartet auf nächste Beobachtung), B173-Nebenfund (Wochen-Rec-Chip ohne Wdh-Reduzierung), VACATION_PLANS-Nebenfund aus B184 (Urlaubstage ohne Muskelgruppen-Tags), B176 (Portal-Refactor, zuletzt in Runde 10 bestätigt zurückgestellt). Bestätigte Infra-Grenze (weiterhin gültig, seit Runde 13 nicht mehr reproduziert): volle Playwright-Suite kann `npx serve` mit `EMFILE`/Dev-Server-Kontention abstürzen lassen — Workaround ist der Batch-Lauf, bei Verdacht auf Massenausfall in Isolation nachprüfen. Bekannte, wiederholt bestätigte Timing-Flakes (unabhängig von jeglichem Sprint-Code, alle bei Retry/Isolation grün): `share_image.spec.js`/`share_image_v3.spec.js` (Download-Event-Timing), `deload_volumen.spec.js` (Backup-Reminder-Toast-Overlap), `plate_calculator.spec.js` (Live-Vorschau erster Tastendruck), NEU seit Phase B: `settings_combination_smoke.spec.js` Szenario 20 (Timing unter Batch-Parallel-Last, 3x in Isolation bestätigt grün). Nicht committet: `Research/`, alle `context-exports/`-Updates + `Diagnose & Sprints/`-Exports (beide gitignored).*
+
+---
+
+## Launch-Roadmap Phase B — Stabilitäts-Baseline (train-v239, 2026-08-04)
+
+Basis: `Diagnose & Sprints/TRAIN-Phase-B-Stabilitaets-Testszenarien.md` (25
+Szenarien über 7 Kategorien von Claude Cowork). Voller Bericht in
+`diagnose-phase-b-stabilitaet-2026-08-04.txt`. Nicht alle 25 blind in
+Tests umgesetzt (wie vorgegeben) — pro Punkt zuerst Diagnose, dann gezielt
+Tests nur für echte Lücken.
+
+**1 echter Bug gefunden + gefixt (B205):** `backup.js` `importJSON()`
+lehnte sehr alte, legitime Backups (vor SCHEMA 6, ohne `meta.schemaVersion`/
+`settings`) über den ECHTEN Restore-Pfad hart als "Ungültiges Backup" ab —
+obwohl `state.js` `migrate()` sie längst korrekt verarbeitet (derselbe
+Fixture-Inhalt migriert über den localStorage-Boot-Pfad in
+`tests/migration_matrix.spec.js` bereits erfolgreich). Root Cause: eine
+Verschärfung von Mitte Juni (Commit ccd22d5) ging über ihr eigentliches
+Ziel hinaus; der ursprüngliche Kommentar davor lautete wörtlich "warn but
+still import (migrate() will handle it)". Fix kehrt zu dieser Philosophie
+zurück: fehlendes `settings` wird auf `{}` normiert, fehlende
+`schemaVersion` gilt als v0. **Wichtiger methodischer Befund:** ALLE
+bisherigen Migrations-Tests injizierten `localStorage` direkt und umgingen
+`backup.js` komplett — der echte Restore-UI-Pfad war vor diesem Fund nur in
+einem einzigen Test überhaupt geprüft. Genau die Art Blindspot, die Phase B
+finden sollte.
+
+**4 echte Test-Lücken geschlossen, kein weiterer Bug gefunden** (bestehende
+Guards hielten in allen 4 Fällen):
+- Mehrere Struktursignale gleichzeitig (`tests/coach_multi_signal_collision.spec.js`) — Deckelung auf max. 2 + Priorität bestätigt.
+- Alle optionalen Settings gleichzeitig AUS/AN (`tests/settings_combination_smoke.spec.js`) — kein Crash, kein Interaktions-Bug.
+- Negatives Gewicht (`tests/input_floor_guards.spec.js`) — B144s Reducer-Floor war nie dediziert regressionsgesichert.
+- Session Coach aktuell deaktiviert, aber historische Daten (`tests/body_tab_sleep_quality_insight.spec.js`, +1 Test) — Erkenntnis bleibt korrekt sichtbar.
+
+Restliche Szenarien (v.a. niedrige Priorität: Datenvolumen, Eingabe-
+Grenzwerte, Datums-Grenzfälle) bewusst nicht vertieft geprüft — kein
+Hinweis auf reales Risiko in den bestehenden Code-Pfaden gefunden.
+
+CACHE_VERSION → `train-v239`. Volle Regressionssuite (83 Spec-Dateien,
+~409 Tests) grün bis auf die bekannten Flakes (siehe Top-Absatz).
+BUGS.md (B205) aktualisiert.
 
 ---
 
