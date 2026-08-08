@@ -1,7 +1,16 @@
 # TRAIN — CLAUDE.md
 # Vollständiger Projektkontext für Claude Code
 # Stand: train-v241 / SCHEMA 33 / August 2026
-# Letztes Update: nach train-v241, Runde 17 (2026-08-04) -- vier unabhängige
+# Letztes Update: Externes Produkt-Briefing (2026-08-04, keine Code-
+# Aenderung) -- eigenstaendig lesbares Dokument fuer eine unabhaengige
+# Produkteinschaetzung ausserhalb des TRAIN-eigenen LLM-Council-Setups
+# erstellt (`Diagnose & Sprints/TRAIN-Produkt-Briefing-Extern.txt`,
+# gitignored). Abschnitte 5-8 (Feature-Uebersicht, Retention-Mechanismen,
+# Einstellungen, Stand) vollstaendig aus der echten Codebasis befuellt,
+# u.a. mit dem Befund, dass die Abzeichen-Vergabe im Code vollstaendig
+# vorhanden, aber seit einem frueheren Cleanup-Sprint eingefroren ist.
+# Siehe HANDOFF.md für Details.
+# Davor train-v241, Runde 17 (2026-08-04) -- vier unabhängige
 # Live-Nutzerfeedback-Punkte. B209: "Plain Mode"-Preset (neue Settings-
 # Karte, buendelt 6 bestehende Settings auf einen Klick, Master
 # "Automatische Wochenerstellung" bleibt bewusst an). B210: Vibrations-Bug
