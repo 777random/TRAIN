@@ -11,11 +11,65 @@ const _h = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').repla
 // Echter ISO-8601-Algorithmus (Donnerstag-Verschiebung), B194
 // (Runde 10, Domäne A): die vorherige Näherungsformel wich an
 // Jahresgrenzen ab — vereinheitlicht mit ui.js' wkLabel()/_isoWeek().
+// Bewusst weiterhin genutzt für das SHARE-BILD (shareWeekReviewImage) —
+// ein geteiltes Bild braucht einen absoluten Zeitanker ("KW 32"), nicht
+// "Diese Woche", das außerhalb des Teilzeitpunkts seinen Sinn verliert.
 function _kw(sd) {
   const d = new Date(sd + 'T12:00:00');
   d.setDate(d.getDate() + 4 - (d.getDay() || 7));
   const yearStart = new Date(d.getFullYear(), 0, 1);
   return Math.ceil(((d - yearStart) / 86_400_000 + 1) / 7);
+}
+
+// 'YYYY-MM-DD' aus lokalen Datumskomponenten (kein toISOString()/UTC-
+// Rollover) — Duplikat von ui.js' _localISODate().
+function _localISODate(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// Findet die Woche, deren Datumsbereich das echte heutige Kalenderdatum
+// enthält — Duplikat von ui.js' _calendarCurrentWeek() (Import aus ui.js
+// wäre zirkulär, da ui.js bereits weekReviewModal.js importiert).
+function _calendarCurrentWeek(weeks) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return weeks.find(w => {
+    const start = new Date(w.startDate + 'T00:00:00');
+    const end   = new Date(start);
+    end.setDate(end.getDate() + 7);
+    return start <= today && today < end;
+  }) ?? null;
+}
+
+// Runde 18 (Cluster 2.1): Duplikat von ui.js' _weekLabel() — die
+// Wochenrückblick-Modal zeigte im Dropdown bereits "Diese Woche"/"Letzte
+// Woche" (über ui.js' eigene _weekLabel()-Nutzung), aber im Modal-Text
+// selbst weiterhin die rohe "KW XX"-Nummer über das lokale _kw() — zwei
+// unterschiedliche Bezeichnungen für dieselbe Woche an zwei Stellen. Diese
+// Datei kann _weekLabel() nicht aus ui.js importieren (zirkulär, ui.js
+// importiert bereits weekReviewModal.js), daher dieselbe intentionale
+// Duplikation wie bei _kw()/_dayISODate() an anderer Stelle im Projekt.
+// Liefert immer einen String (nie null), Fallback: KW-Anzeige.
+function _weekLabel(week, weeks) {
+  const currentWeek = _calendarCurrentWeek(weeks);
+  if (currentWeek) {
+    if (week.startDate === currentWeek.startDate) return 'Diese Woche';
+
+    const nextMonday = new Date(currentWeek.startDate + 'T00:00:00');
+    nextMonday.setDate(nextMonday.getDate() + 7);
+    if (week.startDate === _localISODate(nextMonday)) return 'Nächste Woche';
+
+    const lastMonday = new Date(currentWeek.startDate + 'T00:00:00');
+    lastMonday.setDate(lastMonday.getDate() - 7);
+    if (week.startDate === _localISODate(lastMonday)) return 'Letzte Woche';
+
+    const weekStart = new Date(week.startDate + 'T00:00:00');
+    const curStart = new Date(currentWeek.startDate + 'T00:00:00');
+    const weeksAgo = Math.round((curStart - weekStart) / (7 * 24 * 60 * 60 * 1000));
+    if (weeksAgo >= 2 && weeksAgo <= 8) return `Vor ${weeksAgo} Wochen`;
+  }
+  const d = new Date(week.startDate + 'T12:00:00');
+  return `KW ${_kw(week.startDate)} · ${d.getFullYear()}`;
 }
 
 const _MONTHS = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
@@ -169,13 +223,13 @@ function _cards(items, mod) {
  */
 export function renderWeekReviewHtml(reviewData) {
   const { summary, highlights, lowlights, recommendations, isDeload, isVacation, week } = reviewData;
-  const kw = String(_kw(week.startDate)).padStart(2, '0');
+  const weekLabel = _weekLabel(week, reviewData.allWeeks ?? [week]);
 
   return `
   ${isVacation ? '<div class="wr-vacation-banner">🏖 Urlaubswoche — unterbricht deinen Trainingsrhythmus nicht</div>' : ''}
   ${isDeload ? '<div class="wr-deload-banner">Deload-Woche — reduziertes Volumen erwartet</div>' : ''}
   <div class="wr-kw-row">
-    <span class="wr-kw">KW ${kw}</span>
+    <span class="wr-kw">${_h(weekLabel)}</span>
     ${week.note ? `<span class="wr-note">${_h(week.note)}</span>` : ''}
   </div>
 
@@ -215,7 +269,7 @@ export function showWeekReviewModal(reviewData, onContinue) {
   }
 
   const { week } = reviewData;
-  const kw = String(_kw(week.startDate)).padStart(2, '0');
+  const weekLabel = _weekLabel(week, reviewData.allWeeks ?? [week]);
 
   overlay.innerHTML = `
   <div class="modal wr-modal">
@@ -223,7 +277,7 @@ export function showWeekReviewModal(reviewData, onContinue) {
       <span class="wr-modal-icon" aria-hidden="true">📋</span>
       <div>
         <div class="modal__title" id="wr-modal-title">Wochenrückblick</div>
-        <div class="wr-modal-sub">KW ${kw}${week.note ? ' · ' + _h(week.note) : ''}</div>
+        <div class="wr-modal-sub">${_h(weekLabel)}${week.note ? ' · ' + _h(week.note) : ''}</div>
       </div>
     </div>
     ${renderWeekReviewHtml(reviewData)}

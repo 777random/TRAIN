@@ -3895,7 +3895,14 @@ function _buildCoachQuestionCard(state, focus) {
       { answer: 'yes', label: 'Ja, deutlich anstrengender' },
       { answer: 'no',  label: 'Nein, fühlt sich normal an' },
     ];
-  } else if (focus.status === 'progression' && focus.confidence === 'medium') {
+  } else if (focus.status === 'progression' && (focus.confidence === 'medium' || focus.confidence === 'high')) {
+    // Runde 18 (Cluster 1): ursprünglich nur 'medium' — für einen
+    // konstant mit hoher Konfidenz progredierenden Athleten (der
+    // Normalfall) feuerte dadurch praktisch nie eine coachQuestion, das
+    // Decision-Logging-Feature blieb faktisch unsichtbar. qid/Outcome-
+    // Messung bleiben identisch (progression_feeling, siehe
+    // _checkDecisionOutcomes oben), Frage funktioniert unverändert für
+    // beide Konfidenzstufen.
     qid = 'progression_feeling';
     questionText = `Wie hat sich dein letztes Training bei ${h(focus.exerciseName ?? '')} angefühlt?`;
     options = [
@@ -4008,6 +4015,19 @@ function renderCoachTab(state) {
     return `<div class="coach-confidence ${h(conf.cls)}">● ${h(conf.text)}</div>${dataHint}`;
   })() : '';
 
+  // Runde 18 (Cluster 1): decisionLog-Track-Record ("Weitertrainieren hat
+  // bei dir X-mal funktioniert") war bisher nur als leiser Fließtext im
+  // "▾ Basis dieser Einschätzung"-Collapse sichtbar (Standard: eingeklappt)
+  // — praktisch niemand hat ihn je gesehen, obwohl der Mechanismus bereits
+  // korrekt lief. Jetzt direkt sichtbar, gleiche visuelle Behandlung wie
+  // .coach-confidence (Akzentfarbe statt der vorherigen gedämpften
+  // Kursiv-Fußnote), NICHT mehr zusätzlich im Collapse dupliziert.
+  const relevantDecisionHistory = (state.decisionLog ?? [])
+    .filter(e => e.type === focus.status && e.outcome !== null);
+  const decisionHistoryText = _decisionHistoryConclusion(relevantDecisionHistory);
+  const decisionHistoryHtml = decisionHistoryText
+    ? `<div class="coach-decision-track-record">◆ ${h(decisionHistoryText)}</div>` : '';
+
   // Aktive Entscheidung aus decisionLog (Button-Zustand + Hinweis)
   const activeDecision = balance ? (state.decisionLog ?? [])
     .filter(e => e.type === focus.status && e.outcome === null)
@@ -4051,11 +4071,9 @@ function renderCoachTab(state) {
   // MIT evidence lohnt sich das Aufklappen aber immer (AC1/AC6).
   const hasEvidence = Array.isArray(focus.evidence) && focus.evidence.length > 0;
   const whyHtml = (focus.status !== 'onTrack' || hasEvidence || (focus.reasoning != null && focus.reasoning !== directive)) ? (() => {
-    const relevantHistory = (state.decisionLog ?? [])
-      .filter(e => e.type === focus.status && e.outcome !== null);
-    const historyText = _decisionHistoryConclusion(relevantHistory);
-    const historyHtml = historyText
-      ? `<p class="coach-decision-history">${h(historyText)}</p>` : '';
+    // decisionHistoryHtml (Track-Record) wird seit Runde 18 oben, außerhalb
+    // dieses Collapse, prominent gerendert (siehe decisionHistoryHtml) —
+    // hier bewusst nicht mehr dupliziert.
     const balanceBodyHtml = balance ? `
       ${_renderOption(balance.stayOption)}
       ${_renderOption(balance.changeOption)}
@@ -4065,7 +4083,6 @@ function renderCoachTab(state) {
       <summary class="pr-collapse__summary">▾ Basis dieser Einschätzung</summary>
       <div class="pr-collapse__body">
         <p class="coach-focus-reasoning">${h(focus.reasoning)}</p>
-        ${historyHtml}
         ${balanceBodyHtml}
         ${_evidenceHtml(focus.evidence)}
       </div>
@@ -4147,6 +4164,7 @@ function renderCoachTab(state) {
     <p class="coach-focus-directive">${h(directive)}</p>
     ${focus.subtext ? `<p class="coach-focus-subtext">${h(focus.subtext)}</p>` : ''}
     ${confidenceHtml}
+    ${decisionHistoryHtml}
     ${decisionBtnsHtml}
     ${whyHtml}
     ${plateauActionsHtml}
@@ -8137,6 +8155,9 @@ function _recSubline(r, rpeEnabled) {
   const parts = [statusText];
   if (rpeMatch)  parts.push(`RPE ${rpeMatch[1]}${rpeIntense ? ' zu intensiv' : ''}`);
   if (rateMatch) parts.push(`${rateMatch[1]}%`);
+  // Runde 18 (Cluster 4b): macht sichtbar, dass die Empfehlung auf
+  // mehreren Tagen derselben Woche basiert, statt wie ein Zufall zu wirken.
+  if (r.multiDayTitles) parts.push(`basiert auf ${r.multiDayTitles.join(' + ')}`);
 
   return `${hasWarn ? '⚠ ' : ''}${parts.join(' · ')}`;
 }
@@ -8231,6 +8252,21 @@ function _prepNewWeekModal() {
     if (calcWeeks.length >= 2) {
       const seen = new Set();
       const _autoSelections = [];
+      // Runde 18 (Cluster 4b): eine Übung kann an mehreren Tagen derselben
+      // Woche vorkommen (z.B. "Kreuzheben" an Tag B UND Tag C) — die
+      // Wochen-Empfehlung selbst bleibt bewusst NAME-basiert (calcWeeks
+      // verschmilzt beide Tage, sportlich korrekt, siehe
+      // weightRecommendation.js), aber JEDE Tages-Instanz muss ihr eigenes
+      // nextWeekPlanConfirmed-Flag bekommen, wenn die Empfehlung übernommen
+      // wird — vorher bekam nur die zuerst gefundene Instanz das Flag.
+      const _nameToInstances = new Map();
+      curWk.days.forEach((day, di) => {
+        (day.exercises ?? []).forEach((ex, ei) => {
+          if (ex.substituteFor) return;
+          if (!_nameToInstances.has(ex.name)) _nameToInstances.set(ex.name, []);
+          _nameToInstances.get(ex.name).push({ di, ei, dayTitle: day.title, ex });
+        });
+      });
       curWk.days.forEach((day, di) => {
         (day.exercises ?? []).forEach((ex, ei) => {
           if (seen.has(ex.name)) return;
@@ -8280,10 +8316,24 @@ function _prepNewWeekModal() {
               && ex.nextWeekPlan === _userCustomStepChoice.get(ex.name);
             const alreadyConfirmedSame = customMatch
               || (ex.nextWeekPlanConfirmed && ex.nextWeekPlan === rec.delta);
-            if (autoSelected && !alreadyConfirmedSame) {
-              _autoSelections.push({ di, ei, value: rec.delta });
+            // Runde 18 (Cluster 4b): auf ALLE Tages-Instanzen dieser Übung
+            // schreiben, nicht nur auf (di, ei) der zuerst gefundenen —
+            // jede Instanz wird einzeln gegen ihr eigenes
+            // nextWeekPlanConfirmed/nextWeekPlan geprüft (können unabhängig
+            // voneinander bereits bestätigt sein).
+            const _instances = _nameToInstances.get(ex.name) ?? [{ di, ei, dayTitle: day.title, ex }];
+            if (autoSelected) {
+              for (const inst of _instances) {
+                const instAlreadyConfirmedSame = hasCustomChoice
+                  ? (inst.ex.nextWeekPlanConfirmed && inst.ex.nextWeekPlan === _userCustomStepChoice.get(ex.name))
+                  : (inst.ex.nextWeekPlanConfirmed && inst.ex.nextWeekPlan === rec.delta);
+                if (!instAlreadyConfirmedSame) {
+                  _autoSelections.push({ di: inst.di, ei: inst.ei, value: rec.delta });
+                }
+              }
             }
-            aiRecs.push({ name: ex.name, rec, metric: exMetric, autoSelected, confirmed: autoSelected || alreadyConfirmedSame });
+            const multiDayTitles = _instances.length > 1 ? _instances.map(i => i.dayTitle) : null;
+            aiRecs.push({ name: ex.name, rec, metric: exMetric, autoSelected, confirmed: autoSelected || alreadyConfirmedSame, multiDayTitles });
           }
         });
       });
@@ -9437,6 +9487,13 @@ function _showSkipReasonQueue(di, skippedExercises, onDone) {
   renderStep();
 }
 
+// Runde 18 (Cluster 6): Näherungswerte für den Fall, dass der Pre-Session
+// Check-in (sessionCheckIn.sleep/energyPre, kategorial) für den Tag bereits
+// beantwortet wurde -- Bucket-Mitte je Kategorie, keine Präzisions-Illusion.
+// Siehe _showDayCompletionModal() unten für die Verwendung.
+const SLEEP_HOURS_FROM_CHECKIN  = { poor: 5, medium: 6.5, good: 7.5, great: 8.5 };
+const ENERGY_LEVEL_FROM_CHECKIN = { low: 2, medium: 3, high: 4 };
+
 function _showDayCompletionModal(di) {
   _completionModalDi = di;
   document.getElementById('day-completion-modal')?.remove();
@@ -9462,6 +9519,22 @@ function _showDayCompletionModal(di) {
       const rating    = +btn.dataset.val;
       const st        = getState();
       const day       = st.weeks[st.curIdx]?.days[di];
+
+      // Runde 18 (Cluster 6): Pre-Session-Check-in für HEUTE bereits
+      // beantwortet? Dann nicht nochmal nach Schlaf/Energie fragen, sondern
+      // Näherungswerte ableiten -- Körper-Tab-Auswertungen behalten trotzdem
+      // einen Datenpunkt für den Tag. Bewusst an der TATSÄCHLICHEN Antwort
+      // für diesen Tag geprüft, nicht am Session-Coach-Setting -- war der
+      // Pre-Check aus/übersprungen, bleibt die Abfrage unten unverändert.
+      const preSleep  = day?.sessionCheckIn?.sleep;
+      const preEnergy = day?.sessionCheckIn?.energyPre;
+      if (preSleep && preEnergy) {
+        const derivedSleep  = SLEEP_HOURS_FROM_CHECKIN[preSleep] ?? 7;
+        const derivedEnergy = ENERGY_LEVEL_FROM_CHECKIN[preEnergy] ?? 3;
+        _finishCompletion(di, rating, derivedSleep, derivedEnergy);
+        return;
+      }
+
       const initSleep  = day?.sleepHours  ?? 7;
       const initEnergy = day?.energyLevel ?? 3;
 

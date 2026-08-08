@@ -2419,7 +2419,18 @@ function reduce(state, action) {
     case A.EX_SET_SUBSTITUTE: {
       const ex = _currentWeek()?.days[p.di]?.exercises[p.ei]; if (!ex) break;
       ex.substituteFor = p.substituteFor ?? null;
-      if (ex.substituteFor) _recordSubstitution(STATE, ex.substituteFor, ex.name);
+      if (ex.substituteFor) {
+        _recordSubstitution(STATE, ex.substituteFor, ex.name);
+        // Runde 18 (Cluster 5): "Heute anders" setzt ab sofort denselben
+        // skipReason wie die manuelle "🔄 Durch andere ersetzt"-Auswahl im
+        // Skip-Grund-Picker (EX_SET_SKIP_REASON) — sonst wird der Nutzer
+        // beim Tagesabschluss trotzdem noch gefragt, obwohl er die Übung
+        // bereits per "Heute anders" ersetzt hat. Andere Skip-Gründe
+        // (injury/fatigue/time) bleiben bewusst unverändert erneut fragbar,
+        // siehe EX_SET_SKIP_REASON — nur 'substituted' unterdrückt dauerhaft.
+        ex.skipReason = 'substituted';
+        ex.skipDate = null;
+      }
       break;
     }
     case A.EXERCISE_NOTE_SET: {

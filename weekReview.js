@@ -18,14 +18,26 @@ function _kw(sd) {
   return Math.ceil(((d - yearStart) / 86_400_000 + 1) / 7);
 }
 
-// ISO-Datum eines Tag-Slots — identische Formel zu ui.js' _dayDate() (dort
-// nicht importiert: dieser Datei-Kopfkommentar sagt "kein State-Zugriff",
-// ein Import aus ui.js wäre zudem zirkulär, da ui.js bereits weekReview.js
-// importiert).
+// 'YYYY-MM-DD' aus lokalen Datumskomponenten (kein toISOString()/UTC-
+// Rollover) — Duplikat von ui.js' _localISODate() (dort nicht importiert:
+// dieser Datei-Kopfkommentar sagt "kein State-Zugriff", ein Import aus
+// ui.js wäre zudem zirkulär, da ui.js bereits weekReview.js importiert).
+// Runde 18 (Cluster 2.2/2.3): vorher nutzten _dayISODate() UND die
+// todayISO-Berechnung in _reachableDays() jeweils .toISOString(), das bei
+// negativer UTC-Differenz zur Lokalzeit (z.B. Deutschland nahe Mitternacht)
+// auf den VORHERIGEN Kalendertag zurückrollen kann — ein bereits zweimal
+// gefixtes Antimuster in dieser Datei ("Fix 3", "Fix 3b Nachbessern"), hier
+// erneut aufgetreten, weil todayISO nie auf dieselbe lokale Berechnung
+// umgestellt wurde wie _dayISODate()'s Mittags-Anker.
+function _localISODate(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// ISO-Datum eines Tag-Slots — identische Formel zu ui.js' _dayDate().
 function _dayISODate(week, dayIdx) {
   const d = new Date(week.startDate + 'T12:00:00');
   d.setDate(d.getDate() + dayIdx);
-  return d.toISOString().slice(0, 10);
+  return _localISODate(d);
 }
 
 // Tage, die weder abgeschlossen sind NOCH schon stattgefunden haben, dürfen
@@ -47,7 +59,7 @@ function _dayISODate(week, dayIdx) {
 // schon immer korrekt ausschließen — dieselbe Regel, dieselbe Quelle wie
 // dort, keine eigene Kopie der Ausschluss-Logik.
 function _reachableDays(week) {
-  const todayISO = new Date().toISOString().slice(0, 10);
+  const todayISO = _localISODate(new Date());
   return week.days.filter((d, i) => isTrainingDay(d) && (d.markedDone || _dayISODate(week, i) < todayISO));
 }
 
@@ -185,6 +197,34 @@ function _findFatigueHighlight(week) {
   return { type: 'fatigue', label: 'Hohe Belastung', text: `${worst.name}: Ø RPE ${worst.rpe}`, exName: worst.name };
 }
 
+// Runde 18 (Cluster 2.4): h1 (bestes Highlight) und l1 (schlimmstes
+// Lowlight) wurden bisher komplett unabhängig in je eine eigene
+// Empfehlungszeile übersetzt — bei identischer Übung (z.B. PR-Satz UND
+// höchster-RPE-Satz derselben Woche gehören zu derselben Übung) entstanden
+// zwei nebeneinanderstehende, einander widersprechende Aussagen ("halte
+// Gewicht, steigere Volumen" vs. "leichtere Einheit einplanen"). Verschmilzt
+// beide Informationen zu EINER Aussage statt eine stillschweigend zu
+// unterdrücken.
+function _mergedHighlightLowlightText(h1, l1) {
+  const name = h1.exName;
+  const achievement = h1.type === 'pr'
+    ? `einen neuen PR bei ${name} aufgestellt`
+    : h1.type === 'gain'
+      ? `dich bei ${name} spürbar gesteigert`
+      : `bei ${name} gut abgeschnitten`;
+
+  if (l1.type === 'fatigue') {
+    return `Du hast ${achievement}, allerdings bei hoher Anstrengung — Gewicht diese Woche halten statt weiter zu steigern.`;
+  }
+  if (l1.type === 'fails') {
+    return `Du hast ${achievement}, aber auch fehlgeschlagene Sätze bei derselben Übung — Volumen oder Gewicht für die nächste Einheit leicht reduzieren statt direkt weiter zu steigern.`;
+  }
+  // 'missed' hat kein exName, kann diesen Zweig also nicht erreichen —
+  // Fallback nur zur Sicherheit, falls künftig ein neuer Lowlight-Typ mit
+  // exName hinzukommt.
+  return `${name}: gemischtes Bild diese Woche — beobachten, bevor du weiter steigerst.`;
+}
+
 function _buildRecommendations(highlights, lowlights, completedDays, plannedDays, isDeload) {
   if (isDeload) {
     return [
@@ -194,9 +234,17 @@ function _buildRecommendations(highlights, lowlights, completedDays, plannedDays
   }
 
   const recs = [];
+  const h1 = highlights[0];
+  const l1 = lowlights[0];
+
+  // Gleiche Übung in Highlight UND Lowlight -> eine verschmolzene Aussage
+  // statt zwei einander widersprechenden Zeilen.
+  if (h1?.exName && l1?.exName && h1.exName === l1.exName) {
+    recs.push({ text: _mergedHighlightLowlightText(h1, l1) });
+    return recs;
+  }
 
   // Rec 1: bestes Highlight
-  const h1 = highlights[0];
   if (h1?.type === 'pr') {
     recs.push({ text: 'Du hast einen neuen PR aufgestellt — halte dieses Gewicht und steigere nächste Woche das Volumen.' });
   } else if (h1?.type === 'gain') {
@@ -210,7 +258,6 @@ function _buildRecommendations(highlights, lowlights, completedDays, plannedDays
   }
 
   // Rec 2: schlimmstes Lowlight
-  const l1 = lowlights[0];
   if (l1?.type === 'fails') {
     const name = l1.text.split(':')[0];
     recs.push({ text: `Fehlgeschlagene Sätze bei ${name} — reduziere das Gewicht um 5 % oder das Volumen um einen Satz.` });

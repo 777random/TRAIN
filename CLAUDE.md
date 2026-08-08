@@ -1,7 +1,27 @@
 # TRAIN — CLAUDE.md
 # Vollständiger Projektkontext für Claude Code
-# Stand: train-v241 / SCHEMA 33 / August 2026
-# Letztes Update: Externes Produkt-Briefing (2026-08-04, keine Code-
+# Stand: train-v242 / SCHEMA 33 / August 2026
+# Letztes Update: Runde 18 (2026-08-08) -- Vertrauens- & Datenintegritaets-
+# Bugcluster, Basis: externes Advisor-Feedback (ChatGPT/Gemini/Council) +
+# neues Live-Nutzerfeedback, 5 parallele Diagnose-Durchlaeufe + 3 file-
+# disjunkte Implementierungs-Durchlaeufe. 8 Fixes (B213-B220): Wochenrueck-
+# blick KW-Label-Konsolidierung + UTC-Rollover-Bug bei Tage-Zaehler/
+# "verpasste Tage" (Wiederauftreten eines bereits zweimal gepatchten
+# Antimusters) + verschmolzene statt widersprechender Zwei-Signal-
+# Empfehlungen zur selben Uebung; Timer startet nicht mehr lautlos durch
+# blosses Antippen des Aufwaermfelds; Auto-Steigerung-Confirmed-Flag wird
+# auf ALLE Tages-Instanzen einer mehrfach pro Woche vorkommenden Uebung
+# geschrieben (Substitutions-Historien-Verknuepfung bewusst NICHT gebaut,
+# Nutzer-Entscheidung: Histories bleiben getrennt); Decision Logging
+# feuert jetzt auch bei hoher Konfidenz-Progression, Track-Record-Satz
+# dauerhaft sichtbar statt im Collapse versteckt; "Heute anders" setzt
+# automatisch skipReason=substituted (andere Skip-Gruende fragen bewusst
+# weiter woechentlich nach); Schlaf/Energie-Doppelabfrage nach Sessionende
+# entfernt wenn Pre-Check-in vorhanden (neue "Energie veraendert?"-Frage
+# bewusst NICHT gebaut, redundant zu detectSessionFatigue()). Siehe
+# HANDOFF.md und `Diagnose & Sprints/diagnose-runde18-vertrauensbugs-
+# 2026-08-08.txt` fuer Details.
+# Davor train-v241, Externes Produkt-Briefing (2026-08-04, keine Code-
 # Aenderung) -- eigenstaendig lesbares Dokument fuer eine unabhaengige
 # Produkteinschaetzung ausserhalb des TRAIN-eigenen LLM-Council-Setups
 # erstellt (`Diagnose & Sprints/TRAIN-Produkt-Briefing-Extern.txt`,
@@ -160,7 +180,7 @@ TRAIN ist eine deutschsprachige PWA für Krafttraining. Pure Vanilla ES Modules 
   Sessions müssen aus diesem neuen Pfad heraus gestartet werden, sonst
   landet man am alten (jetzt leeren) OneDrive-Ort. Nutzer zieht den Ordner
   regelmäßig manuell auf eine externe Festplatte statt über Cloud-Sync.
-- Aktueller Stand: SCHEMA_VERSION 33 · CACHE_VERSION train-v239 · CSS ?v=213
+- Aktueller Stand: SCHEMA_VERSION 33 · CACHE_VERSION train-v242 · CSS ?v=216
 
 ---
 

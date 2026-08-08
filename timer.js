@@ -9,11 +9,16 @@
  * Session clock
  * ─────────────
  * • Starts on the FIRST real training interaction:
- *     – User clicks the warmup textarea (triggers 'train:warmup-click')
+ *     – User actually types into the warmup textarea (triggers
+ *       'train:warmup-input' on the textarea's 'input' event)
  *     – User checks a set done (triggers 'train:set-done')
  *     – User edits any set field (triggers 'train:set-input')
- *   NOT started by merely opening/closing an accordion, which is a
- *   common "just browsing the plan" interaction.
+ *   NOT started by merely opening/closing an accordion, or by tapping/
+ *   focusing/scrolling the warmup textarea without typing anything —
+ *   both are "just browsing the plan" interactions. (Runde 18, Cluster 3:
+ *   a bare click on the warmup field used to start the clock, which
+ *   silently inflated the session duration for anyone who opened the app
+ *   hours before actually training.)
  * • Stopped (and logged to state) when the user presses the
  *   "Als abgeschlossen markieren" button (DAY_TOGGLE_COMPLETE action)
  *   OR when the user taps the clock display to manually stop/start.
@@ -372,8 +377,9 @@ function _bindCustomEvents() {
     if (di !== undefined) _ensureSessionStart(di);
   });
 
-  // Fired by ui.js when user clicks inside the warmup textarea
-  window.addEventListener('train:warmup-click', e => {
+  // Fired when the user actually TYPES into the warmup textarea (not on
+  // mere click/focus — Runde 18, Cluster 3, see header comment above)
+  window.addEventListener('train:warmup-input', e => {
     const { di } = e.detail ?? {};
     if (di !== undefined) _ensureSessionStart(di);
   });
@@ -793,13 +799,6 @@ function _bindAppInteractions() {
       });
     }
 
-    // Warmup textarea – start session on first click
-    const warmupArea = e.target.closest('[data-field="warmup"]');
-    if (warmupArea) {
-      const di = +(warmupArea.dataset?.di ?? 0);
-      window.dispatchEvent(new CustomEvent('train:warmup-click', { detail: { di } }));
-    }
-
     // Day complete button – stop session
     const completeBtn = e.target.closest('[data-action="toggle-complete"]');
     if (completeBtn) {
@@ -820,6 +819,13 @@ function _bindAppInteractions() {
     if (action === 'set-weight' || action === 'set-reps' || action === 'set-rpe') {
       const di = +(inputEl.dataset.di ?? 0);
       window.dispatchEvent(new CustomEvent('train:set-input', { detail: { di } }));
+    }
+    // Warmup textarea – start session only on an actual EDIT (typing),
+    // not on a bare click/focus/tap (Runde 18, Cluster 3 — same bar as
+    // the numeric fields above, see header comment).
+    if (action === 'day-field' && inputEl.dataset.field === 'warmup') {
+      const di = +(inputEl.dataset.di ?? 0);
+      window.dispatchEvent(new CustomEvent('train:warmup-input', { detail: { di } }));
     }
   });
 }

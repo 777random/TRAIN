@@ -206,6 +206,47 @@ test('Übung mit skipReason "substituted" aus Vorwoche wird NICHT erneut gefragt
   expect(exercises[1].skipReason).toBe('time');
 });
 
+// Runde 18 (Cluster 5): "Heute anders" (EX_SET_SUBSTITUTE) setzt seit diesem
+// Fix zusätzlich skipReason='substituted' — vorher wurde ein Nutzer, der
+// eine Übung NUR per "Heute anders" ersetzt hatte (ohne separat beim
+// Tagesabschluss "🔄 Durch andere ersetzt" zu wählen), bei jedem weiteren
+// Tagesabschluss erneut gefragt, obwohl er die Übung faktisch schon
+// "beantwortet" hatte. Andere Skip-Gründe (injury/time/fatigue) bleiben
+// bewusst tagesspezifisch wiederkehrend — siehe Test oben
+// ("Übung mit skipReason 'substituted' aus Vorwoche...").
+test('"Heute anders" (confirm-sub, echter UI-Pfad) setzt automatisch skipReason=substituted, Tagesabschluss fragt danach NICHT erneut', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', err => pageErrors.push(err.message));
+
+  await seed(page, [mkDay(11, [
+    mkExercise('Sled Push', [mkPendingSet()]),
+  ])]);
+
+  await page.click('[data-action="toggle-ex-menu"][data-di="0"][data-ei="0"]');
+  await page.click('[data-action="open-sub-form"][data-di="0"][data-ei="0"]');
+  await page.fill('.sub-name-input[data-di="0"][data-ei="0"]', 'Leg Press');
+  await page.click('[data-action="confirm-sub"][data-di="0"][data-ei="0"]');
+
+  let st = await readState(page);
+  expect(st.weeks[0].days[0].exercises[0].skipReason).toBe('substituted');
+
+  // Sätze bleiben nach reiner Umbenennung unangetastet (alle noch pending) —
+  // wäre skipReason NICHT gesetzt, würde jetzt die Skip-Abfrage-Warteschlange
+  // erscheinen (siehe Guard ui.js ~6415, `ex.skipReason !== 'substituted'`).
+  await page.click('[data-action="toggle-complete"]');
+  await expect(page.locator('.completion-modal__title')).not.toContainText('wurde nicht durchgeführt');
+  await expect(page.locator('.completion-modal__rate-btn').first()).toBeVisible();
+  await page.click('.completion-modal__rate-btn[data-val="2"]');
+  await page.click('.completion-modal__skip');
+  await page.waitForSelector('#session-summary-continue', { timeout: 5000 });
+
+  st = await readState(page);
+  expect(st.weeks[0].days[0].exercises[0].skipReason).toBe('substituted');
+  expect(st.weeks[0].days[0].exercises[0].name).toBe('Leg Press');
+
+  expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});
+
 test('Migration: altes State ohne skipReason/skipDate/nextWeekPlanAutoReviewed lädt ohne Absturz, SCHEMA wird 33', async ({ page }) => {
   const pageErrors = [];
   page.on('pageerror', err => pageErrors.push(err.message));
