@@ -228,7 +228,7 @@ function _checkDroppingCompletion(state) {
 // (unfiltered, wie in E-03), da die Deload-Woche selbst gefunden werden muss.
 // Nie ein Deload in der Historie -> gesamte Historie zählt als "seit Deload"
 // (kein Sonderfall nötig: ergibt für neue Nutzer ohnehin niedrige, harmlose
-// Werte unterhalb der 8-Wochen-Schwelle unten).
+// Werte unterhalb der 6-Wochen-Schwelle unten).
 function _weeksSinceLastDeload(state) {
   const sorted = _sortedWeeks(state);
   if (!sorted.length) return 0;
@@ -247,13 +247,21 @@ function _avgRpeWeek(wk) {
   return rpes.length ? rpes.reduce((a, b) => a + b, 0) / rpes.length : null;
 }
 
-// Präventiver Deload: kein Deload seit >=8 Wochen UND (Volumen steigt ODER
+// Präventiver Deload: kein Deload seit >=6 Wochen UND (Volumen steigt ODER
 // Ø RPE der letzten 3 Wochen > RPE_PREVENTIVE_DELOAD_3WK_AVG). Strukturelles
-// Signal (8-Wochen-Horizont, keine akute Wochenentscheidung) — seit Sprint
+// Signal (Wochen-Horizont, keine akute Wochenentscheidung) — seit Sprint
 // "Coach-Tab Architektur" NICHT mehr Teil von _checkOverload(), sondern
 // eigenständig in computeStructuralSignals() unten (Fix Problem 4:
 // strukturelle Signale verdrängten zuvor akute/spezifischere Signale durch
 // ihre Platzierung in der akuten Kaskade).
+//
+// Schwelle 2026-08-09 (WISSENSCHAFTS-AUDIT.md, Domäne B) von 8 auf 6 Wochen
+// gesenkt: reale Praxis unter Wettkampfathleten/Coaches liegt laut Jukic et
+// al. 2024 (Sports Medicine – Open, Querschnittsbefragung n=246) bei Ø
+// 5.6±2.3 Wochen zwischen Deloads — 8 Wochen lag über dem typischen
+// Intervall. Deskriptive Umfrage, kein RCT für einen "optimalen" Wert —
+// 6 Wochen ist bewusst die konservativere Rundung Richtung Praxis-Mittel,
+// kein exakt literaturabgeleiteter Wert.
 //
 // Schwelle bewusst NIEDRIGER als sessionCoach.js' RPE_SET_HARD_ZONE (8.5)
 // und plateauDetector.js' RPE_PLATEAU_DELOAD_STRATEGY_1WK_AVG (8.5), obwohl
@@ -343,7 +351,7 @@ function _checkPreventiveDeload(state) {
   if (_isDismissedRecently(state, 'preventive_deload')) return null;
 
   const weeksSince = _weeksSinceLastDeload(state);
-  if (weeksSince < 8) return null;
+  if (weeksSince < 6) return null;
 
   // Runde 14 (Council-Frage aus der Deload-Diagnose): Fenster von 4 auf 8
   // verbreitert (vergleicht jetzt die letzten 4 vs. die 4 Wochen davor,
@@ -923,6 +931,13 @@ function _checkProgression(state) {
 // Schwelle 1.5 bewusst höher als die 1.4-Schwelle im Fortschritt-Tab — der
 // Coach soll nur bei deutlichem Ungleichgewicht warnen, nicht bei leichter
 // Schieflage (die dortige Anzeige bleibt informativ, ohne Handlungsdruck).
+// WISSENSCHAFTS-AUDIT.md (2026-08-09, Domäne E): Engineering-Heuristik,
+// NICHT literaturbelegt — die Coaching-Literatur zu Push/Pull-Verhältnissen
+// ist selbst uneinig (1:1 bis 1:2 kursieren als Faustregeln), keine
+// belastbare Studie validiert einen exakten Zahlenwert für Freizeit-
+// Kraftsportler. 1.5 ist toleranter als die verbreiteteren Heuristiken,
+// aber nicht dadurch widerlegt — bei Bedarf neu bewerten, nicht als
+// wissenschaftlich hergeleitet missverstehen.
 // Strukturell — seit Sprint "Coach-Tab Architektur" NICHT mehr Teil der
 // akuten Kaskade (dort praktisch nie sichtbar, da Progression fast immer
 // vorher zutrifft), sondern in computeStructuralSignals() unten.
@@ -991,6 +1006,12 @@ function _checkPushPullBalance(state) {
 // 5 Strukturkarten-Signale (siehe computeStructuralSignals() unten) — ein
 // Compound/Isolation-Hinweis ist informativ, nie dringlich genug, um ein
 // akuteres Signal (Fehlschläge/Deload/Konsistenz/Push-Pull) zu verdrängen.
+// WISSENSCHAFTS-AUDIT.md (2026-08-09, Domäne E): Engineering-Heuristik,
+// NICHT literaturbelegt — Hypertrophie-Volumen-Meta-Analysen finden
+// vergleichbare Ganzkörper-Ergebnisse bei gematchtem Gesamtvolumen
+// unabhängig vom Compound/Isolation-Split; kein Beleg für genau 60% (oder
+// die >70%-Empfehlung im Text unten — beide sind Praxis-Konvention, nicht
+// aus einer Studie abgeleitet).
 function _checkCompoundIsolationBalance(state) {
   const customCatMap = buildCategoryMap(state.customExercises);
 
@@ -1146,6 +1167,11 @@ export function computeWeeklyFocus(state) {
 // Schwelle (0% Erfolg, 3 Wochen) bewusst konservativ gewählt, um den
 // gefundenen Bug direkt abzudecken, ohne bei gelegentlichen Fehlschlägen
 // überzureagieren — analog zum 3-Wochen-Mindestfenster von _checkPlateau.
+// WISSENSCHAFTS-AUDIT.md (2026-08-09, Domäne E): Engineering-Heuristik,
+// NICHT literaturbelegt — es existiert keine Studie, die ein bestimmtes
+// Mehrwochen-Fenster für die Erkennung eines echten Programmierungs-
+// problems (statt normaler Streuung) validiert. Weder gestützt noch
+// widerlegt, reine Rauschunterdrückung.
 function _checkPersistentFailure(state) {
   const weeks = _nonDeloadWeeks(state);
   if (weeks.length < 3) return null;
@@ -1232,6 +1258,9 @@ function _checkPersistentFailure(state) {
 // Schwelle je zu erreichen. Mindestens 2 UNTERSCHIEDLICHE betroffene Übungen
 // nötig, sonst ist es exakt der Fall, den _checkPersistentFailure bereits
 // abdeckt (keine doppelte Meldung derselben einen Übung in zwei Karten).
+// WISSENSCHAFTS-AUDIT.md (2026-08-09, Domäne E): wie beim 0%/3-Wochen-Wert
+// in _checkPersistentFailure oben — Engineering-Heuristik gegen
+// Rauschen/Streuung, kein literaturbelegter Schwellenwert.
 function _checkMultiExerciseFailure(state) {
   const weeks = _nonDeloadWeeks(state);
   if (weeks.length < 3) return null;

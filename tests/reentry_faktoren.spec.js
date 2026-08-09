@@ -2,10 +2,12 @@ import { test, expect } from '@playwright/test';
 
 // Sprint C2 (Teil C, Bosquet et al. 2013): Wiedereinstiegs-Reduktion nach
 // einer Trainingspause -- untere zwei Zeitfenster abgeschwächt (Intermediate+
-// zeigen kaum Kraftverlust nach 1-2 Wochen), obere zwei unverändert.
+// zeigen kaum Kraftverlust nach 1-2 Wochen).
 // _detectReentryPause() (ui.js): pauseDays <= 14 -> 5% (war 10%),
-// <= 28 -> 10% (war 15%), <= 56 -> 20% (unverändert), > 56 -> 25% (unverändert,
-// Vorlage nahm faelschlich 30% als aktuellen Wert an).
+// <= 28 -> 10% (war 15%), <= 56 -> 20% (unverändert), > 56 -> 50% (war 25%,
+// WISSENSCHAFTS-AUDIT.md 2026-08-09: 25% lag deutlich unter dem Konsens für
+// 8+ Wochen Pause; oberste Stufe zusätzlich als bewusster Startwert
+// gekennzeichnet, nicht als endgültige Antwort -- siehe isLongBreak-Popup-Text).
 
 function isoDaysAgo(days) {
   const d = new Date();
@@ -89,13 +91,26 @@ test('40 Tage Pause -> 20% Reduktion (unverändert, Regressionsschutz)', async (
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
 });
 
-test('70 Tage Pause -> 25% Reduktion (unverändert, Regressionsschutz -- nicht 30%)', async ({ page }) => {
+test('70 Tage Pause -> 50% Reduktion (WISSENSCHAFTS-AUDIT.md-Fix, war 25%), Popup erklärt Startwert + Session Coach', async ({ page }) => {
   const pageErrors = [];
   page.on('pageerror', err => pageErrors.push(err.message));
   await page.goto('/');
   await page.waitForSelector('#app.is-ready', { timeout: 10000 });
   await seedPause(page, 70);
-  await expectReentryFactor(page, 25);
+  await expectReentryFactor(page, 50);
+  await expect(page.locator('.vac-plan-modal__sub')).toContainText('Session Coach');
+  await expect(page.locator('.vac-plan-modal__sub')).toContainText('grober Startwert');
+  expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});
+
+test('56 Tage Pause (Grenzfall) -> weiterhin 20%, kein Long-Break-Text (Regressionsschutz gegen Off-by-one)', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', err => pageErrors.push(err.message));
+  await page.goto('/');
+  await page.waitForSelector('#app.is-ready', { timeout: 10000 });
+  await seedPause(page, 56);
+  await expectReentryFactor(page, 20);
+  await expect(page.locator('.vac-plan-modal__sub')).not.toContainText('Session Coach');
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
 });
 

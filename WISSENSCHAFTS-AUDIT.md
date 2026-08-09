@@ -179,34 +179,34 @@ auf dieser Granularität ist an vielen Stellen schlicht dünn erforscht,
 das ist kein Versagen dieses Audits, sondern der ehrliche Stand der
 Wissenschaft) oder DEFENSIBLE/MATCHES.
 
-**Konkrete Handlungskandidaten (Freigabe steht aus):**
+**Konkrete Handlungskandidaten — Status nach Nutzer-Freigabe (2026-08-09):**
 
-1. **Wiedereinstiegs-Reduktion bei >56 Tagen Pause** (Domäne D): aktuell
-   −25%, Konsens deutet auf ~−50% oder — methodisch sauberer — einen
-   RPE-autoregulierten Wiedereinstieg statt eines festen Prozentsatzes
-   für diese oberste Stufe.
-2. **Konfidenz-Einstufungs-Logik** (Domäne A): HIGH-Konfidenz stützt sich
-   auf die am wenigsten zuverlässigen RPE-Selbstangaben (niedrigster
-   RPE-Bereich) — Umformulierung oder Neugewichtung der Logik erwägen,
-   nicht zwingend eine reine Zahlen-Änderung.
-3. **Deload-Mechanismus-Inkonsistenz** (Domäne B): zwei koexistierende,
-   unterschiedliche Deload-Modelle (Gewichts- vs. Satz-Reduktion) —
-   unabhängig von der Wissenschaftsfrage vereinheitlichungswürdig,
-   Evidenz-Richtung spricht für das bereits bestehende
-   Satz-Reduktions-Modell als Vorbild.
-4. **Präventiver Deload-Trigger** (Domäne B): 8 Wochen liegt über dem
-   Ø-Praxis-Intervall (5.6±2.3 Wochen) — Erwägung, den Trigger auf ~6
-   Wochen zu senken oder als bewusst konservative Obergrenze zu
-   kennzeichnen.
-5. **Code-Kommentare bei NO-CONSENSUS-Werten**: mehrere Schwellenwerte
-   (Push/Pull 1.5, Compound 60%, Fehlschlag-Fenster) sollten im Code
-   explizit als "Engineering-Heuristik, nicht literaturbelegt" markiert
-   werden, um künftiger Verwechslung mit tatsächlich validierten Werten
-   (wie z.B. dem Bosquet-Zitat) vorzubeugen.
+1. **Wiedereinstiegs-Reduktion bei >56 Tagen Pause** (Domäne D) — **ERLEDIGT
+   (B235, train-v245).** Nutzer wählte die evidenznähere Variante:
+   RPE-autoregulierter Wiedereinstieg statt reiner Zahlen-Änderung. Seed-Wert
+   auf 0.5 angehoben, aber explizit als Startwert gerahmt — Popup-Text
+   erklärt, dass der Session Coach die Anpassung ab Satz 1 per Echtzeit-RPE
+   übernimmt, statt eine feste Prozentzahl als fertige Antwort zu zeigen.
+2. **Konfidenz-Einstufungs-Logik** (Domäne A) — **OFFEN.** Noch nicht
+   umgesetzt, brauchte noch keine Entscheidung in dieser Runde. HIGH-
+   Konfidenz stützt sich weiterhin auf die am wenigsten zuverlässigen
+   RPE-Selbstangaben — Umformulierung/Neugewichtung der Logik bleibt
+   Kandidat für eine künftige Runde.
+3. **Deload-Mechanismus-Inkonsistenz** (Domäne B) — **ERLEDIGT (B234,
+   train-v245).** Diagnose bestätigte einen echten Bug (nicht nur zwei
+   legitime Zwecke): Coach-Tab-Plan reduzierte gleichzeitig Volumen UND
+   Gewicht, widersprach direkt der bereits getroffenen DECISIONS.md-
+   Entscheidung "Sprint C2 Teil B". Manuelles "Deload-Woche" tat zusätzlich
+   das Gegenteil (nur Gewicht, kein Volumen). Vereinheitlicht auf das
+   Satz-Reduktions-Modell, Settings-Beschreibung korrigiert.
+4. **Präventiver Deload-Trigger** (Domäne B) — **ERLEDIGT (B236,
+   train-v245).** Von 8 auf 6 Wochen gesenkt.
+5. **Code-Kommentare bei NO-CONSENSUS-Werten** — **ERLEDIGT (train-v245,
+   kein eigener Bug-Eintrag, reine Kommentar-Ergänzung).** Push/Pull-Ratio,
+   Compound-Anteil, beide Fehlschlag-Fenster jetzt explizit als
+   "Engineering-Heuristik, nicht literaturbelegt" markiert (weeklyFocus.js).
 
 Alle 5 vollständigen Recherche-Berichte (inkl. aller Quellenangaben) sind
 im Sitzungsverlauf dieser Runde dokumentiert; dieses Dokument fasst sie
-zusammen. Nächster Schritt laut vereinbarter Reihenfolge: Nutzer-Freigabe
-für die 4 konkreten Änderungskandidaten oben, danach Umsetzung als eigene
-kleine Runde (Diagnose bereits abgeschlossen, direkt Fix-fähig für #1/#3,
-#2/#4 brauchen noch eine kurze Konzept-Entscheidung).
+zusammen. Einziger offener Punkt: #2 (Konfidenz-Einstufungs-Logik),
+Kandidat für eine künftige Runde.

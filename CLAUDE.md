@@ -1,7 +1,24 @@
 # TRAIN — CLAUDE.md
 # Vollständiger Projektkontext für Claude Code
-# Stand: train-v244 / SCHEMA 33 / August 2026
-# Letztes Update: Runde 19 Cluster 8 abgeschlossen (2026-08-09), zweigeteilt.
+# Stand: train-v245 / SCHEMA 33 / August 2026
+# Letztes Update: WISSENSCHAFTS-AUDIT.md-Handlungskandidaten umgesetzt
+# (2026-08-09), 4 von 5 (B234-B236): Praeventiver Deload-Trigger 8->6
+# Wochen (Jukic et al. 2024, Praxis-Intervall Oe 5.6+-2.3 Wochen).
+# Deload-Doppelreduktion behoben -- Coach-Tab-Plan reduzierte bisher
+# GLEICHZEITIG Volumen UND Gewicht, widersprach der bereits getroffenen
+# DECISIONS.md-Entscheidung "Sprint C2 Teil B"; manuelles "Deload-Woche"
+# tat das GEGENTEIL (nur Gewicht) -- beide jetzt auf denselben Satz-
+# Reduktions-Mechanismus vereinheitlicht, deloadFactor-Setting umbenannt
+# (betrifft nur noch Dauer-Fehlschlag-Vorschlag). Wiedereinstiegs-
+# Reduktion bei >56 Tagen Pause von 25% auf 50% angehoben, NEU als
+# RPE-autoregulierter Startwert gerahmt statt fixer Prozentzahl (Session
+# Coach uebernimmt ab Satz 1). Mehrere NO-CONSENSUS-Schwellenwerte
+# (Push/Pull, Compound-Anteil, Fehlschlag-Fenster) explizit als
+# Engineering-Heuristik statt literaturbelegt gekennzeichnet. Einziger
+# noch offener Kandidat: Konfidenz-Einstufungs-Logik (stuetzt sich auf
+# die am wenigsten zuverlaessigen RPE-Selbstangaben). Siehe HANDOFF.md
+# und WISSENSCHAFTS-AUDIT.md fuer Details.
+# Davor train-v244, Runde 19 Cluster 8 abgeschlossen (2026-08-09), zweigeteilt.
 # Teil 1 umgesetzt: Tage-Uebersicht (manueller Toggle) Kacheln -> volle-
 # Breite-Zeilen (B233). Teil 2 (Uebersicht als Startbildschirm) nach
 # echtem Umsetzungsversuch bewusst zurueckgestellt -- brach bereits bei
@@ -209,7 +226,7 @@ TRAIN ist eine deutschsprachige PWA für Krafttraining. Pure Vanilla ES Modules 
   Sessions müssen aus diesem neuen Pfad heraus gestartet werden, sonst
   landet man am alten (jetzt leeren) OneDrive-Ort. Nutzer zieht den Ordner
   regelmäßig manuell auf eine externe Festplatte statt über Cloud-Sync.
-- Aktueller Stand: SCHEMA_VERSION 33 · CACHE_VERSION train-v243 · CSS ?v=217
+- Aktueller Stand: SCHEMA_VERSION 33 · CACHE_VERSION train-v245 · CSS ?v=218
 
 ---
 
@@ -234,7 +251,7 @@ Bei CSS-Änderungen: Cache-Buster in `index.html` erhöhen:
 | `DECISIONS.md` | Unveränderliche Produkt-/Architektur-Entscheidungen — nicht ohne neue explizite Entscheidung revidieren |
 | `AGENTS.md` | Parallelisierungs-Regeln für Multi-Agent Sprints |
 | `AUDIT-BERECHNUNGEN.md` | Referenzdokument: Konsistenz-Audit über alle Berechnungen im Projekt (Runde 8), alle Funde inzwischen bewertet/behoben (Runde 9) — Vorlage für künftige ähnliche Audits |
-| `WISSENSCHAFTS-AUDIT.md` | Referenzdokument: alle Coach-Schwellenwerte (RPE, Deload, Aufwärmen, Wiedereinstieg, Volumen-Verteilung) gegen aktuellen Sportwissenschafts-Konsens geprüft (2026-08-09) — 5 Handlungskandidaten identifiziert, Freigabe steht aus, siehe HANDOFF.md |
+| `WISSENSCHAFTS-AUDIT.md` | Referenzdokument: alle Coach-Schwellenwerte (RPE, Deload, Aufwärmen, Wiedereinstieg, Volumen-Verteilung) gegen aktuellen Sportwissenschafts-Konsens geprüft (2026-08-09) — 4 von 5 Handlungskandidaten umgesetzt (B234-B236, train-v245), 1 offen (Konfidenz-Einstufungs-Logik) |
 | `SECURITY.md` | Security-Status heutiger Architektur (kein Backend) + dokumentierte Blaupause für Auth/Rate-Limiting/Access-Control, sobald ein Server (Paywall/Coaching) kommt |
 | `LEGAL.md` | Rechts-Recherche zu Impressum/Datenschutz (Name-/Adress-Pflicht, c/o-Workaround, DDG/DSGVO-Fakten) + Blaupause für AGB/Widerrufsrecht/BFSG, sobald Paywall/App-Store kommen |
 | `LOOPS.md` | Automatische Session-Loops (beim Start jeder Session ausführen) |

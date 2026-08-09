@@ -2023,7 +2023,6 @@ function renderExercise(wk, di, ei, state) {
   const ex     = wk.days[di].exercises[ei];
   const isFav  = (state.favoriteExercises ?? []).includes(ex.name);
   const locked = !!wk.days[di].locked;
-  const isDl   = wk.mode === 'deload';
   const drag   = state.settings.drag && !locked;
 
   const _lookupName = ex.substituteFor || ex.name;
@@ -2079,7 +2078,7 @@ function renderExercise(wk, di, ei, state) {
   }
 
   const setsHtml = ex.sets.map((s, si) =>
-    renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled, showIntraCoach, sessionModifier, _nextWeekWeight, wk.id, sessionModifierScope, _nextWeekReason)
+    renderSetRow(s, si, ex, di, ei, prevEx, locked, rpeEnabled, showIntraCoach, sessionModifier, _nextWeekWeight, wk.id, sessionModifierScope, _nextWeekReason)
   ).join('');
 
   // Runde 6 (A9-Folgefix): ex.weightStep === 0 ist der explizite "Reset"-
@@ -2704,7 +2703,7 @@ function _renderIntraFeedback(fb, key, di, ei, si, mode, canAdopt) {
 }
 
 // ─── Set row ─────────────────────────────────────────────────────────────────
-function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true, showIntraCoach = false, sessionModifier = null, nextWeekWeight = null, wkId = null, sessionModifierScope = 'all', nextWeekReason = null) {
+function renderSetRow(s, si, ex, di, ei, prevEx, locked, rpeEnabled = true, showIntraCoach = false, sessionModifier = null, nextWeekWeight = null, wkId = null, sessionModifierScope = 'all', nextWeekReason = null) {
   // B17: prevEx wird in renderExercise() bei einer Ausweichübung (substituteFor)
   // bewusst über den NAMEN DER URSPRÜNGLICHEN Übung gesucht (siehe _lookupName
   // dort) — für den Fulfill-Meter-Metrik-Check dort ist das sinnvoll, aber hier
@@ -2714,8 +2713,16 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, isDl, rpeEnabled = true
   // per Definition keine eigene Vorwochen-Historie — daher hier explizit kein
   // Hint statt eines aus einer anderen Übung übernommenen.
   const prevSet    = ex.substituteFor ? null : (prevEx?.sets?.[si] ?? null);
-  const dlFactor   = getState().settings?.deloadFactor ?? 0.75;
-  const dispW      = isDl ? Math.round(s.weight * dlFactor * 2) / 2 : s.weight;
+  // WISSENSCHAFTS-AUDIT.md-Folgefund (2026-08-09): früher hier ein
+  // wk.mode==='deload'-abhängiger Gewichts-Vorschlag (dlFactor/isDl) --
+  // widersprach DECISIONS.md "Sprint C2 Teil B" (Gewicht ändert sich beim
+  // Deload-Konzept NIE, nur Satz-Anzahl über deloadSkip) und führte bei
+  // per Coach-Tab übernommenen Deload-Plänen zu einer doppelten Reduktion
+  // (Volumen UND Intensität gleichzeitig). Entfernt -- dispW ist jetzt
+  // immer s.weight, `deloadFactor` bleibt als Setting für die separate
+  // Dauer-Fehlschlag-Gewichtsreduktion (_checkPersistentFailure-Vorschlag)
+  // erhalten, betrifft aber nicht mehr Deload-Wochen.
+  const dispW      = s.weight;
   const metric  = ex.metric === 'sec' || ex.metric === 'm' ? ex.metric : 'reps';
   const repStep = metric === 'm' ? '0.1' : '1';
   const repMode = metric === 'm' ? 'decimal' : 'numeric';
@@ -5026,28 +5033,43 @@ function _detectReentryPause(state) {
 
   // Sprint C2 (Teil C, Bosquet et al. 2013): Kraftverlust bei Trainierten
   // nach 1-2 Wochen Pause meist minimal, spürbarer Abfall erst ab Woche 3-4
-  // -- untere zwei Stufen entsprechend abgeschwächt. Obere zwei Stufen
-  // unverändert (bereits literaturkonform).
-  let factor;
+  // -- untere zwei Stufen entsprechend abgeschwächt.
+  //
+  // Oberste Stufe (>56 Tage) laut WISSENSCHAFTS-AUDIT.md (2026-08-09,
+  // Domäne D) von 0.25 auf 0.5 angehoben -- mehrere unabhängige Quellen
+  // (Stronger by Science, PowerliftingTechnique, BarBend) nennen für 8+
+  // Wochen Pause eher ~50% statt 25% Reduktion. Zusätzlich methodisch
+  // anders behandelt als die unteren 3 Stufen: Stronger by Science
+  // argumentiert, dass ein fixer Prozentsatz vom alten Trainingsgewicht
+  // jenseits von ~12 Wochen ohnehin fragwürdig wird, weil die alte Zahl
+  // nicht mehr zuverlässig ist -- 0.5 ist hier bewusst nur ein
+  // VORSICHTIGER STARTWERT für den ersten Satz, nicht die endgültige
+  // Antwort; die tatsächliche Anpassung übernimmt ab dann der bereits
+  // bestehende Session-Coach (satzweise RPE-Rückmeldung), siehe
+  // isLongBreak-Flag unten und _showReentryPopup().
+  let factor, isLongBreak = false;
   if (isVacationOverride)    factor = 0.05;
   else if (pauseDays <= 14)  factor = 0.05;
   else if (pauseDays <= 28)  factor = 0.10;
   else if (pauseDays <= 56)  factor = 0.20;
-  else                       factor = 0.25;
+  else                     { factor = 0.5; isLongBreak = true; }
 
-  return { pauseDays, factor };
+  return { pauseDays, factor, isLongBreak };
 }
 
-function _showReentryPopup(pauseDays, factor) {
+function _showReentryPopup(pauseDays, factor, isLongBreak = false) {
   document.getElementById('reentry-modal')?.remove();
   const overlay = document.createElement('div');
   overlay.id = 'reentry-modal';
   overlay.className = 'vac-plan-modal-overlay';
   const pct = Math.round(factor * 100);
+  const subText = isLongBreak
+    ? `Du warst ${pauseDays} Tage weg — dein altes Trainingsgewicht ist nach so langer Zeit wahrscheinlich nicht mehr zuverlässig. TRAIN startet bewusst leicht (-${pct}% als grober Startwert) und der Session Coach führt dich danach Satz für Satz anhand deiner RPE-Rückmeldung.`
+    : `Du warst ${pauseDays} Tage weg.<br>TRAIN empfiehlt einen sanften Wiedereinstieg: -${pct}%`;
   overlay.innerHTML = `
     <div class="vac-plan-modal">
       <div class="vac-plan-modal__title">🔄 Willkommen zurück</div>
-      <p class="vac-plan-modal__sub">Du warst ${pauseDays} Tage weg.<br>TRAIN empfiehlt einen sanften Wiedereinstieg: -${pct}%</p>
+      <p class="vac-plan-modal__sub">${subText}</p>
       <button class="btn btn--accent" data-reentry="adjust" style="width:100%;min-height:var(--touch)">Ja, angepasst starten</button>
       <button class="btn btn--ghost" data-reentry="full" style="width:100%;min-height:var(--touch)">Nein, volles Gewicht</button>
     </div>`;
@@ -5346,8 +5368,8 @@ function renderSettingsTab(state) {
     </div>
     <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:var(--sp-2)">
       <div>
-        <div class="settings-row__label">Deload-Faktor</div>
-        <div class="settings-row__desc">Aktuelle Einstellung: <strong>${Math.round((s.deloadFactor ?? 0.75) * 100)}%</strong></div>
+        <div class="settings-row__label">Gewichtsreduktion bei Dauer-Fehlschlag</div>
+        <div class="settings-row__desc">Wie stark der Coach das Gewicht vorschlägt zu senken, wenn eine Übung 3 Wochen lang bei 0% Erfolgsquote bleibt. Aktuelle Einstellung: <strong>${Math.round((s.deloadFactor ?? 0.75) * 100)}%</strong>. Betrifft NICHT Deload-Wochen — die reduzieren stattdessen die Satz-Anzahl bei unverändertem Gewicht (wissenschaftlich fundierter für den Krafterhalt, siehe WISSENSCHAFTS-AUDIT.md).</div>
       </div>
       <details class="deload-details">
         <summary class="deload-details__summary">Erweiterte Einstellungen</summary>
@@ -6011,7 +6033,14 @@ function _handleClick(e) {
     case 'mode-dl':
       _weekMenuOpen = false;
       _maybeShowTip('tip-08', 'Deload-Woche: reduziertes Training zur Erholung. TRAIN schließt diese Woche aus der Fortschrittsanalyse aus — kein Einfluss auf Steigerungsempfehlungen.');
-      dispatch(A.WEEK_SET_MODE, { mode: 'deload' }); break;
+      // WISSENSCHAFTS-AUDIT.md-Folgefund (2026-08-09): nutzte vorher
+      // WEEK_SET_MODE (reine Modus-Flagge, keine Wirkung) statt des
+      // bereits bestehenden DELOAD_APPLY-Mechanismus (Sprint C2 Teil B,
+      // Volumen- statt Intensitäts-Reduktion) — der manuelle Weg hier und
+      // der Coach-Tab-Vorschlag taten dadurch zwei unterschiedliche Dinge
+      // unter demselben Namen. Jetzt vereinheitlicht auf denselben
+      // Mechanismus.
+      dispatch(A.DELOAD_APPLY, { weekIdx: getState().curIdx, when: 'now' }); break;
 
     case 'mode-vac': {
       _weekMenuOpen = false;
@@ -9106,7 +9135,7 @@ export function mountApp(root) {
     const st = getState();
     const pause = _detectReentryPause(st);
     if (pause) {
-      _showReentryPopup(pause.pauseDays, pause.factor);
+      _showReentryPopup(pause.pauseDays, pause.factor, pause.isLongBreak);
     } else if (_shouldShowBackupReminder(st)) {
       _showBackupReminderToast();
     }

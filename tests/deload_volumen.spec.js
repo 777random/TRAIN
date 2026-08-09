@@ -265,3 +265,55 @@ test('Woche nach einer Deload-Woche wird aus der Vor-Deload-Woche geklont (origi
 
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
 });
+
+// WISSENSCHAFTS-AUDIT.md-Folgefund (2026-08-09): Coach-Tab-Deload-Plan
+// reduzierte bisher gleichzeitig Volumen (deloadSkip, korrekt) UND
+// Intensität (dispW-Vorschau im Gewichts-Eingabefeld, widersprach Sprint
+// C2 Teil B) -- s.weight selbst war nie betroffen (deshalb schlug die
+// bestehende "Gewicht nie verändert"-Prüfung oben, die nur s.weight
+// prüft, den Bug nicht an). Dieser Test prüft stattdessen den tatsächlich
+// GERENDERTEN Eingabefeld-Wert.
+test('Gewichts-Eingabefeld zeigt nach Deload-Plan-Übernahme weiterhin den echten Wert, keine stille 75%-Vorschau mehr', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', err => pageErrors.push(err.message));
+  await page.goto('/');
+  await page.waitForSelector('#app.is-ready', { timeout: 10000 });
+  await seed(page, buildDeloadWeeks());
+
+  await page.click('[data-tab="coach"]');
+  await page.click('[data-action="apply-deload-plan"]');
+  await page.waitForSelector('#deload-choice-modal', { timeout: 3000 });
+  await page.click('[data-deload="now"]');
+
+  await page.click('[data-tab="workout"]');
+  const weightInput = page.locator('[data-action="set-weight"][data-di="1"][data-ei="0"][data-si="0"]');
+  await expect(weightInput).toHaveValue('120'); // NICHT 90 (120*0.75)
+
+  expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});
+
+// WISSENSCHAFTS-AUDIT.md-Folgefund (2026-08-09): der manuelle "Deload-
+// Woche"-Eintrag im Wochen-Menü nutzte bisher WEEK_SET_MODE (reine Modus-
+// Flagge ohne Wirkung nach der obigen Korrektur) statt des bereits
+// bestehenden DELOAD_APPLY-Mechanismus -- manueller Weg und Coach-Tab-
+// Vorschlag taten unter demselben Namen zwei unterschiedliche Dinge.
+test('Manuelles "Deload-Woche" im Wochen-Menü nutzt jetzt denselben Volumen-Reduktions-Mechanismus wie der Coach-Tab-Vorschlag', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', err => pageErrors.push(err.message));
+  await page.goto('/');
+  await page.waitForSelector('#app.is-ready', { timeout: 10000 });
+  await seed(page, buildDeloadWeeks());
+
+  await page.click('[data-tab="workout"]');
+  await page.click('[data-action="toggle-week-menu"]');
+  await page.click('[data-action="mode-dl"]');
+
+  const st = await getState(page);
+  const wk = st.weeks.at(-1);
+  expect(wk.mode).toBe('deload');
+  const openSets = wk.days[1].exercises[0].sets;
+  expect(openSets.filter(s => s.deloadSkip).length).toBeGreaterThan(0); // Volumen tatsächlich reduziert
+  expect(openSets.every(s => s.weight === 120)).toBe(true); // Gewicht unverändert
+
+  expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});
