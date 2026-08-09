@@ -105,9 +105,24 @@ export function renderProgressChart(exerciseName, weeks, options = {}) {
   const maxXLabels = 6;
   const xStep = Math.max(1, Math.ceil(n / maxXLabels));
   const xIdxs = points.reduce((acc, _, i) => {
-    if (i % xStep === 0 || i === n - 1) acc.push(i);
+    if (i % xStep === 0) acc.push(i);
     return acc;
   }, []);
+  // Runde 19 (Cluster 9): der letzte Punkt wird IMMER angezeigt (Trend-Endpunkt),
+  // aber nur als zusaetzliches Label -- ein simples i===n-1-Anhaengen (aeltere
+  // Version) konnte ein zweites Label knapp neben das letzte gestepte setzen
+  // (z.B. n=52: Indizes ...45, dann zusaetzlich 51 -- nur 6 Punkte auseinander
+  // bei xStep=9), was auf schmalen Bildschirmen zum gemeldeten Ueberlappen
+  // fuehrte. Stattdessen: liegt der letzte gestepte Index nah am echten Ende,
+  // wird er ERSETZT statt ergaenzt.
+  const lastIdx = n - 1;
+  if (xIdxs[xIdxs.length - 1] !== lastIdx) {
+    if (lastIdx - xIdxs[xIdxs.length - 1] < xStep / 2) {
+      xIdxs[xIdxs.length - 1] = lastIdx;
+    } else {
+      xIdxs.push(lastIdx);
+    }
+  }
 
   // ── Grid ─────────────────────────────────────────────────────────────────────
   const gridLines = [0, 0.5, 1].map(f => {
@@ -217,9 +232,24 @@ export function renderBodyWeightChart(points) {
   const maxXLabels = 6;
   const xStep = Math.max(1, Math.ceil(n / maxXLabels));
   const xIdxs = points.reduce((acc, _, i) => {
-    if (i % xStep === 0 || i === n - 1) acc.push(i);
+    if (i % xStep === 0) acc.push(i);
     return acc;
   }, []);
+  // Runde 19 (Cluster 9): der letzte Punkt wird IMMER angezeigt (Trend-Endpunkt),
+  // aber nur als zusaetzliches Label -- ein simples i===n-1-Anhaengen (aeltere
+  // Version) konnte ein zweites Label knapp neben das letzte gestepte setzen
+  // (z.B. n=52: Indizes ...45, dann zusaetzlich 51 -- nur 6 Punkte auseinander
+  // bei xStep=9), was auf schmalen Bildschirmen zum gemeldeten Ueberlappen
+  // fuehrte. Stattdessen: liegt der letzte gestepte Index nah am echten Ende,
+  // wird er ERSETZT statt ergaenzt.
+  const lastIdx = n - 1;
+  if (xIdxs[xIdxs.length - 1] !== lastIdx) {
+    if (lastIdx - xIdxs[xIdxs.length - 1] < xStep / 2) {
+      xIdxs[xIdxs.length - 1] = lastIdx;
+    } else {
+      xIdxs.push(lastIdx);
+    }
+  }
 
   const gridLines = [0, 0.5, 1].map(f => {
     const gy = (pad.t + gH * f).toFixed(1);
@@ -300,9 +330,24 @@ export function renderRelativeStrengthChart(points, options = {}) {
   const maxXLabels = 6;
   const xStep = Math.max(1, Math.ceil(n / maxXLabels));
   const xIdxs = points.reduce((acc, _, i) => {
-    if (i % xStep === 0 || i === n - 1) acc.push(i);
+    if (i % xStep === 0) acc.push(i);
     return acc;
   }, []);
+  // Runde 19 (Cluster 9): der letzte Punkt wird IMMER angezeigt (Trend-Endpunkt),
+  // aber nur als zusaetzliches Label -- ein simples i===n-1-Anhaengen (aeltere
+  // Version) konnte ein zweites Label knapp neben das letzte gestepte setzen
+  // (z.B. n=52: Indizes ...45, dann zusaetzlich 51 -- nur 6 Punkte auseinander
+  // bei xStep=9), was auf schmalen Bildschirmen zum gemeldeten Ueberlappen
+  // fuehrte. Stattdessen: liegt der letzte gestepte Index nah am echten Ende,
+  // wird er ERSETZT statt ergaenzt.
+  const lastIdx = n - 1;
+  if (xIdxs[xIdxs.length - 1] !== lastIdx) {
+    if (lastIdx - xIdxs[xIdxs.length - 1] < xStep / 2) {
+      xIdxs[xIdxs.length - 1] = lastIdx;
+    } else {
+      xIdxs.push(lastIdx);
+    }
+  }
 
   const gridLines = [0, 0.5, 1].map(f => {
     const gy = (pad.t + gH * f).toFixed(1);

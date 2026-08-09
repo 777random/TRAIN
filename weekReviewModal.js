@@ -3,7 +3,7 @@
  * Exportiert showWeekReviewModal() und renderWeekReviewHtml().
  */
 
-import { buildWeekShareCanvas, shareCanvas } from './shareImage.js';
+import { buildWeekShareCanvas, buildWeekSummaryShareCanvas, shareCanvas } from './shareImage.js';
 import { getSortedWeeks, exWeightHistory } from './insightEngine.js';
 
 const _h = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -169,22 +169,37 @@ function _pickBestExercise(reviewData, sorted, favs) {
  * @param {Object} reviewData  Rückgabe von buildWeekReview(), MUSS zusätzlich
  *   `allWeeks` (das komplette state.weeks-Array) tragen — sonst bleibt die
  *   Sparkline leer (kein Absturz, nur Fallback-Anzeige).
+ * @param {'best'|'summary'} [variant='best']  Runde 19, Cluster 11 — 'best'
+ *   ist das bisherige Beste-Übung-Sparkline-Layout (Default, unverändert),
+ *   'summary' die neue "was gut lief"-Zusammenfassungs-Variante
+ *   (buildWeekSummaryShareCanvas(), nutzt reviewData.highlights direkt).
  */
-export async function shareWeekReviewImage(reviewData) {
-  const { summary, week } = reviewData;
+export async function shareWeekReviewImage(reviewData, variant = 'best') {
+  const { summary, week, highlights } = reviewData;
   const kw = String(_kw(week.startDate)).padStart(2, '0');
   try {
-    const sorted = reviewData.allWeeks ? getSortedWeeks({ weeks: reviewData.allWeeks }) : [week];
-    const favs   = reviewData.favoriteExercises ?? [];
-    const best   = _pickBestExercise(reviewData, sorted, favs);
-    const weights = best ? exWeightHistory(sorted, best.name).slice(-8).filter(w => w > 0) : [];
-    const canvas = await buildWeekShareCanvas({
-      kw, monthYear: _monthYear(week.startDate),
-      streak: summary.streak ?? 0,
-      doneDays: summary.completedDays ?? 0, totalDays: summary.plannedDays ?? 0,
-      successPct: summary.goalFulfillment ?? null,
-      bestExercise: best?.name ?? null, weights, isPr: best?.isPr ?? false,
-    });
+    let canvas;
+    if (variant === 'summary') {
+      canvas = await buildWeekSummaryShareCanvas({
+        kw, monthYear: _monthYear(week.startDate),
+        streak: summary.streak ?? 0,
+        doneDays: summary.completedDays ?? 0, totalDays: summary.plannedDays ?? 0,
+        successPct: summary.goalFulfillment ?? null,
+        highlights: (highlights ?? []).map(h => ({ label: h.label, text: h.text })),
+      });
+    } else {
+      const sorted = reviewData.allWeeks ? getSortedWeeks({ weeks: reviewData.allWeeks }) : [week];
+      const favs   = reviewData.favoriteExercises ?? [];
+      const best   = _pickBestExercise(reviewData, sorted, favs);
+      const weights = best ? exWeightHistory(sorted, best.name).slice(-8).filter(w => w > 0) : [];
+      canvas = await buildWeekShareCanvas({
+        kw, monthYear: _monthYear(week.startDate),
+        streak: summary.streak ?? 0,
+        doneDays: summary.completedDays ?? 0, totalDays: summary.plannedDays ?? 0,
+        successPct: summary.goalFulfillment ?? null,
+        bestExercise: best?.name ?? null, weights, isPr: best?.isPr ?? false,
+      });
+    }
     await shareCanvas(canvas, 'train-woche.png', `Wochenrückblick KW ${kw} — TRAIN`);
   } catch (_) { /* Canvas/Share fehlgeschlagen -> stiller Abbruch, kein Crash */ }
 }
@@ -282,7 +297,8 @@ export function showWeekReviewModal(reviewData, onContinue) {
     </div>
     ${renderWeekReviewHtml(reviewData)}
     <div class="wr-continue">
-      <button class="btn btn--ghost wr-share__btn" id="wr-btn-share">📤 Teilen</button>
+      <button class="btn btn--ghost wr-share__btn" id="wr-btn-share" title="Beste Übung teilen">📤 Beste Übung</button>
+      <button class="btn btn--ghost wr-share__btn" id="wr-btn-share-summary" title="Zusammenfassung der Woche teilen">🗒 Zusammenfassung</button>
       <button class="btn btn--accent wr-continue__btn" id="wr-btn-continue">Weiter →</button>
     </div>
   </div>`;
@@ -299,5 +315,7 @@ export function showWeekReviewModal(reviewData, onContinue) {
     }, { once: true });
 
   overlay.querySelector('#wr-btn-share')
-    ?.addEventListener('click', () => shareWeekReviewImage(reviewData));
+    ?.addEventListener('click', () => shareWeekReviewImage(reviewData, 'best'));
+  overlay.querySelector('#wr-btn-share-summary')
+    ?.addEventListener('click', () => shareWeekReviewImage(reviewData, 'summary'));
 }

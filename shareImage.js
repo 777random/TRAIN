@@ -429,6 +429,159 @@ export async function buildWeekShareCanvas({
   });
 }
 
+/**
+ * Zusammenfassungs-Variante des Wochenrückblick-Share-Bilds (Runde 19,
+ * Cluster 11) — Alternative zu buildWeekShareCanvas() (Beste-Übung-Hero).
+ * Zeigt statt einer einzelnen Übung die "was gut lief"-Highlights der
+ * Woche (aus buildWeekReview()s reviewData.highlights, siehe weekReview.js
+ * — max. 3 Einträge, nicht neu berechnet). Teilt Header/Stats-Kacheln/
+ * Footer-Layout mit buildWeekShareCanvas() (bewusste Duplizierung statt
+ * gemeinsamer Helper — beide Funktionen bleiben unabhängig änderbar, wie
+ * an anderen Stellen dieser Datei bereits gehandhabt).
+ *
+ * @param {Object} p
+ * @param {string} p.kw
+ * @param {string} p.monthYear
+ * @param {number} p.streak
+ * @param {number} p.doneDays
+ * @param {number} p.totalDays
+ * @param {number|null} p.successPct
+ * @param {Array<{label:string, text:string}>} p.highlights  Bis zu 3 Einträge.
+ *   Leer -> Fallback-Ausblick statt leerer Fläche.
+ */
+export async function buildWeekSummaryShareCanvas({
+  kw, monthYear, streak, doneDays, totalDays, successPct, highlights,
+}) {
+  const bg     = _themeColor('--c-bg', '#0E0E10');
+  const accent = _themeColor('--c-accent', '#C8FF00');
+  const text   = _themeColor('--c-text', '#F0F0F0');
+  const text2  = _themeColor('--c-text-2', '#B0B0B8');
+  const PAD = 32;
+  const items = (Array.isArray(highlights) ? highlights : []).slice(0, 3);
+
+  return _buildCanvas(ctx => {
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, SIZE, SIZE);
+
+    // ── Zone 1: Header (identisch zu buildWeekShareCanvas) ──────────
+    ctx.fillStyle = accent;
+    ctx.fillRect(0, 0, SIZE, 3);
+
+    ctx.textAlign = 'left';
+    ctx.fillStyle = accent;
+    ctx.font = '900 11px "DM Sans", sans-serif';
+    ctx.letterSpacing = '4px';
+    ctx.fillText('TRAIN', PAD, 52);
+    ctx.letterSpacing = '0px';
+
+    ctx.textAlign = 'right';
+    ctx.fillStyle = text2;
+    ctx.font = '400 11px "DM Sans", sans-serif';
+    ctx.fillText(`KW ${kw} · ${monthYear}`, SIZE - PAD, 52);
+
+    // ── Zone 2: Titel + Highlights-Liste (statt Sparkline-Hero) ─────
+    ctx.textAlign = 'center';
+    ctx.fillStyle = text;
+    ctx.font = '900 46px "DM Sans", sans-serif';
+    ctx.fillText('WAS GUT LIEF', SIZE / 2, 130);
+
+    const chartX = PAD, chartW = SIZE - 2 * PAD;
+    const listY  = 170, listBottom = 630;
+
+    if (items.length === 0) {
+      ctx.fillStyle = text2;
+      ctx.font = '400 26px "DM Sans", sans-serif';
+      ctx.fillText('Trainiere weiter — die nächste Zusammenfassung wird aussagekräftiger.', SIZE / 2, (listY + listBottom) / 2);
+    } else {
+      const rowGap = 20;
+      const rowH   = (listBottom - listY - (items.length - 1) * rowGap) / items.length;
+      items.forEach((item, i) => {
+        const ry = listY + i * (rowH + rowGap);
+        ctx.beginPath();
+        ctx.moveTo(chartX + 16, ry);
+        ctx.arcTo(chartX + chartW, ry, chartX + chartW, ry + rowH, 16);
+        ctx.arcTo(chartX + chartW, ry + rowH, chartX, ry + rowH, 16);
+        ctx.arcTo(chartX, ry + rowH, chartX, ry, 16);
+        ctx.arcTo(chartX, ry, chartX + chartW, ry, 16);
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(255,255,255,0.03)';
+        ctx.fill();
+
+        ctx.textAlign = 'left';
+        ctx.fillStyle = accent;
+        ctx.font = '700 13px "DM Sans", sans-serif';
+        ctx.letterSpacing = '1px';
+        ctx.fillText((item.label ?? '').toUpperCase(), chartX + 28, ry + 34);
+        ctx.letterSpacing = '0px';
+
+        ctx.fillStyle = text;
+        ctx.font = '700 26px "DM Sans", sans-serif';
+        _wrapText(ctx, item.text ?? '', chartX + 28, ry + 72, chartW - 56, 30, 2);
+      });
+    }
+
+    // ── Zone 3: Stats-Kacheln (identisch zu buildWeekShareCanvas) ───
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, 650);
+    ctx.lineTo(SIZE, 650);
+    ctx.stroke();
+
+    const tileGap = 16, tileY = 680, tileH = 120;
+    const tileW = (chartW - 2 * tileGap) / 3;
+    const tiles = [
+      { num: `${doneDays}/${totalDays}`, label: 'EINHEITEN DIESE WOCHE', color: text },
+      { num: `${streak}`,                label: 'WOCHEN IN FOLGE',       color: text },
+      { num: successPct != null ? `${successPct}%` : '—', label: 'SÄTZE AM ZIEL', color: accent },
+    ];
+    tiles.forEach((t, i) => {
+      const tx = chartX + i * (tileW + tileGap);
+      ctx.beginPath();
+      ctx.moveTo(tx + 12, tileY);
+      ctx.arcTo(tx + tileW, tileY, tx + tileW, tileY + tileH, 12);
+      ctx.arcTo(tx + tileW, tileY + tileH, tx, tileY + tileH, 12);
+      ctx.arcTo(tx, tileY + tileH, tx, tileY, 12);
+      ctx.arcTo(tx, tileY, tx + tileW, tileY, 12);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(255,255,255,0.04)';
+      ctx.fill();
+
+      ctx.textAlign = 'center';
+      ctx.fillStyle = t.color;
+      ctx.font = '900 36px "DM Sans", sans-serif';
+      ctx.fillText(t.num, tx + tileW / 2, tileY + 56);
+      ctx.fillStyle = text2;
+      ctx.font = '400 10px "DM Sans", sans-serif';
+      ctx.fillText(t.label, tx + tileW / 2, tileY + 90);
+    });
+
+    // ── Zone 4: Footer (identisch zu buildWeekShareCanvas) ──────────
+    const footY = 860, footH = 100;
+    ctx.beginPath();
+    ctx.moveTo(chartX + 10, footY);
+    ctx.arcTo(chartX + chartW, footY, chartX + chartW, footY + footH, 10);
+    ctx.arcTo(chartX + chartW, footY + footH, chartX, footY + footH, 10);
+    ctx.arcTo(chartX, footY + footH, chartX, footY, 10);
+    ctx.arcTo(chartX, footY, chartX + chartW, footY, 10);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(255,255,255,0.025)';
+    ctx.fill();
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = text2;
+    ctx.font = '600 14px "DM Sans", sans-serif';
+    ctx.fillText('TRAIN · KI-gestütztes Kraft-Coaching', SIZE / 2, footY + 44);
+    ctx.globalAlpha = 0.3;
+    ctx.font = '400 11px "DM Sans", sans-serif';
+    _wrapText(ctx, 'Sagt dir was du als Nächstes tun sollst — nicht nur was du gemacht hast', SIZE / 2, footY + 68, chartW - 80, 20, 2);
+    ctx.globalAlpha = 1;
+
+    ctx.fillStyle = _withAlpha(accent, 0.4);
+    ctx.fillRect(0, SIZE - 3, SIZE, 3);
+  });
+}
+
 /** Fügt einer #RRGGBB- oder Farbnamen-CSS-Variable eine Alpha-Komponente hinzu. */
 function _withAlpha(color, alpha) {
   if (color.startsWith('#') && color.length === 7) {

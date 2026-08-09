@@ -17,8 +17,8 @@
  */
 
 import {
-  getState, dispatch, subscribe, A, canUndo, BADGE_THRESHOLDS, VACATION_PLANS,
-  calcCurrentStreak, calcLongestStreakEver, weekTrainingStatus, getLatestWeek,
+  getState, dispatch, subscribe, A, canUndo, VACATION_PLANS,
+  calcCurrentStreak, calcLongestStreakEver, getLatestWeek,
   clearAutoWeekPending, STORAGE_KEY, STORAGE_KEY_SHADOW, defaultWeightStepForExercise,
   getEffectiveWeightStep,
 } from './state.js';
@@ -97,6 +97,10 @@ function _liveWeightKey(di, ei, si) {
 
 /** Id of the currently open Kennzahlen-Erklärungstooltip (Fortschritt-Tab) or null. */
 let _metricTooltipKey = null;
+
+/** Name of the exercise whose Bestleistungen-Detail-Ebene (Sätze/Wdh/Datum) gerade
+ * aufgeklappt ist, oder null — Runde 19, Cluster 5. */
+let _prDetailOpenName = null;
 
 /** Key of exercise whose confirm button is flashing green: `${di}-${ei}` or null. */
 let _confirmFlashKey = null;
@@ -275,6 +279,11 @@ let _acceptedFeedback = new Map();
 // B93: Sätze (Keys `${di}-${ei}-${si}`), deren "▾ Warum?"-Begründung gerade
 // aufgeklappt ist. Rein transient, nicht persistiert.
 let _setFeedbackExpanded = new Set();
+// Runde 19/Cluster 1: Sätze (gleiches Key-Schema), deren Übernehmen/X-Zeile
+// per X-Tap bewusst weggeklickt wurde -- rein UI-lokales "gesehen/ignoriert",
+// kein State-Write (identisches Muster zu dismiss-optional-set weiter unten).
+// Rein transient, nicht persistiert -- wie _setFeedbackExpanded.
+let _setFeedbackDismissed = new Set();
 
 /** Last rendered week index – used to detect week navigation. */
 let _lastRenderedCurIdx = null;
@@ -748,9 +757,16 @@ function _renderFavoritesOverview(state) {
   }
   container.innerHTML = favNames.map(nm => {
     const pr = prs[nm];
+    // Runde 19 (Cluster 5): .pr-row ist seit der Bestleistungen-Detail-Ebene
+    // kein Flex-Container mehr -- .pr-row__main traegt jetzt das Layout
+    // (siehe styles.css). Diese Uebersicht hat keinen Detail-Toggle, daher
+    // ein <div> statt <button>, cursor:default ueberschreibt den sonst
+    // interaktiven Button-Cursor von .pr-row__main.
     return `<div class="pr-row pr-row--fav">
-      <span class="pr-name">⭐ ${h(nm)}</span>
-      ${pr ? `<span class="pr-val">${pr.maxWeight} kg</span>${pr.date ? `<span class="pr-date">${pr.date}</span>` : ''}` : `<span class="pr-val" style="color:var(--c-text-3)">–</span>`}
+      <div class="pr-row__main" style="cursor:default">
+        <span class="pr-name">⭐ ${h(nm)}</span>
+        ${pr ? `<span class="pr-val">${pr.maxWeight} kg</span>${pr.date ? `<span class="pr-date">${pr.date}</span>` : ''}` : `<span class="pr-val" style="color:var(--c-text-3)">–</span>`}
+      </div>
     </div>`;
   }).join('');
 }
@@ -1133,6 +1149,74 @@ function _realDayDate(day, week, dayIdx) {
 }
 
 /**
+ * Bestleistungen ueber die komplette Historie, EINE Quelle fuer Gewichts- UND
+ * Wdh-PRs -- Runde 19, Cluster 5. state.prs (state.js _applyPrTracking())
+ * ueberspringt die Aktualisierung komplett bei weight===0 (ohne Gewicht
+ * bedeutungslos fuer 1RM/Volumen-Tracking), wodurch reine Koerpergewichts-
+ * uebungen (z.B. Klimmzuege) dort NIE einen Eintrag bekommen. Statt state.js
+ * anzufassen: ein einmaliger Scan ueber state.weeks pro Aufruf, der pro
+ * Uebungsname den besten Satz ALLER ZEITEN liefert (Gewicht zuerst, Wdh als
+ * Tiebreak) -- bei durchgehend gewichtslosen Uebungen bleibt weight===0 ueber
+ * den ganzen Scan, wodurch automatisch der Wdh-Bestwert gewinnt, ohne
+ * Sonderfall-Code. Liefert zusaetzlich alle an diesem Tag erfolgreichen
+ * Saetze derselben Uebung (daySets) als Kontext fuer die neue Detail-Ebene.
+ * Rechenaufwand: O(Saetze der gesamten Historie), einmal pro Fortschritt-Tab-
+ * Render -- bei der groessten Test-Fixture (100 Wochen) unproblematisch.
+ */
+function _computeBestleistungen(state) {
+  const best = new Map(); // name -> { weight, reps, date, daySets }
+  state.weeks.forEach(wk => {
+    wk.days.forEach((day, di) => {
+      const byName = new Map();
+      day.exercises.forEach(ex => {
+        const successSets = ex.sets.filter(s => s.status === 'success');
+        if (!successSets.length) return;
+        const list = byName.get(ex.name) ?? [];
+        successSets.forEach(s => list.push({ weight: s.weight ?? 0, reps: s.reps }));
+        byName.set(ex.name, list);
+      });
+      byName.forEach((sets, name) => {
+        sets.forEach(s => {
+          const prev = best.get(name);
+          const better = !prev
+            || s.weight > prev.weight
+            || (s.weight === prev.weight && s.reps > prev.reps);
+          if (better) {
+            best.set(name, { weight: s.weight, reps: s.reps, date: _realDayDate(day, wk, di), daySets: sets });
+          }
+        });
+      });
+    });
+  });
+  return best;
+}
+
+/**
+ * Haelt #app.scrollTop ueber mehrere Animationsframes hinweg auf `target`
+ * fest -- Runde 19 (Cluster 7), Erkenntnisse +/--Scroll-Sprung-Bug. Ein
+ * einzelnes requestAnimationFrame() direkt nach dispatch() (aeltere Fix-4b-
+ * Version) reicht NICHT: Diagnose per Playwright-Probe zeigte, dass
+ * scrollTop mehrere Frames lang stabil bleibt und danach TROTZDEM springt --
+ * der Uebungsfortschritt-Chart wird in einem eigenen, spaeteren rAF-Block
+ * innerhalb des Tab-Renders neu gezeichnet (_updateExChart(), siehe dort),
+ * dessen Hoehenaenderung erst NACH dem einzelnen Restore-Frame durchschlaegt
+ * (zusaetzlich verstaerkt durch Chromes eingebautes CSS-Scroll-Anchoring,
+ * das bei Hoehenaenderungen oberhalb des Viewports selbststaendig
+ * nachjustiert). Statt den exakten Ursprung des zweiten Layout-Shifts
+ * fragil zu jagen: scrollTop wird ueber ~15 Frames (bei 60fps ca. 250ms,
+ * reichlich Marge ueber den beobachteten Verzug) aktiv zurueckgesetzt,
+ * sobald es abweicht -- robust gegen weitere, heute unbekannte
+ * asynchrone Layout-Verschieber in diesem Pfad.
+ */
+function _pinScrollTop(el, target, framesLeft = 15) {
+  if (!el || framesLeft <= 0) return;
+  requestAnimationFrame(() => {
+    if (el.scrollTop !== target) el.scrollTop = target;
+    _pinScrollTop(el, target, framesLeft - 1);
+  });
+}
+
+/**
  * Trainings-Ritual-Kontext: findet den chronologisch letzten Tag VOR (wk, di)
  * mit Aktivität (abgeschlossen ODER mindestens ein bewerteter Satz) — über
  * Wochengrenzen hinweg, unabhängig vom Wochenindex (NICHT dasselbe wie der
@@ -1213,29 +1297,6 @@ function _renderStreakBadge(state) {
   const streakWeeks = (_calcStreak(state)?.cur ?? 0);
   const streakLabel = streakWeeks === 1 ? '1 Woche' : `${streakWeeks} Wochen`;
   return `<span class="streak-badge" aria-label="${streakLabel} konsistentes Training"><span class="streak-badge__num">${streakWeeks}</span> ${streakWeeks === 1 ? 'Woche' : 'Wochen'}</span>`;
-}
-
-/** Abzeichen-Detailansicht (D2) — nur für bereits erreichte Abzeichen, dieselbe disposable-Overlay-Konvention wie _showReentryPopup(). */
-function _showBadgeDetail(thr, earned) {
-  document.getElementById('badge-detail-modal')?.remove();
-  const dateStr = new Date(earned.unlockedAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' });
-  const overlay = document.createElement('div');
-  overlay.id = 'badge-detail-modal';
-  overlay.className = 'vac-plan-modal-overlay';
-  overlay.innerHTML = `
-    <div class="vac-plan-modal" style="align-items:center;text-align:center">
-      <img src="./badges/${thr.id}.png" alt="${thr.title}" class="badge-img" width="120" height="120" style="align-self:center">
-      <div class="vac-plan-modal__title">${thr.title}</div>
-      <p class="vac-plan-modal__sub">${thr.weeks} Wochen Training in Folge</p>
-      <p class="vac-plan-modal__sub" style="color:var(--c-ok)">Erreicht am ${dateStr}</p>
-      <button class="btn btn--ghost" data-action="close-modal" data-target="badge-detail-modal" style="width:100%;min-height:var(--touch)">Schließen</button>
-    </div>`;
-  document.body.appendChild(overlay);
-
-  overlay.addEventListener('click', e => {
-    if (e.target === overlay) { overlay.remove(); return; }
-    if (e.target.closest('[data-action="close-modal"]')) overlay.remove();
-  });
 }
 
 /**
@@ -2604,8 +2665,18 @@ function _renderIntraFeedback(fb, key, di, ei, si, mode, canAdopt) {
     : mode === 'reverted' ? '✓ Übernommen (rückgängig gemacht)'
     : null;
   const confirmHtml = confirmText ? ` <span class="set-feedback__line--confirm">${confirmText}</span>` : '';
-  const adoptBtnHtml = (mode === 'live' && canAdopt)
-    ? ` <button type="button" class="set-feedback__adopt-btn" data-action="adopt-set-feedback" data-di="${di}" data-ei="${ei}" data-si="${si}" data-next-weight="${fb.nextWeight}" data-pause-sec="${fb.pauseSec ?? ''}">Übernehmen ↗</button>`
+  const dismissed = _setFeedbackDismissed.has(key);
+  // Runde 19/Cluster 1: Text-Link "Übernehmen ↗" durch zwei Icon-Buttons
+  // (Haken/X) ersetzt, >=44px Touch-Target (iOS-HIG) statt der bisherigen
+  // 24px-Inline-Pille -- dafür in eine eigene Zeile ausgelagert (passt
+  // sonst nicht neben den 11px-Fliesstext), gleiches Reihen-Muster wie das
+  // bestehende .set-feedback__actions (siehe "+ Satz hinzufügen"/"Fertig").
+  const adoptActionsHtml = (mode === 'live' && canAdopt && !dismissed)
+    ? `
+  <div class="set-feedback__actions">
+    <button type="button" class="set-feedback__icon-btn set-feedback__icon-btn--accept" data-action="adopt-set-feedback" data-di="${di}" data-ei="${ei}" data-si="${si}" data-next-weight="${fb.nextWeight}" data-pause-sec="${fb.pauseSec ?? ''}" aria-label="Vorschlag übernehmen">${ic.check()}</button>
+    <button type="button" class="set-feedback__icon-btn set-feedback__icon-btn--reject" data-action="dismiss-set-feedback" data-di="${di}" data-ei="${ei}" data-si="${si}" aria-label="Vorschlag ignorieren">${ic.xMark()}</button>
+  </div>`
     : '';
   const whyToggleHtml = ` <button type="button" class="set-feedback__why-toggle" data-action="toggle-set-feedback-why" data-di="${di}" data-ei="${ei}" data-si="${si}">${expanded ? '▴' : '▾'} Warum?</button>`;
   const repsLine = fb.repDiff == null
@@ -2624,7 +2695,7 @@ function _renderIntraFeedback(fb, key, di, ei, si, mode, canAdopt) {
   return `
 <div class="set-feedback" data-di="${di}" data-ei="${ei}" data-si="${si}">
   <span class="set-feedback__line">→ Nächster Satz: ${fb.nextWeight}kg</span>
-  <span class="set-feedback__line set-feedback__line--sub">${h(fb.hint)}${fb.pauseSec ? ` · Pause: ${_fmtPause(fb.pauseSec)}` : ''}${adoptBtnHtml}${confirmHtml}${whyToggleHtml}</span>${whyBodyHtml}
+  <span class="set-feedback__line set-feedback__line--sub">${h(fb.hint)}${fb.pauseSec ? ` · Pause: ${_fmtPause(fb.pauseSec)}` : ''}${confirmHtml}${whyToggleHtml}</span>${adoptActionsHtml}${whyBodyHtml}
 </div>`;
 }
 
@@ -2938,6 +3009,28 @@ ${s._showNote ? `
 
 /** Körpergewichts-Verlauf: Wochendurchschnitt aus weightLog, aufsteigend.
  *  Fallback auf bodyData.weight für alte Daten (vor v29). */
+/**
+ * Relative Zeitangabe fuer die Koerpergewicht-Chart-X-Achse -- Runde 19
+ * (Cluster 9). wkLabel() (KW-Format) bleibt fuer Wochenrueckblick/Dropdown
+ * unveraendert (dort ist die exakte Kalenderwoche relevant); hier ist nur
+ * eine grobe zeitliche Einordnung gefragt, und KW-Nummern sagen Nutzern
+ * laut Feedback nichts. Gleiche Kurzstufen wie _weekLabel() bis 8 Wochen,
+ * danach -- anders als dort -- Monats- statt KW-Fallback (die Chart-Achse
+ * braucht auch bei langer Historie durchgehend relative Sprache, keine
+ * Rueckkehr zu absoluten Angaben).
+ */
+function _bodyWeightChartLabel(startDate) {
+  const d = new Date(startDate + 'T12:00:00');
+  const today = new Date();
+  today.setHours(12, 0, 0, 0);
+  const daysAgo = Math.round((today - d) / (24 * 60 * 60 * 1000));
+  const weeksAgo = Math.round(daysAgo / 7);
+  if (weeksAgo <= 0) return 'Diese Woche';
+  if (weeksAgo === 1) return 'Letzte Woche';
+  if (weeksAgo <= 8) return `Vor ${weeksAgo} Wochen`;
+  const monthsAgo = Math.max(2, Math.round(daysAgo / 30.44));
+  return `Vor ${monthsAgo} Monaten`;
+}
 function _bodyWeightHistory(state) {
   return [...state.weeks]
     .filter(w => (w.bodyData?.weightLog?.length > 0) || w.bodyData?.weight)
@@ -3116,7 +3209,7 @@ function renderBodyTab(state) {
 
   // ── Sektion 1: Körpergewicht ─────────────────────────────────────────────
   const history = _bodyWeightHistory(state);
-  const chartSvg = renderBodyWeightChart(history.map(p => ({ label: wkLabel(p.startDate), weight: p.weight })));
+  const chartSvg = renderBodyWeightChart(history.map(p => ({ label: _bodyWeightChartLabel(p.startDate), weight: p.weight })));
   const first = history[0] ?? null;
   const last  = history[history.length - 1] ?? null;
   const change = first && last ? Math.round((last.weight - first.weight) * 10) / 10 : null;
@@ -4157,9 +4250,18 @@ function renderCoachTab(state) {
 
   const questionCardHtml  = _buildCoachQuestionCard(state, focus);
   const perfSummaryHtml   = _coachPerfSummaryHtml(state);
+  // Runde 19 (Cluster 12): sichtbarer Beleg, dass die Karte für DIESE Woche
+  // neu ausgewertet wurde (auch wenn Status/Text gegenüber der Vorwoche
+  // unverändert sind) — reine Anzeige, keine neue Berechnung, nutzt die
+  // bereits bestehende relative Wochen-Bezeichnung (_weekLabel()).
+  const _curWk = getLatestWeek(state.weeks);
+  const weekStampHtml = _curWk
+    ? `<div class="coach-focus-week-stamp">Stand: ${h(_weekLabel(_curWk, state.weeks))}</div>`
+    : '';
   container.innerHTML = `
   <div class="chart-card coach-focus-card">
     <div class="chart-card__title">📋 Fokus der Woche</div>
+    ${weekStampHtml}
     <div class="coach-focus-status">${icon} ${h(focus.headline)}</div>
     <p class="coach-focus-directive">${h(directive)}</p>
     ${focus.subtext ? `<p class="coach-focus-subtext">${h(focus.subtext)}</p>` : ''}
@@ -4470,24 +4572,46 @@ function renderProgressTab(state) {
   const archivedNames = new Set(
     state.weeks.flatMap(w => w.days.flatMap(d => d.exercises.filter(e => e.archived).map(e => e.name)))
   );
-  const allExNames = [...new Set(
+  const allExNamesRaw = [...new Set(
     state.weeks.flatMap(w => w.days.flatMap(d => d.exercises.map(e => e.name)))
   )].sort();
+  // Runde 19 (Cluster 6): Favoriten (state.favoriteExercises, bereits genutzt
+  // von Bestleistungen/Coach-Fokus) zuerst im Dropdown -- da <select> ohne
+  // explizit gesetztes .value automatisch die erste <option> waehlt, macht das
+  // zugleich den ersten Favoriten zum Default statt der alphabetisch ersten
+  // Uebung (kein zusaetzlicher JS-Eingriff auf sel.value noetig).
+  const _favOrder = (state.favoriteExercises ?? []).filter(n => allExNamesRaw.includes(n));
+  const allExNames = [..._favOrder, ...allExNamesRaw.filter(n => !_favOrder.includes(n))];
 
   // ── Bestleistungen ──────────────────────────────────────────────────────────
+  // Runde 19 (Cluster 5): _computeBestleistungen() ersetzt state.prs als Quelle
+  // (siehe Doku dort) -- deckt jetzt auch reine Koerpergewichts-Uebungen
+  // (Wdh-PR statt Gewicht) ab, plus neue Detail-Ebene (Saetze/Wdh/Datum) hinter
+  // einem Tap, analog zum bestehenden "Basis dieser Einschaetzung"-Muster.
   const bestleistungenHtml = (() => {
-    const prs = state.prs ?? {};
     const favSet = new Set(state.favoriteExercises ?? []);
-    const entries = Object.entries(prs).sort((a, b) => b[1].maxWeight - a[1].maxWeight);
+    const best = _computeBestleistungen(state);
+    const entries = [...best.entries()].sort((a, b) => (b[1].weight - a[1].weight) || (b[1].reps - a[1].reps));
     if (!entries.length) return '';
     const favEntries  = entries.filter(([nm]) => favSet.has(nm));
     const restEntries = entries.filter(([nm]) => !favSet.has(nm));
-    const renderRow = ([nm, pr], isFav) => `
+    const renderRow = ([nm, pr], isFav) => {
+      const headline = pr.weight > 0 ? `${pr.weight} kg` : `${pr.reps} Wdh`;
+      const dOpen = _prDetailOpenName === nm;
+      return `
       <div class="pr-row${isFav ? ' pr-row--fav' : ''}">
-        <span class="pr-name">${isFav ? '⭐ ' : ''}${h(nm)}</span>
-        <span class="pr-val">${pr.maxWeight} kg</span>
-        ${pr.date ? `<span class="pr-date">${pr.date}</span>` : ''}
+        <button type="button" class="pr-row__main" data-action="toggle-pr-detail" data-ex="${h(nm)}" aria-expanded="${dOpen}">
+          <span class="pr-name">${isFav ? '⭐ ' : ''}${h(nm)}</span>
+          <span class="pr-val">${headline}</span>
+          ${pr.date ? `<span class="pr-date">${pr.date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' })}</span>` : ''}
+        </button>
+        ${dOpen ? `
+        <div class="pr-row__detail">
+          ${pr.daySets.map(s => `<div class="pr-detail-set">${s.weight > 0 ? `${s.weight} kg × ${s.reps} Wdh` : `${s.reps} Wdh`}</div>`).join('')}
+          ${pr.date ? `<div class="pr-detail-date">${pr.date.toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' })}</div>` : ''}
+        </div>` : ''}
       </div>`;
+    };
     const restHtml = restEntries.length ? `
       <details class="pr-collapse">
         <summary class="pr-collapse__summary">Alle Übungen (${restEntries.length}) ▼</summary>
@@ -4525,7 +4649,6 @@ function renderProgressTab(state) {
   ${_renderMovementPattern(state)}
 
   <div class="chart-card">
-    ${_renderStreakChain(state)}
     ${(() => {
       const allLogs  = state.weeks.flatMap(w => w.sessionLog ?? []);
       const totalMin = allLogs.length ? Math.round(allLogs.reduce((s, l) => s + l.duration, 0) / 60) : null;
@@ -4547,12 +4670,10 @@ function renderProgressTab(state) {
     ${_metricTooltipKey === 'avg-score' ? `
     <div class="metric-tooltip">Anteil der Sätze bei denen du dein Wdh-Ziel erreicht hast — gemittelt über alle bisherigen Wochen. Pending-Sätze werden nicht gezählt.</div>` : ''}`;
     })()}
-    ${_renderBadgeGallery(state)}
   </div>`;
 
   requestAnimationFrame(() => {
     _updateExChart(state);
-    _attachStreakChainTooltips();
     document.getElementById('chart-ex-select')?.addEventListener('change', () => {
       _updateExChart(getState());
     });
@@ -4581,8 +4702,12 @@ function _updateInlineReview(state) {
   // mindestens einen markedDone-Tag, ist also nie die leere Falle, die
   // _runAutoWeekFlow() treffen konnte.
   wrap.innerHTML = `${renderWeekReviewHtml(review)}
-    <button type="button" class="btn btn--ghost" id="week-review-inline-share" style="width:100%;margin-top:var(--sp-3);min-height:var(--touch)">📤 Teilen</button>`;
-  wrap.querySelector('#week-review-inline-share')?.addEventListener('click', () => shareWeekReviewImage(review));
+    <div style="display:flex;flex-wrap:wrap;gap:var(--sp-3);margin-top:var(--sp-3)">
+      <button type="button" class="btn btn--ghost wr-share__btn" id="week-review-inline-share" title="Beste Übung teilen">📤 Beste Übung</button>
+      <button type="button" class="btn btn--ghost wr-share__btn" id="week-review-inline-share-summary" title="Zusammenfassung der Woche teilen">🗒 Zusammenfassung</button>
+    </div>`;
+  wrap.querySelector('#week-review-inline-share')?.addEventListener('click', () => shareWeekReviewImage(review, 'best'));
+  wrap.querySelector('#week-review-inline-share-summary')?.addEventListener('click', () => shareWeekReviewImage(review, 'summary'));
 }
 
 function _calcStreak(state) {
@@ -4592,66 +4717,6 @@ function _calcStreak(state) {
   const cur  = calcCurrentStreak(state.weeks) ?? 0;
   const best = Math.max(state.longestStreakEver ?? 0, calcLongestStreakEver(state.weeks) ?? 0);
   return { cur, best };
-}
-
-function _renderStreakChain(state) {
-  const sorted = [...state.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
-  const last8  = sorted.slice(-8);
-  if (last8.length < 2) return '';
-  const R = 6, GAP = 32, PAD = 12;
-  const W = PAD * 2 + (last8.length - 1) * GAP;
-  const H = 28;
-  const cy = H / 2;
-  const dots = last8.map((wk, i) => {
-    const cx       = PAD + i * GAP;
-    const score    = _weekSuccessScore(wk);
-    const streakStatus = weekTrainingStatus(wk); // 'completed' | 'attended' | 'missed'
-    const isRestOnly = streakStatus === 'attended';
-    const done     = streakStatus === 'completed';
-    const ss       = score.total > 0 ? score.pct : 0;
-    const wkNum = _isoWeek(new Date(wk.startDate + 'T12:00:00'));
-    return { cx, done, isRestOnly, ss, wkNum, startDate: wk.startDate };
-  });
-  const lines = dots.slice(0, -1).map((d, i) => {
-    const next  = dots[i + 1];
-    const color = d.done && next.done ? '#C8FF00' : '#2E2E35';
-    const dash  = d.done && next.done ? '' : 'stroke-dasharray="4 3"';
-    return `<line x1="${d.cx}" y1="${cy}" x2="${next.cx}" y2="${cy}" stroke="${color}" stroke-width="2" ${dash}/>`;
-  });
-  const circles = dots.map(d => {
-    const fill   = d.isRestOnly ? '#2E2E35' : d.done ? '#C8FF00' : '#1A1A2E';
-    const stroke = d.isRestOnly ? '#444'    : d.done ? '#C8FF00' : '#2E2E35';
-    const tip    = d.isRestOnly ? `KW ${d.wkNum} · Anwesend` : `KW ${d.wkNum} · ${d.ss}% Erfolg`;
-    return `<circle cx="${d.cx}" cy="${cy}" r="${R}" fill="${fill}" stroke="${stroke}" stroke-width="2" data-streak-tip="${tip}" style="cursor:pointer"/>`;
-  });
-  return `<div class="streak-chain-wrap">
-    <svg class="streak-chain" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
-      ${lines.join('')}
-      ${circles.join('')}
-    </svg>
-    <div id="streak-chain-tooltip" style="display:none;position:absolute;background:#1A1A2E;border:1px solid #2E2E35;color:#E0E0E8;font-size:11px;padding:4px 8px;border-radius:6px;pointer-events:none;z-index:50;white-space:nowrap"></div>
-  </div>`;
-}
-
-function _attachStreakChainTooltips() {
-  const wrap    = document.querySelector('.streak-chain-wrap');
-  const tooltip = document.getElementById('streak-chain-tooltip');
-  if (!wrap || !tooltip) return;
-  const show = (e) => {
-    const t = e.target.closest('[data-streak-tip]');
-    if (!t) return;
-    const rect    = t.getBoundingClientRect();
-    const wrapR   = wrap.getBoundingClientRect();
-    tooltip.textContent = t.dataset.streakTip;
-    tooltip.style.display = 'block';
-    tooltip.style.left = `${rect.left - wrapR.left + rect.width / 2 - tooltip.offsetWidth / 2}px`;
-    tooltip.style.top  = `${rect.top - wrapR.top - tooltip.offsetHeight - 6}px`;
-  };
-  const hide = () => { tooltip.style.display = 'none'; };
-  wrap.addEventListener('mouseover', show);
-  wrap.addEventListener('mouseout',  hide);
-  wrap.addEventListener('touchstart', e => { show(e.touches[0] ?? e); }, { passive: true });
-  wrap.addEventListener('touchend',   hide, { passive: true });
 }
 
 /** Tooltip-Handler für data-tip-Kreise im SVG-Chart. */
@@ -5817,13 +5882,6 @@ function _handleClick(e) {
 
   switch (action) {
 
-    case 'show-badge-detail': {
-      const thr = BADGE_THRESHOLDS.find(t => t.id === el.dataset.badgeId);
-      const earned = (getState().badges ?? []).find(b => b.id === el.dataset.badgeId);
-      if (thr && earned) _showBadgeDetail(thr, earned);
-      break;
-    }
-
     // ── Overview mode ─────────────────────────────────────────────────────
     case 'toggle-overview':
       _overviewMode = !_overviewMode;
@@ -5847,6 +5905,14 @@ function _handleClick(e) {
     case 'toggle-metric-tooltip': {
       const _mKey = el.dataset.metric;
       _metricTooltipKey = _metricTooltipKey === _mKey ? null : _mKey;
+      scheduleRender();
+      break;
+    }
+
+    // Runde 19 (Cluster 5): Bestleistungen-Detail-Ebene (Sätze/Wdh/Datum)
+    case 'toggle-pr-detail': {
+      const _exNm = el.dataset.ex;
+      _prDetailOpenName = _prDetailOpenName === _exNm ? null : _exNm;
       scheduleRender();
       break;
     }
@@ -6363,7 +6429,7 @@ function _handleClick(e) {
         const _appEl = document.getElementById('app');
         const _scrollTop = _appEl?.scrollTop ?? 0;
         dispatch(A.SET_ERKENNTNISSE_HORIZONT, { value: _curN - 1 });
-        requestAnimationFrame(() => { if (_appEl) _appEl.scrollTop = _scrollTop; });
+        _pinScrollTop(_appEl, _scrollTop);
       }
       break;
     }
@@ -6375,7 +6441,7 @@ function _handleClick(e) {
         const _appEl = document.getElementById('app');
         const _scrollTop = _appEl?.scrollTop ?? 0;
         dispatch(A.SET_ERKENNTNISSE_HORIZONT, { value: _curN + 1 });
-        requestAnimationFrame(() => { if (_appEl) _appEl.scrollTop = _scrollTop; });
+        _pinScrollTop(_appEl, _scrollTop);
       }
       break;
     }
@@ -6595,7 +6661,16 @@ function _handleClick(e) {
     }
 
     case 'set-pause':
-      dispatch(A.EX_UPDATE, { di: +di, ei: +ei, field: 'pauseSec', value: +sec }); break;
+      // Runde 19/Cluster 2: pauseSecManual markiert einen BEWUSST vom
+      // Nutzer gewählten Wert -- unterscheidet sich vom reinen
+      // Erstellungs-Default (ex.pauseSec ist sonst nie "leer", jede Übung
+      // bekommt bei Erstellung bereits 90/übungsspezifisch, siehe state.js).
+      // Erst mit diesem Flag darf die feste Pausenzeit die dynamische
+      // Session-Coach-Empfehlung overrulen (siehe timer.js/ui.js
+      // autoStartPauseTimer-Pfad + adopt-set-feedback).
+      dispatch(A.EX_UPDATE, { di: +di, ei: +ei, field: 'pauseSec', value: +sec });
+      dispatch(A.EX_UPDATE, { di: +di, ei: +ei, field: 'pauseSecManual', value: true });
+      break;
 
     case 'remove-ex':
       // P1-Fix: kein natives confirm() mehr -- Inline-Panel-Muster wie
@@ -7121,12 +7196,18 @@ function _handleClick(e) {
         // bisher statischen ex.pauseSec, wenn eine existiert (gleiche
         // Gating-Bedingung wie das restliche Intra-Session-Feedback).
         let _feedbackPauseSec = null;
-        const _fbWk  = _aft.weeks[_aft.curIdx];
-        const _fbDay = _fbWk?.days[+di];
-        if (_fbDay && _aft.settings?.sessionCoach !== false && !_fbDay.isVacation && _isTodayDay(_fbWk, +di)) {
-          const _fbIsCompound = isCompoundExercise(_aftEx.name, buildCategoryMap(_aft.customExercises));
-          const _fb = buildSetFeedback(_aftSet, _aftEx, _fbDay.sessionModifier ?? null, _csi, _aft.settings?.goal ?? null, _fbIsCompound, _fbDay.sessionModifierScope ?? 'all', getEffectiveWeightStep(_aftEx, _aft.settings, _aft.customExercises));
-          if (_fb?.pauseSec) _feedbackPauseSec = _fb.pauseSec;
+        // Runde 19/Cluster 2: eine BEWUSST manuell gesetzte Pausenzeit
+        // (pauseSecManual) overrult die dynamische Coach-Empfehlung --
+        // ansonsten (Default/unangetastet) gewinnt weiterhin die
+        // Session-Coach-Berechnung wie bisher (B77).
+        if (!_aftEx.pauseSecManual) {
+          const _fbWk  = _aft.weeks[_aft.curIdx];
+          const _fbDay = _fbWk?.days[+di];
+          if (_fbDay && _aft.settings?.sessionCoach !== false && !_fbDay.isVacation && _isTodayDay(_fbWk, +di)) {
+            const _fbIsCompound = isCompoundExercise(_aftEx.name, buildCategoryMap(_aft.customExercises));
+            const _fb = buildSetFeedback(_aftSet, _aftEx, _fbDay.sessionModifier ?? null, _csi, _aft.settings?.goal ?? null, _fbIsCompound, _fbDay.sessionModifierScope ?? 'all', getEffectiveWeightStep(_aftEx, _aft.settings, _aft.customExercises));
+            if (_fb?.pauseSec) _feedbackPauseSec = _fb.pauseSec;
+          }
         }
         window.dispatchEvent(new CustomEvent('train:set-done', { detail: { pauseSec: _feedbackPauseSec ?? (_cex.pauseSec ?? 90), di: +di } }));
       }
@@ -7720,6 +7801,17 @@ function _handleClick(e) {
       const _whyKey = `${di}-${ei}-${si}`;
       if (_setFeedbackExpanded.has(_whyKey)) _setFeedbackExpanded.delete(_whyKey);
       else _setFeedbackExpanded.add(_whyKey);
+      scheduleRender();
+      break;
+    }
+
+    case 'dismiss-set-feedback': {
+      // Runde 19/Cluster 1: X-Button neben dem Haken -- rein UI-lokales
+      // "gesehen, ignoriert" (kein State-Write, kein dispatch), identisches
+      // Muster zu dismiss-optional-set weiter unten. Blendet nur die
+      // Accept/Reject-Zeile dieses EINEN Satzes aus, Hint-Text/Pause-Info
+      // bleiben sichtbar.
+      _setFeedbackDismissed.add(`${di}-${ei}-${si}`);
       scheduleRender();
       break;
     }
@@ -8560,9 +8652,10 @@ function _switchToTab(tab) {
     document.getElementById('app').scrollTop = 0;
     renderProgressTab(state);
     const _completedWks = state.weeks.filter(w => w.days?.some(d => d.markedDone)).length;
-    if (_completedWks >= 2) {
-      _maybeShowTip('tip-05', 'Jeder Punkt = eine Woche. Blau = Training · Amber = Urlaub · Grau = Pause.');
-    }
+    // tip-05 entfernt (Runde 19, Cluster 10) — erklärte die Streak-Dots-Kette
+    // (_renderStreakChain()), die im selben Sprint entfernt wurde (siehe
+    // BUGS.md). Ein Tipp für ein nicht mehr existierendes UI-Element wäre
+    // irreführend.
     // tip-07 entfernt (Sprint "Framework-Audit Cleanup", Fix 5) — versprach
     // "4 Wochen Streak = erstes Abzeichen", aber die Abzeichen-Vergabe ist
     // eingefroren (siehe state.js' _checkAndGrantBadges()). Ein Tipp, der ein
@@ -8707,14 +8800,8 @@ function _buildScaffold(root) {
 </section>
 
 <section id="page-progress" class="page" role="tabpanel" aria-label="Fortschrittsanalyse">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--sp-4)">
-    <div>
-      <h1 class="page-title">Fortschritt</h1>
-      <p class="page-subtitle">Wochenrückblick, Beobachtungen & Muster</p>
-    </div>
-    <button class="btn btn--accent btn--sm" data-action="open-export"
-      aria-label="Daten exportieren">${ic.download()} Export</button>
-  </div>
+  <h1 class="page-title">Fortschritt</h1>
+  <p class="page-subtitle">Wochenrückblick, Beobachtungen & Muster</p>
   <div id="progress-tab-content"></div>
 </section>
 
@@ -8978,12 +9065,6 @@ export function mountApp(root) {
     _swVersionLabel = `TRAIN ${event.data.version}`;
     const el = document.getElementById('sw-version-label');
     if (el) el.textContent = _swVersionLabel;
-  });
-
-  window.addEventListener('train:badge-earned', e => {
-    (e.detail ?? []).forEach((badge, i) => {
-      setTimeout(() => _showBadgeOverlay(badge), i * 5500);
-    });
   });
 
   // Von index.html gefeuert bei window.onerror/unhandledrejection (Pre-Launch-
@@ -9311,6 +9392,8 @@ function _finishCompletion(di, rating, sleepHours, energyLevel) {
   const _expandedPrefix = `${di}-`;
   for (const _k of [..._acceptedFeedback.keys()]) if (_k.startsWith(_acceptedPrefix)) _acceptedFeedback.delete(_k);
   for (const _k of [..._setFeedbackExpanded]) if (_k.startsWith(_expandedPrefix)) _setFeedbackExpanded.delete(_k);
+  // Runde 19/Cluster 1: gleiches Cleanup-Prinzip für die neue X-Dismiss-Menge.
+  for (const _k of [..._setFeedbackDismissed]) if (_k.startsWith(_expandedPrefix)) _setFeedbackDismissed.delete(_k);
   if (lockedDay?.markedDone) {
     const allDone   = afterSt.weeks[afterSt.curIdx]?.days.every(d => d.markedDone);
     const trigger   = allDone ? 'WOCHE_ABGESCHLOSSEN' : 'TAG_ABGESCHLOSSEN';
@@ -9662,50 +9745,12 @@ function _showPrMomentToast(exName, weight, reps, prevWeight) {
   });
 }
 
-function _showBadgeOverlay(badge) {
-  const existing = document.getElementById('badge-earned-overlay');
-  if (existing) existing.remove();
-  const el = document.createElement('div');
-  el.id        = 'badge-earned-overlay';
-  el.className = 'badge-earned-overlay';
-  el.innerHTML = `
-    <div class="badge-earned-overlay__inner">
-      <div class="badge-earned-overlay__header">Abzeichen freigeschaltet!</div>
-      <img src="./badges/${badge.id}.png" alt="${badge.title}" class="badge-img" width="160" height="160">
-      <div class="badge-earned-overlay__title">${badge.title}</div>
-      <div class="badge-earned-overlay__sub">nach ${badge.weeks * 7} Tagen konsequentem Training</div>
-    </div>`;
-  document.body.appendChild(el);
-  const dismiss = () => { clearTimeout(timer); el.remove(); };
-  const timer   = setTimeout(dismiss, 5000);
-  el.addEventListener('click', dismiss, { once: true });
-}
-
-// weeksLeft-Countdown ("noch X Tage") für nicht erreichte Abzeichen entfernt
-// (Sprint "Framework-Audit Cleanup", Fix 5) — seit die Abzeichen-Vergabe
-// eingefroren ist (_checkAndGrantBadges() in state.js), wäre ein Countdown
-// bis zu einem Unlock, der nie kommt, irreführend. Grau/transparent allein
-// kommuniziert bereits "nicht erreicht", ohne ein Versprechen zu machen.
-function _renderBadgeGallery(state) {
-  const badges  = state.badges ?? [];
-  const items = BADGE_THRESHOLDS.map(thr => {
-    const earned = badges.find(b => b.id === thr.id);
-    if (earned) {
-      const dateStr = new Date(earned.unlockedAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' });
-      return `<button type="button" class="badge-item badge-item--earned" data-action="show-badge-detail" data-badge-id="${thr.id}" aria-label="${thr.title} — Details">
-        <img src="./badges/${thr.id}.png" alt="${thr.title}" class="badge-img" width="80" height="80">
-        <div class="badge-item__title">${thr.title}</div>
-        <div class="badge-item__sub badge-item__date">${dateStr}</div>
-      </button>`;
-    }
-    return `<div class="badge-item">
-      <img src="./badges/${thr.id}.png" alt="${thr.title}" class="badge-img" width="80" height="80" style="filter:grayscale(100%) opacity(0.3)">
-      <div class="badge-item__title">${thr.title}</div>
-    </div>`;
-  });
-  return `<div class="section-label" style="margin-top:var(--sp-5)">Abzeichen</div>
-    <div class="badge-gallery">${items.join('')}</div>`;
-}
+// Abzeichen-Galerie + Streak-Dots-Kette (_renderStreakChain(), vormals
+// hier) entfernt (Runde 19, Cluster 10) — Nutzer-Entscheidung, konsequent
+// zu Ende geführt, was train-v150 (Badge-Granting-Freeze) begonnen hat.
+// state.badges bleibt im Schema (keine Migration nötig), nur die UI-
+// Darstellung (Galerie, "Abzeichen freigeschaltet!"-Overlay, Detail-Modal)
+// ist entfernt. Neutrale Streak-ZAHL bleibt bestehen (_renderStreakBadge()).
 
 function _showInvalidBackupDialog(fileInput) {
   const existing = document.getElementById('invalid-backup-dialog');
@@ -9743,7 +9788,11 @@ function _showBackupReminderToast() {
       <button id="backup-now-btn" class="btn btn--accent btn--sm">Jetzt sichern</button>
       <button id="backup-later-btn" class="btn btn--ghost btn--sm">Später</button>
     </div>`;
-  document.body.appendChild(div);
+  // Runde 19: an #app statt document.body haengen -- #app hat
+  // position:fixed (immer eigener Stacking-Context), ein body-Kind
+  // konkurriert dadurch NICHT im selben Context wie Modal-Overlays
+  // (siehe styles.css .backup-reminder-Kommentar).
+  (document.getElementById('app') ?? document.body).appendChild(div);
   document.getElementById('backup-now-btn')?.addEventListener('click', () => {
     div.remove();
     exportJSON(() => showToast('✓ Backup gespeichert', 'ok', 2000));

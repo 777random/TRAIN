@@ -576,12 +576,19 @@ button, input, select, textarea { font: inherit; }
 /* B87 Fix 4+5: bestätigende Aktion -> --c-accent Text, im Unterschied zum
    dämpfenden Reduzierungs-Button oben. */
 .set-feedback__line--confirm { color: var(--c-accent); font-weight: 600; }
-.set-feedback__adopt-btn {
-  display: inline-block; margin-left: var(--sp-2); min-height: 24px;
-  padding: 2px var(--sp-2); border-radius: var(--r-sm);
-  background: var(--c-surface2); border: none; color: var(--c-accent);
-  font-size: 11px; font-weight: 600; vertical-align: baseline;
+/* Runde 19/Cluster 1: Haken/X-Icon-Buttons statt der alten "Übernehmen ↗"-
+   Textpille -- eigene .set-feedback__actions-Zeile (siehe unten), da 44px
+   Touch-Targets nicht mehr inline neben den 11px-Fliesstext passen. */
+.set-feedback__icon-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px; border-radius: var(--r-sm);
+  background: var(--c-surface2); border: none; cursor: pointer;
+  flex-shrink: 0;
 }
+.set-feedback__icon-btn svg { width: 20px; height: 20px; }
+.set-feedback__icon-btn--accept { color: var(--c-accent); }
+.set-feedback__icon-btn--reject { color: var(--c-text-3); }
+.set-feedback__icon-btn:hover { background: var(--c-surface); }
 /* B92-B94: Entscheidungsmatrix-Begründung ("▾ Warum?") + dauerhafte
    Übernehmen-Bestätigung (löst die B89-2s-Auto-Ausblendung ab). */
 .set-feedback__why-toggle {
@@ -1419,6 +1426,7 @@ exercise { position: unset; }
 .erkenntnis-stepper__label { font-size: 14px; font-weight: 600; color: var(--c-text); min-width: 80px; text-align: center; }
 .erkenntnis-stepper__hint { font-size: 11px; color: var(--c-text-3); margin: 0 0 var(--sp-3); }
 .coach-focus-card { border-left: 3px solid var(--c-accent); }
+.coach-focus-week-stamp { font-size: 11px; color: var(--c-text-3); margin: 0 0 var(--sp-2); }
 .coach-focus-status { font-family: var(--font-display); font-size: 20px; letter-spacing: .04em; margin-bottom: var(--sp-3); }
 .coach-focus-reasoning { font-size: 13px; color: var(--c-text-2); margin: 0 0 var(--sp-3); }
 .coach-focus-recommendation { font-size: 14px; font-weight: 600; color: var(--c-text); margin: 0; }
@@ -1574,11 +1582,16 @@ exercise { position: unset; }
    PR is already conveyed by the separate .pr-badge trophy, so no color override here. */
 .pr-badge { display: flex; justify-content: center; line-height: 0; }
 .pr-badge svg { width: 16px; height: 16px; color: #FFD700; }
-.pr-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--c-border); font-size: 13px; }
+.pr-row { padding: 6px 0; border-bottom: 1px solid var(--c-border); font-size: 13px; }
 .pr-row:last-child { border-bottom: none; }
+/* Runde 19 (Cluster 5): .pr-row-Inhalt lebt jetzt in einem Button (Detail-Ebene-Toggle) statt direkt im Row-Div. */
+.pr-row__main { display: flex; align-items: center; gap: 8px; width: 100%; background: none; border: none; padding: 0; margin: 0; font: inherit; color: inherit; text-align: left; cursor: pointer; }
 .pr-name { flex: 1; }
 .pr-val  { font-family: var(--font-display); font-size: 16px; color: var(--c-accent); }
 .pr-date { font-size: 10px; color: var(--c-text-3); }
+.pr-row__detail { margin: 6px 0 2px; padding: 8px 10px; background: var(--c-surface-2); border-radius: var(--r-sm); font-size: 12px; }
+.pr-detail-set { color: var(--c-text-2); line-height: 1.6; }
+.pr-detail-date { margin-top: 4px; color: var(--c-text-3); font-size: 11px; }
 .pr-row--fav { background: color-mix(in srgb, var(--c-accent) 6%, transparent); border-radius: var(--r-sm); padding-left: 6px; }
 .pr-row--fav .pr-name { font-weight: 600; }
 .pr-collapse { margin-top: var(--sp-3); }
@@ -2419,9 +2432,9 @@ details[open] > .deload-details__summary::before { content: '▾ '; }
 .wr-card__txt { font-size: 14px; color: var(--c-text); line-height: 1.45; }
 
 /* Continue button */
-.wr-continue { margin-top: var(--sp-5); display: flex; gap: var(--sp-3); }
-.wr-continue__btn { width: 100%; flex: 2; }
-.wr-share__btn { flex: 1; min-height: var(--touch); }
+.wr-continue { margin-top: var(--sp-5); display: flex; flex-wrap: wrap; gap: var(--sp-3); }
+.wr-continue__btn { width: 100%; flex: 1 1 100%; }
+.wr-share__btn { flex: 1 1 calc(50% - var(--sp-3) / 2); min-height: var(--touch); font-size: 13px; padding-left: var(--sp-2); padding-right: var(--sp-2); }
 
 /* ── RPE Nudge (Sprint 5) ─────────────────────────────────── */
 .confirm-set-wrap { position: relative; }
@@ -2573,55 +2586,9 @@ details[open] > .deload-details__summary::before { content: '▾ '; }
   padding: var(--sp-1) var(--sp-4);
 }
 
-/* ── Streak-Kette (Sprint 6) ──────────────────────────────── */
-.streak-chain-wrap {
-  margin-bottom: var(--sp-3);
-  padding: var(--sp-2) 0 var(--sp-1);
-}
-.streak-chain { overflow: visible; display: block; }
-
-/* ── Abzeichen-System (Sprint 6) ─────────────────────────── */
-.badge-gallery {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: var(--sp-3);
-  margin-top: var(--sp-3);
-}
-.badge-item {
-  display: flex; flex-direction: column; align-items: center; gap: 4px;
-  text-align: center;
-}
-.badge-item--earned {
-  background: none; border: none; font-family: inherit; padding: 0; cursor: pointer;
-}
-.badge-item__img { width: 52px; height: 52px; border-radius: 50%; }
-.badge-img { width: 80px; height: 80px; object-fit: contain; border-radius: 50%; }
-.badge-item__title { font-size: 10px; font-weight: 600; color: var(--c-text-2); line-height: 1.2; }
-.badge-item__sub { font-size: 9px; color: var(--c-text-3); line-height: 1.2; }
-.badge-item--earned .badge-item__title { color: var(--c-accent); }
-.badge-item__date { color: var(--c-ok); }
-
-.badge-earned-overlay {
-  position: fixed; inset: 0; z-index: 960;
-  background: var(--c-bg);
-  display: flex; align-items: center; justify-content: center;
-  animation: cs-in 280ms var(--ease) both;
-  cursor: pointer;
-}
-.badge-earned-overlay__inner {
-  display: flex; flex-direction: column; align-items: center; gap: var(--sp-4);
-  padding: var(--sp-8);
-}
-.badge-earned-overlay__header {
-  font-size: 22px; font-weight: 700; color: var(--c-text);
-  letter-spacing: .04em;
-}
-.badge-earned-overlay__img { width: 120px; height: 120px; border-radius: 50%; }
-.badge-earned-overlay__title {
-  font-family: var(--font-display); font-size: 36px; color: var(--c-accent);
-  letter-spacing: .08em; line-height: 1;
-}
-.badge-earned-overlay__sub { font-size: 16px; color: var(--c-text-3); }
+/* Streak-Kette (.streak-chain-wrap) + Abzeichen-System (.badge-gallery,
+   .badge-item, .badge-earned-overlay) entfernt (Runde 19, Cluster 10) —
+   siehe ui.js-Kommentar an derselben Stelle. */
 
 /* ── Onboarding ──────────────────────────────────────────── */
 .onboarding {
@@ -2766,7 +2733,22 @@ details[open] > .deload-details__summary::before { content: '▾ '; }
   border-radius: var(--r-lg); box-shadow: var(--shadow-md);
   padding: var(--sp-3) var(--sp-4);
   display: flex; flex-direction: column; gap: var(--sp-2);
-  max-width: min(380px, calc(100vw - 32px)); z-index: 800;
+  /* Runde 19 (Bundlefolgefund): war z-index 800 UND (in ui.js) an
+     document.body statt #app gehängt. #app hat `position:fixed`, das
+     IMMER einen neuen Stacking-Context erzeugt (unabhängig vom z-index-
+     Wert) -- ein an body gehängtes Element mit explizitem z-index
+     rendert dadurch über JEDEM Inhalt innerhalb #app, egal welchen
+     z-index dieser Inhalt intern nutzt (Ursache des seit Phase B
+     dokumentierten "Backup-Reminder-Toast-Overlap"-Flakes in
+     deload_volumen.spec.js, jetzt auch reproduzierbar in
+     settings_combination_smoke.spec.js Szenario 20, seit die Wochenrück-
+     blick-Share-Buttons den Modal-Inhalt höher machen). Fix hat zwei
+     Teile: (1) hier z-index auf 350 gesenkt (über Sticky-Kopfzeile
+     300/Tab-Nav 250, unter jedem Modal-Overlay 400+), (2) in ui.js
+     _showBackupReminderToast() an #app statt document.body gehängt --
+     erst dadurch wirkt der Wert hier überhaupt innerhalb desselben
+     Stacking-Context wie die Modals. */
+  max-width: min(380px, calc(100vw - 32px)); z-index: 350;
   font-size: 14px; color: var(--c-text-2);
 }
 .backup-reminder__btns { display: flex; gap: var(--sp-2); justify-content: flex-end; }

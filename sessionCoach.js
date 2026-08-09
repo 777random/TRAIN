@@ -209,6 +209,10 @@ export function buildSetFeedback(s, ex, sessionModifier, si, goal = null, isComp
 
   const rpeZone = rpe <= 6 ? 'leicht' : rpe < RPE_SET_HARD_ZONE ? 'optimal' : 'hart';
   nextWeight = _applyModifier(nextWeight, currentWeight, sessionModifier, step, modifierScope, isCompound);
+  // Runde 19/Cluster 2: eine bewusst manuell gesetzte Pausenzeit (ex.pauseSecManual)
+  // overrult die dynamische RPE-/Trend-basierte Empfehlung -- Gewichts-
+  // vorschlag/Hint bleiben unverändert dynamisch, nur die Pausendauer wird fix.
+  if (ex.pauseSecManual && ex.pauseSec) pauseSec = ex.pauseSec;
   return { nextWeight: _round(nextWeight, step), pauseSec, hint, repDiff, rpe, rpeZone, reps, targetReps, unit };
 }
 

@@ -1,7 +1,27 @@
 # TRAIN — CLAUDE.md
 # Vollständiger Projektkontext für Claude Code
-# Stand: train-v242 / SCHEMA 33 / August 2026
-# Letztes Update: Runde 18 (2026-08-08) -- Vertrauens- & Datenintegritaets-
+# Stand: train-v243 / SCHEMA 33 / August 2026
+# Letztes Update: Runde 19 (2026-08-09) -- UI-/UX-Fix-Sammelrunde, 12 Fixes
+# (B221-B232), 4 file-disjunkte parallele Bundles nach UI-Region gruppiert
+# (fast jeder Cluster betraf ui.js). Session-Coach Haken/X-Icons statt
+# Textpille + 44px-Touch-Target; Pausenzeit-Automatik bei Default,
+# manuelle Uebungs-Pausenzeit overrult weiterhin; "Ton nach Pause" war
+# ein echter Bug (Key fehlte in Settings-Defaults/migrate(), kein
+# Browser-Limit). CSV-Export-Duplikat entfernt; Bestleistungen zeigt
+# jetzt Wdh-PR fuer gewichtslose Uebungen + Detailebene; Uebungsfort-
+# schritt startet auf Favorit; Erkenntnisse-Scroll-Jump-Bug diesmal
+# wirklich behoben; Koerpergewicht-Chart zeigt relative Zeitangaben statt
+# KW. Gamification-Reste (Streak-Punkte-Kette + Abzeichen-Galerie)
+# endgueltig entfernt (train-v150-Cleanup zu Ende gefuehrt); Wochenrueck-
+# blick-Share bietet jetzt 2 Varianten. Coach-Tab-Wochen-Stempel ergaenzt.
+# Eigener Nebenfund: Backup-Reminder-Toast hing an document.body statt
+# #app (das position:fixed hat, IMMER eigener Stacking-Context) und
+# konnte dadurch ueber JEDEM offenen Modal rendern -- behoben, loest
+# nebenbei den seit Phase B dokumentierten deload_volumen.spec.js-Flake
+# dauerhaft. Cluster 8 (Home-Screen-Redesign) bewusst zurueckgestellt,
+# noch offen. Siehe HANDOFF.md und
+# `Diagnose & Sprints/TRAIN-Sprint-Prompts-Runde19.md` fuer Details.
+# Davor train-v242, Runde 18 (2026-08-08) -- Vertrauens- & Datenintegritaets-
 # Bugcluster, Basis: externes Advisor-Feedback (ChatGPT/Gemini/Council) +
 # neues Live-Nutzerfeedback, 5 parallele Diagnose-Durchlaeufe + 3 file-
 # disjunkte Implementierungs-Durchlaeufe. 8 Fixes (B213-B220): Wochenrueck-
@@ -180,7 +200,7 @@ TRAIN ist eine deutschsprachige PWA für Krafttraining. Pure Vanilla ES Modules 
   Sessions müssen aus diesem neuen Pfad heraus gestartet werden, sonst
   landet man am alten (jetzt leeren) OneDrive-Ort. Nutzer zieht den Ordner
   regelmäßig manuell auf eine externe Festplatte statt über Cloud-Sync.
-- Aktueller Stand: SCHEMA_VERSION 33 · CACHE_VERSION train-v242 · CSS ?v=216
+- Aktueller Stand: SCHEMA_VERSION 33 · CACHE_VERSION train-v243 · CSS ?v=217
 
 ---
 

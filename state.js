@@ -229,6 +229,15 @@ function buildDefaultState() {
       lastBackupDate:                 null,
       activeTags:                     ALL_TAGS_FLAT,
       vibrationEnabled:               true,
+      // Runde 19/Cluster 3: war seit Runde 17/B210 im Settings-Tab
+      // renderbar (tog('soundEnabled', ...)), aber NIE hier bzw. in migrate()
+      // (siehe vibrationEnabled direkt darüber) ergänzt worden -- SETTING_TOGGLE
+      // (state.js) flippt einen Key nur, wenn er BEREITS in state.settings
+      // existiert ('key in state.settings'-Guard), war also für jeden echten
+      // Nutzer dauerhaft ein No-Op. Kein Browser-Limit wie bei der Vibration
+      // selbst (B210) -- echter, simpler Bug. Default false (Opt-in, wie im
+      // Sprint beschrieben, nicht rückwirkend beide Signale gleichzeitig an).
+      soundEnabled:                   false,
       rpeEnabled:                     true,
       weeksSinceLastBackupReminder:   0,
       maxSessionMs:                   10800000, // 3h default
@@ -995,6 +1004,10 @@ function migrate(raw) {
 
   // Always-apply defaults for settings added in later versions
   if (raw.settings.vibrationEnabled               === undefined) raw.settings.vibrationEnabled               = true;
+  // Runde 19/Cluster 3: fehlte hier bisher komplett (B210/Runde 17 hatte nur
+  // die UI ergänzt) -- SETTING_TOGGLE toggled nur Keys, die bereits in
+  // state.settings existieren, war für Bestandsnutzer dauerhaft ein No-Op.
+  if (raw.settings.soundEnabled                   === undefined) raw.settings.soundEnabled                   = false;
   if (raw.settings.rpeEnabled                     === undefined) raw.settings.rpeEnabled                     = true;
   if (raw.settings.autoEval                       === undefined) raw.settings.autoEval                       = false;
   if (raw.settings.weeksSinceLastBackupReminder   === undefined) raw.settings.weeksSinceLastBackupReminder   = 0;
