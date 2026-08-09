@@ -234,6 +234,7 @@ Bei CSS-Änderungen: Cache-Buster in `index.html` erhöhen:
 | `DECISIONS.md` | Unveränderliche Produkt-/Architektur-Entscheidungen — nicht ohne neue explizite Entscheidung revidieren |
 | `AGENTS.md` | Parallelisierungs-Regeln für Multi-Agent Sprints |
 | `AUDIT-BERECHNUNGEN.md` | Referenzdokument: Konsistenz-Audit über alle Berechnungen im Projekt (Runde 8), alle Funde inzwischen bewertet/behoben (Runde 9) — Vorlage für künftige ähnliche Audits |
+| `WISSENSCHAFTS-AUDIT.md` | Referenzdokument: alle Coach-Schwellenwerte (RPE, Deload, Aufwärmen, Wiedereinstieg, Volumen-Verteilung) gegen aktuellen Sportwissenschafts-Konsens geprüft (2026-08-09) — 5 Handlungskandidaten identifiziert, Freigabe steht aus, siehe HANDOFF.md |
 | `SECURITY.md` | Security-Status heutiger Architektur (kein Backend) + dokumentierte Blaupause für Auth/Rate-Limiting/Access-Control, sobald ein Server (Paywall/Coaching) kommt |
 | `LEGAL.md` | Rechts-Recherche zu Impressum/Datenschutz (Name-/Adress-Pflicht, c/o-Workaround, DDG/DSGVO-Fakten) + Blaupause für AGB/Widerrufsrecht/BFSG, sobald Paywall/App-Store kommen |
 | `LOOPS.md` | Automatische Session-Loops (beim Start jeder Session ausführen) |
