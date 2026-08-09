@@ -1,7 +1,16 @@
 # TRAIN — CLAUDE.md
 # Vollständiger Projektkontext für Claude Code
-# Stand: train-v243 / SCHEMA 33 / August 2026
-# Letztes Update: Runde 19 (2026-08-09) -- UI-/UX-Fix-Sammelrunde, 12 Fixes
+# Stand: train-v244 / SCHEMA 33 / August 2026
+# Letztes Update: Runde 19 Cluster 8 abgeschlossen (2026-08-09), zweigeteilt.
+# Teil 1 umgesetzt: Tage-Uebersicht (manueller Toggle) Kacheln -> volle-
+# Breite-Zeilen (B233). Teil 2 (Uebersicht als Startbildschirm) nach
+# echtem Umsetzungsversuch bewusst zurueckgestellt -- brach bereits bei
+# einer 3-Datei-Stichprobe den Kern-Smoke-Test + Grossteil von
+# session_coach.spec.js (praktisch jeder Tages-Interaktionsablauf setzt
+# ein beim Laden automatisch offenes Tag voraus), sofort revertiert.
+# Nutzer-Entscheidung: aktuelles Verhalten bleibt, siehe DECISIONS.md
+# 2026-08-09. Davor train-v243, Runde 19 (2026-08-09) -- UI-/UX-Fix-
+# Sammelrunde, 12 Fixes
 # (B221-B232), 4 file-disjunkte parallele Bundles nach UI-Region gruppiert
 # (fast jeder Cluster betraf ui.js). Session-Coach Haken/X-Icons statt
 # Textpille + 44px-Touch-Target; Pausenzeit-Automatik bei Default,

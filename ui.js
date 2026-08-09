@@ -1079,13 +1079,17 @@ function renderDayList(state) {
         return `<div class="day-overview-card${done ? ' day-overview-card--done' : ''}${isDl ? ' day-overview-card--deload' : ''}"
           data-action="overview-open-day" data-di="${di}" role="button" tabindex="0"
           aria-label="${h(day.title)} öffnen">
-          <div class="day-overview-card__title">${h(day.title)}${isDl ? '<span class="deload-badge">D</span>' : ''}</div>
-          <div class="day-overview-card__sub">${h(day.subtitle ?? '')}</div>
-          <div class="day-overview-card__stats">
-            <span>${done_s}/${total} Sätze</span>
-            ${vol > 0 ? `<span>${vol >= 1000 ? (vol/1000).toFixed(1)+'t' : vol+'kg'}</span>` : ''}
+          <div class="day-overview-card__main">
+            <div class="day-overview-card__title">${h(day.title)}${isDl ? '<span class="deload-badge">D</span>' : ''}</div>
+            <div class="day-overview-card__sub">${h(day.subtitle ?? '')}</div>
           </div>
-          <div class="day-overview-card__bar"><div style="width:${dpct}%;height:3px;background:var(--c-accent);border-radius:2px"></div></div>
+          <div class="day-overview-card__side">
+            <div class="day-overview-card__stats">
+              <span>${done_s}/${total} Sätze</span>
+              ${vol > 0 ? `<span>${vol >= 1000 ? (vol/1000).toFixed(1)+'t' : vol+'kg'}</span>` : ''}
+            </div>
+            <div class="day-overview-card__bar"><div style="width:${dpct}%;height:3px;background:var(--c-accent);border-radius:2px"></div></div>
+          </div>
           ${done ? `<div class="day-overview-card__done-badge">✓</div>` : ''}
         </div>`;
       }).join('')}

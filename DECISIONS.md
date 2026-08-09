@@ -1040,3 +1040,39 @@ Aktivierung mehr.
 **Gilt:** Präzedenzfall für jede künftige Web-API mit Autoplay-/Activation-
 Beschränkungen — die Aktivierung so früh wie möglich im echten Klick-
 Kontext anstoßen, nicht erst dort, wo die API tatsächlich gebraucht wird.
+
+### 2026-08-09 — Tage-Übersicht als Startbildschirm zurückgestellt (Runde 19, Cluster 8, Teil 2)
+
+**Wunsch (Live-Nutzerfeedback 2026-08-08):** die Tage-Übersicht (manueller
+Toggle im Training-Tab) soll der Startbildschirm beim Öffnen der App sein,
+statt automatisch den ersten offenen Tag zu expandieren.
+
+**Umgesetzt:** Teil 1 (Kacheln → volle-Breite-Zeilen, B233) — unabhängig
+vom Default-Ansicht-Teil, geringes Risiko, sofort verifiziert grün.
+
+**Zurückgestellt:** Teil 2 (Übersicht als Default). Erster Umsetzungs-
+versuch machte `_overviewMode` beim ersten Laden ohne bereits begonnene
+Session standardmäßig `true` statt automatisch den ersten offenen Tag zu
+aktivieren. Bereits bei einer Stichprobe von 3 Testdateien brach das
+`regression_core.spec.js` (Kern-Smoke-Test) und den Großteil von
+`session_coach.spec.js` — praktisch jeder Tages-Interaktionsablauf
+(Satz-Logging, Session-Check-in) setzt implizit voraus, dass beim Laden
+bereits ein Tag offen ist, nicht nur in Tests, sondern strukturell in der
+App selbst. Die reale Änderung wäre damit deutlich größer als ein
+UI-Layout-Fix: potenziell 50+ Test-Fixtures betroffen, und im echten
+Alltag ein zusätzlicher Tap im schnellsten Pfad der App (Training
+beginnen) für JEDEN Nutzer bei JEDEM App-Öffnen ohne bereits laufende
+Session.
+
+**Nutzer-Entscheidung (nach Vorlage der 3 Optionen):** aktuelles Verhalten
+unverändert lassen (automatisches Öffnen des ersten offenen Tags bleibt
+Default), Idee nicht verworfen, aber nur bei Bedarf später als eigene,
+dediziert gescopte Runde neu aufgreifen (Test-Fixture-Audit vorab nötig,
+kein Nebenbei-Fix).
+
+**Gilt:** Bevor eine App-weite Default-State-Änderung (nicht nur ein
+Layout-Fix) umgesetzt wird, den tatsächlichen Blast-Radius per Stichprobe
+gegen den Kern-Smoke-Test + mindestens einen weiteren zentralen Testfile
+prüfen, BEVOR die volle Suite/ein Commit folgt — ein früher Fehlschlag an
+einer kleinen Stichprobe ist der günstigste Punkt, den echten Aufwand zu
+erkennen.
