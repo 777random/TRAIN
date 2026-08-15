@@ -1148,3 +1148,28 @@ Mehrwert gegenüber dem Status quo gehabt.
 **Gilt:** Bei künftigem ähnlichem Feedback zuerst prüfen, ob `_recSubline()`
 tatsächlich sichtbar ist, bevor an der Empfehlungslogik selbst gearbeitet
 wird.
+
+### 2026-08-15 — Pause-Lerninhalte (B245): Default auf AUS/Opt-in korrigiert
+
+**Kontext:** Runde 21 baute die Pause-Tipps mit Default AN (Begründung damals:
+"Zusatzinhalt statt neuer Automatismus, konsistent mit ähnlichen Opt-out-
+Features"). Der Nutzer korrigierte das direkt nach dem Sprint.
+
+**Entscheidung:** `showPauseTips` Default auf `false` geändert (state.js
+`buildDefaultState()` + additiver `migrate()`-Fallback). Reine Nutzer-Aktion
+bleibt nötig, um die Tipps einzuschalten.
+
+**Begründung (wörtlich vom Nutzer):** "Ein Lesetext ist ein aktiver
+Aufmerksamkeitsanspruch genau in dem Moment, der bei 'einfach nur
+trainieren, nicht mehr nachdenken' bewusst frei bleiben soll." Die Pause
+ist im Kernprinzip der App bewusst mentale Leerlaufzeit — anders als z.B.
+"Ton nach Pause" oder "Vibration", die keine Aufmerksamkeit binden,
+verlangt ein Lesetext aktives Verarbeiten.
+
+**Gilt:** Präzedenzfall für künftige Zusatzinhalte während der eigentlichen
+Trainingsausführung (nicht nur Pausen) — bei Zweifel, ob ein Feature
+Aufmerksamkeit vom Training abzieht, Opt-in statt Opt-out wählen, auch wenn
+das Feature selbst schon inhaltlich genehmigt wurde. Die Positionierungsfrage
+("Ablenkung ja/nein") war in Runde 21 bereits für den Feature-Bau selbst
+geklärt (Kurzartikel statt Spiel) — diese Korrektur zeigt, dass sie auch für
+den Default-Zustand separat gestellt werden muss.

@@ -5,8 +5,11 @@ Befund 9, siehe DECISIONS.md/TRAIN-Launch-Roadmap.md Phase H) — kurze, kategor
 gebundene Trainings-Tipps im Pause-Overlay (Push/Pull/Squat/Hinge/Carry/Core +
 generischer Fallback, `pauseTips.js`), Explore-Agent lieferte Bauplan, Nutzer
 bestätigte im Plan-Mode: Übungs-/Signal-Bindung statt des empfohlenen generischen
-Pools (höherer Pflegeaufwand pro Kategorie bewusst in Kauf genommen), Setting-Default
-AN. Befüllt ausschließlich im `train:set-done`-Handler, nicht im `train:pause-restart`-
+Pools (höherer Pflegeaufwand pro Kategorie bewusst in Kauf genommen). Setting-Default
+direkt danach vom Nutzer von AN auf AUS/Opt-in korrigiert (DECISIONS.md 2026-08-15:
+ein Lesetext ist ein aktiver Aufmerksamkeitsanspruch genau in dem Moment, der bei
+"einfach nur trainieren, nicht mehr nachdenken" bewusst frei bleiben soll). Befüllt
+ausschließlich im `train:set-done`-Handler, nicht im `train:pause-restart`-
 Handler (Runde 20/B242) — Tipp-Text bleibt bei nachträglicher RPE-Korrektur stabil.
 Neuer additiver Settings-Key `showPauseTips` (Training-Gruppe). Nebenfund bei der
 Umsetzung: die durch den Tipp höhere Pause-Overlay-Pille kollidierte mit dem
