@@ -44,7 +44,8 @@
 
 import { dispatch, subscribe, getState, A, getLatestWeek, getEffectiveWeightStep } from './state.js';
 import { buildSetFeedback } from './sessionCoach.js';
-import { buildCategoryMap, isCompoundExercise } from './movementMap.js';
+import { buildCategoryMap, isCompoundExercise, resolveCategory } from './movementMap.js';
+import { PAUSE_TIPS_BY_CATEGORY } from './pauseTips.js';
 
 // ─── Wake Lock ────────────────────────────────────────────────────────────────
 
@@ -104,6 +105,8 @@ let _clockEl      = null;   // <button> displaying "00:00" in toolbar
 let _pauseOverlay = null;   // floating pause pill
 let _pauseNumEl   = null;   // number inside pause ring
 let _pauseRingEl  = null;   // SVG circle for countdown ring
+let _pauseTipEl   = null;   // Runde 21: kategorie-gebundener Trainings-Tipp
+let _lastPauseTipTitle = null; // verhindert unmittelbare Wiederholung, rein modul-lokal
 let _goPopup      = null;   // "WEITER!" full-screen popup
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -372,6 +375,37 @@ function _onStateChange(state) {
 // ui.js doesn't import timer.js directly (avoids circular dependency).
 // Instead it fires custom DOM events on window, and timer.js listens here.
 
+/**
+ * Runde 21 (Kurzartikel-Feature): rendert einen kategorie-gebundenen
+ * Trainings-Tipp ins Pause-Overlay. `key` ist dieselbe "${di}-${ei}-${si}"-
+ * Kennung wie `_pauseSetKey` -- daraus wird die gerade trainierte Übung
+ * nachgeschlagen, ihre Bewegungskategorie aufgelöst (movementMap.js) und
+ * ein Tipp aus dem passenden Pool gewählt (Fallback `_generic`). Bewusst
+ * NUR hier aufgerufen (train:set-done), NICHT im train:pause-restart-
+ * Handler -- sonst würde eine nachträgliche RPE-Korrektur den Tipp mitten
+ * in der laufenden Pause wechseln (siehe B242-Kommentar dort). Rotation
+ * ist rein modul-lokal, kein state.js-Feld nötig.
+ */
+function _renderPauseTip(key) {
+  if (!_pauseTipEl) return;
+  const state = getState();
+  if (state.settings?.showPauseTips === false) {
+    _pauseTipEl.hidden = true;
+    return;
+  }
+  const [di, ei] = (key ?? '').split('-');
+  const ex = state.weeks[state.curIdx]?.days?.[+di]?.exercises?.[+ei];
+  const category = ex ? resolveCategory(ex.name, buildCategoryMap(state.customExercises)) : null;
+  const pool = (category && PAUSE_TIPS_BY_CATEGORY[category]?.length ? PAUSE_TIPS_BY_CATEGORY[category] : PAUSE_TIPS_BY_CATEGORY._generic);
+  let tip = pool[Math.floor(Math.random() * pool.length)];
+  if (pool.length > 1 && tip.title === _lastPauseTipTitle) {
+    tip = pool[(pool.indexOf(tip) + 1) % pool.length];
+  }
+  _lastPauseTipTitle = tip.title;
+  _pauseTipEl.innerHTML = `<span class="pause-overlay__tip-title">${tip.title}</span>${tip.body}`;
+  _pauseTipEl.hidden = false;
+}
+
 function _bindCustomEvents() {
   // Fired by ui.js when user marks a set as done
   window.addEventListener('train:set-done', e => {
@@ -380,6 +414,7 @@ function _bindCustomEvents() {
     if (typeof pauseSec === 'number' && pauseSec > 0) {
       _pauseSetKey = key ?? null;
       _startPause(pauseSec);
+      _renderPauseTip(key);
     }
   });
 
@@ -460,51 +495,54 @@ function _buildOverlayDOM() {
   overlay.setAttribute('aria-live', 'off');
 
   overlay.innerHTML = `
-    <button
-      class="pause-overlay__dismiss"
-      aria-label="Pause beenden"
-      id="pause-dismiss-btn"
-    >
-      <!-- SVG countdown ring -->
-      <svg
-        class="pause-ring"
-        viewBox="0 0 36 36"
-        aria-hidden="true"
-        focusable="false"
+    <div class="pause-overlay__row">
+      <button
+        class="pause-overlay__dismiss"
+        aria-label="Pause beenden"
+        id="pause-dismiss-btn"
       >
-        <!-- Track -->
-        <circle
-          class="pause-ring__track"
-          cx="18" cy="18" r="${RING_RADIUS}"
-          fill="none"
-          stroke-width="3"
-        />
-        <!-- Progress arc – dashoffset animated by JS -->
-        <circle
-          class="pause-ring__arc"
-          id="pause-ring-arc"
-          cx="18" cy="18" r="${RING_RADIUS}"
-          fill="none"
-          stroke-width="3"
-          stroke-dasharray="${RING_CIRCUMF}"
-          stroke-dashoffset="${RING_CIRCUMF}"
-          stroke-linecap="round"
-          transform="rotate(-90 18 18)"
-        />
-        <!-- Countdown number inside ring -->
-        <text
-          class="pause-ring__num"
-          id="pause-ring-num"
-          x="18" y="18"
-          text-anchor="middle"
-          dominant-baseline="central"
-        >90</text>
-      </svg>
-    </button>
-    <div class="pause-overlay__label">
-      <strong>Pause</strong>
-      <span>Tippen zum Beenden</span>
+        <!-- SVG countdown ring -->
+        <svg
+          class="pause-ring"
+          viewBox="0 0 36 36"
+          aria-hidden="true"
+          focusable="false"
+        >
+          <!-- Track -->
+          <circle
+            class="pause-ring__track"
+            cx="18" cy="18" r="${RING_RADIUS}"
+            fill="none"
+            stroke-width="3"
+          />
+          <!-- Progress arc – dashoffset animated by JS -->
+          <circle
+            class="pause-ring__arc"
+            id="pause-ring-arc"
+            cx="18" cy="18" r="${RING_RADIUS}"
+            fill="none"
+            stroke-width="3"
+            stroke-dasharray="${RING_CIRCUMF}"
+            stroke-dashoffset="${RING_CIRCUMF}"
+            stroke-linecap="round"
+            transform="rotate(-90 18 18)"
+          />
+          <!-- Countdown number inside ring -->
+          <text
+            class="pause-ring__num"
+            id="pause-ring-num"
+            x="18" y="18"
+            text-anchor="middle"
+            dominant-baseline="central"
+          >90</text>
+        </svg>
+      </button>
+      <div class="pause-overlay__label">
+        <strong>Pause</strong>
+        <span>Tippen zum Beenden</span>
+      </div>
     </div>
+    <div class="pause-overlay__tip" id="pause-tip" hidden></div>
   `;
 
   // ── "WEITER!" go-popup ────────────────────────────────────────────────────
@@ -566,8 +604,8 @@ function _injectStyles() {
     right: 16px;
     z-index: 450;
     display: flex;
-    align-items: center;
-    gap: 10px;
+    flex-direction: column;
+    align-items: stretch;
     background: var(--c-surface);
     border: 1px solid var(--c-accent);
     border-radius: var(--r-lg);
@@ -577,10 +615,28 @@ function _injectStyles() {
     transform: translateY(8px) scale(.96);
     pointer-events: none;
     min-width: 220px;
+    max-width: 280px;
     transition:
       opacity 200ms var(--ease),
       transform 200ms var(--ease);
   }
+  .pause-overlay__row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  /* Runde 21 (Kurzartikel-Feature): kurzer, kategorie-gebundener
+     Trainings-Tipp, nur sichtbar solange die Pause läuft. */
+  .pause-overlay__tip {
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--c-text-3);
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--c-border);
+  }
+  .pause-overlay__tip[hidden] { display: none; }
+  .pause-overlay__tip-title { color: var(--c-text-2); font-weight: 600; display: block; margin-bottom: 2px; }
   .pause-overlay--visible {
     opacity: 1;
     transform: translateY(0) scale(1);
@@ -873,6 +929,7 @@ export function mountTimer() {
   _goPopup      = goPopup;
   _pauseNumEl   = document.getElementById('pause-ring-num');
   _pauseRingEl  = document.getElementById('pause-ring-arc');
+  _pauseTipEl   = document.getElementById('pause-tip');
 
   // 3. Bind overlay dismiss
   _bindOverlayEvents(overlay);

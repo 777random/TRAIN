@@ -16,7 +16,7 @@
  *   asset conflicts.
  */
 
-const CACHE_VERSION  = 'train-v246';
+const CACHE_VERSION  = 'train-v247';
 
 // Runde 20 (Befund 4): kurze Änderungsliste für den aktuellen Build, im
 // Update-Banner beim Aufklappen ("mehr Details") angezeigt. 2-3 knappe
@@ -28,9 +28,9 @@ const CACHE_VERSION  = 'train-v246';
 // (Browser-Update-Algorithmus) -- die Werte sind dadurch garantiert die des
 // NEUEN, wartenden Workers, ganz ohne zusätzlichen Cache-Bypass.
 const CHANGELOG_ENTRIES = [
+  'Neu: kurze Trainings-Tipps im Pause-Overlay (abschaltbar in Einstellungen → Training)',
   'Gewichts-Reduktion nach schlechtem Schlaf/Energie muss jetzt bestätigt werden',
   'Update-Erkennung repariert (lief zuvor bei vielen Nutzungsmustern nicht mehr an)',
-  'Diverses Live-Feedback: Onboarding-Startgewichte, Pausentimer, Wochenwechsel-Hinweis',
 ];
 
 /**
@@ -77,6 +77,7 @@ const PRECACHE_URLS = [
   './sessionCoach.js',
   './sessionSummary.js',
   './exerciseAlternatives.js',
+  './pauseTips.js',
   './fonts/BebasNeue-latin.woff2',
   './fonts/BebasNeue-latinext.woff2',
   './fonts/DMSans-latin.woff2',

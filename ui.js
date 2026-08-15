@@ -5350,6 +5350,7 @@ function renderSettingsTab(state) {
     ${tog('hideStopwatch', 'Stoppuhr ausblenden', 'Session-Timer oben in der Toolbar verstecken')}
     ${tog('vibrationEnabled', 'Vibration nach Pause', 'Funktioniert nur auf Android — iOS unterstützt Vibration in PWAs technisch nicht. Manche Android-/Chrome-Versionen unterdrücken die Vibration zusätzlich strukturell, wenn die Pause zu lange nach der letzten Berührung endet — dagegen hilft "Ton nach Pause" unten.')}
     ${tog('soundEnabled', 'Ton nach Pause', 'Kurzer Signalton, sobald die Pause endet — Alternative/Ergänzung zur Vibration. Kann bei aktiviertem Stumm-Modus des Geräts lautlos bleiben, ohne dass die App das erkennen kann.')}
+    ${tog('showPauseTips', 'Lerninhalte in der Pause', 'Kurzer Trainings-Tipp im Pause-Overlay, passend zur gerade trainierten Übungsart.')}
     ${tog('swipe', 'Swipe-Navigation', 'Wischen zum Wochenwechsel')}
     <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:var(--sp-2)">
       <div>
@@ -7869,7 +7870,7 @@ function _handleClick(e) {
       // Prüfung ist der sichtbare DOM-Zustand des Overlays.
       const _pauseRunning = document.getElementById('pause-overlay')?.classList.contains('pause-overlay--visible');
       if (!_pauseRunning && _adPauseSec) {
-        window.dispatchEvent(new CustomEvent('train:set-done', { detail: { pauseSec: _adPauseSec, di: _adDi } }));
+        window.dispatchEvent(new CustomEvent('train:set-done', { detail: { pauseSec: _adPauseSec, di: _adDi, key: `${_adDi}-${_adEi}-${_adSi}` } }));
       }
       // B94: kompletter Feedback-Snapshot statt nur Zeitstempel -- bleibt
       // dauerhaft sichtbar (siehe _renderIntraFeedback), nicht mehr nur 2s

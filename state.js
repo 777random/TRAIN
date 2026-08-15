@@ -238,6 +238,7 @@ function buildDefaultState() {
       // selbst (B210) -- echter, simpler Bug. Default false (Opt-in, wie im
       // Sprint beschrieben, nicht rückwirkend beide Signale gleichzeitig an).
       soundEnabled:                   false,
+      showPauseTips:                  true, // Runde 21: kategorie-gebundener Trainings-Tipp im Pause-Overlay (timer.js/pauseTips.js)
       rpeEnabled:                     true,
       weeksSinceLastBackupReminder:   0,
       maxSessionMs:                   10800000, // 3h default
@@ -1008,6 +1009,7 @@ function migrate(raw) {
   // die UI ergänzt) -- SETTING_TOGGLE toggled nur Keys, die bereits in
   // state.settings existieren, war für Bestandsnutzer dauerhaft ein No-Op.
   if (raw.settings.soundEnabled                   === undefined) raw.settings.soundEnabled                   = false;
+  if (raw.settings.showPauseTips                  === undefined) raw.settings.showPauseTips                  = true;
   if (raw.settings.rpeEnabled                     === undefined) raw.settings.rpeEnabled                     = true;
   if (raw.settings.autoEval                       === undefined) raw.settings.autoEval                       = false;
   if (raw.settings.weeksSinceLastBackupReminder   === undefined) raw.settings.weeksSinceLastBackupReminder   = 0;

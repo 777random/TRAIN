@@ -1891,11 +1891,15 @@ exercise { position: unset; }
    (.pause-overlay--visible, toggled by timer.js). Both elements are appended
    to <body> (toast inside #app's static shell, pause overlay directly), so
    :has() on the shared body ancestor is used instead of a sibling combinator. */
+/* Runde 21 (Kurzartikel-Feature): der Offset wurde von 168px auf 240px
+   angehoben -- das Pause-Overlay kann jetzt durch den optionalen
+   Trainings-Tipp (timer.js) spürbar höher werden als die ursprüngliche
+   Ein-Zeilen-Pille, gegen die 168px kalibriert war. */
 body:has(.pause-overlay--visible) .toast {
-  bottom: calc(168px + var(--sab));
+  bottom: calc(240px + var(--sab));
 }
 body:has(.pause-overlay--visible) .pr-moment-toast {
-  bottom: calc(168px + var(--sab));
+  bottom: calc(240px + var(--sab));
 }
 
 /* PR-Moment-Toast (B73) — dezenter, klickbarer Banner direkt nach einem
