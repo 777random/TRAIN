@@ -162,6 +162,52 @@ export function progressTrendOutlier(state, N = 8) {
  * @returns {{ calibrationRate: number, startWeight: number, noTrend: false }
  *   | { noTrend: true, startWeight: number } | null}
  */
+/**
+ * Runde 20 (Befund 5): "Wie viel stärker bin ich in den letzten X Wochen
+ * geworden?" -- vergleicht den besten geschätzten 1RM (Epley-Formel, exakt
+ * dieselbe Filterlogik/Formel wie ui.js' _renderAnalysis1RM(): status
+ * success, 1-10 Wdh, Gewicht>0, metric 'reps' oder unset) der ÄLTESTEN
+ * gegen die NEUESTE Trainingswoche innerhalb der letzten `weeksBack`
+ * relevanten (nicht Deload/Urlaub) Wochen, die überhaupt einen gültigen
+ * Datenpunkt für die Übung liefert. Kein neues State-Schema.
+ * @returns {{ firstEst:number, firstDetail:{w:number,r:number}, firstDate:string,
+ *   lastEst:number, lastDetail:{w:number,r:number}, lastDate:string,
+ *   gainKg:number, gainPct:number } | null}
+ */
+export function computeStrengthGain(state, exName, weeksBack = 8) {
+  const weeks = _relevantWeeks(state).slice(-weeksBack);
+  if (weeks.length < 2) return null;
+
+  const perWeekBest = weeks.map(w => {
+    const sets = w.days.flatMap(d => (d.exercises ?? [])
+      .filter(ex => ex.name === exName || ex.substituteFor === exName)
+      .flatMap(ex => {
+        if (ex.metric && ex.metric !== 'reps') return [];
+        return (ex.sets ?? [])
+          .filter(s => s.status === 'success' && (s.reps ?? 0) >= 1 && (s.reps ?? 0) <= 10 && (s.weight ?? 0) > 0)
+          .map(s => ({ w: s.weight, r: s.reps, est: s.weight * (1 + s.reps / 30) }));
+      }));
+    if (!sets.length) return null;
+    const best = sets.reduce((mx, s) => s.est > (mx?.est ?? 0) ? s : mx, null);
+    return { date: w.startDate, best };
+  }).filter(Boolean);
+
+  if (perWeekBest.length < 2) return null;
+
+  const first = perWeekBest[0];
+  const last  = perWeekBest[perWeekBest.length - 1];
+  if (first.date === last.date) return null; // nur ein Datenpunkt im Fenster
+
+  const gainKg  = last.best.est - first.best.est;
+  const gainPct = first.best.est > 0 ? (gainKg / first.best.est) * 100 : 0;
+
+  return {
+    firstEst: first.best.est, firstDetail: { w: first.best.w, r: first.best.r }, firstDate: first.date,
+    lastEst: last.best.est, lastDetail: { w: last.best.w, r: last.best.r }, lastDate: last.date,
+    gainKg, gainPct,
+  };
+}
+
 export function getProgressCorridorCalibration(sortedWeeks, exName) {
   const rw = _exerciseRateWindow(sortedWeeks, exName); // N=8 default → Korridor-Verhalten unverändert
   if (!rw) return null;

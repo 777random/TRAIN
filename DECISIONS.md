@@ -1076,3 +1076,75 @@ gegen den Kern-Smoke-Test + mindestens einen weiteren zentralen Testfile
 prüfen, BEVOR die volle Suite/ein Commit folgt — ein früher Fehlschlag an
 einer kleinen Stichprobe ist der günstigste Punkt, den echten Aufwand zu
 erkennen.
+
+### 2026-08-15 — B62 teilweise revidiert: SW-Registrierung wieder an jeden App-Start gekoppelt (Runde 20, Befund 4)
+
+**Kontext:** B62 (Runde 13) koppelte die Service-Worker-Registrierung
+bewusst an die erste echte Trainingsaktion statt an den reinen
+Seitenaufruf (Offline-Opt-in-Philosophie). Live-Feedback nach Wochen
+echter Nutzung: "ich bekomme nicht mehr die Meldung dass es Updates
+gibt." Diagnose bestätigte eine echte Regression — `_ensureSessionStart()`
+feuert den Registrierungs-Trigger nur EINMAL PRO TAG, ein Nutzer der die
+App öffnet ohne sofort zu trainieren (oder sie mehrfach am selben Tag neu
+öffnet) bekam dadurch nie eine neue SW-Registrierung/Update-Prüfung in
+diesem JS-Kontext.
+
+**Entscheidung:** SW-Registrierung läuft jetzt zusätzlich Idle-verzögert
+bei JEDEM App-Start (`mountTimer()`, timer.js), nicht mehr ausschließlich
+an eine Trainingsaktion gekoppelt. Der ursprüngliche B62-Trigger
+(`_ensureSessionStart()`) bleibt als redundanter Fallback bestehen,
+`{ once: true }` in index.html verhindert eine doppelte Registrierung.
+
+**Begründung:** Zuverlässige Update-Erkennung wiegt schwerer als die
+B62-Zurückhaltung "kein Registrierungs-Overhead ohne echte Nutzung" — der
+eigentliche Kern von B62 (kein Install-Prompt-Zwang, reduzierter
+Precache-Scope für Datenschutz/Badges) bleibt unangetastet, nur der reine
+Registrierungszeitpunkt ändert sich zurück in Richtung des Vor-B62-
+Verhaltens.
+
+**Gilt:** Bis explizit anders entschieden. Falls künftig erneut über eine
+Verzögerung der SW-Registrierung nachgedacht wird: zuerst sicherstellen,
+dass die Update-Erkennung bei JEDEM realistischen Nutzungsmuster
+(mehrfaches Öffnen ohne Training, Öffnen an mehreren Tagen) weiterhin
+funktioniert — das war der eigentliche, hier übersehene Blast-Radius.
+
+### 2026-08-15 — Trainingsfokus (goal) bewusst NICHT in Steigerungs-Schwellenwerte eingebaut (Runde 20, Befund 2)
+
+**Kontext:** Betatest-Feedback fragte, ob die Berechnungslogik kcal-
+Situation (nutritionPhase) UND Trainingsfokus (goal: Kraft/Muskelaufbau/
+Fitness) gemeinsam berücksichtigt. Diagnose bestätigte: nutritionPhase
+fließt bereits in `_recommendationCore()` (weightRecommendation.js) ein,
+goal dagegen NICHT — nur in sessionCoach.js für Pausenzeit/session-lokale
+Hinweise genutzt.
+
+**Entscheidung:** In diesem Sprint bewusst NICHT umgesetzt. Ob und wie
+goal die Steigerungs-Schwellenwerte beeinflussen sollte (z.B.
+konservativere Delta-Größen bei "kraftaufbau"), ist eine fachliche/
+produktseitige Frage ohne offensichtlich richtige Antwort — anders als
+z.B. die B139-Erweiterung (nutritionPhase bei getMetricRecommendation()),
+die einem bereits etablierten Muster folgte.
+
+**Gilt:** Offener Punkt für den Cowork-Strategie-Chat (siehe
+`Diagnose & Sprints/diagnose-runde20-betatest-feedback-2026-08-15.txt`).
+Erst nach dortiger Klärung als eigener, gescopter Sprint-Punkt umsetzen —
+nicht im Vorbeigehen entscheiden.
+
+### 2026-08-15 — RPE-7-Inkonsistenz zwischen Übungen: kein Bug, bestehende Transparenz ausreichend (Runde 20, Befund 14)
+
+**Kontext:** Nutzer fragte, warum bei manchen Übungen RPE 7 eine Steigerung
+auslöst, bei anderen nicht. Diagnose: `_recommendationCore()`
+(weightRecommendation.js) kombiniert RPE mit Erfolgsquote der letzten 3-4
+Wochen, nutritionPhase-abhängigen Schwellen, isCompound und
+progressionMode — erwartungsgemäßes Verhalten, kein Inkonsistenz-Bug,
+unterschiedliche Übungen haben unterschiedliche Historie.
+
+**Entscheidung:** Kein Logik-Fix. Die Begründung (`reasons[]`,
+weightRecommendation.js) wird bereits heute in `_recSubline()` (ui.js,
+Wochenrückblick-Empfehlungs-Chip) sichtbar gerendert, nicht hinter einem
+Toggle versteckt — z.B. "⚠ RPE 7 · 65% · Tap zum Bestätigen" neben
+"Gewicht halten (Xkg)". Zusätzliche Änderung hier hätte keinen klaren
+Mehrwert gegenüber dem Status quo gehabt.
+
+**Gilt:** Bei künftigem ähnlichem Feedback zuerst prüfen, ob `_recSubline()`
+tatsächlich sichtbar ist, bevor an der Empfehlungslogik selbst gearbeitet
+wird.

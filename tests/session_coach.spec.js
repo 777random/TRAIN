@@ -181,9 +181,16 @@ test('Schlecht geschlafen, einmalig (keine kumulierte Historie) -> modifier redu
   await expect(page.locator('.session-briefing-card__msg')).toContainText('Leicht reduzieren heute — Gewichte -5%');
   await expect(page.locator('.session-briefing-card__focus')).toContainText('RPE 7.5'); // 8 - 0.5
 
+  // Runde 20 (Befund 1): keine automatische Reduktion mehr beim Check-in --
+  // Gewichte bleiben unverändert, bis der Nutzer die Empfehlung bestätigt.
+  const dayBeforeConfirm = await page.evaluate(() => JSON.parse(localStorage.getItem('train_v6')).weeks.at(-1).days[0]);
+  expect(dayBeforeConfirm.sessionModifier).toBe('reduced_mild');
+  expect(dayBeforeConfirm.sessionModifierScope).toBe('all');
+  expect(dayBeforeConfirm.exercises[0].sets[0].weight).toBe(80);
+
+  await page.click('[data-action="reduce-today-weights"]');
+
   const day = await page.evaluate(() => JSON.parse(localStorage.getItem('train_v6')).weeks.at(-1).days[0]);
-  expect(day.sessionModifier).toBe('reduced_mild');
-  expect(day.sessionModifierScope).toBe('all');
   // 80kg * 0.95 = 76, gerundet auf weightStep 5 -> 75
   expect(day.exercises[0].sets[0].weight).toBe(75);
   expect(day.exercises[0].sets[1].weight).toBe(75);

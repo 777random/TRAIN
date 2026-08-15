@@ -68,6 +68,52 @@ test('Vorlagen-Übernahme: showPlates ist true für Gewichts-Übungen, false fü
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
 });
 
+// Runde 20 (Befund 12): "Startwerte eingeben (optional)" landeten bisher nur
+// in der separaten ONBOARDING_SEED-Historie, nicht in der geladenen Vorlage
+// selbst -- der Nutzer musste dieselben Gewichte beim ersten echten Training
+// erneut eintippen. Jetzt: weight aus _startwerte wird für ALLE Sätze der
+// jeweiligen Übung übernommen (reps bleibt targetReps aus der Vorlage).
+test('Onboarding-Startgewicht wird in ALLE Sätze der Übung in der geladenen Vorlage übernommen', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', err => pageErrors.push(err.message));
+
+  await page.goto('/');
+  await page.waitForSelector('#onboarding', { timeout: 10000 });
+
+  await page.click('.ob-tpl-card >> nth=0'); // Vorlage mit Kniebeuge als erste Übung
+  await page.click('.ob-startwerte > .ob-optional__summary');
+  await page.fill('[data-sw-field="weight"][data-sw-name="Kniebeuge"]', '80');
+
+  await page.click('[data-ob="load"]');
+  await expect(page.locator('.ob-screen h2')).toHaveText('Deine Daten bleiben bei dir');
+  await page.click('[data-ob="privacy-continue"]');
+  await page.waitForSelector('#onboarding', { state: 'detached', timeout: 10000 });
+
+  const kniebeuge = await page.evaluate(() => {
+    const st = JSON.parse(localStorage.getItem('train_v6'));
+    return st.weeks[0].days[0].exercises.find(ex => ex.name === 'Kniebeuge');
+  });
+  expect(kniebeuge.sets.every(s => s.weight === 80)).toBe(true);
+
+  expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});
+
+test('Ohne Eingabe bei "Startwerte eingeben" bleibt Gewicht wie bisher 0', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForSelector('#onboarding', { timeout: 10000 });
+
+  await page.click('.ob-tpl-card >> nth=0');
+  await page.click('[data-ob="load"]');
+  await page.click('[data-ob="privacy-continue"]');
+  await page.waitForSelector('#onboarding', { state: 'detached', timeout: 10000 });
+
+  const kniebeuge = await page.evaluate(() => {
+    const st = JSON.parse(localStorage.getItem('train_v6'));
+    return st.weeks[0].days[0].exercises.find(ex => ex.name === 'Kniebeuge');
+  });
+  expect(kniebeuge.sets.every(s => s.weight === 0)).toBe(true);
+});
+
 // Befund (P1): "Vorlage laden" blieb inaktiv, obwohl eine Karte durch
 // Erfahrung+Hauptziel bereits als "Empfohlen für dich" markiert war -- die
 // Empfehlung (_recommendedIdx, rein visuell) war nie mit der echten Auswahl

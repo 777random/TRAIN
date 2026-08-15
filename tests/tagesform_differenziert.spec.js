@@ -99,12 +99,21 @@ test('Kumulierter Schlafmangel + schlecht geschlafen -> reduced/compound, Isolat
 
   await expect(page.locator('.session-briefing-card__msg')).toContainText('Compound-Übungen heute reduzieren — Gewichte -10%, Isolation unverändert');
 
+  // Runde 20 (Befund 1): keine automatische Reduktion mehr beim Check-in --
+  // direkt danach sind die Gewichte noch unverändert, der Nutzer muss die
+  // Empfehlung erst über den Button bestätigen.
+  const dayBeforeConfirm = await page.evaluate(() => JSON.parse(localStorage.getItem('train_v6')).weeks.at(-1).days[0]);
+  expect(dayBeforeConfirm.sessionModifier).toBe('reduced');
+  expect(dayBeforeConfirm.sessionModifierScope).toBe('compound');
+  expect(dayBeforeConfirm.exercises[0].sets[0].weight).toBe(100);
+  expect(dayBeforeConfirm.exercises[1].sets[0].weight).toBe(20);
+
+  await page.click('[data-action="reduce-today-weights"]');
+
   const day = await page.evaluate(() => {
     const st = JSON.parse(localStorage.getItem('train_v6'));
     return st.weeks.at(-1).days[0];
   });
-  expect(day.sessionModifier).toBe('reduced');
-  expect(day.sessionModifierScope).toBe('compound');
   // Bankdrücken (Compound): 100 * 0.9 = 90, gerundet auf Schritt 5 -> 90
   expect(day.exercises[0].sets[0].weight).toBe(90);
   // Bizepscurls (Isolation): unverändert
@@ -126,6 +135,8 @@ test('Einmalig schlechter Schlaf (keine kumulierte Historie) -> reduced_mild/all
   await checkIn(page, { sleep: 'poor', energyPre: 'medium' });
 
   await expect(page.locator('.session-briefing-card__msg')).toContainText('Leicht reduzieren heute — Gewichte -5%');
+
+  await page.click('[data-action="reduce-today-weights"]');
 
   const day = await page.evaluate(() => {
     const st = JSON.parse(localStorage.getItem('train_v6'));
@@ -170,9 +181,10 @@ test('Catch-up-Button zeigt korrekten Prozentsatz für reduced_mild (-5%) und re
 });
 
 test('Intra-Session-Coach: reduced/compound dämpft nur die Compound-Übung, Isolation bleibt bei der vollen Reduktion', async ({ page }) => {
-  // Check-in mit modifier='reduced'/scope='compound' hat Bankdrücken (Compound)
-  // bereits bei der Abgabe von 100kg -> 90kg reduziert (_reducePendingWeights),
-  // Bizepscurls (Isolation) blieb bei 20kg. RPE 10 (Gruppe C, "Maximum —
+  // Check-in mit modifier='reduced'/scope='compound' + bestätigter Reduktion
+  // (Runde 20/Befund 1: erst nach Klick auf den Bestätigen-Button, nicht mehr
+  // automatisch) hat Bankdrücken (Compound) von 100kg -> 90kg reduziert
+  // (_reducePendingWeights), Bizepscurls (Isolation) blieb bei 20kg. RPE 10 (Gruppe C, "Maximum —
   // deutlich reduzieren", nextWeight = currentWeight - 2*step) ist danach VOR
   // dem Intra-Session-Modifier bereits eine echte Reduktion -- _applyModifier
   // greift hier als Kappung ("nicht stärker als -1 Schritt/-10%"), nicht als
@@ -188,6 +200,7 @@ test('Intra-Session-Coach: reduced/compound dämpft nur die Compound-Übung, Iso
     mkEx({ name: 'Bizepscurls', weight: 20, step: 2.5, nSets: 2 }),
   ] });
   await checkIn(page, { sleep: 'poor', energyPre: 'medium' });
+  await page.click('[data-action="reduce-today-weights"]');
 
   await page.click('[data-action="open-rpe-popover"][data-di="0"][data-ei="0"][data-si="0"]');
   await page.click('[data-action="set-rpe-val"][data-di="0"][data-ei="0"][data-si="0"][data-val="10"]');

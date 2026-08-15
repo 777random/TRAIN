@@ -2202,9 +2202,12 @@ function reduce(state, action) {
       };
       day.sessionModifier = p.modifier ?? 'normal';
       day.sessionModifierScope = p.modifierScope ?? 'all';
-      if (p.modifier === 'reduced' || p.modifier === 'reduced_mild') {
-        _reducePendingWeights(day, p.modifier, p.modifierScope, p.compoundExerciseNames, state.settings, state.customExercises);
-      }
+      // Runde 20 (Befund 1): keine automatische Reduktion mehr beim Check-in
+      // selbst -- der Nutzer soll die Empfehlung erst bestätigen (siehe
+      // "Gewichte heute anpassen"-Button, ui.js _renderSessionBriefing).
+      // DAY_REDUCE_PENDING_WEIGHTS ist jetzt der EINZIGE Weg, wie tatsächlich
+      // reduziert wird (vorher: automatisch hier + zusätzlich als Catch-up-
+      // Button für später hinzugefügte Übungen).
       break;
     }
 

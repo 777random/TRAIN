@@ -1,13 +1,20 @@
 import { test, expect } from '@playwright/test';
 
-// B62 (Runde 13, Council-Entscheidung): Service-Worker-Registrierung soll
+// B62 (Runde 13, Council-Entscheidung): Service-Worker-Registrierung sollte
 // nicht mehr unconditional beim reinen Seitenaufruf passieren, sondern erst
-// bei der ersten echten Trainingsaktion (timer.js '_ensureSessionStart()',
-// ausgelöst z.B. über das bestehende 'train:set-input'-Event, das ui.js bei
-// jeder Gewichts-/Wiederholungs-/RPE-Eingabe feuert). Grund: die 7.
-// Precache-Reduktion (datenschutz.html + Badge-PNGs raus, siehe sw.js) allein
-// hätte den P0-Kern des Bugs nicht behoben — der eigentliche Punkt ist der
-// VERSCHOBENE Registrierungszeitpunkt.
+// bei der ersten echten Trainingsaktion (timer.js '_ensureSessionStart()').
+//
+// Runde 20 (Befund 4): Live-Nutzer-Feedback ("ich bekomme nicht mehr die
+// Meldung dass es Updates gibt") deckte eine Regression aus B62 auf --
+// _ensureSessionStart() feuert den Registrierungs-Trigger nur EINMAL PRO TAG
+// (Guard: day.sessionStartTs bereits gesetzt). Ein Nutzer, der die App nur
+// öffnet ohne sofort zu trainieren, oder sie mehrfach am selben Tag neu
+// öffnet, bekam dadurch NIE eine neue SW-Registrierung/updatefound-Prüfung
+// in diesem JS-Kontext -- vor B62 lief das bei JEDEM Seitenaufruf. Fix:
+// zusätzlicher, Idle-verzögerter Trigger bei JEDEM App-Start (mountTimer(),
+// timer.js), unabhängig von einer Trainingsaktion. Die 7. Precache-Reduktion
+// (datenschutz.html + Badge-PNGs raus, siehe sw.js) bleibt unverändert --
+// nur der Registrierungszeitpunkt ändert sich erneut.
 //
 // navigator.serviceWorker.register() wird per addInitScript instrumentiert
 // (Zähler statt echtem Two-Version-SW-Zyklus — analog zum bestehenden Muster
@@ -65,7 +72,7 @@ async function seed(page) {
   await page.waitForSelector('#app.is-ready', { timeout: 10000 });
 }
 
-test('registerServiceWorker() wird NICHT beim reinen Seitenaufruf aufgerufen', async ({ page }) => {
+test('registerServiceWorker() wird nach dem Seitenaufruf automatisch (Idle-verzögert) aufgerufen, auch OHNE Trainingsaktion', async ({ page }) => {
   const pageErrors = [];
   page.on('pageerror', err => pageErrors.push(err.message));
 
@@ -74,13 +81,16 @@ test('registerServiceWorker() wird NICHT beim reinen Seitenaufruf aufgerufen', a
   await page.waitForSelector('#app.is-ready', { timeout: 10000 });
   await seed(page);
 
-  const calls = await page.evaluate(() => window.__swRegisterCalls);
-  expect(calls).toBe(0);
+  // Runde 20 (Befund 4): keine Trainingsaktion ausgelöst -- Registrierung
+  // muss trotzdem passieren (Idle-Trigger aus mountTimer(), timer.js).
+  await expect.poll(() => page.evaluate(() => window.__swRegisterCalls), { timeout: 8000 }).toBe(1);
+  await expect(page.locator('#toast')).toHaveClass(/is-visible/);
+  await expect(page.locator('#toast')).toContainText('lokal');
 
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
 });
 
-test('registerServiceWorker() wird erst nach der ersten Trainingsaktion (Session-Start) aufgerufen + zeigt Hinweis-Toast', async ({ page }) => {
+test('Eine Trainingsaktion nach bereits erfolgter Idle-Registrierung löst KEINE zweite Registrierung aus ({ once: true })', async ({ page }) => {
   const pageErrors = [];
   page.on('pageerror', err => pageErrors.push(err.message));
 
@@ -89,25 +99,13 @@ test('registerServiceWorker() wird erst nach der ersten Trainingsaktion (Session
   await page.waitForSelector('#app.is-ready', { timeout: 10000 });
   await seed(page);
 
-  expect(await page.evaluate(() => window.__swRegisterCalls)).toBe(0);
+  await expect.poll(() => page.evaluate(() => window.__swRegisterCalls), { timeout: 8000 }).toBe(1);
 
   // Simuliert exakt das Event, das ui.js bei der ersten Gewichts-/
   // Wiederholungs-/RPE-Eingabe feuert (timer.js hört hier bereits ab,
-  // siehe timer.js '_bindCustomEvents()' -> 'train:set-input').
-  await page.evaluate(() => {
-    window.dispatchEvent(new CustomEvent('train:set-input', { detail: { di: 0 } }));
-  });
-
-  await expect.poll(() => page.evaluate(() => window.__swRegisterCalls)).toBe(1);
-
-  await expect(page.locator('#toast')).toHaveClass(/is-visible/);
-  await expect(page.locator('#toast')).toContainText('lokal');
-
-  // Erneutes Auslösen (z.B. weitere Eingabe im selben, bereits gestarteten
-  // Tag) darf KEINE zweite Registrierung nach sich ziehen -- der Guard in
-  // '_ensureSessionStart()' (day.sessionStartTs bereits gesetzt) verhindert
-  // das bereits für den SESSION_START-Dispatch selbst, das neue
-  // 'train:sw-register-trigger'-Event hängt am selben Guard.
+  // siehe timer.js '_bindCustomEvents()' -> 'train:set-input') -- der
+  // redundante _ensureSessionStart()-Trigger darf dank { once: true } in
+  // index.html keine zweite Registrierung mehr auslösen.
   await page.evaluate(() => {
     window.dispatchEvent(new CustomEvent('train:set-input', { detail: { di: 0 } }));
   });

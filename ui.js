@@ -33,7 +33,7 @@ import { buildWeekReview }        from './weekReview.js';
 import { showWeekReviewModal, renderWeekReviewHtml, shareWeekReviewImage } from './weekReviewModal.js';
 import { computeWeeklyFocus, computeStructuralSignals, isInRecoveryWindow, buildDecisionalBalance, _dismissCooldownDays } from './weeklyFocus.js';
 import { findExactDuplicates, findSimilarCandidates } from './exerciseNameCleanup.js';
-import { computeErkenntnisLines, getProgressCorridorCalibration } from './progressInsights.js';
+import { computeErkenntnisLines, getProgressCorridorCalibration, computeStrengthGain } from './progressInsights.js';
 import { buildPrShareCanvas, shareCanvas } from './shareImage.js';
 import { buildCategoryMap, resolveCategory, isCompoundExercise, MOVEMENT_MAP, resolveMuscleGroups } from './movementMap.js';
 import { computeQualityTrend, computeConsistencyTrend, computeVolumeTrend, computeBreadthProgress } from './overallPerformance.js';
@@ -788,6 +788,24 @@ function _initStickyObserver() {
   );
 }
 
+// Runde 20 (Befund 8): ein Beta-Tester hielt die App fälschlich für
+// datenverlustig, weil ein unbewusster Swipe (z.B. beim Scrollen in der
+// Satz-Tabelle ausgelöst) ihn in eine andere Woche navigiert hatte, ohne
+// dass der -- nicht sticky positionierte -- Wochen-Indikator im sichtbaren
+// Bereich war. Minimalinvasiver Fix: kurzer Toast bei JEDEM Wochenwechsel
+// (Swipe UND Prev/Next-Buttons), unabhängig von der Scroll-Position sichtbar.
+function _navigateWeekWithToast(delta) {
+  const before = getState().curIdx;
+  dispatch(A.WEEK_NAVIGATE, { delta });
+  const st = getState();
+  if (st.curIdx === before) return;
+  const wk = st.weeks[st.curIdx];
+  // dieselbe relative Bezeichnung wie im (nicht-sticky) Wochen-Header
+  // (renderWeekHeader, "Diese/Nächste/Letzte Woche" bzw. "KW N · Jahr"),
+  // damit der Toast genau das zeigt, was der Nutzer sonst oben sehen würde.
+  if (wk) showToast(`📅 ${wk.label ? wk.label : _weekLabel(wk, st.weeks)}`, 'info');
+}
+
 // ─── Swipe navigation ────────────────────────────────────────────────────────
 function _initSwipe(container) {
   container.addEventListener('touchstart', e => {
@@ -804,7 +822,7 @@ function _initSwipe(container) {
     const dx = e.changedTouches[0].clientX - _swipeStartX;
     const dy = e.changedTouches[0].clientY - _swipeStartY;
     if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.2) {
-      dispatch(A.WEEK_NAVIGATE, { delta: dx < 0 ? 1 : -1 });
+      _navigateWeekWithToast(dx < 0 ? 1 : -1);
     }
     _swipeStartX = null;
     _swipeStartY = null;
@@ -1731,18 +1749,17 @@ function _renderSessionBriefing(di, day, wk, state) {
   const defaultExpanded = !day.sessionStartTs;
   const isExpanded = _briefingExpandedOverride.has(di) ? _briefingExpandedOverride.get(di) : defaultExpanded;
 
-  // B87 Fix 3: manueller "Catch-up"-Button für die -10%-Reduzierung bei
-  // sessionModifier='reduced'. Die automatische Reduktion (SESSION_CHECKIN_SET,
-  // state.js) hat zum Zeitpunkt der Check-in-Abgabe bereits alle DAMALS
-  // pending Sätze mit Gewicht>0 reduziert -- dieser Button fängt Übungen ab,
-  // die ERST NACH dem Check-in zum Tag hinzugefügt wurden (die die
-  // automatische Schleife nie sah). Das localStorage-Flag verhindert
-  // doppeltes Auslösen durch DIESEN Button (nicht durch die automatische
-  // Reduktion, die davon unabhängig bleibt) — siehe DECISIONS.md für den
-  // bewusst in Kauf genommenen Grenzfall (erneutes Klicken vor dem ersten
-  // Tag-Abschluss würde bereits reduzierte, noch offene Sätze ein zweites
-  // Mal dämpfen; da die Richtung immer "weniger Gewicht" ist, ist das
-  // konservativ, nie riskant).
+  // Runde 20 (Befund 1): dieser Button ist seit state.js SESSION_CHECKIN_SET
+  // keine automatische Reduktion mehr auslöst der EINZIGE Weg, wie Gewichte
+  // tatsächlich reduziert werden -- vorher (B87 Fix 3) war er nur ein
+  // "Catch-up" für Übungen, die ERST NACH dem Check-in zum Tag hinzugefügt
+  // wurden, weil die automatische Reduktion zum Check-in-Zeitpunkt schon
+  // gelaufen war. Jetzt zeigt er die Empfehlung als offenen Vorschlag, den
+  // der Nutzer explizit bestätigen muss, bevor irgendein Gewicht sinkt --
+  // das deckt beide Fälle ab (erste Bestätigung UND später hinzugefügte
+  // Übungen), da DAY_REDUCE_PENDING_WEIGHTS immer alle aktuell pending
+  // Sätze des Tages reduziert. Das localStorage-Flag verhindert weiterhin
+  // doppeltes Auslösen durch denselben Button.
   const reduceFlagKey = `train_reduced_${wk.startDate}_${di}`;
   let reduceHtml = '';
   if (modifier === 'reduced' || modifier === 'reduced_mild') {
@@ -1751,7 +1768,7 @@ function _renderSessionBriefing(di, day, wk, state) {
     const reducePct = modifier === 'reduced_mild' ? 5 : 10;
     reduceHtml = alreadyReduced
       ? `<div class="session-briefing-card__reduce-done">✓ Gewichte angepasst</div>`
-      : `<button type="button" class="session-briefing-card__reduce-btn" data-action="reduce-today-weights" data-di="${di}">Gewichte heute anpassen (-${reducePct}%)</button>`;
+      : `<button type="button" class="session-briefing-card__reduce-btn" data-action="reduce-today-weights" data-di="${di}">Empfehlung bestätigen: Gewichte heute anpassen (-${reducePct}%)</button>`;
   }
 
   // B87 Fix 2: öffnet den Check-in erneut, vorausgefüllt mit den aktuellen
@@ -2660,7 +2677,7 @@ function _renderIntraFeedback(fb, key, di, ei, si, mode, canAdopt) {
   if (!fb.hint) {
     return `
 <div class="set-feedback" data-di="${di}" data-ei="${ei}" data-si="${si}">
-  <span class="set-feedback__line">→ Nächster Satz: ${fb.nextWeight}kg</span>
+  <span class="set-feedback__line set-feedback__line--primary">→ Nächster Satz: ${fb.nextWeight}kg</span>
 </div>`;
   }
   const expanded = _setFeedbackExpanded.has(key);
@@ -2697,7 +2714,7 @@ function _renderIntraFeedback(fb, key, di, ei, si, mode, canAdopt) {
     : '';
   return `
 <div class="set-feedback" data-di="${di}" data-ei="${ei}" data-si="${si}">
-  <span class="set-feedback__line">→ Nächster Satz: ${fb.nextWeight}kg</span>
+  <span class="set-feedback__line set-feedback__line--primary">→ Nächster Satz: ${fb.nextWeight}kg</span>
   <span class="set-feedback__line set-feedback__line--sub">${h(fb.hint)}${fb.pauseSec ? ` · Pause: ${_fmtPause(fb.pauseSec)}` : ''}${confirmHtml}${whyToggleHtml}</span>${adoptActionsHtml}${whyBodyHtml}
 </div>`;
 }
@@ -4652,6 +4669,16 @@ function renderProgressTab(state) {
     <div class="chart-wrap" id="chart-ex-wrap"></div>
     <div id="chart-archive-hint"></div>
     <div id="chart-1rm-hint"></div>
+    <div class="strength-gain-row">
+      <span class="strength-gain-row__label">Kraftzuwachs letzte</span>
+      <select class="chart-select chart-select--sm" id="chart-strength-gain-weeks" aria-label="Zeitraum für Kraftzuwachs wählen">
+        <option value="4">4 Wochen</option>
+        <option value="8" selected>8 Wochen</option>
+        <option value="12">12 Wochen</option>
+        <option value="26">26 Wochen</option>
+      </select>
+    </div>
+    <div id="chart-strength-gain-wrap"></div>
     <div id="chart-last4-wrap"></div>
   </div>
 
@@ -4686,6 +4713,9 @@ function renderProgressTab(state) {
   requestAnimationFrame(() => {
     _updateExChart(state);
     document.getElementById('chart-ex-select')?.addEventListener('change', () => {
+      _updateExChart(getState());
+    });
+    document.getElementById('chart-strength-gain-weeks')?.addEventListener('change', () => {
       _updateExChart(getState());
     });
     _updateInlineReview(getState());
@@ -4821,8 +4851,27 @@ function _updateExChart(state) {
   }
   const ormWrap = document.getElementById('chart-1rm-hint');
   if (ormWrap) ormWrap.innerHTML = _renderAnalysis1RM(name, state);
+  const gainWrap = document.getElementById('chart-strength-gain-wrap');
+  if (gainWrap) gainWrap.innerHTML = _renderStrengthGain(name, state);
   const last4Wrap = document.getElementById('chart-last4-wrap');
   if (last4Wrap) last4Wrap.innerHTML = _renderLast4Units(name, state);
+}
+
+/**
+ * Runde 20 (Befund 5): Anzeige-Layer für computeStrengthGain() -- reine
+ * Präsentation, keine eigene Berechnungslogik (die lebt vollständig in
+ * progressInsights.js, gleiches Trennungsmuster wie _renderAnalysis1RM()).
+ */
+function _renderStrengthGain(name, state) {
+  const weeksBack = +(document.getElementById('chart-strength-gain-weeks')?.value ?? 8);
+  const gain = computeStrengthGain(state, name, weeksBack);
+  if (!gain) {
+    return `<p class="strength-gain-hint strength-gain-hint--empty">Noch nicht genug Trainingswochen mit dieser Übung in diesem Zeitraum.</p>`;
+  }
+  const sign = gain.gainKg > 0 ? '+' : '';
+  const color = gain.gainKg > 0 ? 'var(--c-accent)' : gain.gainKg < 0 ? 'var(--c-danger)' : 'var(--c-text-2)';
+  return `<p class="strength-gain-hint" style="color:${color}">${sign}${gain.gainKg.toFixed(1)} kg geschätzter 1RM (${sign}${gain.gainPct.toFixed(0)}%)
+    <span class="strength-gain-hint__basis">~${gain.firstEst.toFixed(1)} kg (${gain.firstDetail.w} kg × ${gain.firstDetail.r} Wdh) → ~${gain.lastEst.toFixed(1)} kg (${gain.lastDetail.w} kg × ${gain.lastDetail.r} Wdh)</span></p>`;
 }
 
 function _renderLast4Units(name, state) {
@@ -6015,10 +6064,10 @@ function _handleClick(e) {
     }
 
     case 'nav-prev':
-      dispatch(A.WEEK_NAVIGATE, { delta: -1 }); break;
+      _navigateWeekWithToast(-1); break;
 
     case 'nav-next':
-      dispatch(A.WEEK_NAVIGATE, { delta: 1 }); break;
+      _navigateWeekWithToast(1); break;
 
     case 'toggle-week-menu': {
       _weekMenuOpen = !_weekMenuOpen;
@@ -7119,6 +7168,11 @@ function _handleClick(e) {
             if (ins.immediate) showToast(ins.message, ins.type === 'warning' ? 'warn' : 'ok', ins.id === 'P-05' ? 4000 : 3000);
           }
           _maybeShowPrMomentToast(+di, +ei, +si, _prevPrWeight);
+          // Runde 20 (Befund 3): Erstnutzer-Spotlight, gleiche Stelle wie im
+          // confirm-set-Pfad -- toggle-done (manuelles ✓/✗-Icon) ist laut
+          // B78-Kommentar der vermutlich häufiger genutzte Pfad, der Tip muss
+          // daher auch hier feuern, nicht nur über "Satz bestätigen".
+          _maybeShowTip('tip-10', 'TRAIN schlägt dir nach jedem Satz das Gewicht für den nächsten vor — direkt unter der Satzzeile.');
         }
       }
       // Bugfix (Android-Report): das neu gerenderte Intra-Session-Feedback
@@ -7199,6 +7253,11 @@ function _handleClick(e) {
           if (ins.immediate) showToast(ins.message, ins.type === 'warning' ? 'warn' : 'ok', ins.id === 'P-05' ? 4000 : 3000);
         }
         _maybeShowPrMomentToast(+di, +ei, _csi, _prevPrWeightConfirm);
+        // Runde 20 (Befund 3): Erstnutzer-Spotlight für die In-Session-
+        // Empfehlungszeile (".set-feedback", direkt unter dem bestätigten
+        // Satz) -- Diagnose ergab, dass sie visuell zu unauffällig war, um
+        // beim ersten Mal als "hier gibt's einen Coach" erkannt zu werden.
+        _maybeShowTip('tip-10', 'TRAIN schlägt dir nach jedem Satz das Gewicht für den nächsten vor — direkt unter der Satzzeile.');
         // RPE nudge — only if rpeEnabled
         if (_aft.settings?.rpeEnabled !== false && _aftSet.rpe == null) {
           clearTimeout(_rpeNudgeTimer);
@@ -7242,7 +7301,7 @@ function _handleClick(e) {
             if (_fb?.pauseSec) _feedbackPauseSec = _fb.pauseSec;
           }
         }
-        window.dispatchEvent(new CustomEvent('train:set-done', { detail: { pauseSec: _feedbackPauseSec ?? (_cex.pauseSec ?? 90), di: +di } }));
+        window.dispatchEvent(new CustomEvent('train:set-done', { detail: { pauseSec: _feedbackPauseSec ?? (_cex.pauseSec ?? 90), di: +di, key: `${di}-${ei}-${_csi}` } }));
       }
       // Bugfix (Android-Report): bisher wurde hier aktiv zum NÄCHSTEN offenen
       // Satz zentriert (block:'center') -- das drängte das gerade gerenderte
@@ -7278,6 +7337,7 @@ function _handleClick(e) {
       const rpeVal = el.dataset.val === '' ? null : +el.dataset.val;
       dispatch(A.SET_UPDATE, { di: +di, ei: +ei, si: +si, field: 'rpe', value: rpeVal });
       _rpePopoverKey = null;
+      if (rpeVal != null) _maybeRestartPauseForRpe(+di, +ei, +si);
       break;
     }
 
@@ -7287,6 +7347,7 @@ function _handleClick(e) {
       _rpeNudgeKey   = null;
       _rpeNudgeTimer = null;
       _rpeNudgeVariant = 'plain';
+      _maybeRestartPauseForRpe(+di, +ei, +si);
       scheduleRender();
       break;
     }
@@ -7294,6 +7355,7 @@ function _handleClick(e) {
     case 'autofill-rpe': {
       dispatch(A.SET_AUTOFILL_RPE, { di: +di, ei: +ei, si: +si });
       showToast('RPE auf nächsten Satz übernommen', 'ok');
+      _maybeRestartPauseForRpe(+di, +ei, +si);
       break;
     }
     case 'autofill-down': {
@@ -8992,15 +9054,45 @@ function _buildScaffold(root) {
 </div>
 
 <div class="sw-update-banner" id="sw-update-banner" role="alert">
-  <span>🔄 Update verfügbar</span>
-  <button class="btn btn--ghost" id="sw-update-later-btn">Später</button>
-  <button class="btn" id="sw-update-btn">Jetzt aktualisieren</button>
+  <div class="sw-update-banner__row">
+    <span>🔄 Update verfügbar</span>
+    <button class="btn btn--ghost" id="sw-update-later-btn">Später</button>
+    <button class="btn" id="sw-update-btn">Jetzt aktualisieren</button>
+  </div>
+  <button type="button" class="sw-update-banner__details-toggle" id="sw-update-details-toggle" aria-expanded="false">mehr Details ▾</button>
+  <div class="sw-update-banner__details" id="sw-update-details" hidden></div>
 </div>`;
 }
 
 // ════════════════════════════════════════════════════════════════════════════
 // MOUNT – public entry point
 // ════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Runde 20 (Befund 4): fragt einen ServiceWorker (typischerweise der
+ * wartende, noch nicht aktive Worker) per MessageChannel nach seiner
+ * CHANGELOG_ENTRIES-Liste (sw.js). MessageChannel statt event.source-
+ * basierter Antwort, da Replies an einen WARTENDEN Worker darüber
+ * browserübergreifend weniger zuverlässig sind. 2s-Timeout -> null (banner
+ * zeigt dann "Keine Details verfügbar" statt endlos zu laden).
+ */
+function _fetchWaitingChangelog(worker) {
+  return new Promise(resolve => {
+    if (!worker?.postMessage) { resolve(null); return; }
+    const channel = new MessageChannel();
+    const timer = setTimeout(() => resolve(null), 2000);
+    channel.port1.onmessage = e => {
+      clearTimeout(timer);
+      resolve(e.data?.type === 'CHANGELOG' ? e.data : null);
+    };
+    try {
+      worker.postMessage({ type: 'GET_CHANGELOG' }, [channel.port2]);
+    } catch {
+      clearTimeout(timer);
+      resolve(null);
+    }
+  });
+}
 
 export function mountApp(root) {
   _root = root;
@@ -9023,6 +9115,28 @@ export function mountApp(root) {
   // Update weiterhin wartet — kein zusätzlicher Persistenz-Mechanismus nötig.
   document.getElementById('sw-update-later-btn')?.addEventListener('click', () => {
     document.getElementById('sw-update-banner')?.classList.remove('is-visible');
+  });
+
+  // Runde 20 (Befund 4): "mehr Details" -- fragt den WARTENDEN (neuen, noch
+  // nicht aktiven) Worker per MessageChannel nach seiner kurzen
+  // Änderungsliste (CHANGELOG_ENTRIES, sw.js). Lazy/einmalig: erst beim
+  // ersten Aufklappen abgefragt, nicht schon beim Banner-Erscheinen.
+  let _changelogLoaded = false;
+  document.getElementById('sw-update-details-toggle')?.addEventListener('click', async (e) => {
+    const toggle = e.currentTarget;
+    const body   = document.getElementById('sw-update-details');
+    if (!body) return;
+    const nowExpanded = toggle.getAttribute('aria-expanded') !== 'true';
+    toggle.setAttribute('aria-expanded', String(nowExpanded));
+    toggle.textContent = nowExpanded ? 'weniger Details ▴' : 'mehr Details ▾';
+    body.hidden = !nowExpanded;
+    if (!nowExpanded || _changelogLoaded) return;
+    _changelogLoaded = true;
+    const worker = _pendingSwRegistration?.waiting ?? _pendingSwRegistration?.installing;
+    const result = await _fetchWaitingChangelog(worker);
+    body.innerHTML = result?.entries?.length
+      ? `<ul class="sw-update-banner__details-list">${result.entries.map(t => `<li>${h(t)}</li>`).join('')}</ul>`
+      : `<span class="sw-update-banner__details-empty">Keine Details verfügbar.</span>`;
   });
 
   document.getElementById('sw-update-btn')?.addEventListener('click', async (e) => {
@@ -9760,6 +9874,38 @@ function _maybeShowPrMomentToast(di, ei, si, prevWeight) {
   }
 }
 
+/**
+ * Runde 20 (Befund 11): buildSetFeedback() liefert pauseSec:null solange RPE
+ * fehlt (sessionCoach.js) -- der beim Bestätigen gestartete Timer lief daher
+ * bis zu einer nachträglichen RPE-Eingabe (RPE-Nudge/Popover/Autofill)
+ * immer mit dem generischen ex.pauseSec-Fallback weiter. Bewertet nach
+ * JEDER dieser drei RPE-Eingabestellen den Pausenvorschlag mit dem jetzt
+ * bekannten RPE neu und feuert train:pause-restart -- timer.js wendet den
+ * neuen Wert nur an, wenn der Timer noch zu GENAU diesem Satz gehört
+ * (_pauseSetKey-Vergleich), damit eine RPE-Korrektur an einem älteren Satz
+ * nicht den Timer eines inzwischen schon laufenden späteren Satzes zurück-
+ * dreht. Dieselben Gating-Bedingungen wie beim ursprünglichen Timer-Start
+ * (confirm-set, Zeile ~7250ff.).
+ */
+function _maybeRestartPauseForRpe(di, ei, si) {
+  const st  = getState();
+  const wk  = st.weeks[st.curIdx];
+  const day = wk?.days[+di];
+  const ex  = day?.exercises[+ei];
+  const s   = ex?.sets[+si];
+  if (!wk || !day || !ex || !s) return;
+  if (ex.pauseSecManual) return;
+  if (!st.settings?.autoStartPauseTimer) return;
+  if (st.settings?.sessionCoach === false) return;
+  if (day.isVacation || !_isTodayDay(wk, +di)) return;
+  const isLastSet = +si === (ex.sets?.length ?? 0) - 1;
+  if (isLastSet) return;
+  const isCompound = isCompoundExercise(ex.name, buildCategoryMap(st.customExercises));
+  const fb = buildSetFeedback(s, ex, day.sessionModifier ?? null, +si, st.settings?.goal ?? null, isCompound, day.sessionModifierScope ?? 'all', getEffectiveWeightStep(ex, st.settings, st.customExercises));
+  if (!fb?.pauseSec) return;
+  window.dispatchEvent(new CustomEvent('train:pause-restart', { detail: { pauseSec: fb.pauseSec, key: `${di}-${ei}-${si}` } }));
+}
+
 function _showPrMomentToast(exName, weight, reps, prevWeight) {
   document.getElementById('pr-moment-toast')?.remove();
   const el = document.createElement('div');
@@ -10143,10 +10289,20 @@ function _showOnboarding() {
       exercises: ds.exercises.map(ex => {
         const { n, ps } = _adjustedSetsAndPause(ex);
         const tr = _adjustedTargetReps(ex.tr, ex.m);
+        // Runde 20 (Befund 12): im Onboarding eingegebene Startgewichte
+        // (_startwerte, "Startwerte eingeben (optional)") landeten bisher
+        // NUR in der separaten ONBOARDING_SEED-Historie (PR-Kaltstart), nicht
+        // in der tatsächlich geladenen Vorlage -- der Nutzer musste dieselben
+        // Gewichte beim ersten echten Training erneut eintippen. Prefill hier
+        // nur für weight (Startgewicht gilt für alle Sätze der Übung); reps/
+        // rpe aus _startwerte bleiben wie bisher ausschließlich Input für die
+        // ONBOARDING_SEED-Historie -- rpe auf einem noch 'pending' Satz
+        // vorzubelegen wäre semantisch falsch (Satz wurde ja nicht bewertet).
+        const swWeight = _startwerte[ex.name]?.weight;
         return {
           name: ex.name, note: '', pauseSec: ps, metric: ex.m,
           sets: Array.from({ length: n }, () => ({
-            weight: 0, reps: tr, rpe: null, status: 'pending', done: false, note: '',
+            weight: (typeof swWeight === 'number' && swWeight >= 0) ? swWeight : 0, reps: tr, rpe: null, status: 'pending', done: false, note: '',
           })),
           weightStep: defaultWeightStepForExercise(ex.name, getState().customExercises), nextWeekPlan: 0, nextWeekPlanConfirmed: false,
           metricStep: ex.m === 'm' ? 50 : ex.m === 'sec' ? 10 : undefined,

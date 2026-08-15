@@ -132,11 +132,12 @@ test('Versions-Label zeigt die per Laufzeit-Message abgefragte CACHE_VERSION sta
 
   await seed(page);
 
-  // B62 (Runde 13): Registrierung passiert seit diesem Sprint nicht mehr
-  // automatisch beim Laden, sondern erst nach der ersten Trainingsaktion
-  // (timer.js '_ensureSessionStart()'). seed() hier hat keine Übungen/Tage
-  // für eine echte UI-Interaktion -- das Trigger-Event direkt zu feuern
-  // simuliert exakt das, was index.html im echten Betrieb dafür abhört.
+  // B62 (Runde 13)/Runde 20 (Befund 4): Registrierung passiert seit B62
+  // idle-verzögert beim Laden (mountTimer(), timer.js) UND weiterhin
+  // redundant nach der ersten Trainingsaktion (_ensureSessionStart()).
+  // seed() hier hat keine Übungen/Tage für eine echte UI-Interaktion -- das
+  // Trigger-Event direkt zu feuern simuliert exakt das, was index.html im
+  // echten Betrieb dafür abhört, ohne auf den Idle-Callback warten zu müssen.
   await page.evaluate(() => {
     window.dispatchEvent(new CustomEvent('train:sw-register-trigger'));
   });
@@ -241,4 +242,52 @@ test('Mehrere-Deploys-Szenario: nach "Später" erscheint der Banner bei einem we
   expect(posted.msg).toEqual({ type: 'SKIP_WAITING' });
 
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});
+
+// Runde 20 (Befund 4): "mehr Details" im Update-Banner fragt den wartenden
+// Worker per MessageChannel nach CHANGELOG_ENTRIES (sw.js) und zeigt sie an
+// -- vorher gab es keinerlei Änderungsliste beim Update-Hinweis.
+test('Runde 20: "mehr Details" fragt den wartenden Worker per MessageChannel ab und zeigt die Änderungsliste', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', err => pageErrors.push(err.message));
+
+  await seed(page);
+
+  await page.evaluate(() => {
+    const fakeWaiting = {
+      postMessage: (msg, transfer) => {
+        if (msg?.type === 'GET_CHANGELOG') {
+          transfer?.[0]?.postMessage({ type: 'CHANGELOG', version: 'train-v999', entries: ['Testeintrag A', 'Testeintrag B'] });
+        }
+      },
+    };
+    window.dispatchEvent(new CustomEvent('train:show-update-banner', {
+      detail: { registration: { waiting: fakeWaiting } },
+    }));
+  });
+
+  await expect(page.locator('#sw-update-banner')).toHaveClass(/is-visible/);
+  await expect(page.locator('#sw-update-details')).toBeHidden();
+
+  await page.click('#sw-update-details-toggle');
+
+  await expect(page.locator('#sw-update-details')).toBeVisible();
+  await expect(page.locator('#sw-update-details')).toContainText('Testeintrag A');
+  await expect(page.locator('#sw-update-details')).toContainText('Testeintrag B');
+
+  expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});
+
+test('Runde 20: "mehr Details" zeigt einen Fallback-Text, wenn der Worker nicht antwortet', async ({ page }) => {
+  await seed(page);
+
+  await page.evaluate(() => {
+    const fakeWaiting = { postMessage: () => {} }; // antwortet nie
+    window.dispatchEvent(new CustomEvent('train:show-update-banner', {
+      detail: { registration: { waiting: fakeWaiting } },
+    }));
+  });
+
+  await page.click('#sw-update-details-toggle');
+  await expect(page.locator('#sw-update-details')).toContainText('Keine Details verfügbar', { timeout: 4000 });
 });

@@ -456,7 +456,10 @@ function _buildOverloadResult(signal, energySignal = null) {
       status: 'overload',
       headline: 'Schlaf priorisieren',
       reasoning,
-      recommendation: 'Diese Woche keine Gewichtssteigerungen — dein Schlaf kostet Kraft.',
+      // Runde 20 (Befund 7): Kausalität war vorher reine Behauptung ("kostet
+      // Kraft") ohne Herleitung im Text -- jetzt kurz erklärt, damit die
+      // Empfehlung nachvollziehbar ist statt beliebig zu wirken.
+      recommendation: 'Diese Woche keine Gewichtssteigerungen — bei Schlafmangel sinkt die neuromuskuläre Leistungsfähigkeit, eine Steigerung würde jetzt vor allem das Verletzungs- und Formrisiko erhöhen statt echten Fortschritt zu bringen.',
       signalType: signal.signal,
       // E1 (Transparenz Coach-Tab): signal.value/energySignal.value waren
       // bisher nur in reasoning-Prosa verbaut, hier zusätzlich strukturiert.

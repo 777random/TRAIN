@@ -30,7 +30,7 @@
   <link rel="apple-touch-icon" sizes="192x192" href="./icon-192.png">
   <link rel="apple-touch-icon" sizes="512x512" href="./icon-512.png">
 
-  <link rel="stylesheet" href="./styles.css?v=218">
+  <link rel="stylesheet" href="./styles.css?v=219">
 
   <!-- modulepreload-Hints: ohne Bundler (bewusste Architekturentscheidung,
        siehe CLAUDE.md) entdeckt der Browser den ES-Module-Graphen sonst nur
@@ -179,11 +179,17 @@
     splash.classList.add('is-hidden');
     splash.addEventListener('transitionend', () => splash.remove(), { once: true });
 
-    // B62 (Runde 13, Council-Entscheidung): Service Worker erst bei der
-    // ersten echten Trainingsaktion registrieren, nicht schon beim reinen
-    // Seitenaufruf (timer.js '_ensureSessionStart()' feuert das Trigger-
-    // Event). register() ist browser-seitig idempotent, { once: true }
-    // genügt trotzdem als zusätzliche Absicherung.
+    // B62 (Runde 13, Council-Entscheidung): Service Worker ursprünglich erst
+    // bei der ersten echten Trainingsaktion registriert, nicht schon beim
+    // reinen Seitenaufruf. Runde 20 (Befund 4): das führte dazu, dass ein
+    // Nutzer, der die App öffnet ohne zu trainieren (oder mehrfach am
+    // selben Tag neu öffnet), NIE eine neue SW-Registrierung/Update-Prüfung
+    // in diesem JS-Kontext bekam. Trigger kommt jetzt sowohl Idle-verzögert
+    // bei jedem App-Start (mountTimer(), timer.js) als auch weiterhin bei
+    // der ersten Trainingsaktion (_ensureSessionStart(), Fallback). register()
+    // ist browser-seitig idempotent, { once: true } verhindert hier
+    // zusätzlich eine doppelte Registrierung/doppelte updatefound-Listener
+    // innerhalb desselben Seitenaufrufs.
     window.addEventListener('train:sw-register-trigger', () => {
       registerServiceWorker();
       window.dispatchEvent(new CustomEvent('train:show-toast', {

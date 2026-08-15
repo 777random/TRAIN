@@ -161,6 +161,77 @@ test('Fix 3: Klick löst EINEN Undo-Schritt für alle betroffenen Sätze aus', a
   expect(after).toEqual([100, 60]); // EIN Undo macht BEIDE Übungen rückgängig
 });
 
+// ─── Runde 20 (Befund 11) ─────────────────────────────────────────────────
+
+test('Befund 11: Pausentimer wird nach nachträglicher RPE-Eingabe per Nudge auf den empfohlenen Wert neu gestartet', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', err => pageErrors.push(err.message));
+  await page.goto('/');
+  await page.waitForSelector('#app.is-ready', { timeout: 10000 });
+  // pauseSec:90 (statischer Fallback, Default in mkEx) -- RPE ist beim
+  // "Satz bestätigen"-Klick noch unbekannt, der Timer startet daher
+  // zunächst mit diesem statischen Wert statt einer RPE-basierten Empfehlung.
+  // Der RPE-Nudge erscheint ausschließlich über confirm-set, nicht über das
+  // manuelle toggle-done-Icon (bestehendes, unverändertes Verhalten).
+  await seed(page, { exercises: [mkEx({ weight: 100, step: 2.5, nSets: 3 })], autoStartPauseTimer: true });
+
+  await page.click('[data-action="confirm-set"][data-di="0"][data-ei="0"]');
+  await expect(page.locator('#pause-overlay')).toHaveClass(/pause-overlay--visible/);
+  const numBefore = await page.locator('#pause-ring-num').textContent();
+  expect(Number(numBefore)).toBeLessThanOrEqual(90);
+
+  await page.click('[data-action="rpe-nudge-select"][data-di="0"][data-ei="0"][data-si="0"][data-rpe="10"]');
+
+  // RPE 10 (Bankdrücken=Compound, goal nicht gesetzt=Hypertrophie-Fallback)
+  // -> 180s statt der statischen 90s (siehe sessionCoach.js _pauseSecForRpe).
+  const numAfter = await page.locator('#pause-ring-num').textContent();
+  expect(Number(numAfter)).toBeGreaterThan(150);
+
+  expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});
+
+test('Befund 11: RPE-Korrektur an einem ÄLTEREN, bereits abgeschlossenen Satz dreht den Timer eines späteren, schon laufenden Satzes nicht zurück', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForSelector('#app.is-ready', { timeout: 10000 });
+  await seed(page, { exercises: [mkEx({ weight: 100, step: 2.5, nSets: 3 })], autoStartPauseTimer: true });
+
+  // Satz 0 mit RPE 6 (-> 90s Pause) bestätigen und die Pause direkt wieder
+  // verstreichen lassen (Timer-Overlay schließen), dann Satz 1 mit RPE 10
+  // (-> 180s) bestätigen -- Timer läuft jetzt für Satz 1 (Key "0-0-1").
+  await setRpe(page, 0, 0, 0, 6);
+  await toggleDone(page, 0, 0, 0);
+  await toggleDone(page, 0, 0, 1); // ohne RPE -> statischer Fallback 90s für Satz 1
+  await expect(page.locator('#pause-overlay')).toHaveClass(/pause-overlay--visible/);
+
+  // Nachträgliche RPE-Korrektur an Satz 0 (bereits abgeschlossen, altes Feedback) --
+  // darf den für Satz 1 laufenden Timer NICHT beeinflussen (falscher Key).
+  await page.click('[data-action="open-rpe-popover"][data-di="0"][data-ei="0"][data-si="0"]');
+  await page.click('[data-action="set-rpe-val"][data-di="0"][data-ei="0"][data-si="0"][data-val="9"]');
+
+  const numAfter = await page.locator('#pause-ring-num').textContent();
+  expect(Number(numAfter)).toBeLessThanOrEqual(90);
+});
+
+// ─── Runde 20 (Befund 3) ──────────────────────────────────────────────────
+
+test('Befund 3: Empfehlungszeile hat die prominente Akzent-Klasse + Erstnutzer-Tip erscheint einmalig', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', err => pageErrors.push(err.message));
+  await page.goto('/');
+  await page.waitForSelector('#app.is-ready', { timeout: 10000 });
+  await seed(page, { exercises: [mkEx({ weight: 100, step: 2.5, nSets: 2 })] });
+
+  await toggleDone(page, 0, 0, 0);
+
+  await expect(page.locator('.set-feedback__line--primary').first()).toContainText('Nächster Satz');
+  await expect(page.locator('.tip-banner')).toContainText('Gewicht für den nächsten vor');
+
+  const seenTips = await page.evaluate(() => JSON.parse(localStorage.getItem('train_v6')).seenTips);
+  expect(seenTips).toContain('tip-10');
+
+  expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});
+
 // ─── Fix 4+5 ────────────────────────────────────────────────────────────────
 
 test('Fix 4+5: "Übernehmen"-Button setzt Gewicht des nächsten Satzes UND startet den Timer', async ({ page }) => {

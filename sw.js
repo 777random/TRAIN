@@ -16,7 +16,22 @@
  *   asset conflicts.
  */
 
-const CACHE_VERSION  = 'train-v245';
+const CACHE_VERSION  = 'train-v246';
+
+// Runde 20 (Befund 4): kurze Änderungsliste für den aktuellen Build, im
+// Update-Banner beim Aufklappen ("mehr Details") angezeigt. 2-3 knappe
+// Stichpunkte, KEIN vollständiger Changelog -- wird von demselben Agent
+// gepflegt, der CACHE_VERSION erhöht (gleiche Konvention wie die
+// CACHE_VERSION-Erhöhung selbst, siehe AGENTS.md "GRUNDREGEL" Punkt 3).
+// Lebt bewusst hier (nicht in einer separaten .js/.json-Datei), weil sw.js
+// bei jedem Update-Check ohnehin byte-genau frisch vom Server geladen wird
+// (Browser-Update-Algorithmus) -- die Werte sind dadurch garantiert die des
+// NEUEN, wartenden Workers, ganz ohne zusätzlichen Cache-Bypass.
+const CHANGELOG_ENTRIES = [
+  'Gewichts-Reduktion nach schlechtem Schlaf/Energie muss jetzt bestätigt werden',
+  'Update-Erkennung repariert (lief zuvor bei vielen Nutzungsmustern nicht mehr an)',
+  'Diverses Live-Feedback: Onboarding-Startgewichte, Pausentimer, Wochenwechsel-Hinweis',
+];
 
 /**
  * App shell – every file the app needs to render its first frame offline.
@@ -165,5 +180,12 @@ self.addEventListener('message', event => {
   }
   if (event.data?.type === 'GET_VERSION') {
     event.source?.postMessage({ type: 'VERSION', version: CACHE_VERSION });
+  }
+  // Runde 20 (Befund 4): Antwort per MessagePort statt event.source -- ui.js
+  // fragt hierüber gezielt den WARTENDEN (noch nicht aktiven) Worker ab, für
+  // den event.source-basiertes Antworten browserübergreifend weniger
+  // zuverlässig ist als bei einem bereits kontrollierenden Worker.
+  if (event.data?.type === 'GET_CHANGELOG') {
+    event.ports?.[0]?.postMessage({ type: 'CHANGELOG', version: CACHE_VERSION, entries: CHANGELOG_ENTRIES });
   }
 });

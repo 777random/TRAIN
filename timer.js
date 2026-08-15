@@ -86,6 +86,12 @@ let _pauseRAF     = null;   // rAF handle for pause countdown
 let _pauseSec     = 90;     // current pause duration in seconds
 let _goTimer      = null;   // setTimeout handle for "WEITER!" popup auto-hide
 let _lastWeekIdx  = null;   // detect week navigation to reset clock
+// Runde 20 (Befund 11): welcher Satz (`${di}-${ei}-${si}`) die aktuell
+// laufende Pause ausgelöst hat -- train:pause-restart darf den Timer nur
+// neu starten, wenn er noch zu GENAU diesem Satz gehört (verhindert, dass
+// eine nachträgliche RPE-Korrektur an einem älteren Satz den Timer eines
+// inzwischen schon laufenden späteren Satzes zurückdreht).
+let _pauseSetKey  = null;
 
 // Runde 17 (Cluster 2, soundEnabled): einziger AudioContext der App, lazy
 // erzeugt. Absichtlich erst beim Pausenstart (echter Klick-Kontext) erzeugt/
@@ -160,8 +166,12 @@ function _ensureSessionStart(di) {
   if (!day || day.sessionStartTs || day.markedDone) return;
   _clockDi = di;
   dispatch(A.SESSION_START, { di, ts: Date.now() });
-  // B62 (Runde 13): SW-Registrierung + Erstlade-Hinweis erst bei der ersten
-  // echten Trainingsaktion auslösen, nicht schon beim reinen Seitenaufruf.
+  // B62 (Runde 13): ursprünglich der EINZIGE SW-Registrierungs-Trigger, seit
+  // Runde 20 (Befund 4) nur noch ein zusätzlicher, redundanter Trigger --
+  // der eigentliche Trigger läuft jetzt Idle-verzögert bei jedem App-Start
+  // (mountTimer(), timer.js), unabhängig von einer Trainingsaktion. Bleibt
+  // hier bestehen als Fallback (z.B. falls requestIdleCallback ungewöhnlich
+  // spät feuert) -- harmlos dank { once: true } in index.html.
   // index.html hört dieses Event ab (timer.js darf ui.js nicht importieren).
   window.dispatchEvent(new CustomEvent('train:sw-register-trigger'));
   if (!_sessInterval) {
@@ -303,6 +313,7 @@ function _startPause(seconds) {
 function _dismissPause() {
   cancelAnimationFrame(_pauseRAF);
   _pauseEnd = null;
+  _pauseSetKey = null;
   _hidePauseOverlay();
   _releaseWakeLock();
 }
@@ -364,8 +375,22 @@ function _onStateChange(state) {
 function _bindCustomEvents() {
   // Fired by ui.js when user marks a set as done
   window.addEventListener('train:set-done', e => {
-    const { pauseSec, di } = e.detail ?? {};
+    const { pauseSec, di, key } = e.detail ?? {};
     if (di !== undefined) _ensureSessionStart(di);
+    if (typeof pauseSec === 'number' && pauseSec > 0) {
+      _pauseSetKey = key ?? null;
+      _startPause(pauseSec);
+    }
+  });
+
+  // Runde 20 (Befund 11): fired by ui.js nach einer nachträglichen RPE-
+  // Eingabe (RPE-Nudge/Popover/Autofill) -- der beim Bestätigen gestartete
+  // Timer lief bis dahin mit dem generischen Fallback-Wert, weil RPE zu dem
+  // Zeitpunkt noch fehlte. Nur anwenden, wenn der Timer noch zu GENAU dem
+  // Satz gehört, der gerade das RPE bekommen hat (_pauseSetKey-Vergleich).
+  window.addEventListener('train:pause-restart', e => {
+    const { pauseSec, key } = e.detail ?? {};
+    if (!key || key !== _pauseSetKey) return;
     if (typeof pauseSec === 'number' && pauseSec > 0) {
       _startPause(pauseSec);
     }
@@ -793,7 +818,7 @@ function _bindAppInteractions() {
             if (fb?.pauseSec) pauseSec = fb.pauseSec;
           }
           window.dispatchEvent(new CustomEvent('train:set-done', {
-            detail: { pauseSec, di },
+            detail: { pauseSec, di, key: `${di}-${ei}-${doneBtn.dataset.si}` },
           }));
         }
       });
@@ -863,6 +888,22 @@ export function mountTimer() {
 
   // 7. Wire direct interactions from #app clicks/inputs
   _bindAppInteractions();
+
+  // 7b. Runde 20 (Befund 4): B62 koppelte die SW-Registrierung (+ den
+  // Erstlade-Hinweis-Toast) bewusst an die erste ECHTE Trainingsaktion statt
+  // an den bloßen Seitenaufruf. Diagnose ergab eine Regression daraus: da
+  // _ensureSessionStart() den Trigger nur EINMAL PRO TAG feuert (Guard:
+  // `day.sessionStartTs` bereits gesetzt), bekam ein Nutzer, der die App nur
+  // öffnet ohne sofort zu trainieren (oder sie mehrfach am selben Tag neu
+  // öffnet), nie eine neue SW-Registrierung in diesem JS-Kontext -- und
+  // damit auch keinen updatefound-Listener, der ein zwischenzeitliches
+  // Deployment erkennen könnte (vor B62 lief das bei JEDEM Seitenaufruf).
+  // Fix: zusätzlich bei jedem App-Start ein Idle-verzögerter Trigger, NICHT
+  // mehr an einen Trainingsstart gekoppelt -- der bestehende { once: true }
+  // Listener in index.html verhindert weiterhin eine doppelte Registrierung,
+  // falls _ensureSessionStart() im selben Seitenaufruf zusätzlich feuert.
+  const _idleCb = window.requestIdleCallback || (cb => setTimeout(cb, 1500));
+  _idleCb(() => window.dispatchEvent(new CustomEvent('train:sw-register-trigger')));
 
   // 8. Return control API for tests / external use
   return {

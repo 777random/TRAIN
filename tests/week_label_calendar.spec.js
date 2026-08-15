@@ -105,6 +105,47 @@ test('Diese Woche im Header, auch wenn curIdx auf eine im Voraus erstellte Zukun
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
 });
 
+// Runde 20 (Befund 8): Toast bei Wochenwechsel, damit ein versehentlicher
+// Swipe nicht wie Datenverlust wirkt (der Wochen-Indikator im Header ist
+// nicht sticky und beim Scrollen zur Satz-Eingabe oft außer Sicht).
+test('Toast zeigt das neue Wochenlabel bei Prev/Next-Navigation', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', err => pageErrors.push(err.message));
+  await page.clock.install({ time: FIXED_NOW });
+  await page.goto('/');
+  await page.waitForSelector('#app.is-ready', { timeout: 10000 });
+
+  const thisWeek = makeWeek(1, isoMondayOffset(0), { markedDone: true });
+  const lastWeek  = makeWeek(2, isoMondayOffset(-1), { markedDone: true });
+  await seedWeeks(page, [lastWeek, thisWeek], 1);
+
+  await page.click('[data-action="nav-prev"]');
+  await expect(page.locator('.toast.is-visible')).toContainText('Letzte Woche');
+
+  await page.click('[data-action="nav-next"]');
+  await expect(page.locator('.toast.is-visible')).toContainText('Diese Woche');
+
+  expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
+});
+
+test('Kein Toast wenn WEEK_NAVIGATE am Rand nichts bewirkt (bereits älteste/neueste Woche)', async ({ page }) => {
+  await page.clock.install({ time: FIXED_NOW });
+  await page.goto('/');
+  await page.waitForSelector('#app.is-ready', { timeout: 10000 });
+
+  const onlyWeek = makeWeek(1, isoMondayOffset(0));
+  await seedWeeks(page, [onlyWeek], 0);
+
+  // Der Button ist an dieser Grenze bereits disabled (reguläre UI kann den
+  // No-op-Pfad gar nicht erreichen) -- { force: true } testet trotzdem
+  // gezielt den defensiven Bounds-Check in WEEK_NAVIGATE (state.js) +
+  // _navigateWeekWithToast()s before/after-Vergleich (ui.js).
+  await expect(page.locator('[data-action="nav-prev"]')).toBeDisabled();
+  await page.click('[data-action="nav-prev"]', { force: true });
+  await page.waitForTimeout(200);
+  await expect(page.locator('.toast.is-visible')).toHaveCount(0);
+});
+
 test('Letzte Woche + "Vor N Wochen" fuer 2-8 Wochen zurueck', async ({ page }) => {
   await page.clock.install({ time: FIXED_NOW });
   await page.goto('/');
