@@ -301,6 +301,23 @@ Kernproblem ("Fläche fühlt sich wertlos an") ohne Datenverlust löst.
 nicht überzeugt — dann wäre Option (B) erneut zu prüfen, diesmal mit vollem
 Bewusstsein über den Feature-Verlust.
 
+### 2026-08-16 — "Automatische Satz-Bewertung" (autoEval) Default AUS → AN (Runde 22, B260)
+**Entscheidung:** Der Blur-basierte Auto-Eval-Pfad (Satz wird beim Verlassen
+des Wdh-Feldes automatisch bewertet, ohne expliziten Bestätigen-Klick) ist
+jetzt Opt-out (Default AN) statt Opt-in (Default AUS). Manuelles Bestätigen
+bleibt über den Settings-Schalter weiterhin verfügbar.
+**Begründung:** Der Nutzer empfand das manuelle Bestätigen jedes einzelnen
+Satzes im Solotest als unnötige Reibung im eigentlichen Trainingsfluss. Im
+selben Sprint wurde zudem ein Bug behoben (B249), durch den der Auto-Eval-
+Pfad den Pausentimer nie startete — der Pfad war also bisher sowohl selten
+aktiv (Opt-in) als auch unvollständig funktionsfähig, sobald er es war.
+**Gilt:** Bis neues Nutzerfeedback das Gegenteil nahelegt. Präzedenzfall
+liegt AUF DER GEGENSEITE der Runde-21-Pause-Tipp-Entscheidung
+(showPauseTips, Default AUS/Opt-in) — Abgrenzung: dort ist der Inhalt ein
+aktiver Lesetext während der PAUSE (bewusst freizuhaltender Moment), hier
+ist es reine Automatisierung eines ohnehin nötigen Bestätigungsschritts
+WÄHREND des Satzes, keine zusätzliche Aufmerksamkeitsanforderung.
+
 ---
 
 ## SICHERHEIT

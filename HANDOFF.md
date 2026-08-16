@@ -1,5 +1,33 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-08-15 — Runde 21 (train-v246→v247, B245): Kurzartikel-
+*Letzte Aktualisierung: 2026-08-16 — Runde 22 (train-v247→v248, B246-B265):
+Solotest-Feedback-Sammelrunde. Nutzer testete die App eigenständig anhand der
+`TRAIN-Solotest-Checkliste.md` und trug ~40 Rohpunkte (Bugs, UX-Fragen,
+Produktfragen) direkt in die Checkliste ein; 7 parallele Diagnose-Agenten
+clusterten die Punkte (A: Onboarding/Startwerte-Woche, B: Session-Coach/Pause-
+Timer, C: Bodyweight-RPE, D: Heute-anders, E: Fortschritt/Wochenrückblick,
+F: Settings/Sonstiges, G: PWA/Kategorie-Anzeige). 20 Fixes umgesetzt (B246-B265,
+siehe BUGS.md für Details je Eintrag). Wichtigste architektonische Erkenntnis:
+die synthetische Startwerte-Woche (`ONBOARDING_SEED`/`isSeedWeek`) fehlte
+komplett in der Streak-/Wochennavigations-Ausschlussliste, was mehrere
+scheinbar unabhängige Nutzerbeschwerden erklärte (B246). Zweite größere
+Erkenntnis: der Auto-Eval-Blur-Pfad (Einstellung "Automatische Satz-
+Bewertung") feuerte nie das `train:set-done`-Event aus Runde 20/B242, wodurch
+der Pausentimer für automatisch bewertete Sätze nie startete (B249) — dieser
+Default wurde in derselben Runde zusätzlich von AUS auf AN gedreht (B260,
+Produktentscheidung: manuelles Bestätigen jedes Satzes wurde im Solotest als
+Reibung empfunden). Neue `defaultShowPlates()`-Ausschlussliste (movementMap.js)
+für stangenlose Übungen (B252). Zwei von Hand gebaute Backup-JSON-Fixtures
+(`Diagnose & Sprints/simtest-*.json`) für zwei nie im Solotest ausgelöste
+Features (Verletzungs-Erinnerung, Pre-Plateau-Rückfrage) zum manuellen
+Nachtesten. Volle Regressionssuite (97 Spec-Dateien, gebatcht wegen EMFILE)
+grün — 3 vorbestehende Tests an die bewusst geänderten Defaults/Dedupe
+angepasst (`migration_matrix.spec.js`, `session_coach_decision_matrix_v2.spec.js`,
+`weekreview_deload_pr_filter.spec.js`), 1 Flake in `share_image.spec.js`
+bestätigt unabhängig (isoliert grün). Bewusst zurückgestellt/nicht Teil dieser
+Runde: Superset-Feature-Konzept (nur als Vorschlag skizziert, nicht
+implementiert), Settings-Tab-Reorganisation, vollständiger Schlaf-Korrelation-
+Redesign (nur Fallback-Meldung ergänzt), Onboarding-Tutorial-Slideshow.
+Davor: Runde 21 (train-v246→v247, B245): Kurzartikel-
 Feature (Ersatz für die von Cowork/Nutzer abgelehnte In-App-Spiel-Idee aus Runde 20/
 Befund 9, siehe DECISIONS.md/TRAIN-Launch-Roadmap.md Phase H) — kurze, kategorie-
 gebundene Trainings-Tipps im Pause-Overlay (Push/Pull/Squat/Hinge/Carry/Core +

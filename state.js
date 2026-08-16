@@ -20,7 +20,7 @@
  * and console.warn for non-fatal errors.
  */
 
-import { buildCategoryMap, resolveCategory, resolveMuscleGroups } from './movementMap.js';
+import { buildCategoryMap, resolveCategory, resolveMuscleGroups, defaultShowPlates } from './movementMap.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -243,6 +243,12 @@ function buildDefaultState() {
       weeksSinceLastBackupReminder:   0,
       maxSessionMs:                   10800000, // 3h default
       autoStartPauseTimer:            true,
+      // Solotest-Feedback (2026-08-16): war zuvor NUR in migrate() (Fallback
+      // für Bestandsnutzer) gesetzt, in buildDefaultState() (neue Nutzer)
+      // dagegen komplett unerwähnt (effektiv undefined -> falsy -> aus).
+      // Default jetzt bewusst an (Opt-out statt Opt-in) -- siehe migrate()
+      // für die Begründung des Runde-2026-08-16-Defaultwechsels.
+      autoEval:                       true,
       hideStreakBadge:                false, // B60: Streak-Badge im Trainings-Tab optional ausblendbar
       hideStopwatch:                  false, // Runde 6/B4: Session-Stoppuhr in der Toolbar optional ausblendbar
       sessionCoach:                   true,  // B76: Pre-Session Check-in + Briefing
@@ -417,6 +423,13 @@ export function _dayEvalCounts(day) {
 }
 
 function _weekTrainingStatus(wk) {
+  // Solotest-Feedback (2026-08-16): ONBOARDING_SEED-Wochen (isSeedWeek) sind
+  // ein synthetischer PR-Kaltstart-Datenpunkt, keine echte Trainingswoche --
+  // zählten bisher fälschlich als 'completed' (Satz-Status success), was die
+  // Streak direkt nach dem Onboarding auf 1 sprang, obwohl noch nie trainiert
+  // wurde. 'attended' (wie Deload/Urlaub) verhält sich neutral: zählt nicht
+  // mit, bricht aber auch nichts.
+  if (wk.isSeedWeek) return 'attended';
   if (wk.mode === 'deload') return 'attended';
   if (wk.mode === 'vacation' || (wk.days.length > 0 && wk.days.every(d => d.isVacation))) return 'attended';
 
@@ -1011,7 +1024,12 @@ function migrate(raw) {
   if (raw.settings.soundEnabled                   === undefined) raw.settings.soundEnabled                   = false;
   if (raw.settings.showPauseTips                  === undefined) raw.settings.showPauseTips                  = false;
   if (raw.settings.rpeEnabled                     === undefined) raw.settings.rpeEnabled                     = true;
-  if (raw.settings.autoEval                       === undefined) raw.settings.autoEval                       = false;
+  // Solotest-Feedback (2026-08-16): Default false->true (Opt-out statt
+  // Opt-in) -- die manuelle Bestätigung jedes einzelnen Satzes wurde im
+  // Solotest als unnötige Reibung empfunden; automatische Bewertung bei
+  // Blur ist der erwartete Normalfall, manuelles Bestätigen bleibt über den
+  // Schalter weiterhin für Nutzer verfügbar, die es explizit wollen.
+  if (raw.settings.autoEval                       === undefined) raw.settings.autoEval                       = true;
   if (raw.settings.weeksSinceLastBackupReminder   === undefined) raw.settings.weeksSinceLastBackupReminder   = 0;
   if (raw.settings.maxSessionMs                   === undefined) raw.settings.maxSessionMs                   = 10800000;
   if (raw.settings.autoStartPauseTimer            === undefined) raw.settings.autoStartPauseTimer            = true;
@@ -1783,7 +1801,14 @@ function reduce(state, action) {
 
     // ── Navigation ───────────────────────────────────────────────────────────
     case A.WEEK_NAVIGATE: {
-      const next = state.curIdx + p.delta;
+      // Solotest-Feedback (2026-08-16): ONBOARDING_SEED-Wochen sind kein
+      // echtes Navigationsziel -- überspringen, sonst landet der Nutzer auf
+      // der synthetischen "Startwerte"-Woche und hält sie für eine reale
+      // Trainingswoche (Diagnose Cluster A, Punkt 6/7).
+      let next = state.curIdx + p.delta;
+      while (next >= 0 && next < state.weeks.length && state.weeks[next].isSeedWeek) {
+        next += p.delta;
+      }
       if (next >= 0 && next < state.weeks.length) state.curIdx = next;
       break;
     }
@@ -2268,6 +2293,11 @@ function reduce(state, action) {
         // history.tags-Wert (auch ein bewusst geleertes []) hat unten
         // weiterhin Vorrang, siehe AGENTS.md-Diskussion zu B41.
         tags: resolveMuscleGroups(p.name),
+        // Solotest-Feedback (2026-08-16): showPlates war hier bisher gar
+        // nicht gesetzt (immer undefined/aus) -- analog zu den bereits
+        // gefixten ONBOARDING_SEED- und _applyTpl()-Kopien (movementMap.js
+        // defaultShowPlates()) jetzt auch beim manuellen "+Übung" gesetzt.
+        showPlates: m === 'reps' && defaultShowPlates(p.name),
         sets: [mkSet(), mkSet(), mkSet()],
       };
       if (history) {
@@ -2436,6 +2466,17 @@ function reduce(state, action) {
     }
     case A.EX_SET_SUBSTITUTE: {
       const ex = _currentWeek()?.days[p.di]?.exercises[p.ei]; if (!ex) break;
+      // Solotest-Feedback (2026-08-16): der manuelle Reset ("Substitution
+      // zurücksetzen") setzte bisher nur substituteFor auf null, ließ aber
+      // ex.name auf dem Ersatznamen stehen -- die Originalübung kam nie
+      // zurück, UND der nächste Wochenklon (_resetExerciseSubstitution())
+      // fand `substituteFor` schon leer vor und übernahm den Ersatznamen
+      // fälschlich als "Original". Namen zuerst restaurieren, dann erst
+      // substituteFor löschen -- zentral hier statt nur im UI-Handler, damit
+      // jeder künftige Aufrufer mit substituteFor:null automatisch korrekt ist.
+      if (p.substituteFor == null && ex.substituteFor) {
+        ex.name = ex.substituteFor;
+      }
       ex.substituteFor = p.substituteFor ?? null;
       if (ex.substituteFor) {
         _recordSubstitution(STATE, ex.substituteFor, ex.name);
@@ -2622,9 +2663,16 @@ function reduce(state, action) {
     case A.SESSION_STOP: {
       const wk = _currentWeek(); if (!wk) break;
       if (!wk.sessionLog) wk.sessionLog = [];
+      // Solotest-Feedback (2026-08-16): defensive Deckelung gegen das
+      // Session-Timeout, zusätzlich zur bereits gedeckelten Anzeige in
+      // timer.js _updateClockDisplay() — verhindert, dass eine nie sauber
+      // beendete Session (App im Hintergrund vergessen, erst Stunden/Tage
+      // später manuell gestoppt) eine überzogene Dauer in den sessionLog
+      // schreibt und den Ø-Session-Wert im Fortschritt-Tab verzerrt.
+      const maxSec = Math.round((state.settings?.maxSessionMs ?? 10800000) / 1000);
       wk.sessionLog.push({
         date:     new Date().toISOString(),
-        duration: p.duration,
+        duration: Math.min(p.duration, maxSec),
         time:     p.time,
       });
       break;
@@ -2928,11 +2976,10 @@ function reduce(state, action) {
         weightStep: defaultWeightStepForExercise(sw.name, state.customExercises), nextWeekPlan: 0, nextWeekPlanConfirmed: false, nextWeekPlanAutoReviewed: true,
         skipReason: null, skipDate: null,
         targetReps: sw.reps ?? 5,
-        // Befund #3: Hantelscheiben-Rechner-Default an. Unconditional true
-        // hier korrekt (nicht nur "meist"), weil metric oben in diesem
-        // Reducer bereits hart auf 'reps' (Gewichts-Metrik) gesetzt ist —
-        // ONBOARDING_SEED erzeugt nie Distanz-/Zeit-Übungen.
-        _showCfg: false, setType: 'standard', tags: [], showPlates: true,
+        // Befund #3: Hantelscheiben-Rechner-Default an, außer bei bekannten
+        // stangenlosen Übungen (Solotest-Feedback 2026-08-16, siehe
+        // defaultShowPlates()/NO_BARBELL_EXERCISE_NAMES, movementMap.js).
+        _showCfg: false, setType: 'straight', tags: [], showPlates: defaultShowPlates(sw.name),
         progressionType: 'weight', substituteFor: null,
         progressionMode: 'weight_first', targetRepsMax: null, prRepsHistory: {},
       }));

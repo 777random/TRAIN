@@ -67,6 +67,30 @@ export async function registerServiceWorker() {
       });
     });
 
+    // Solotest-Feedback (2026-08-16): eine installierte PWA (Android WebAPK)
+    // führt beim Zurückkehren aus dem Hintergrund KEIN Neuladen von
+    // registerSW.js aus — mountTimer()/registerServiceWorker() läuft nur
+    // einmal beim ersten Start. Der Browser prüft zwar selbständig
+    // periodisch auf SW-Updates, aber ohne einen erneuten Check hier bleibt
+    // ein zwischenzeitlich fertig heruntergeladener, wartender Worker
+    // unentdeckt -- das Update-Banner erschien dadurch bei Resume-aus-
+    // Hintergrund nie, nur bei einem vollständigen Neuladen der Seite.
+    // visibilitychange (Tab-/App-Wechsel) + pageshow (bfcache-Restore)
+    // decken zusammen die relevanten Resume-Fälle ab. registration.update()
+    // stößt zusätzlich aktiv einen Update-Check an (kein automatischer
+    // Reload, nur Download+Installation im Hintergrund).
+    const _recheckForUpdate = () => {
+      if (document.visibilityState !== 'visible') return;
+      registration.update().catch(() => { /* Netzwerkfehler ignorieren, nächster Trigger versucht es erneut */ });
+      if (registration.waiting) {
+        window.dispatchEvent(new CustomEvent('train:sw-update-ready', {
+          detail: { registration },
+        }));
+      }
+    };
+    document.addEventListener('visibilitychange', _recheckForUpdate);
+    window.addEventListener('pageshow', _recheckForUpdate);
+
     console.info('[SW] Registered, scope:', registration.scope);
   } catch (err) {
     console.error('[SW] Registration failed:', err);

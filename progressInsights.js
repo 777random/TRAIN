@@ -32,23 +32,32 @@ function _weekdayName(wk, di) {
  */
 export function mostSuccessfulExercise(state, N = 8) {
   const sorted = _relevantWeeks(state).slice(-N);
-  const stats = new Map(); // name -> { success, total, weeks: Set<startDate> }
+  const stats = new Map(); // name -> { success, total, weeks: Set<startDate>, lastIdx }
 
-  for (const wk of sorted) {
+  sorted.forEach((wk, idx) => {
     for (const day of wk.days) {
       for (const ex of day.exercises) {
         if (ex.sets.length === 0) continue;
-        const e = stats.get(ex.name) ?? { success: 0, total: 0, weeks: new Set() };
+        const e = stats.get(ex.name) ?? { success: 0, total: 0, weeks: new Set(), lastIdx: -1 };
         for (const s of ex.sets) { e.total++; if (s.status === 'success') e.success++; }
         e.weeks.add(wk.startDate);
+        e.lastIdx = idx;
         stats.set(ex.name, e);
       }
     }
-  }
+  });
+
+  // Solotest-Feedback (2026-08-16): ohne Recency-Filter konnte eine längst
+  // ersetzte/nicht mehr trainierte Übung (starke Quote nur in den ersten
+  // Wochen des N-Fensters) als "erfolgreichste Übung" gewinnen, obwohl der
+  // Nutzer sie aktuell gar nicht mehr macht. Jetzt nur Übungen zulässig, die
+  // in einer der letzten 3 Wochen des Fensters (oder allen, falls N<3)
+  // tatsächlich trainiert wurden.
+  const recentThresholdIdx = sorted.length - Math.min(3, sorted.length);
 
   const entries = [...stats.entries()]
-    .map(([name, e]) => ({ name, rate: e.total > 0 ? e.success / e.total : 0, weeks: e.weeks.size, total: e.total }))
-    .filter(e => e.weeks >= 3 && e.total >= 6);
+    .map(([name, e]) => ({ name, rate: e.total > 0 ? e.success / e.total : 0, weeks: e.weeks.size, total: e.total, lastIdx: e.lastIdx }))
+    .filter(e => e.weeks >= 3 && e.total >= 6 && e.lastIdx >= recentThresholdIdx);
   if (entries.length === 0) return null;
 
   const avgAll = entries.reduce((s, e) => s + e.rate, 0) / entries.length;

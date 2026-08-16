@@ -55,11 +55,18 @@ test('Deload-Woche selbst zeigt keinen "Neuer PR", auch bei höherem Gewicht als
 
 test('Genuine Steigerung gg. Deload-Vorwoche zeigt keine "Stärkste Steigerung" (Kontrolle: Nicht-Deload-Vorwoche zeigt sie)', async ({ page }) => {
   await goto(page);
-  const weeksDeloadPrev = [mkWeek(1, '2026-06-01', 'deload', 60), mkWeek(2, '2026-06-08', 'standard', 80)];
-  const deloadPrevTypes = await reviewHighlights(page, weeksDeloadPrev, 1);
+  // Solotest-Feedback (2026-08-16, weekReview.js): "Stärkste Steigerung" wird
+  // jetzt unterdrückt, wenn sie dieselbe Übung wie "Neuer PR" beträfe (Dedupe
+  // gegen Redundanz). Mit nur EINER Übung über 2 Wochen träfen PR und Gain
+  // zwangsläufig dieselbe Übung -- eine vorgeschaltete, bereits höhere
+  // All-Time-Bestleistung (90kg) isoliert diesen Test bewusst von diesem
+  // Dedupe: _findPR() findet dadurch KEINEN neuen PR (80/80 < 90), nur
+  // _findBestGain() (reine Vorwochen-Differenz) bleibt betroffen.
+  const weeksDeloadPrev = [mkWeek(0, '2026-05-25', 'standard', 90), mkWeek(1, '2026-06-01', 'deload', 60), mkWeek(2, '2026-06-08', 'standard', 80)];
+  const deloadPrevTypes = await reviewHighlights(page, weeksDeloadPrev, 2);
   expect(deloadPrevTypes).not.toContain('gain');
 
-  const weeksControl = [mkWeek(1, '2026-06-01', 'standard', 60), mkWeek(2, '2026-06-08', 'standard', 80)];
-  const controlTypes = await reviewHighlights(page, weeksControl, 1);
+  const weeksControl = [mkWeek(0, '2026-05-25', 'standard', 90), mkWeek(1, '2026-06-01', 'standard', 60), mkWeek(2, '2026-06-08', 'standard', 80)];
+  const controlTypes = await reviewHighlights(page, weeksControl, 2);
   expect(controlTypes).toContain('gain');
 });

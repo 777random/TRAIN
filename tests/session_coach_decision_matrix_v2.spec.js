@@ -36,7 +36,11 @@ async function seed(page, { exercises, sessionModifier = null } = {}) {
     localStorage.setItem('train_v6', JSON.stringify({
       meta: { schemaVersion: 32, savedAt: Date.now(), createdAt: Date.now() },
       curIdx: 0, weeks: weeksArg,
-      customTemplate: [], settings: { sessionCoach: true, autoStartPauseTimer: false, rpeEnabled: true },
+      // autoEval: false explizit -- dieser Test prüft den manuellen
+      // toggle-done-Bestätigungspfad; seit dem Solotest-Feedback-Defaultwechsel
+      // (autoEval jetzt standardmäßig an) würde sonst bereits der Reps-Blur
+      // automatisch auswerten, bevor der Test-Klick auf toggle-done erfolgt.
+      customTemplate: [], settings: { sessionCoach: true, autoStartPauseTimer: false, rpeEnabled: true, autoEval: false },
       prs: {}, coachPerformance: { suggestions: [] }, coachQuestion: null, coachQuestionHistory: [],
       lastReentryHandled: null, plateauActions: {}, decisionLog: [], badges: [], onboardingDone: true,
       longestStreakEver: 0, favoriteExercises: [],

@@ -296,7 +296,8 @@ test('v33 (aktuell) mit Legacy-Restmuell: alle Always-apply-Defaults + Subtrakti
   const s = migrated.settings;
   expect(s.vibrationEnabled).toBe(true);
   expect(s.rpeEnabled).toBe(true);
-  expect(s.autoEval).toBe(false);
+  // Solotest-Feedback (2026-08-16): Default false->true (Opt-out statt Opt-in), siehe state.js migrate()-Kommentar.
+  expect(s.autoEval).toBe(true);
   expect(s.hideStopwatch).toBe(false);
   expect(s.largestPlate).toBe(25);
   expect(s.goal).toBeNull();

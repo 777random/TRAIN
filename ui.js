@@ -35,7 +35,7 @@ import { computeWeeklyFocus, computeStructuralSignals, isInRecoveryWindow, build
 import { findExactDuplicates, findSimilarCandidates } from './exerciseNameCleanup.js';
 import { computeErkenntnisLines, getProgressCorridorCalibration, computeStrengthGain } from './progressInsights.js';
 import { buildPrShareCanvas, shareCanvas } from './shareImage.js';
-import { buildCategoryMap, resolveCategory, isCompoundExercise, MOVEMENT_MAP, resolveMuscleGroups } from './movementMap.js';
+import { buildCategoryMap, resolveCategory, isCompoundExercise, MOVEMENT_MAP, resolveMuscleGroups, defaultShowPlates } from './movementMap.js';
 import { computeQualityTrend, computeConsistencyTrend, computeVolumeTrend, computeBreadthProgress } from './overallPerformance.js';
 import { weekSuccessCounts } from './setUtils.js';
 import { getSortedWeeks, exWeightHistory, exMetricHistory, detectRecurringStep } from './insightEngine.js';
@@ -107,6 +107,22 @@ let _confirmFlashKey = null;
 
 /** Key of the exercise with the open substitute-name form: `${di}-${ei}` or null. */
 let _subFormOpenKey = null;
+
+// Solotest-Feedback (2026-08-16): der Name im "Heute anders"-Suchfeld ging
+// bisher bei jedem Re-Render verloren (das Input-Feld war ungebunden, ohne
+// value-Attribut) -- jeder dispatch() (auch scheinbar unabhängige wie
+// CUSTOM_ALTERNATIVE_ADD) löst über _notify() einen vollständigen Re-Render
+// aus, der das Feld leer neu aufbaute. Modul-lokaler Entwurfswert schließt
+// die Lücke, ohne einen state.js-Feld dafür zu brauchen.
+let _subNameDraft = '';
+
+// Solotest-Feedback (2026-08-16): "Tag abschließen" saß unauffällig am Ende
+// der Tagesansicht und wurde beim Solotest übersehen, obwohl alle Sätze
+// längst erledigt waren. Set aus `${wk.id}-${di}`-Keys, für die der Button
+// bereits einmal automatisch ins Sichtfeld gescrollt wurde -- verhindert
+// wiederholtes Scrollen bei jedem Re-Render, solange der Tag im "bereit"-
+// Zustand verharrt (Nutzer hat evtl. bewusst noch nicht abgeschlossen).
+const _dayCompletePrompted = new Set();
 
 /**
  * ServiceWorkerRegistration of the currently waiting (new, installed but not
@@ -344,7 +360,7 @@ const _ONBOARDING_TEMPLATES = [
     weekTitle: 'Ganzkörper — Woche 1',
     days: [
       {
-        title: 'Tag A — Ganzkörper A',
+        title: 'Ganzkörper A',
         warmup:   '5 Min Gelenkmobilisation + leichte Aufwärmsätze (50% Gewicht)',
         cooldown: '5 Min statisches Dehnen: Brust, Rücken, Oberschenkel',
         exercises: [
@@ -356,7 +372,7 @@ const _ONBOARDING_TEMPLATES = [
         ],
       },
       {
-        title: 'Tag B — Ganzkörper B',
+        title: 'Ganzkörper B',
         warmup:   '5 Min Gelenkmobilisation + leichte Aufwärmsätze',
         cooldown: '5 Min statisches Dehnen',
         exercises: [
@@ -375,7 +391,7 @@ const _ONBOARDING_TEMPLATES = [
     weekTitle: 'Push Pull Legs — Woche 1',
     days: [
       {
-        title: 'Tag Push — Brust, Schultern, Trizeps',
+        title: 'Push',
         warmup:   '5 Min Schulter-Mobilisation + Aufwärmsätze Bankdrücken',
         cooldown: '5 Min Brust + Schultern dehnen',
         exercises: [
@@ -387,7 +403,7 @@ const _ONBOARDING_TEMPLATES = [
         ],
       },
       {
-        title: 'Tag Pull — Rücken, Bizeps',
+        title: 'Pull',
         warmup:   '5 Min Schulterblatt-Aktivierung + Aufwärmsätze Klimmzüge',
         cooldown: '5 Min Rücken + Bizeps dehnen',
         exercises: [
@@ -399,7 +415,7 @@ const _ONBOARDING_TEMPLATES = [
         ],
       },
       {
-        title: 'Tag Legs — Beine, Core',
+        title: 'Beine',
         warmup:   '5 Min Hüft-Mobilisation + Aufwärmsätze Kniebeuge',
         cooldown: '5 Min Beine + Hüfte dehnen',
         exercises: [
@@ -810,6 +826,13 @@ function _navigateWeekWithToast(delta) {
 function _initSwipe(container) {
   container.addEventListener('touchstart', e => {
     if (!getState().settings.swipe) return;
+    // Solotest-Feedback (2026-08-16): die breiten Balken im Bewegungsmuster-
+    // Chart (Fortschritt-Tab) laden dazu ein, mit dem Finger horizontal
+    // entlangzufahren, um den Wert zu lesen -- das löste ungewollt eine
+    // Wochennavigation aus. Swipe-Tracking startet für diese Karte gar nicht
+    // erst; andere chart-cards (ohne breite horizontale Balken) bleiben
+    // bewusst unberührt, sonst wäre Swipe-Nav im gesamten Fortschritt-Tab tot.
+    if (e.target.closest('.chart-card--movement-pattern')) return;
     const x = e.touches[0].clientX;
     // Ignore swipes starting within 20px of either edge (iOS back/forward gesture zone)
     if (x < 20 || x > window.innerWidth - 20) return;
@@ -909,10 +932,15 @@ function renderWeekHeader(state) {
       const kw       = _isoWeek(new Date(wk.startDate + 'T12:00:00'));
       const range    = _wkRangeFull(wk.startDate);
       const vacBadge = isVac ? ' <span class="wk-badge-vacation">🏖 Urlaub</span>' : '';
+      // Solotest-Feedback (2026-08-16): die synthetische Startwerte-Woche
+      // (ONBOARDING_SEED) wurde ohne Kennzeichnung angezeigt und für eine
+      // reale Trainingswoche gehalten (Diagnose Cluster A) — eigenes Badge,
+      // analog zum Urlaubs-Badge direkt darüber.
+      const seedBadge = wk.isSeedWeek ? ' <span class="wk-badge-vacation">📋 Startwerte</span>' : '';
       // Bei manuell umbenannter Woche hat der Nutzer-Name Vorrang vor der
       // relativen Bezeichnung — KW+Datum bleibt in beiden Fällen sekundär.
       const primary = wk.label ? h(wk.label) : _weekLabel(wk, state.weeks);
-      labelEl.innerHTML = `${primary}${vacBadge}`;
+      labelEl.innerHTML = `${primary}${vacBadge}${seedBadge}`;
       if (rangeEl) rangeEl.textContent = `KW ${String(kw).padStart(2,'0')} · ${range}`;
     } else {
       labelEl.textContent = '–';
@@ -947,6 +975,7 @@ function renderDayList(state) {
     _overviewMode = false;
     _cfgAdvOpen.clear();
     _subFormOpenKey = null;
+    _subNameDraft = '';
     _scrollToFirstPending(_activeDayIdx);
   }
   _lastRenderedCurIdx = state.curIdx;
@@ -1761,14 +1790,26 @@ function _renderSessionBriefing(di, day, wk, state) {
   // Sätze des Tages reduziert. Das localStorage-Flag verhindert weiterhin
   // doppeltes Auslösen durch denselben Button.
   const reduceFlagKey = `train_reduced_${wk.startDate}_${di}`;
+  // Solotest-Feedback (2026-08-16): die Empfehlung hatte bisher nur einen
+  // Bestätigen-Button -- wer nicht reduzieren wollte, hatte keine Möglichkeit,
+  // den Hinweis loszuwerden, außer ihn dauerhaft zu ignorieren. Eigener
+  // Dismiss-Flag (getrennt vom "tatsächlich angewendet"-Flag), damit ein
+  // abgelehnter Vorschlag ebenfalls verschwindet, ohne Gewichte anzufassen.
+  const reduceDismissKey = `train_reduce_dismissed_${wk.startDate}_${di}`;
   let reduceHtml = '';
   if (modifier === 'reduced' || modifier === 'reduced_mild') {
-    let alreadyReduced = false;
+    let alreadyReduced = false, dismissed = false;
     try { alreadyReduced = localStorage.getItem(reduceFlagKey) === 'true'; } catch (_) { /* best effort, kein Blockieren */ }
+    try { dismissed = localStorage.getItem(reduceDismissKey) === 'true'; } catch (_) { /* best effort, kein Blockieren */ }
     const reducePct = modifier === 'reduced_mild' ? 5 : 10;
-    reduceHtml = alreadyReduced
-      ? `<div class="session-briefing-card__reduce-done">✓ Gewichte angepasst</div>`
-      : `<button type="button" class="session-briefing-card__reduce-btn" data-action="reduce-today-weights" data-di="${di}">Empfehlung bestätigen: Gewichte heute anpassen (-${reducePct}%)</button>`;
+    if (alreadyReduced) {
+      reduceHtml = `<div class="session-briefing-card__reduce-done">✓ Gewichte angepasst</div>`;
+    } else if (!dismissed) {
+      reduceHtml = `<div class="session-briefing-card__reduce-row">
+        <button type="button" class="session-briefing-card__reduce-btn" data-action="reduce-today-weights" data-di="${di}">Empfehlung bestätigen: Gewichte heute anpassen (-${reducePct}%)</button>
+        <button type="button" class="session-briefing-card__reduce-dismiss" data-action="dismiss-reduce-suggestion" data-di="${di}" aria-label="Empfehlung ablehnen">Nein danke</button>
+      </div>`;
+    }
   }
 
   // B87 Fix 2: öffnet den Check-in erneut, vorausgefüllt mit den aktuellen
@@ -1795,6 +1836,23 @@ function renderDayBody(wk, di, state) {
   const done     = !!day.markedDone;
   const isVacDay = !!day.isVacation;
   const isDl     = wk.mode === 'deload';
+
+  // Solotest-Feedback (2026-08-16): "bereit zum Abschließen", sobald jede
+  // nicht-archivierte Übung nur noch bewertete (nicht mehr 'pending') Sätze
+  // hat — steuert sowohl den prominenteren Button-Stil unten als auch das
+  // einmalige Auto-Scroll direkt darunter.
+  const _relevantEx = (day.exercises ?? []).filter(ex => !ex.archived);
+  const _dayAllSetsEvaluated = !done && !isVacDay && !locked && _relevantEx.length > 0 &&
+    _relevantEx.every(ex => (ex.sets ?? []).every(s => s.status !== 'pending'));
+  if (_dayAllSetsEvaluated) {
+    const _promptKey = `${wk.id}-${di}`;
+    if (!_dayCompletePrompted.has(_promptKey)) {
+      _dayCompletePrompted.add(_promptKey);
+      requestAnimationFrame(() => {
+        document.getElementById(`complete-btn-${di}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+    }
+  }
 
   // Runde 16 (Phase-C-Cluster-2a): Titel/Subtitle-Header wiederhergestellt.
   // Seit B169 (Runde 6, train-v227) zeigte die offene Tagesansicht
@@ -1947,13 +2005,14 @@ function renderDayBody(wk, di, state) {
 
     <div class="day-actions">
       <button
-        class="complete-btn${done ? ' is-done' : ''}"
+        id="complete-btn-${di}"
+        class="complete-btn${done ? ' is-done' : ''}${_dayAllSetsEvaluated ? ' complete-btn--ready' : ''}"
         data-action="toggle-complete" data-di="${di}"
         aria-pressed="${done}"
         aria-label="${lockBtnLabel}"
       >
         ${lockBtnIcon}
-        ${done ? 'Gesperrt – Tippen zum Entsperren' : 'Abgeschlossen & sperren'}
+        ${done ? 'Gesperrt – Tippen zum Entsperren' : (_dayAllSetsEvaluated ? 'Alle Sätze erledigt — Tag abschließen' : 'Abgeschlossen & sperren')}
       </button>
     </div>
 
@@ -2110,7 +2169,13 @@ function renderExercise(wk, di, ei, state) {
   // eigenes Feld (ex.metricStep), da Gewicht und Distanz/Zeit nie gleichzeitig
   // relevant sind (nie beide gleichzeitig anzeigen, siehe cfgRow unten).
   const metricStepVal = ex.metricStep ?? (metric === 'm' ? 50 : metric === 'sec' ? 10 : 2.5);
-  const _exCatOverride = (state.customExercises ?? []).find(c => c.name === ex.name)?.category ?? '';
+  // Solotest-Feedback (2026-08-16): zeigte bisher NUR einen explizit
+  // gesetzten Override (state.customExercises) an -- Standardübungen, deren
+  // Kategorie ganz normal über resolveCategory()/MOVEMENT_MAP im Hintergrund
+  // für Analysen (Bewegungsmuster, Recommendation-Logik etc.) aufgelöst
+  // wird, zeigten hier immer "Keine", obwohl die Kategorisierung längst
+  // korrekt funktionierte. Jetzt derselbe Resolver wie überall sonst.
+  const _exCatOverride = resolveCategory(ex.name, buildCategoryMap(state.customExercises ?? []));
 
   // Vorschlag: Ø erfolgreiche Wiederholungen der gleichen Übung aus der Vorwoche
   let _suggestionHtml = '';
@@ -2221,6 +2286,7 @@ function renderExercise(wk, di, ei, state) {
       placeholder="z.B. Klimmzüge …"
       data-di="${di}" data-ei="${ei}"
       autocomplete="off"
+      value="${h(_subNameDraft)}"
       autofocus
     />
     <datalist id="sub-list-${di}-${ei}">
@@ -2319,6 +2385,35 @@ function renderExercise(wk, di, ei, state) {
           >Satz ↑</button>
         </div>
       </div>` : ''}
+      <!-- Solotest-Feedback (2026-08-16): Schrittweite war zuvor unten im
+           kollabierten "Erweitert"-Panel versteckt, obwohl sie inhaltlich
+           direkt zur Steigerungsart darüber gehört -- jetzt direkt daneben. -->
+      ${!locked && metric === 'reps' ? `
+      <div class="weight-plan-row" role="group" aria-label="Steigerungsrate">
+        <span class="pause-row__label">Schrittweite:</span>
+        <div class="weight-step-opts">
+          ${[0, 1.25, 2, 2.5, 5, 7.5, 10].map(s => `
+            <button
+              class="weight-step-btn${step === s ? ' is-selected' : ''}"
+              data-action="set-step" data-di="${di}" data-ei="${ei}" data-step="${s}"
+              aria-pressed="${step === s}"
+            >${s === 0 ? 'Reset' : s}</button>`).join('')}
+        </div>
+        ${_stepSuggestionHtml}
+      </div>` : ''}
+      ${!locked && metric !== 'reps' ? `
+      <div class="weight-plan-row" role="group" aria-label="Steigerungsrate">
+        <span class="pause-row__label">Schrittweite:</span>
+        <div class="weight-step-opts">
+          ${(metric === 'm' ? [0, 10, 25, 50, 100, 200] : [0, 5, 10, 15, 30, 60]).map(s => `
+            <button
+              class="weight-step-btn${metricStepVal === s ? ' is-selected' : ''}"
+              data-action="set-metric-step" data-di="${di}" data-ei="${ei}" data-step="${s}"
+              aria-pressed="${metricStepVal === s}"
+            >${s === 0 ? 'Reset' : s}</button>`).join('')}
+        </div>
+        ${_stepSuggestionHtml}
+      </div>` : ''}
       ${!locked ? `
       <div class="weight-plan-row" role="group" aria-label="Progressions-Modus">
         <span class="pause-row__label">Progressions-Modus:</span>
@@ -2397,32 +2492,6 @@ function renderExercise(wk, di, ei, state) {
             data-action="toggle-superset" data-di="${di}" data-ei="${ei}"
             aria-pressed="${!!ex.supersetId}"
           >${ex.supersetId ? 'An (SS)' : 'Aus'}</button>
-        </div>` : ''}
-        ${!locked && metric === 'reps' ? `
-        <div class="weight-plan-row" role="group" aria-label="Steigerungsrate">
-          <span class="pause-row__label">Schrittweite:</span>
-          <div class="weight-step-opts">
-            ${[0, 1.25, 2, 2.5, 5, 7.5, 10].map(s => `
-              <button
-                class="weight-step-btn${step === s ? ' is-selected' : ''}"
-                data-action="set-step" data-di="${di}" data-ei="${ei}" data-step="${s}"
-                aria-pressed="${step === s}"
-              >${s === 0 ? 'Reset' : s}</button>`).join('')}
-          </div>
-          ${_stepSuggestionHtml}
-        </div>` : ''}
-        ${!locked && metric !== 'reps' ? `
-        <div class="weight-plan-row" role="group" aria-label="Steigerungsrate">
-          <span class="pause-row__label">Schrittweite:</span>
-          <div class="weight-step-opts">
-            ${(metric === 'm' ? [0, 10, 25, 50, 100, 200] : [0, 5, 10, 15, 30, 60]).map(s => `
-              <button
-                class="weight-step-btn${metricStepVal === s ? ' is-selected' : ''}"
-                data-action="set-metric-step" data-di="${di}" data-ei="${ei}" data-step="${s}"
-                aria-pressed="${metricStepVal === s}"
-              >${s === 0 ? 'Reset' : s}</button>`).join('')}
-          </div>
-          ${_stepSuggestionHtml}
         </div>` : ''}
         ${(state.customExercises ?? []).some(c => c.name === ex.name && c.metric != null) ? `
         <button type="button" class="btn btn--ghost btn--sm" data-action="edit-custom-ex" data-di="${di}" data-ei="${ei}" style="margin-top:var(--sp-2)">
@@ -2712,9 +2781,16 @@ function _renderIntraFeedback(fb, key, di, ei, si, mode, canAdopt) {
     <div class="set-feedback__line">→ ${h(fb.hint)}</div>
   </div>`
     : '';
+  // Solotest-Feedback (2026-08-16): bei Körpergewichts-Übungen (repsAdjust
+  // gesetzt, siehe sessionCoach.js buildSetFeedback()) wäre "Nächster Satz:
+  // 0kg" irreführend — es gibt kein Zusatzgewicht, das reduziert werden
+  // könnte. Zeigt stattdessen die vorgeschlagene Ziel-Wdh-Senkung.
+  const primaryLine = fb.repsAdjust != null
+    ? `→ Nächstes Ziel: ${Math.max(1, fb.targetReps + fb.repsAdjust)} ${fb.unit}`
+    : `→ Nächster Satz: ${fb.nextWeight}kg`;
   return `
 <div class="set-feedback" data-di="${di}" data-ei="${ei}" data-si="${si}">
-  <span class="set-feedback__line set-feedback__line--primary">→ Nächster Satz: ${fb.nextWeight}kg</span>
+  <span class="set-feedback__line set-feedback__line--primary">${primaryLine}</span>
   <span class="set-feedback__line set-feedback__line--sub">${h(fb.hint)}${fb.pauseSec ? ` · Pause: ${_fmtPause(fb.pauseSec)}` : ''}${confirmHtml}${whyToggleHtml}</span>${adoptActionsHtml}${whyBodyHtml}
 </div>`;
 }
@@ -3400,7 +3476,24 @@ function renderBodyTab(state) {
   // kein Datenverlust für diese Nutzergruppe).
   const sleepQualityCorr = calcSleepCorrelation(getSortedWeeks(state));
   let sleepQualityInsightHtml = '';
-  if (sleepQualityCorr.hasSig && sleepQualityCorr.totalDaysWithSleep >= 6) {
+  // Solotest-Feedback (2026-08-16): bei durchgehend gutem Schlaf blieb der
+  // "poor/medium"-Bucket leer (poorAvg === null) — die Karte verschwand dann
+  // trotz ausreichend Check-in-Daten komplett, ohne Erklärung. Jetzt bei
+  // genug Gesamtdaten, aber fehlender Schwankung, eine erklärende
+  // Fallback-Meldung statt stillem Verschwinden.
+  if (sleepQualityCorr.totalDaysWithSleep >= 6 && (sleepQualityCorr.poorAvg == null || sleepQualityCorr.goodAvg == null)) {
+    sleepQualityInsightHtml = `
+      <div style="margin-top:var(--sp-3)">
+        <button class="insight-toggle${_showSleepQualityInsight ? ' is-active' : ''}"
+          data-action="toggle-sleep-quality-insight"
+          aria-pressed="${_showSleepQualityInsight}"
+          style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--c-text-3);background:none;border:none;cursor:pointer;padding:0"
+        >
+          ${ic.lightbulb()} Schlaf & Erfolgsquote
+        </button>
+        ${_showSleepQualityInsight ? `<div class="insight-card" style="margin-top:var(--sp-2)">${ic.lightbulb()}<span>Noch nicht genug Schwankung in deiner Schlafqualität für eine Aussage — deine Check-ins zeigen bisher (fast) durchgehend dieselbe Kategorie.</span></div>` : ''}
+      </div>`;
+  } else if (sleepQualityCorr.hasSig && sleepQualityCorr.totalDaysWithSleep >= 6) {
     const qMsg = `An Tagen nach besserem Schlaf lag deine Satz-Erfolgsquote im Schnitt ${sleepQualityCorr.diff} Prozentpunkte höher (${sleepQualityCorr.goodAvg}% vs. ${sleepQualityCorr.poorAvg}%).`;
     sleepQualityInsightHtml = `
       <div style="margin-top:var(--sp-3)">
@@ -3577,7 +3670,7 @@ function _renderMovementPattern(state) {
     ratioHtml = `<p class="erkenntnis-line" style="margin-top:var(--sp-3)">${h(ratioText)}</p>`;
   }
 
-  return `<div class="chart-card">
+  return `<div class="chart-card chart-card--movement-pattern">
     <div class="chart-card__title">Bewegungsmuster</div>
     <p style="font-size:11px;color:var(--c-text-3);margin-bottom:var(--sp-3)">Letzte 4 Wochen (ohne Deload)</p>
     ${chartHtml}
@@ -6871,11 +6964,13 @@ function _handleClick(e) {
     case 'open-sub-form':
       _maybeShowTip('tip-11', 'Ersetzt diese Übung nur für heute. Nächste Woche kehrt TRAIN automatisch zur Originalübung zurück.');
       _subFormOpenKey = `${di}-${ei}`;
+      _subNameDraft = '';
       scheduleRender();
       break;
 
     case 'close-sub-form':
       _subFormOpenKey = null;
+      _subNameDraft = '';
       scheduleRender();
       break;
 
@@ -6887,6 +6982,7 @@ function _handleClick(e) {
       dispatch(A.EX_UPDATE, { di: +di, ei: +ei, field: 'name', value: _subName });
       dispatch(A.EX_SET_SUBSTITUTE, { di: +di, ei: +ei, substituteFor: _origName });
       _subFormOpenKey = null;
+      _subNameDraft = '';
       break;
     }
 
@@ -6904,6 +7000,7 @@ function _handleClick(e) {
       dispatch(A.EX_UPDATE, { di: +di, ei: +ei, field: 'name', value: suggested });
       dispatch(A.EX_SET_SUBSTITUTE, { di: +di, ei: +ei, substituteFor: original });
       _subFormOpenKey = null;
+      _subNameDraft = '';
       break;
     }
 
@@ -6916,6 +7013,7 @@ function _handleClick(e) {
       dispatch(A.EX_UPDATE, { di: +di, ei: +ei, field: 'name', value: suggested });
       dispatch(A.EX_SET_SUBSTITUTE, { di: +di, ei: +ei, substituteFor: original });
       _subFormOpenKey = null;
+      _subNameDraft = '';
       break;
     }
 
@@ -7738,6 +7836,15 @@ function _handleClick(e) {
       scheduleRender();
       break;
     }
+
+    case 'dismiss-reduce-suggestion': {
+      const _rdDi = +di;
+      const _rdWk = getState().weeks[getState().curIdx];
+      if (!_rdWk) break;
+      try { localStorage.setItem(`train_reduce_dismissed_${_rdWk.startDate}_${_rdDi}`, 'true'); } catch (_) { /* best effort, kein Blockieren */ }
+      scheduleRender();
+      break;
+    }
     case 'toggle-session-briefing': {
       const _bDi = +di;
       const _bWk = getState().weeks[getState().curIdx];
@@ -8049,6 +8156,7 @@ function _handleInput(e) {
   // Eingabe — direkter Klassen-Toggle statt scheduleRender()/dispatch()
   // (gleiches Muster wie oben, verhindert den Tastatur-Bug).
   if (e.target.matches?.('.sub-name-input')) {
+    _subNameDraft = e.target.value;
     const { di, ei } = e.target.dataset;
     const btn = document.querySelector(`.save-alt-btn[data-di="${di}"][data-ei="${ei}"]`);
     if (!btn) return;
@@ -8077,15 +8185,36 @@ function _handleBlur(e) {
     dispatch(A.AUTO_EVAL_SET, { di: _di, ei: _ei, si: _si, reps });
     // RPE-Nudge nach erfolgreicher Auto-Bewertung (identisch zu confirm-set)
     const aft    = getState();
-    const aftSet = aft.weeks[aft.curIdx]?.days[_di]?.exercises[_ei]?.sets[_si];
+    const aftEx  = aft.weeks[aft.curIdx]?.days[_di]?.exercises[_ei];
+    const aftSet = aftEx?.sets[_si];
     if (aftSet?.status === 'success' && aft.settings?.rpeEnabled !== false && aftSet.rpe == null) {
       clearTimeout(_rpeNudgeTimer);
       _rpeNudgeKey   = `${_di}-${_ei}-${_si}`;
-      const _aeExName = aft.weeks[aft.curIdx]?.days[_di]?.exercises[_ei]?.name;
+      const _aeExName = aftEx?.name;
       _rpeNudgeVariant = _aeExName ? _decideRpeNudgeVariant(_aeExName, aft) : 'plain';
       if (_rpeNudgeVariant === 'favorite') _markFavNudgeShown(_aeExName);
       scheduleRender();
       _rpeNudgeTimer = setTimeout(() => { _rpeNudgeKey = null; _rpeNudgeTimer = null; _rpeNudgeVariant = 'plain'; scheduleRender(); }, 4000);
+    }
+    // Solotest-Feedback (2026-08-16): dieser Pfad ("Automatische Satz-
+    // Bewertung", Blur-Auslösung) feuerte bisher NIE train:set-done — der
+    // Pausentimer startete/aktualisierte sich hier nie, und _pauseSetKey
+    // (Runde 20/B242) blieb auf einem alten Satz stehen, was die vom Nutzer
+    // gemeldeten, scheinbar widersprüchlichen RPE-Timer-Bugs erklärte.
+    // Identische Logik wie im confirm-set-Handler (ui.js, `case 'confirm-set'`).
+    const isLastSet = _si === (aftEx?.sets?.length ?? 0) - 1;
+    if (aftSet && !isLastSet && aft.settings?.autoStartPauseTimer) {
+      let _feedbackPauseSec = null;
+      if (!aftEx.pauseSecManual) {
+        const _fbWk  = aft.weeks[aft.curIdx];
+        const _fbDay = _fbWk?.days[_di];
+        if (_fbDay && aft.settings?.sessionCoach !== false && !_fbDay.isVacation && _isTodayDay(_fbWk, _di)) {
+          const _fbIsCompound = isCompoundExercise(aftEx.name, buildCategoryMap(aft.customExercises));
+          const _fb = buildSetFeedback(aftSet, aftEx, _fbDay.sessionModifier ?? null, _si, aft.settings?.goal ?? null, _fbIsCompound, _fbDay.sessionModifierScope ?? 'all', getEffectiveWeightStep(aftEx, aft.settings, aft.customExercises));
+          if (_fb?.pauseSec) _feedbackPauseSec = _fb.pauseSec;
+        }
+      }
+      window.dispatchEvent(new CustomEvent('train:set-done', { detail: { pauseSec: _feedbackPauseSec ?? (aftEx.pauseSec ?? 90), di: _di, key: `${_di}-${_ei}-${_si}` } }));
     }
   }, 0);
 }
@@ -8100,8 +8229,16 @@ function _handleKeydown(e) {
     if (inp.classList.contains('sub-name-input')) {
       const name = inp.value.trim();
       if (name) {
-        dispatch(A.EX_SET_SUBSTITUTE, { di: +inp.dataset.di, ei: +inp.dataset.ei, substituteFor: name });
+        // Solotest-Feedback (2026-08-16): dispatchte bisher substituteFor mit
+        // dem NEUEN Namen statt dem Original (vertauscht) und ohne den
+        // EX_UPDATE, der die Übung überhaupt erst umbenennt -- Enter im Feld
+        // benannte die Übung dadurch nie um, sondern setzte nur einen falschen
+        // substituteFor-Wert. Identisch zu 'confirm-sub' (oben, _handleClick).
+        const _origName = getState().weeks[getState().curIdx]?.days[+inp.dataset.di]?.exercises[+inp.dataset.ei]?.name;
+        dispatch(A.EX_UPDATE, { di: +inp.dataset.di, ei: +inp.dataset.ei, field: 'name', value: name });
+        dispatch(A.EX_SET_SUBSTITUTE, { di: +inp.dataset.di, ei: +inp.dataset.ei, substituteFor: _origName });
         _subFormOpenKey = null;
+        _subNameDraft = '';
       } else {
         inp.focus();
       }
@@ -9372,7 +9509,7 @@ function _buildSessionSummaryData(di) {
       nextWeekWeight = rec?.recommendedWeight ?? null;
     }
   }
-  const nextPreview = buildNextSessionPreview(day, state.customExercises, nextWeekWeight);
+  const nextPreview = buildNextSessionPreview(focusEx, nextWeekWeight);
 
   // Schlaf-Korrelation: einmalig, nur wenn genug Historie + nachweisbar.
   let sleepInsight = null;
@@ -10007,7 +10144,7 @@ function _showOnboarding() {
     'top:0!important',
     'left:0!important',
     'width:100vw!important',
-    'height:100vh!important',
+    'height:100dvh!important',
     'z-index:9999!important',
     'background:#0d0d0d!important',
     'display:flex!important',
@@ -10015,6 +10152,8 @@ function _showOnboarding() {
     'align-items:center!important',
     'justify-content:center!important',
     'overflow-y:auto!important',
+    '-webkit-overflow-scrolling:touch!important',
+    'overscroll-behavior:none!important',
   ].join(';');
   document.body.appendChild(el);
 
@@ -10036,7 +10175,10 @@ function _showOnboarding() {
         <div class="ob-screen">
           <div style="font-size:48px;line-height:1">💾</div>
           <h2 class="ob-title ob-title--sm">Deine Daten bleiben bei dir</h2>
-          <p class="ob-sub">TRAIN speichert alles ausschließlich auf diesem Gerät (Sätze, Gewichte, Schlaf, Energie) — kein Konto, kein Server, kein Login.</p>
+          <ul class="ob-privacy-list">
+            <li>📱 Alles bleibt <strong>nur auf diesem Gerät</strong> (Sätze, Gewichte, Schlaf, Energie)</li>
+            <li>🚫 Kein Konto, kein Server, kein Login</li>
+          </ul>
           <div class="ob-backup-warn">
             💡 Weil alles nur lokal liegt, geht es beim Löschen des Browser-
             Caches oder einem Geräte-Reset verloren — TRAIN hat keine Kopie.
@@ -10096,9 +10238,14 @@ function _showOnboarding() {
         </div>
       </div>`).join('');
 
-    // Exercises for the selected template (reps-metric only, max 5)
+    // Exercises for the selected template (reps-metric only, 1 pro Tag).
+    // Solotest-Feedback (2026-08-16): vorher slice(0,5) über ALLE Tage
+    // hinweg -- bei Vorlagen mit vielen Übungen an Tag A kamen Tag B/C nie in
+    // die Startwerte-Abfrage. 1 Übung pro Tag deckt stattdessen jeden Tag ab.
     const tplExercises = _selTpl !== null
-      ? _ONBOARDING_TEMPLATES[_selTpl].days.flatMap(d => d.exercises).filter(ex => ex.m === 'reps').slice(0, 5)
+      ? _ONBOARDING_TEMPLATES[_selTpl].days
+          .map(d => d.exercises.find(ex => ex.m === 'reps'))
+          .filter(Boolean)
       : [];
 
     const startwerteHtml = tplExercises.length > 0 ? `
@@ -10125,7 +10272,6 @@ function _showOnboarding() {
       <div class="ob-screen">
         <h2 class="ob-title ob-title--sm">Womit möchtest du starten?</h2>
         <div class="ob-tpl-list">${cards}</div>
-        <button class="btn btn--accent ob-btn" data-ob="load"${_selTpl === null ? ' disabled' : ''}>Vorlage laden →</button>
         <details class="ob-optional">
           <summary class="ob-optional__summary">Optional: Vorlage anpassen ▾</summary>
           <div class="ob-optional__body">
@@ -10148,6 +10294,7 @@ function _showOnboarding() {
           </div>
         </details>
         ${startwerteHtml}
+        <button class="btn btn--accent ob-btn" data-ob="load"${_selTpl === null ? ' disabled' : ''}>Vorlage laden →</button>
         <button class="btn btn--ghost ob-btn ob-btn--sm" data-ob="skip">Ohne Vorlage starten</button>
       </div>`;
 
@@ -10308,12 +10455,18 @@ function _showOnboarding() {
           weightStep: defaultWeightStepForExercise(ex.name, getState().customExercises), nextWeekPlan: 0, nextWeekPlanConfirmed: false,
           metricStep: ex.m === 'm' ? 50 : ex.m === 'sec' ? 10 : undefined,
           targetReps: tr,
-          _showCfg: false, setType: 'standard',
+          // Solotest-Feedback (2026-08-16): setType 'standard' ist kein
+          // gültiger Wert (überall sonst 'straight' als Default gelesen, s.
+          // ex.setType ?? 'straight') -- die Übungseinstellungen zeigten hier
+          // dadurch nie den korrekt vorselektierten Satztyp-Button.
+          _showCfg: false, setType: 'straight',
           // Befund #3: Hantelscheiben-Rechner-Default an — NUR für
           // Gewichts-Übungen (ex.m === 'reps'/undefined), nicht für
-          // Distanz-/Zeit-Übungen ('m'/'sec'), analog zur progressionType-
-          // Weiche direkt darunter.
-          tags: resolveMuscleGroups(ex.name), showPlates: (ex.m ?? 'reps') === 'reps',
+          // Distanz-/Zeit-Übungen ('m'/'sec'), UND nicht für stangenlose
+          // Übungen (defaultShowPlates(), movementMap.js — Solotest-Feedback
+          // 2026-08-16, analog zur bereits gefixten ONBOARDING_SEED-Kopie in
+          // state.js), analog zur progressionType-Weiche direkt darunter.
+          tags: resolveMuscleGroups(ex.name), showPlates: (ex.m ?? 'reps') === 'reps' && defaultShowPlates(ex.name),
           progressionType: (ex.m ?? 'reps') === 'reps' ? 'weight' : 'reps',
           substituteFor: null,
           progressionMode: 'weight_first', targetRepsMax: null, prRepsHistory: {},

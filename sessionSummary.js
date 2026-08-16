@@ -5,15 +5,14 @@
  * Trainingstages (Highlights, Text-Einordnung, Vorschau, Schlaf-Korrelation).
  * Importiert insightEngine.js (getSortedWeeks/exWeightHistory, bereits
  * etablierte Quelle für Wochen-Zeitreihen, z.B. weekReviewModal.js) und
- * setUtils.js (isFullSuccess) sowie movementMap.js (Kategorie-Lookup für
- * die Fokus-Übung der nächsten Session — dupliziert bewusst denselben,
- * kleinen Kategorie-Filter wie ui.js' B77-Helper statt ui.js zu importieren,
- * gleiches Muster wie weeklyFocus.js' inline Push/Pull-Duplikation).
+ * setUtils.js (isFullSuccess). Die Fokus-Übung für buildNextSessionPreview()
+ * wird seit dem Solotest-Feedback (2026-08-16) vom Aufrufer (ui.js) übergeben
+ * statt hier erneut (und leicht abweichend) hergeleitet — kein eigener
+ * movementMap.js-Import mehr nötig.
  */
 
 import { exWeightHistory } from './insightEngine.js';
 import { isFullSuccess } from './setUtils.js';
-import { buildCategoryMap, resolveCategory } from './movementMap.js';
 
 const RPE_WARN_THRESHOLD = 8.5;
 
@@ -162,30 +161,23 @@ export function buildSessionEinordnung(day, sortedWeeks, curWeekIdx) {
   return 'Training abgeschlossen.';
 }
 
-/** Duplikat des Kategorie-Filters aus ui.js' _findFirstCompoundExercise
- *  (B77) — bewusst hier erneut, kein ui.js-Import (siehe Datei-Kommentar). */
-function _findFirstCompoundExercise(day, customExercises) {
-  const catMap = buildCategoryMap(customExercises ?? []);
-  for (const ex of day.exercises ?? []) {
-    if (ex.archived) continue;
-    if ((ex.metric ?? 'reps') !== 'reps') continue;
-    const cat = resolveCategory(ex.name, catMap);
-    if (cat === 'Squat' || cat === 'Hinge' || cat === 'Push' || cat === 'Pull') return ex;
-  }
-  return null;
-}
-
 /**
  * "Nächstes Training: [Name] → [Gewicht]kg" für die erste Compound-Übung
- * des Tages. `nextWeekWeight` kommt vom Aufrufer (ui.js, via
- * getWeightRecommendation() — echte "nächste Woche"-Projektion, der
- * einzige legitime Gebrauch dieser Funktion, siehe DECISIONS.md).
+ * des Tages. `focusEx` UND `nextWeekWeight` kommen beide vom Aufrufer
+ * (ui.js, via getWeightRecommendation() — echte "nächste Woche"-Projektion,
+ * der einzige legitime Gebrauch dieser Funktion, siehe DECISIONS.md).
+ * Solotest-Feedback (2026-08-16): vorher leitete diese Funktion die
+ * Fokus-Übung über ein eigenes (leicht abweichendes) Kategorie-Duplikat
+ * erneut her, statt die von ui.js für nextWeekWeight bereits ermittelte
+ * focusEx zu übernehmen -- bei einer heute substituierten Übung konnte das
+ * einen ANDEREN Namen anzeigen als das Gewicht, zu dem es berechnet wurde
+ * (ui.js löst die Kategorie über ex.substituteFor ?? ex.name auf, das
+ * Duplikat hier nur über ex.name). Jetzt ein einziger Ermittlungsort.
  * Null wenn keine Compound-Übung im Tag oder keine Empfehlung vorliegt.
  */
-export function buildNextSessionPreview(day, customExercises, nextWeekWeight) {
-  const ex = _findFirstCompoundExercise(day, customExercises);
-  if (!ex || nextWeekWeight == null) return null;
-  return `Nächstes Training: ${ex.name} → ${nextWeekWeight}kg`;
+export function buildNextSessionPreview(focusEx, nextWeekWeight) {
+  if (!focusEx || nextWeekWeight == null) return null;
+  return `Nächstes Training: ${focusEx.name} → ${nextWeekWeight}kg`;
 }
 
 /**

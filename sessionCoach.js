@@ -131,7 +131,11 @@ export function _pauseSecForRpe(rpe, goal, isCompound) {
  *   (ex.weightStep ?? settings.plateStep ?? Kategorie-Default) — vom Aufrufer
  *   bestimmt, damit sessionCoach.js importfrei bleibt (gleiches Muster wie
  *   isCompound oben). Fällt ohne Angabe auf das alte ex.weightStep||2.5 zurück.
- * @returns {{ nextWeight: number, pauseSec: number|null, hint: string|null, repDiff: number|null, rpe: number|null, rpeZone: string|null, reps: number, targetReps: number, unit: string } | null}
+ * @returns {{ nextWeight: number, pauseSec: number|null, hint: string|null, repDiff: number|null, rpe: number|null, rpeZone: string|null, reps: number, targetReps: number, unit: string, repsAdjust: number|null } | null}
+ *   repsAdjust (Solotest-Feedback 2026-08-16): nur bei Körpergewichts-Sätzen
+ *   (currentWeight === 0) gesetzt, wenn RPE eine Reduktion nahelegen würde --
+ *   negative Ziel-Wdh-Anpassung (-1/-2) statt eines sinnlosen negativen
+ *   Gewichtswerts (siehe Kommentar im Funktionskörper).
  */
 export function buildSetFeedback(s, ex, sessionModifier, si, goal = null, isCompound = true, modifierScope = 'all', effectiveStep = null) {
   if (!s || (s.status !== 'success' && s.status !== 'fail')) return null;
@@ -149,8 +153,13 @@ export function buildSetFeedback(s, ex, sessionModifier, si, goal = null, isComp
   // keine RPE-Bänder, gegen die repDiff sinnvoll kombiniert werden könnte.
   if (rpe == null) {
     let nextWeight = s.status === 'success' ? currentWeight : currentWeight - step;
+    // Solotest-Feedback (2026-08-16): ohne RPE kein Hinweistext/repsAdjust
+    // möglich (keine Schwere-Einschätzung), aber ein negatives Gewicht bei
+    // Körpergewichts-Übungen (currentWeight 0) ist so oder so sinnlos --
+    // bei einem fehlgeschlagenen Satz bleibt es hier einfach bei 0.
+    if (currentWeight === 0 && nextWeight < 0) nextWeight = 0;
     nextWeight = _applyModifier(nextWeight, currentWeight, sessionModifier, step, modifierScope, isCompound);
-    return { nextWeight: _round(nextWeight, step), pauseSec: null, hint: null, repDiff: null, rpe: null, rpeZone: null, reps, targetReps, unit };
+    return { nextWeight: _round(nextWeight, step), pauseSec: null, hint: null, repDiff: null, rpe: null, rpeZone: null, reps, targetReps, unit, repsAdjust: null };
   }
 
   const repDiff = targetReps - reps; // positiv = Wdh verfehlt, 0 = erreicht, negativ = übertroffen
@@ -208,12 +217,31 @@ export function buildSetFeedback(s, ex, sessionModifier, si, goal = null, isComp
   }
 
   const rpeZone = rpe <= 6 ? 'leicht' : rpe < RPE_SET_HARD_ZONE ? 'optimal' : 'hart';
+
+  // Solotest-Feedback (2026-08-16): bei Körpergewichts-Übungen (currentWeight
+  // === 0, z.B. Klimmzüge ohne Zusatzgewicht) schlugen die obigen Zweige bei
+  // hohem RPE ein Gewicht UNTER 0 vor ("-2.5kg") -- sinnlos, da hier gar kein
+  // Zusatzgewicht existiert, das man reduzieren könnte. Der eigentlich
+  // verfügbare Hebel ist die Ziel-Wiederholungszahl. Statt eines negativen
+  // Gewichts bleibt nextWeight bei 0 und repsAdjust schlägt eine Wdh-Senkung
+  // vor (Aufrufer/UI entscheidet, ob/wie das angezeigt wird).
+  let repsAdjust = null;
+  const isBodyweight = currentWeight === 0;
+  if (isBodyweight && nextWeight < currentWeight) {
+    const severe = nextWeight <= currentWeight - step * 2;
+    repsAdjust = severe ? -2 : -1;
+    nextWeight = 0;
+    hint = severe
+      ? `Sehr hart (RPE ${rpe}) — Ziel-${unit} um 2 senken statt Gewicht (Körpergewichtsübung)`
+      : `Hart (RPE ${rpe}) — Ziel-${unit} um 1 senken statt Gewicht (Körpergewichtsübung)`;
+  }
+
   nextWeight = _applyModifier(nextWeight, currentWeight, sessionModifier, step, modifierScope, isCompound);
   // Runde 19/Cluster 2: eine bewusst manuell gesetzte Pausenzeit (ex.pauseSecManual)
   // overrult die dynamische RPE-/Trend-basierte Empfehlung -- Gewichts-
   // vorschlag/Hint bleiben unverändert dynamisch, nur die Pausendauer wird fix.
   if (ex.pauseSecManual && ex.pauseSec) pauseSec = ex.pauseSec;
-  return { nextWeight: _round(nextWeight, step), pauseSec, hint, repDiff, rpe, rpeZone, reps, targetReps, unit };
+  return { nextWeight: _round(nextWeight, step), pauseSec, hint, repDiff, rpe, rpeZone, reps, targetReps, unit, repsAdjust };
 }
 
 /**

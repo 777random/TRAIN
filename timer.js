@@ -186,7 +186,12 @@ function _ensureSessionStart(di) {
 function _stopSession() {
   const day = _getActiveDay();
   if (!day?.sessionStartTs || day.sessionEndTs) return;
-  const duration = Math.round((Date.now() - day.sessionStartTs) / 1000);
+  // Solotest-Feedback (2026-08-16): analog zur bereits gedeckelten
+  // Live-Anzeige (_updateClockDisplay() unten) -- vorher wurde hier die
+  // ungedeckelte Wanduhr-Differenz persistiert, eine nie sauber beendete
+  // Session konnte den Ø-Session-Wert im Fortschritt-Tab massiv verzerren.
+  const maxMs    = getState().settings?.maxSessionMs ?? 10800000;
+  const duration = Math.min(Math.round((Date.now() - day.sessionStartTs) / 1000), Math.round(maxMs / 1000));
   const time     = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
   dispatch(A.SESSION_STOP, { duration, time });
   if (_sessInterval) { clearInterval(_sessInterval); _sessInterval = null; }

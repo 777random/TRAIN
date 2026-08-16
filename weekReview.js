@@ -317,16 +317,23 @@ export function buildWeekReview(week, allWeeks, favoriteExercises = []) {
   // ist in einer Deload-Woche absichtlich reduziert, kein echter PR/Fortschritt).
   const highlights  = [];
   const prevWeeks   = weekIdx > 0 ? sorted.slice(0, weekIdx).filter(w => w.mode !== 'deload') : [];
+  let prH = null;
   if (!isDeload) {
-    const prH = _findPR(week, prevWeeks);
+    prH = _findPR(week, prevWeeks);
     if (prH) highlights.push(prH);
   }
+  // Solotest-Feedback (2026-08-16): "Stärkste Steigerung" zeigte oft dieselbe
+  // Übung wie "Neuer PR" nochmal an (beides aus demselben Max-Gewicht
+  // abgeleitet) -- reine Redundanz ohne neue Info. Übersprungen, wenn beide
+  // Highlights dieselbe Übung meinen (Option A der Diagnose).
   if (!isDeload && prevWeek && prevWeek.mode !== 'deload') {
     const gainH = _findBestGain(week, prevWeek);
-    if (gainH && highlights.length < 3) highlights.push(gainH);
+    if (gainH && gainH.exName !== prH?.exName && highlights.length < 3) highlights.push(gainH);
   }
-  if (streak >= 2 && highlights.length < 3)
-    highlights.push({ type: 'streak', label: 'Konsistenz', text: `${streak} Wochen in Folge` });
+  // Solotest-Feedback (2026-08-16): "Konsistenz" (Streak) entfernt — der
+  // Streak ist bereits dauerhaft sichtbar (Fortschritt-Tab), Wiederholung
+  // hier bot laut Nutzer-Feedback keinen Mehrwert ("hat für den Athleten
+  // keinen Mehrwert").
 
   // ── Lowlights ─────────────────────────────────────────────────────────────────
   const lowlights = [];

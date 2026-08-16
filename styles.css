@@ -515,11 +515,22 @@ button, input, select, textarea { font: inherit; }
 
 /* B87 Fix 3: Reduzierungs-Button -- dämpfende Aktion, bewusst NICHT
    --c-accent (das ist für positive/bestätigende Aktionen reserviert). */
+.session-briefing-card__reduce-row {
+  display: flex; gap: var(--sp-2); margin-top: var(--sp-2); align-items: stretch;
+}
 .session-briefing-card__reduce-btn {
-  display: block; width: 100%; margin-top: var(--sp-2);
+  display: block; flex: 1; margin-top: 0;
   min-height: var(--touch); padding: var(--sp-2) var(--sp-3);
   background: var(--c-surface2); border: 1px solid var(--c-text);
   border-radius: var(--r-md); color: var(--c-text); font-size: 12px;
+}
+/* Solotest-Feedback (2026-08-16): explizite Ablehnen-Option neben dem
+   Bestätigen-Button — bewusst unauffälliger (schmaler, gedämpfter) als
+   dieser, da Bestätigen die häufigere/empfohlene Aktion bleibt. */
+.session-briefing-card__reduce-dismiss {
+  flex-shrink: 0; margin-top: 0; min-height: var(--touch); padding: var(--sp-2) var(--sp-3);
+  background: none; border: 1px solid var(--c-border);
+  border-radius: var(--r-md); color: var(--c-text-3); font-size: 12px;
 }
 .session-briefing-card__reduce-done {
   margin-top: var(--sp-2); font-size: 12px; color: var(--c-text-2);
@@ -530,7 +541,7 @@ button, input, select, textarea { font: inherit; }
   color: var(--c-text-2); opacity: .7; font-size: 11px; min-height: var(--touch);
   padding: var(--sp-1) 0; text-align: left;
 }
-.session-briefing-card.is-collapsed .session-briefing-card__reduce-btn,
+.session-briefing-card.is-collapsed .session-briefing-card__reduce-row,
 .session-briefing-card.is-collapsed .session-briefing-card__reduce-done,
 .session-briefing-card.is-collapsed .session-briefing-card__edit-link { display: none; }
 
@@ -1346,6 +1357,17 @@ exercise { position: unset; }
 .complete-btn svg { width: 18px; height: 18px; }
 .complete-btn:hover { border-color: var(--c-ok); color: var(--c-ok); }
 .complete-btn.is-done { background: var(--c-ok); border-color: var(--c-ok); color: #000; }
+/* Solotest-Feedback (2026-08-16): auffälliger Hinweisstil, sobald alle Sätze
+   des Tages bewertet sind — der Button wurde zuvor trotz erledigtem
+   Training als unauffälliger Standard-Button übersehen. */
+.complete-btn--ready {
+  border-color: var(--c-ok); color: var(--c-ok);
+  animation: complete-btn-ready-pulse 1.8s ease-in-out infinite;
+}
+@keyframes complete-btn-ready-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(0, 230, 118, .35); }
+  50%      { box-shadow: 0 0 0 6px rgba(0, 230, 118, 0); }
+}
 
 .day-actions {
   display: flex; gap: var(--sp-2); align-items: stretch;
@@ -2681,6 +2703,17 @@ details[open] > .deload-details__summary::before { content: '▾ '; }
   font-size: 14px; color: var(--c-text-2);
   text-align: center; line-height: 1.6;
   margin: 0; max-width: 320px;
+}
+/* Solotest-Feedback (2026-08-16): ersetzt den vorherigen Fließtext-Satz auf
+   dem Datenschutz-Screen — als kurze, scannbare Liste statt eines Satzes
+   leichter auf einen Blick erfassbar. */
+.ob-privacy-list {
+  list-style: none; margin: 0; padding: 0; max-width: 320px;
+  display: flex; flex-direction: column; gap: var(--sp-2);
+  text-align: left;
+}
+.ob-privacy-list li {
+  font-size: 14px; color: var(--c-text-2); line-height: 1.5;
 }
 .ob-backup-warn {
   background: var(--c-surface2); border: 1px solid var(--c-border);

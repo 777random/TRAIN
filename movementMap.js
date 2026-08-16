@@ -185,6 +185,25 @@ const ISOLATION_EXERCISE_NAMES = new Set([
 ]);
 
 /**
+ * Solotest-Feedback (2026-08-16): Übungen ohne Stange/Hantelscheiben, deren
+ * "Zusatzgewicht" (falls vorhanden) über Gewichtsgurt/Kurzhantel/Weste läuft
+ * — der Hantelscheiben-Rechner (showPlates-Default) ergibt hier keinen Sinn.
+ * Bewusst als eigene Liste (nicht ISOLATION_EXERCISE_NAMES wiederverwendet),
+ * da die beiden Kategorisierungen unabhängig sind (z.B. Klimmzüge sind
+ * Compound, aber trotzdem stangenlos).
+ */
+const NO_BARBELL_EXERCISE_NAMES = new Set([
+  'Klimmzüge', 'Pull Up', 'Pull Ups', 'Pull-Up', 'Pull-Ups', 'Chin Up', 'Chin Ups',
+  'Dips', 'Bench Dips', 'Trizepsdips', 'Liegestütz', 'Push Up', 'Push Ups',
+  'Planks', 'Plank',
+]);
+
+/** Ob für diese Übung standardmäßig der Hantelscheiben-Rechner sinnvoll ist (Solotest-Feedback 2026-08-16). */
+export function defaultShowPlates(name) {
+  return !NO_BARBELL_EXERCISE_NAMES.has(name);
+}
+
+/**
  * Compound (mehrgelenkig) vs. Isolation (eingelenkig) für die Pausenzeiten-
  * Empfehlung (Sprint C1). Prüft zuerst die explizite Isolationsliste oben,
  * fällt sonst auf die Bewegungskategorie zurück: Core/Carry = Isolation,
