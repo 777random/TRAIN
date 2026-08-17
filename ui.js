@@ -1593,7 +1593,10 @@ function _findRecentInjurySkipExercise(di) {
   const state = getState();
   const wk = state.weeks[state.curIdx]; if (!wk) return null;
   const day = wk.days[di]; if (!day) return null;
-  const names = new Set((day.exercises ?? []).map(ex => ex.name));
+  // Nutzer-Feedback (2026-08-17, Coach-Tab-Audit): enthält zusätzlich
+  // substituteFor -- siehe identischer Kommentar in weeklyFocus.js'
+  // _checkInjuryReminder() (dieselbe 14-Tage-Logik, hier gespiegelt).
+  const names = new Set((day.exercises ?? []).flatMap(ex => ex.substituteFor ? [ex.name, ex.substituteFor] : [ex.name]));
   if (!names.size) return null;
 
   const lookbackWeeks = state.weeks
@@ -3714,8 +3717,14 @@ function _noAnalysisDataHtml() {
 }
 
 function _hasAnyTrainingData(state) {
+  // Nutzer-Feedback (2026-08-17, Coach-Tab-Audit): isSeedWeek ausgeschlossen
+  // -- die Startwerte-Woche hat immer genau 1 bewerteten ('success') Satz
+  // pro Übung (state.js ONBOARDING_SEED). Ein Nutzer, der nur die optionale
+  // Startwerte-Abfrage im Onboarding ausgefüllt, aber noch KEIN einziges
+  // Training abgeschlossen hat, bekam dadurch verfrüht die volle Coach-
+  // Karte statt der "Datenbasis wird aufgebaut"-Leerdarstellung.
   return state.weeks.some(w =>
-    w.days.some(d => d.exercises.some(ex => ex.sets.some(s => s.status === 'success' || s.status === 'fail')))
+    !w.isSeedWeek && w.days.some(d => d.exercises.some(ex => ex.sets.some(s => s.status === 'success' || s.status === 'fail')))
   );
 }
 
@@ -3903,7 +3912,19 @@ function _checkDecisionOutcomes(state) {
   if (!pending.length) return;
 
   const currentStatus = computeWeeklyFocus(state).status;
-  const sorted = [...state.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
+  // Nutzer-Feedback (2026-08-17, Coach-Tab-Audit): isSeedWeek- und
+  // deload/vacation-Ausschluss ergänzt -- die zwei Blöcke direkt darunter in
+  // DERSELBEN Funktion (_sortedNonSeed/_cqNonSeed) filtern isSeedWeek
+  // bereits korrekt, dieser hier (successRateBefore/successRateAfter für
+  // DECISION_LOG_OUTCOME) tat es bisher nicht. Eine Seed-Woche (immer 100%
+  // Erfolgsquote) oder Deload-Woche (typischerweise künstlich hohe Quote
+  // durch reduziertes Gewicht) hätte successRateBefore/After verzerren und
+  // damit die "hat Weitertrainieren funktioniert?"-Schlussfolgerung kippen
+  // können -- analog zum bereits etablierten Deload-Ausschluss-Muster in
+  // weekReview.js (PR-/Steigerungs-Vergleich, "Runde 9/Cluster 2").
+  const sorted = [...state.weeks]
+    .filter(w => !w.isSeedWeek && w.mode !== 'deload' && w.mode !== 'vacation')
+    .sort((a, b) => a.startDate.localeCompare(b.startDate));
 
   const _d = new Date();
   const _dow = _d.getDay();
@@ -4129,8 +4150,12 @@ function _buildCoachQuestionCard(state, focus) {
     if (!exName) return '';
     const action = (state.plateauActions ?? {})[exName];
     if (action?.action !== 'implemented') return '';
-    const sinceMs = new Date(action.since + 'T00:00:00').getTime();
-    const curMs   = curWkStart ? new Date(curWkStart + 'T00:00:00').getTime() : 0;
+    // Nutzer-Feedback (2026-08-17, Coach-Tab-Audit): T12:00:00 statt
+    // T00:00:00 -- der im Projekt sonst etablierte Mittags-Anker (B195/
+    // Runde 10) verhindert einen möglichen ±1-Tag-Drift bei einer DST-
+    // Umstellung zwischen `since` und `curWkStart`.
+    const sinceMs = new Date(action.since + 'T12:00:00').getTime();
+    const curMs   = curWkStart ? new Date(curWkStart + 'T12:00:00').getTime() : 0;
     if (curMs - sinceMs < 7 * 86_400_000) return '';
     qid = 'plateau_outcome';
     questionText = `Hat die Strategie bei ${h(exName)} geholfen?`;
@@ -4155,7 +4180,8 @@ function _buildCoachQuestionCard(state, focus) {
       data-action="coach-answer"
       data-qid="${h(qid)}"
       data-week="${h(curWkStart ?? '')}"
-      data-answer="${h(o.answer)}">${h(o.label)}</button>`
+      data-answer="${h(o.answer)}"
+      data-exname="${h(focus.exerciseName ?? '')}">${h(o.label)}</button>`
   ).join('');
 
   return `
@@ -4426,7 +4452,13 @@ function _erkenntnisseHorizontLabel(N) {
 }
 
 function _overallPerformanceParagraphs(state, N = 8) {
-  const sortedWeeks = [...state.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
+  // Nutzer-Feedback (2026-08-17, Coach-Tab-Audit): isSeedWeek ausgeschlossen
+  // -- scoredWeeks sind bereits vorverdichtete {succ,fail,total,pct}-Objekte
+  // (nicht die Wochenobjekte selbst), computeQualityTrend() kann intern also
+  // gar nicht mehr nach isSeedWeek filtern. Der Ausschluss muss daher hier
+  // an der Quelle passieren, sonst hebt die künstlich perfekte Startwerte-
+  // Woche die "Erfolgsquote"-Trendberechnung an.
+  const sortedWeeks = [...state.weeks].filter(w => !w.isSeedWeek).sort((a, b) => a.startDate.localeCompare(b.startDate));
   const scoredWeeks = sortedWeeks.map(w => _weekSuccessScore(w));
 
   const quality     = computeQualityTrend(scoredWeeks, N);
@@ -6402,9 +6434,10 @@ function _handleClick(e) {
     // Navigieren auf eine andere Woche zeigen).
     case 'coach-answer': {
       dispatch(A.COACH_ANSWER, {
-        weekStart:  el.dataset.week,
-        questionId: el.dataset.qid,
-        answer:     el.dataset.answer,
+        weekStart:    el.dataset.week,
+        questionId:   el.dataset.qid,
+        answer:       el.dataset.answer,
+        exerciseName: el.dataset.exname || null,
       });
       showToast('Antwort gespeichert', 'ok');
       break;

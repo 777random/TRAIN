@@ -43,7 +43,11 @@ function _dayISODate(wk, dayIdx) {
  * Array-Index (für die Datumsberechnung) bleibt dabei erhalten.
  */
 export function _weekConsistencyRatio(wk) {
-  const todayISO = new Date().toISOString().slice(0, 10);
+  // Nutzer-Feedback (2026-08-17, Coach-Tab-Audit): 'YYYY-MM-DD' aus LOKALEN
+  // Datumskomponenten statt .toISOString() (UTC) -- dasselbe, im Projekt
+  // bereits mehrfach gefixte Antimuster (siehe weekReview.js _localISODate()).
+  const _now = new Date();
+  const todayISO = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`;
   const due = wk.days
     .map((day, di) => ({ day, di }))
     .filter(({ day }) => isTrainingDay(day))
@@ -70,8 +74,18 @@ export function _weekConsistencyRatio(wk) {
 }
 
 export function _consistencyEligibleWeeks(state) {
+  // Nutzer-Feedback (2026-08-17, Coach-Tab-Audit): isSeedWeek-Ausschluss
+  // ergänzt -- getSortedWeeks() (insightEngine.js) selbst schließt die
+  // synthetische Startwerte-Woche bewusst NICHT aus (sie wird an anderer
+  // Stelle als PR-/Gewichts-Kaltstart-Baseline gebraucht), hier aber nötig:
+  // die Seed-Woche hat immer genau 1 Tag mit vollständig bewerteten Sätzen
+  // -> _weekConsistencyRatio() liefert dafür 100%, was den berechneten
+  // Konsistenz-Durchschnitt bei wenig echter Historie künstlich anhebt
+  // (_checkConsistencyGap()/computeConsistencyTrend()). Bewusst NUR hier
+  // gefixt, nicht zentral in getSortedWeeks() (siehe B267-Kommentar dort),
+  // um die legitime Baseline-Verwendung an anderen Stellen nicht zu brechen.
   return getSortedWeeks(state)
-    .filter(w => w.mode !== 'deload')
+    .filter(w => w.mode !== 'deload' && !w.isSeedWeek)
     .map(wk => ({ wk, ratio: _weekConsistencyRatio(wk) }))
     .filter(r => r.ratio !== null);
 }

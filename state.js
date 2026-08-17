@@ -1558,7 +1558,7 @@ export const A = Object.freeze({
   // Decision log (Sprint: Abwägungs-Entscheidungen)
   DECISION_LOG_ADD:         'DECISION_LOG_ADD',         // { type, signal, choice: 'stay'|'change', decidedWeekStart }
   DECISION_LOG_OUTCOME:     'DECISION_LOG_OUTCOME',     // { id, outcome: { measuredWeekStart, signalPersisted, successRateBefore, successRateAfter } }
-  COACH_ANSWER:             'COACH_ANSWER',             // { weekStart, questionId, answer }
+  COACH_ANSWER:             'COACH_ANSWER',             // { weekStart, questionId, answer, exerciseName? }
   ONBOARDING_SEED:          'ONBOARDING_SEED',          // { startDate, exercises: [{ name, weight, reps?, rpe? }] }
   COACH_PERF_LOG:           'COACH_PERF_LOG',           // { weekStart, status, exerciseName, suggestedDelta, fromWeight, confidenceLevel }
   COACH_PERF_MEASURE:       'COACH_PERF_MEASURE',       // { id, followed, outcome, measuredWeekStart }
@@ -3027,10 +3027,18 @@ function reduce(state, action) {
       break;
     }
     case A.COACH_ANSWER: {
+      // Nutzer-Feedback (2026-08-17, Coach-Tab-Audit): exerciseName ergänzt --
+      // ohne dieses Feld matchte _checkPrePlateau() (weeklyFocus.js) eine
+      // gespeicherte Antwort nur über weekStart+questionId, nicht über die
+      // konkrete Übung. Erfüllten in derselben Woche zwei unterschiedliche
+      // Übungen unabhängig voneinander die Pre-Plateau-Bedingung, konnte die
+      // Antwort des Nutzers (bezogen auf Übung A) fälschlich auf Übung B
+      // angewendet werden.
       state.coachQuestion = {
         weekStart:         p.weekStart,
         questionId:        p.questionId,
         answer:            p.answer,
+        exerciseName:      p.exerciseName ?? null,
         outcome:           null,
         measuredWeekStart: null,
       };
@@ -3045,6 +3053,7 @@ function reduce(state, action) {
         weekStart:         state.coachQuestion.weekStart,
         questionId:        state.coachQuestion.questionId,
         answer:            state.coachQuestion.answer,
+        exerciseName:      state.coachQuestion.exerciseName ?? null,
         outcome:           p.outcome,
         measuredWeekStart: p.measuredWeekStart,
       });

@@ -62,14 +62,19 @@ test('Seed-Woche (100% künstliche Erfolgsquote) täuscht keinen Erfolgsquote-R�
   await page.waitForSelector('#app.is-ready', { timeout: 10000 });
 
   const seedWeek = mkWeek(0, isoWeeksAgo(10), [mkDay(1, [mkExRate('Kniebeuge', 1, 1)])], true);
-  // "prev"-Fenster (Wochen -8..-3): 75% Erfolgsquote.
+  // "prev"-Fenster (Wochen -8..-3): 75% Erfolgsquote. Alle 6 Wochen (prev +
+  // last3) bewusst lückenlos aufeinanderfolgend (isoWeeksAgo(9-n) für
+  // n=1..6 -> 8,7,6,5,4,3 Wochen her) -- eine Kalenderlücke zwischen den
+  // Fenstern würde sonst durch die (separat getestete) Kontinuitätsprüfung
+  // in _checkDroppingCompletion() abgefangen und hier fälschlich als
+  // "Seed-Woche korrekt ausgeschlossen" statt als "Lücke erkannt" durchgehen.
   const prevWeeks = [1, 2, 3].map(n =>
     mkWeek(n, isoWeeksAgo(9 - n), [mkDay(10 + n, [mkExRate('Kniebeuge', 15, 20)])])
   );
   // "last3"-Fenster (aktuellste 3 Wochen): 70% -- nur 5 Prozentpunkte Rückgang,
   // UNTER der 10-Prozentpunkte-Schwelle für ein echtes Signal.
   const last3Weeks = [4, 5, 6].map(n =>
-    mkWeek(n, isoWeeksAgo(6 - n), [mkDay(20 + n, [mkExRate('Kniebeuge', 14, 20)])])
+    mkWeek(n, isoWeeksAgo(9 - n), [mkDay(20 + n, [mkExRate('Kniebeuge', 14, 20)])])
   );
 
   const weeks = [seedWeek, ...prevWeeks, ...last3Weeks];
@@ -89,12 +94,13 @@ test('Kontrolle: derselbe echte 15-Prozentpunkte-Rückgang OHNE Seed-Woche löst
 
   // Gleiches Muster, aber ohne Seed-Woche und mit einem echten, deutlichen
   // Rückgang (85% -> 65%, 20 Prozentpunkte) -- Kontrolltest, dass das Signal
-  // bei einem tatsächlichen Rückgang weiterhin sauber feuert.
+  // bei einem tatsächlichen Rückgang weiterhin sauber feuert. Alle 6 Wochen
+  // bewusst lückenlos aufeinanderfolgend (siehe Kommentar im ersten Test oben).
   const prevWeeks = [1, 2, 3].map(n =>
     mkWeek(n, isoWeeksAgo(9 - n), [mkDay(10 + n, [mkExRate('Kniebeuge', 17, 20)])])
   );
   const last3Weeks = [4, 5, 6].map(n =>
-    mkWeek(n, isoWeeksAgo(6 - n), [mkDay(20 + n, [mkExRate('Kniebeuge', 13, 20)])])
+    mkWeek(n, isoWeeksAgo(9 - n), [mkDay(20 + n, [mkExRate('Kniebeuge', 13, 20)])])
   );
 
   const weeks = [...prevWeeks, ...last3Weeks];

@@ -76,11 +76,45 @@ function _nonDeloadWeeks(state) {
   return _sortedWeeks(state).filter(w => w.mode !== 'deload' && w.mode !== 'vacation');
 }
 
+// Nutzer-Feedback (2026-08-17): zählte bisher ALLE Sätze im Nenner, auch
+// noch nicht bewertete ('pending') -- die kanonische Quelle im Projekt
+// (setUtils.js weekSuccessCounts()) zählt success/(success+fail), pending
+// UND archivierte Übungen ausgeschlossen. Da _checkDroppingCompletion()
+// (unten) praktisch immer die aktuell laufende, nur teilweise trainierte
+// Woche mit einbezieht, drückten deren offene 'pending'-Sätze die
+// berechnete Quote künstlich nach unten -- ein systematischer
+// Falsch-Positiv-Bias für "Erfolgsquote gesunken", der vermutlich die
+// Hauptursache des gemeldeten Symptoms war (unabhängig vom bereits
+// gefixten Seed-Wochen-Bug, B267). Jetzt identische Formel wie
+// weekSuccessCounts(), nur als 0-1-Verhältnis statt gerundetem Prozentwert
+// (die beiden Aufrufer unten vergleichen direkt als Fließkommazahl).
+// Nutzer-Feedback (2026-08-17, Coach-Tab-Audit, Verdachtsfall): .slice(-3)
+// nimmt "die letzten 3 EINTRÄGE der Liste", unabhängig davon ob dazwischen
+// eine große Kalenderlücke liegt -- state.weeks enthält nur tatsächlich
+// angelegte Wochen, keinen Eintrag pro realer Kalenderwoche. Nach einer
+// langen Trainingspause (außerhalb des 7-Tage-Reentry-Fensters,
+// REENTRY_WINDOW_DAYS oben) könnten sonst Wochen verglichen werden, die
+// real Monate auseinanderliegen, als wären es 3 aufeinanderfolgende
+// Wochen. Grobe Toleranz (21 Tage statt exakt 7), damit eine gelegentlich
+// ausgelassene einzelne Woche nicht überreagiert.
+const MAX_REALISTIC_WEEK_GAP_DAYS = 21;
+function _hasRealisticWeeklySpacing(weeks) {
+  for (let i = 1; i < weeks.length; i++) {
+    const prevMs = new Date(weeks[i - 1].startDate + 'T12:00:00').getTime();
+    const curMs  = new Date(weeks[i].startDate + 'T12:00:00').getTime();
+    if (curMs - prevMs > MAX_REALISTIC_WEEK_GAP_DAYS * DAY_MS) return false;
+  }
+  return true;
+}
+
 function _completionRate(wk) {
   let success = 0, total = 0;
-  for (const d of wk.days) for (const ex of d.exercises) for (const s of ex.sets) {
-    total++;
-    if (s.status === 'success') success++;
+  for (const d of wk.days) for (const ex of d.exercises) {
+    if (ex.archived) continue;
+    for (const s of ex.sets) {
+      if (s.status === 'success') { success++; total++; }
+      else if (s.status === 'fail') { total++; }
+    }
   }
   return total > 0 ? success / total : 0;
 }
@@ -104,7 +138,15 @@ export function isInRecoveryWindow(state) {
   if (!state.lastReentryHandled) return false;
   const startMs = state.lastReentryHandled;
   const endMs   = startMs + REENTRY_WINDOW_DAYS * DAY_MS;
+  // Nutzer-Feedback (2026-08-17): filterte bisher rohes state.weeks statt
+  // der zentralen, seit B267 isSeedWeek-ausschließenden _sortedWeeks() --
+  // die Startwerte-Woche zählt dadurch bisher nicht mit (kein
+  // w.startDate-Filter-Bezug zu _sortedWeeks() nötig, aber der Ausschluss
+  // selbst fehlte). Praktisch selten relevant (die Seed-Woche liegt fast
+  // immer weit vor jedem Wiedereinstiegsfenster), aber dieselbe Fehlerklasse
+  // wie an den bereits gefixten Stellen -- der Vollständigkeit halber ergänzt.
   const relevantWeeks = state.weeks.filter(w => {
+    if (w.isSeedWeek) return false;
     const ms = new Date(w.startDate + 'T00:00:00').getTime();
     return ms >= startMs && ms < endMs;
   });
@@ -197,6 +239,7 @@ function _checkRisingRpe(state) {
   const weeks = _nonDeloadWeeks(state);
   if (weeks.length < 3) return null;
   const last3 = weeks.slice(-3);
+  if (!_hasRealisticWeeklySpacing(last3)) return null;
   const exNames = [...new Set(last3.flatMap(w => w.days.flatMap(d => d.exercises.map(e => e.name))))];
   for (const name of exNames) {
     const weights = last3.map(wk => {
@@ -226,6 +269,11 @@ function _checkDroppingCompletion(state) {
   const last3 = weeks.slice(-3);
   const prev  = weeks.slice(-8, -3);
   if (prev.length < 2) return null;
+  // Prüft Kontinuität über BEIDE Fenster hinweg (inkl. der Lücke dazwischen)
+  // in einem Rutsch -- ein Trendvergleich zwischen zwei zeitlich weit
+  // auseinanderliegenden Blöcken wäre genauso aussagelos wie eine Lücke
+  // innerhalb eines der beiden Fenster.
+  if (!_hasRealisticWeeklySpacing([...prev, ...last3])) return null;
   const avg3 = last3.reduce((s, w) => s + _completionRate(w), 0) / last3.length;
   const avg8 = prev.reduce((s, w) => s + _completionRate(w), 0) / prev.length;
   if (avg3 >= avg8 - 0.1) return null;
@@ -336,10 +384,24 @@ export function _dismissCooldownDays(signalType) {
   return DISMISS_COOLDOWN_DAYS[signalType] ?? null;
 }
 
+// Nutzer-Feedback (2026-08-17): 'YYYY-MM-DD' aus LOKALEN Datumskomponenten
+// statt .toISOString() (UTC) -- dasselbe, im Projekt bereits zweimal
+// gefixte Antimuster wie weekReview.js' _localISODate()-Kommentar
+// beschreibt: .toISOString() kann bei positiver lokaler UTC-Differenz
+// (z.B. Deutschland) nahe Mitternacht auf den falschen Kalendertag rollen,
+// was den Dismiss-Cooldown (verglichen als String gegen
+// d.decidedWeekStart, ein lokales Wochendatum) um einen Tag verschieben
+// konnte.
+function _localISODateDaysAgo(days) {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 function _isDismissedRecently(state, signalType) {
   const days = _dismissCooldownDays(signalType);
   if (!days) return false;
-  const cutoffISO = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+  const cutoffISO = _localISODateDaysAgo(days);
   return (state.decisionLog ?? []).some(d =>
     d.type === signalType && d.choice === 'stay' && d.decidedWeekStart >= cutoffISO
   );
@@ -539,6 +601,7 @@ function _checkPrePlateau(state) {
   const weeks = _nonDeloadWeeks(state);
   if (weeks.length < 3) return null;
   const last3 = weeks.slice(-3);
+  if (!_hasRealisticWeeklySpacing(last3)) return null;
   const exNames = [...new Set(last3.flatMap(w => w.days.flatMap(d => d.exercises.map(e => e.name))))];
 
   for (const name of exNames) {
@@ -587,7 +650,12 @@ function _checkPrePlateau(state) {
 
     const cqWkStart = getLatestWeek(state.weeks)?.startDate;
     const cq = state.coachQuestion;
-    const cqAnswer = (cq?.weekStart === cqWkStart && cq?.questionId === 'pre_plateau_subjective' && cq?.answer != null) ? cq.answer : null;
+    // Nutzer-Feedback (2026-08-17): zusätzlich cq.exerciseName geprüft --
+    // ohne diesen Abgleich hätte die gespeicherte Antwort bei zwei
+    // unterschiedlichen, unabhängig voneinander qualifizierenden Übungen
+    // fälschlich der jeweils ANDEREN Übung zugeordnet werden können (siehe
+    // COACH_ANSWER-Reducer-Kommentar, state.js).
+    const cqAnswer = (cq?.weekStart === cqWkStart && cq?.questionId === 'pre_plateau_subjective' && cq?.exerciseName === name && cq?.answer != null) ? cq.answer : null;
     return {
       status: 'pre_plateau',
       headline: 'Steigerung wird teurer',
@@ -1195,7 +1263,14 @@ function _checkPersistentFailure(state) {
     let succ = 0, fail = 0, weeksAttempted = 0, lastFailWeight = null, lastFailEx = null;
     for (const wk of last3) {
       let wkEvaluated = 0;
-      for (const d of wk.days) for (const ex of d.exercises) if (ex.name === name) {
+      // Nutzer-Feedback (2026-08-17): archivierte Übungen fehlten hier bisher
+      // im Ausschluss -- anders als die strukturell fast identischen
+      // Nachbarfunktionen _checkPushPullBalance()/_checkCompoundIsolationBalance()
+      // (beide filtern ex.archived korrekt). Eine bewusst archivierte Übung
+      // (z.B. wegen wiederholtem Scheitern) konnte so noch Wochen später
+      // fälschlich "Gewicht reduzieren" vorschlagen, obwohl sie gar nicht
+      // mehr trainiert wird.
+      for (const d of wk.days) for (const ex of d.exercises) if (ex.name === name && !ex.archived) {
         for (const s of ex.sets) {
           if (s.status === 'success') { succ++; wkEvaluated++; }
           else if (s.status === 'fail') {
@@ -1282,7 +1357,10 @@ function _checkMultiExerciseFailure(state) {
   let succ = 0, fail = 0;
   const perExercise = new Map();
   for (const wk of last3) {
+    // Nutzer-Feedback (2026-08-17): siehe identischer Kommentar in
+    // _checkPersistentFailure() oben -- archivierte Übungen ausgeschlossen.
     for (const d of wk.days) for (const ex of d.exercises) {
+      if (ex.archived) continue;
       let entry = perExercise.get(ex.name);
       if (!entry) { entry = { succ: 0, fail: 0, lastFailWeight: null, lastFailEx: null }; perExercise.set(ex.name, entry); }
       for (const s of ex.sets) {
@@ -1360,7 +1438,13 @@ function _checkInjuryReminder(state) {
         if (ex.skipReason !== 'injury' || !ex.skipDate) continue;
         const daysSince = Math.round((todayNoon - new Date(ex.skipDate + 'T12:00:00')) / DAY_MS);
         if (daysSince < 0 || daysSince > 14) continue;
-        const stillPresent = currentWeek.days.some(d => d.exercises.some(e => e.name === ex.name));
+        // Nutzer-Feedback (2026-08-17, Coach-Tab-Audit): matcht zusätzlich
+        // gegen e.substituteFor -- eine wegen Verletzung übersprungene
+        // Übung wird oft genau DESHALB per "Heute anders" auf eine andere
+        // Übung substituiert (e.name zeigt dann den Ersatznamen, e.name
+        // === ex.name schlägt fehl, obwohl es sich um dieselbe, weiterhin
+        // verletzungsbedingt gemiedene Übung handelt).
+        const stillPresent = currentWeek.days.some(d => d.exercises.some(e => e.name === ex.name || e.substituteFor === ex.name));
         if (!stillPresent) continue;
         if (!found || daysSince < found.daysSince) {
           found = { exerciseName: ex.name, skipDate: ex.skipDate, daysSince };
@@ -1385,15 +1469,17 @@ function _checkInjuryReminder(state) {
  * @returns {Array<Object>} 0-2 strukturelle Signale, höchstens 2 gleichzeitig
  *   (Priorität Mehr-Übungen-Aggregation > Verletzungs-Erinnerung > Präventiver
  *   Deload > Wiederkehrende Erschöpfung (B140, Runde 13) > Konsistenz-Qualität
- *   > Push/Pull bei Überzahl — die Aggregation steht zuoberst, da ein
- *   datenbasierter breiter Totalausfall der konkreteste Befund unter den
- *   strukturellen Signalen ist, analog zur Top-Priorität von
- *   _checkPersistentFailure in der akuten Kaskade; die Verletzungs-Erinnerung
- *   direkt danach, da sicherheitsrelevant). Jedes Objekt trägt ein
+ *   > Push/Pull bei Überzahl > Compound/Isolation-Verhältnis — die
+ *   Aggregation steht zuoberst, da ein datenbasierter breiter Totalausfall
+ *   der konkreteste Befund unter den strukturellen Signalen ist, analog zur
+ *   Top-Priorität von _checkPersistentFailure in der akuten Kaskade; die
+ *   Verletzungs-Erinnerung direkt danach, da sicherheitsrelevant;
+ *   Compound/Isolation zuletzt, da rein informativ, nie dringlich — siehe
+ *   Kommentar bei _checkCompoundIsolationBalance()). Jedes Objekt trägt ein
  *   `type`-Feld ('multi_exercise_failure'|'injury_reminder'|'deload_preventive'|
- *   'recurring_fatigue'|'consistency_quality'|'push_pull') als Diskriminator fürs Rendering in
- *   ui.js, zusätzlich zu den jeweiligen Rohdaten (weeksSince/dominant/etc.)
- *   für die dortigen Kurztexte.
+ *   'recurring_fatigue'|'consistency_quality'|'push_pull'|'compound_isolation')
+ *   als Diskriminator fürs Rendering in ui.js, zusätzlich zu den jeweiligen
+ *   Rohdaten (weeksSince/dominant/etc.) für die dortigen Kurztexte.
  */
 export function computeStructuralSignals(state) {
   const signals = [];

@@ -34,8 +34,14 @@ import { buildCategoryMap, resolveCategory } from './movementMap.js';
 
 const RADAR_CATS = ['Push', 'Pull', 'Squat', 'Hinge', 'Carry', 'Core'];
 
+// Nutzer-Feedback (2026-08-17, Coach-Tab-Audit): isSeedWeek-Ausschluss
+// ergänzt -- dieselbe Fehlerklasse wie B267 (weeklyFocus.js), hier für die
+// Volumen-/Breite-Trends im Fortschritt-Tab (computeVolumeTrend()/
+// computeBreadthProgress() unten). getSortedWeeks() selbst bleibt bewusst
+// ungefiltert (dient an anderer Stelle als PR-/Gewichts-Kaltstart-
+// Baseline), Ausschluss daher hier am Konsumenten.
 function _nonDeloadVacationWeeks(state) {
-  return getSortedWeeks(state).filter(w => w.mode !== 'deload' && w.mode !== 'vacation');
+  return getSortedWeeks(state).filter(w => w.mode !== 'deload' && w.mode !== 'vacation' && !w.isSeedWeek);
 }
 
 // ─── Qualität ────────────────────────────────────────────────────────────────

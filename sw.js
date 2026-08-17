@@ -16,7 +16,7 @@
  *   asset conflicts.
  */
 
-const CACHE_VERSION  = 'train-v249';
+const CACHE_VERSION  = 'train-v250';
 
 // Runde 20 (Befund 4): kurze Änderungsliste für den aktuellen Build, im
 // Update-Banner beim Aufklappen ("mehr Details") angezeigt. 2-3 knappe
@@ -28,9 +28,9 @@ const CACHE_VERSION  = 'train-v249';
 // (Browser-Update-Algorithmus) -- die Werte sind dadurch garantiert die des
 // NEUEN, wartenden Workers, ganz ohne zusätzlichen Cache-Bypass.
 const CHANGELOG_ENTRIES = [
-  'Automatische Satz-Bewertung ist jetzt standardmäßig an (abschaltbar in Einstellungen)',
+  'Coach-Tab: mehrere Berechnungsfehler behoben (u.a. falsches "Erfolgsquote gesunken"-Signal)',
+  'Wochenrückblick zeigt jetzt bis zu 3 statt 2 Highlights/Lowlights, mit Favoriten-Priorität',
   'Bestätigung, wenn ein Update im Hintergrund installiert wurde (statt spurlos zu verschwinden)',
-  'Diverse Verbesserungen an Onboarding, Fortschritt-Tab und Coach-Tab',
 ];
 
 /**

@@ -7,7 +7,8 @@
  *   2. Average success rate across those weeks ≥ 0.8 (it's not too hard — potential exists).
  *   3. At least 3 such weeks exist.
  *
- * Deload weeks (week.mode === 'deload') are completely excluded from counting.
+ * Deload/vacation weeks and the synthetic ONBOARDING_SEED "Startwerte" week
+ * (week.isSeedWeek) are completely excluded from counting.
  *
  * "Success" here means isFullSuccess() (status='success' AND reps>=targetReps
  * when a target is set) — a 'success' set with fewer reps than the target is
@@ -127,8 +128,17 @@ function _buildTexts(exName, plateauWeeks, strategy) {
  */
 export function detectPlateaus(allWeeks, favoriteExercises = [], rpeEnabled = true) {
   const favs = favoriteExercises ?? [];
+  // Nutzer-Feedback (2026-08-17, Coach-Tab-Audit): isSeedWeek-Ausschluss
+  // ergänzt -- die synthetische Startwerte-Woche (ONBOARDING_SEED) hat
+  // typischerweise nur 1 Satz pro Übung bei unverändertem Gewicht ggü. dem
+  // Startwert, konnte dadurch bei Nutzern mit erst 2 echten Trainingswochen
+  // fälschlich als "3. stagnierende Woche" mitzählen -- ein falsches
+  // Plateau-Signal direkt zu Beginn, wenn ein Neueinsteiger es am wenigsten
+  // erwartet. Beide Aufrufer (insightEngine.js, weeklyFocus.js) übergeben
+  // ungefiltertes state.weeks -- zentral hier gefixt statt an jeder
+  // Aufrufstelle einzeln.
   const sortedNonDeload = [...allWeeks]
-    .filter(w => w.mode !== 'deload' && w.mode !== 'vacation')
+    .filter(w => w.mode !== 'deload' && w.mode !== 'vacation' && !w.isSeedWeek)
     .sort((a, b) => a.startDate.localeCompare(b.startDate));
 
   if (sortedNonDeload.length < 3) return [];

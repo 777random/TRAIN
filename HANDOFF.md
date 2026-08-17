@@ -1,5 +1,33 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-08-17 — Runde 23 (train-v248→v249, B266-B268):
+*Letzte Aktualisierung: 2026-08-17 — Runde 24 (train-v249→v250, B269-B282):
+Vollständiger Coach-Tab-Berechnungs-Audit auf Nutzeranfrage ("prüfe jede
+Berechnung des Coaching Tabs auf weitere Fehler"), ausgelöst durch den
+B267-Zufallsfund in Runde 23. 5 parallele read-only Diagnose-Agenten haben
+je einen Funktionscluster geprüft (Recovery/Overload, Preventive-Deload/
+Fatigue/Pre-Plateau, Konsistenz/Plateau/Progression, Struktursignale/
+Decisional-Balance, ui.js-Aggregationsschicht) — Ergebnis in
+`Diagnose & Sprints/diagnose-coach-tab-audit-2026-08-17.txt`. 14 Funde (7
+bestätigt + 7 Verdacht), Nutzer wählte "alle fixen" -> B269-B282
+umgesetzt. Wichtigster Fund (B269): `_completionRate()` (weeklyFocus.js)
+zählte `pending`-Sätze im Nenner mit -- da die aktuell laufende, nur
+teilweise trainierte Woche praktisch immer im 3-Wochen-Vergleichsfenster
+liegt, drückten deren offene Sätze die Quote systematisch nach unten und
+erklären vermutlich direkt das vom Nutzer gemeldete "Erfolgsquote gesunken
+obwohl es nicht stimmt". Zweithäufigstes Muster (B270-B274, B276-B277):
+dieselbe isSeedWeek-Fehlerklasse wie B267, aber in UNABHÄNGIGEN "alle
+Wochen holen"-Kopien über mehrere Dateien verstreut (plateauDetector.js,
+consistencyUtils.js/insightEngine.js, ui.js-lokale sorted-Arrays) --
+bewusst NICHT zentral in der geteilten `getSortedWeeks()` (insightEngine.js)
+gefixt, da diese an anderer Stelle als PR-/Gewichts-Kaltstart-Baseline
+gebraucht wird (nur an den jeweiligen Konsumenten gefixt). B275: adaptive
+Pre-Plateau-Rückfrage bekam ein `exerciseName`-Feld (state.coachQuestion),
+um Antworten nicht mehr der falschen Übung zuzuordnen. 11 neue Tests
+(weeklyfocus_audit_fixes.spec.js, Erweiterung von
+weeklyfocus_seedweek_exclusion.spec.js). Volle Suite (101 Spec-Dateien,
+gebatcht) grün, 2 eigene Vorrunden-Tests mussten wegen einer unrealistischen
+4-Wochen-Kalenderlücke im Test-Fixture selbst angepasst werden (durch die
+neue Kontinuitätsprüfung B280 aufgedeckt, keine Regression).
+Davor: Runde 23 (train-v248→v249, B266-B268):
 3 punktuelle Nutzer-Rückmeldungen direkt im Chat (kein Solotest-Dokument
 diesmal). (1) Update-Banner "Später" -> Hinweis kam beim nächsten App-Öffnen
 nicht wieder: kein echter Bug, sondern fehlende Rückmeldung -- ein wartender
