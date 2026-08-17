@@ -2138,8 +2138,15 @@ function renderExercise(wk, di, ei, state) {
       // auch 'Carry'-Distanz/Zeit-Übungen mit progressionType 'weight' (siehe
       // state.js EX_ADD), nicht mehr nur klassische metric:'reps'-Übungen.
       if ((ex.progressionType ?? 'weight') === 'weight') {
+        // Trainings-Tab-Audit (2026-08-17): isSeedWeek ausgeschlossen -- ohne
+        // diesen Filter zählte die synthetische Startwerte-Woche (immer 1
+        // status:'success'-Satz) bei einem Neueinsteiger mit nur Startwerte
+        // + erster echter Woche bereits als "2 Wochen Trend" und verglich
+        // die selbst eingetragenen Startwerte gegen die allererste echte
+        // Session. Dieselbe Fehlerklasse wie B267/B269-B282, hier 4-fach
+        // dupliziert in ui.js (siehe identische Stellen weiter unten).
         const calcWeeks = state.weeks
-          .filter(w => w.mode !== 'deload' && w.mode !== 'vacation')
+          .filter(w => !w.isSeedWeek && w.mode !== 'deload' && w.mode !== 'vacation')
           .filter(w => w.days.some(d => d.exercises.some(e => e.name === ex.name && e.sets.some(s2 => s2.status === 'success'))));
         if (calcWeeks.length >= 2) {
           const recStep = getEffectiveWeightStep(ex, state.settings, state.customExercises);
@@ -2180,22 +2187,20 @@ function renderExercise(wk, di, ei, state) {
   // korrekt funktionierte. Jetzt derselbe Resolver wie überall sonst.
   const _exCatOverride = resolveCategory(ex.name, buildCategoryMap(state.customExercises ?? []));
 
-  // Vorschlag: Ø erfolgreiche Wiederholungen der gleichen Übung aus der Vorwoche
+  // Vorschlag: Ø erfolgreiche Wiederholungen der gleichen Übung.
+  // Trainings-Tab-Audit (2026-08-17): nutzte bisher eine eigene, abweichende
+  // Berechnung (nur die unmittelbar vorherige Woche per Array-Index, kein
+  // Deload-Ausschluss) statt _avgRepsLast4() -- dieselbe Funktion, die
+  // direkt daneben als Eingabefeld-Platzhalter für dieselbe Übung dient.
+  // Bei einer Deload-Vorwoche oder starker Abweichung vom 4-Wochen-Schnitt
+  // konnten Platzhaltertext und "Vorschlag"-Button gleichzeitig
+  // unterschiedliche Zahlen für dieselbe Übung zeigen. Jetzt eine einzige
+  // Quelle für beide.
   let _suggestionHtml = '';
-  if (!locked && state.curIdx > 0) {
-    const prevWk = state.weeks[state.curIdx - 1];
-    if (prevWk) {
-      for (const d of prevWk.days) {
-        const pe = d.exercises.find(e => e.name === ex.name);
-        if (pe) {
-          const scs = pe.sets.filter(s => s.status === 'success' && s.reps != null && s.reps > 0);
-          if (scs.length > 0) {
-            const avg = Math.round(scs.reduce((sum, s) => sum + (parseFloat(s.reps) || 0), 0) / scs.length);
-            _suggestionHtml = `<span class="target-suggestion">Vorschlag: ${avg} (Ø letzte Woche)</span><button type="button" class="btn-adopt-target" data-action="adopt-target-reps" data-di="${di}" data-ei="${ei}" data-value="${avg}">Übernehmen</button>`;
-          }
-          break;
-        }
-      }
+  if (!locked) {
+    const avg = _avgRepsLast4(ex.name, state.weeks);
+    if (avg !== null) {
+      _suggestionHtml = `<span class="target-suggestion">Vorschlag: ${avg} (Ø letzte Wochen)</span><button type="button" class="btn-adopt-target" data-action="adopt-target-reps" data-di="${di}" data-ei="${ei}" data-value="${avg}">Übernehmen</button>`;
     }
   }
 
@@ -7305,6 +7310,27 @@ function _handleClick(e) {
           // B78-Kommentar der vermutlich häufiger genutzte Pfad, der Tip muss
           // daher auch hier feuern, nicht nur über "Satz bestätigen".
           _maybeShowTip('tip-10', 'TRAIN schlägt dir nach jedem Satz das Gewicht für den nächsten vor — direkt unter der Satzzeile.');
+          // Trainings-Tab-Audit (2026-08-17): dieser Pfad (manuelles ✓/✗-Icon,
+          // laut B78-Kommentar direkt oben der vermutlich HÄUFIGSTE
+          // Bewertungspfad) feuerte train:set-done bisher NIE -- der
+          // Pausentimer startete für ihn nie automatisch, exakt derselbe
+          // Bug-Typ wie B242 (Runde 20)/B249 (Runde 22, Auto-Eval-Pfad).
+          // Identische Logik wie im confirm-set-Handler direkt darunter.
+          const _tdEx = afterSt.weeks[afterSt.curIdx]?.days[+di]?.exercises[+ei];
+          const _tdIsLastSet = +si === (_tdEx?.sets?.length ?? 0) - 1;
+          if (_tdEx && !_tdIsLastSet && afterSt.settings?.autoStartPauseTimer) {
+            let _tdFeedbackPauseSec = null;
+            if (!_tdEx.pauseSecManual) {
+              const _tdWk  = afterSt.weeks[afterSt.curIdx];
+              const _tdDay = _tdWk?.days[+di];
+              if (_tdDay && afterSt.settings?.sessionCoach !== false && !_tdDay.isVacation && _isTodayDay(_tdWk, +di)) {
+                const _tdIsCompound = isCompoundExercise(_tdEx.name, buildCategoryMap(afterSt.customExercises));
+                const _tdFb = buildSetFeedback(afterSet, _tdEx, _tdDay.sessionModifier ?? null, +si, afterSt.settings?.goal ?? null, _tdIsCompound, _tdDay.sessionModifierScope ?? 'all', getEffectiveWeightStep(_tdEx, afterSt.settings, afterSt.customExercises));
+                if (_tdFb?.pauseSec) _tdFeedbackPauseSec = _tdFb.pauseSec;
+              }
+            }
+            window.dispatchEvent(new CustomEvent('train:set-done', { detail: { pauseSec: _tdFeedbackPauseSec ?? (_tdEx.pauseSec ?? 90), di: +di, key: `${di}-${ei}-${si}` } }));
+          }
         }
       }
       // Bugfix (Android-Report): das neu gerenderte Intra-Session-Feedback
@@ -8604,8 +8630,10 @@ function _prepNewWeekModal() {
   const aiRecs = [];
   const inRecoveryWindow = isInRecoveryWindow(state);
   if (curWk) {
+    // Trainings-Tab-Audit (2026-08-17): isSeedWeek ausgeschlossen -- siehe
+    // identischer Kommentar bei der ersten calcWeeks-Fundstelle weiter oben.
     const calcWeeks = state.weeks
-      .filter(w => w.mode !== 'deload' && w.mode !== 'vacation')
+      .filter(w => !w.isSeedWeek && w.mode !== 'deload' && w.mode !== 'vacation')
       .filter(w => w.days.some(d => d.exercises.some(ex => ex.sets.some(s => s.status === 'success'))));
     if (calcWeeks.length >= 2) {
       const seen = new Set();
@@ -9538,8 +9566,10 @@ function _buildSessionSummaryData(di) {
     return cat === 'Squat' || cat === 'Hinge' || cat === 'Push' || cat === 'Pull';
   });
   if (focusEx && (focusEx.progressionType ?? 'weight') !== 'reps') {
+    // Trainings-Tab-Audit (2026-08-17): isSeedWeek ausgeschlossen -- siehe
+    // identischer Kommentar bei der ersten calcWeeks-Fundstelle weiter oben.
     const calcWeeks = state.weeks
-      .filter(w => w.mode !== 'deload' && w.mode !== 'vacation')
+      .filter(w => !w.isSeedWeek && w.mode !== 'deload' && w.mode !== 'vacation')
       .filter(w => w.days.some(d => d.exercises.some(e => e.name === focusEx.name && e.sets.some(s => s.status === 'success'))));
     if (calcWeeks.length >= 2) {
       const step = getEffectiveWeightStep(focusEx, state.settings, state.customExercises);
@@ -9639,8 +9669,10 @@ function _autoSetNextWeekPlanForDay(di, skippedNames) {
   const wk    = state.weeks[state.curIdx]; if (!wk) return;
   const day   = wk.days[di]; if (!day) return;
 
+  // Trainings-Tab-Audit (2026-08-17): isSeedWeek ausgeschlossen -- siehe
+  // identischer Kommentar bei der ersten calcWeeks-Fundstelle weiter oben.
   const calcWeeks = state.weeks
-    .filter(w => w.mode !== 'deload' && w.mode !== 'vacation')
+    .filter(w => !w.isSeedWeek && w.mode !== 'deload' && w.mode !== 'vacation')
     .filter(w => w.days.some(d => d.exercises.some(ex => ex.sets.some(s => s.status === 'success'))));
   if (calcWeeks.length < 2) return;
 
@@ -9828,13 +9860,17 @@ function _showVacationPlanModal(di) {
       overlay.remove();
     } else if (vac === 'equipment') {
       overlay.innerHTML = screen2();
-    } else if (vac === 'custom') {
-      dispatch(A.DAY_LOAD_VACATION_PLAN, { di, plan: 'custom' });
-      overlay.remove();
-    } else if (vac === 'rest') {
-      dispatch(A.DAY_LOAD_VACATION_PLAN, { di, plan: 'rest' });
-      overlay.remove();
-    } else if (VACATION_PLANS[vac]) {
+    } else if (vac === 'custom' || vac === 'rest' || VACATION_PLANS[vac]) {
+      // Trainings-Tab-Audit (2026-08-17): DAY_LOAD_VACATION_PLAN überschreibt
+      // day.exercises im Reducer bedingungslos -- ohne diesen Guard konnten
+      // bereits eingetragene Sätze (z.B. wenn der Nutzer mitten im Training
+      // umentscheidet und den Tag doch als Urlaubstag markiert) kommentarlos
+      // verloren gehen.
+      const _day = getState().weeks[getState().curIdx]?.days[+di];
+      const _hasData = (_day?.exercises ?? []).some(ex => ex.sets.some(s => s.status !== 'pending'));
+      if (_hasData && !confirm('Dieser Tag hat bereits eingetragene Sätze — die gehen beim Wechsel zum Urlaubsplan verloren. Fortfahren?')) {
+        return;
+      }
       dispatch(A.DAY_LOAD_VACATION_PLAN, { di, plan: vac });
       overlay.remove();
     }

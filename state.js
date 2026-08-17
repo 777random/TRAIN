@@ -413,11 +413,23 @@ export function isTrainingDay(d) {
  * Definition ("Tag erledigt" = >=50% der Sätze bewertet, nicht markedDone)
  * wiederverwenden können, statt sie unabhängig zu duplizieren.
  */
+// Trainings-Tab-Audit (2026-08-17): ex.archived ausgeschlossen -- anders
+// als die kanonische Schwesterfunktion weekSuccessCounts() (setUtils.js)
+// zählte diese Funktion archivierte Übungen bisher mit. Geteilte Quelle für
+// _weekTrainingStatus() (Streak, unten) UND _weekConsistencyRatio()
+// (Coach-Tab-Konsistenz-Quote, consistencyUtils.js importiert sie direkt) --
+// ein Tag mit einer archivierten, noch pending-Sätze enthaltenden Übung
+// (EX_ARCHIVE löscht keine Sätze) konnte so fälschlich unter die
+// 50%-Schwelle rutschen und die Streak trotz vollständig erledigtem,
+// relevantem Training brechen lassen.
 export function _dayEvalCounts(day) {
   let evaluated = 0, total = 0;
-  for (const ex of day.exercises) for (const s of ex.sets) {
-    total++;
-    if (s.status === 'success' || s.status === 'fail') evaluated++;
+  for (const ex of day.exercises) {
+    if (ex.archived) continue;
+    for (const s of ex.sets) {
+      total++;
+      if (s.status === 'success' || s.status === 'fail') evaluated++;
+    }
   }
   return { evaluated, total };
 }
@@ -1220,10 +1232,16 @@ const _exNameKey = name => String(name ?? '').trim().toLowerCase();
 function _findExerciseSettingsHistory(state, name, di) {
   const key = _exNameKey(name);
   if (!key) return null;
+  // Trainings-Tab-Audit (2026-08-17): showPlates/metricStep ergänzt -- ein
+  // bewusst ausgeschalteter Hantelscheiben-Rechner oder eine individuelle
+  // Distanz-/Zeit-Schrittweite ging bisher beim Entfernen+Neu-Hinzufügen
+  // (oder erstmaligem Hinzufügen in einer neuen Woche mit History) verloren,
+  // während alle anderen Einstellungen erhalten blieben.
   const pick = ex => ({
     weightStep: ex.weightStep, targetReps: ex.targetReps, pauseSec: ex.pauseSec,
     progressionType: ex.progressionType, metric: ex.metric,
     tags: Array.isArray(ex.tags) ? [...ex.tags] : [],
+    showPlates: ex.showPlates, metricStep: ex.metricStep,
   });
   const wk = state.weeks[state.curIdx];
   if (!wk) return null;
@@ -1463,7 +1481,12 @@ export const A = Object.freeze({
   AUTO_WEEK_CREATE:    'AUTO_WEEK_CREATE',    // { startDate } – automatische Wochenerstellung beim App-Öffnen, Steigerungen NIE still angewendet
   WEEK_DELETE:         'WEEK_DELETE',         // { weekIdx?: number }  — omit to delete curIdx
   WEEK_COPY_PREV:      'WEEK_COPY_PREV',      // {}
-  WEEK_SET_MODE:       'WEEK_SET_MODE',       // { mode: 'standard'|'deload'|'vacation' }
+  // Trainings-Tab-Audit (2026-08-17): mode:'deload' setzt HIER nur das Flag,
+  // reduziert KEIN Volumen/Gewicht (das übernimmt ausschließlich
+  // DELOAD_APPLY, siehe dort) -- die UI dispatcht WEEK_SET_MODE inzwischen
+  // auch nur noch mit 'standard'/'vacation'. Für einen tatsächlich
+  // wirksamen Deload-Wechsel DELOAD_APPLY nutzen, nicht diese Action.
+  WEEK_SET_MODE:       'WEEK_SET_MODE',       // { mode: 'standard'|'vacation' } — für 'deload' siehe DELOAD_APPLY
   DELOAD_APPLY:        'DELOAD_APPLY',        // { weekIdx?, when: 'now'|'next' } – Sprint C2 Teil B: Volumen-Deload (Sätze reduzieren, Gewicht unverändert)
   WEEK_SET_NOTE:       'WEEK_SET_NOTE',       // { note }
   WEEK_SET_LABEL:      'WEEK_SET_LABEL',      // { label: string }
@@ -1628,6 +1651,20 @@ function _resetClonedDays(days) {
     (day.exercises ?? []).forEach(ex => {
       if (ex._showCfg) ex._showCfg = false;
       _resetExerciseSubstitution(ex);
+      // Trainings-Tab-Audit (2026-08-17): skipReason/skipDate wurden hier
+      // bisher NIE zurückgesetzt, entgegen der dokumentierten Absicht (siehe
+      // ui.js "A6-Fix"-Kommentar: NUR 'substituted' ist strukturell dauerhaft
+      // gemeint, alle anderen Gründe (injury/time/fatigue/kein Grund) sollen
+      // "jede Woche neu gefragt werden"). Eine als "Verletzung" übersprungene
+      // Übung blieb dadurch über beliebig viele Folgewochen markiert --
+      // weekReview.js blendet skipReason==='injury' bewusst aus "Was nicht
+      // gut lief" aus (B129); trainierte der Nutzer die Übung später wieder
+      // normal, aber mit echten Fehlschlägen, wurden diese durch das
+      // veraltete Flag weiterhin stillschweigend unterdrückt.
+      if (ex.skipReason !== 'substituted') {
+        ex.skipReason = null;
+        ex.skipDate   = null;
+      }
       (ex.sets ?? []).forEach(s => {
         s.status = 'pending';
         s.done   = false;
@@ -1706,6 +1743,64 @@ function _applyPlannedProgression(days, state) {
  * _resetClonedDays() — rührt ex.oneRM bewusst nicht an). Betroffene Nutzer
  * sahen den Hinweis in der neuen, noch leeren Woche schlicht verschwinden.
  */
+// Trainings-Tab-Audit (2026-08-17): 'YYYY-MM-DD' aus LOKALEN
+// Datumskomponenten statt .toISOString() (UTC) -- dasselbe, im Projekt
+// bereits mehrfach gefixte Antimuster (weekReview.js _localISODate(),
+// weeklyFocus.js/consistencyUtils.js, B278 u.a.). Genutzt für das
+// gespeicherte PR-Datum UND die Trophy-Badge-Tagessperre unten -- beide
+// konnten nahe lokaler Mitternacht um einen Tag daneben liegen.
+function _localISODateToday() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// Trainings-Tab-Audit (2026-08-17): _applyPrTracking() aktualisiert PRs nur
+// nach oben (Math.max) -- wird ein Satz, der aktuell den PR trägt,
+// nachträglich korrigiert (Gewicht/Wdh runter oder Status weg von
+// 'success'), blieb der alte PR-Wert bisher als "Phantom-PR" stehen, obwohl
+// ihn kein Satz mehr stützt. Scannt die komplette Historie neu (nur bei
+// einer Korrektur an einem bereits bewerteten Satz ausgelöst, siehe
+// SET_UPDATE/SET_TOGGLE_DONE unten -- nicht bei jedem normalen Satz-Update).
+// ex.prWeight/ex.prRepsAtMaxWeight liegen pro Wochen-Klon auf dem jeweiligen
+// Übungs-Objekt (überleben Wochen-Klone unverändert, siehe
+// _resetClonedDays()) -- werden hier deshalb auf JEDER Instanz über alle
+// Wochen aktualisiert, nicht nur der aktuellen.
+function _recomputePrFromHistory(state, exName) {
+  let maxWeight = 0, maxVolume = 0, maxEst1RM = 0, maxRepsAtMaxWeight = 0;
+  for (const wk of state.weeks) {
+    if (wk.mode === 'deload') continue;
+    for (const day of wk.days) {
+      for (const ex of day.exercises) {
+        if (ex.name !== exName) continue;
+        for (const s of ex.sets) {
+          if (s.status !== 'success') continue;
+          const w = parseFloat(s.weight) || 0;
+          const r = parseFloat(s.reps) || 0;
+          if (w <= 0 || r <= 0) continue;
+          if (w > maxWeight) { maxWeight = w; maxRepsAtMaxWeight = r; }
+          else if (w === maxWeight && r > maxRepsAtMaxWeight) { maxRepsAtMaxWeight = r; }
+          maxVolume = Math.max(maxVolume, w * r);
+          maxEst1RM = Math.max(maxEst1RM, r <= 10 ? w * (1 + r / 30) : 0);
+        }
+      }
+    }
+  }
+  if (state.prs) {
+    if (maxWeight === 0 && maxVolume === 0 && maxEst1RM === 0) delete state.prs[exName];
+    else state.prs[exName] = { maxWeight, maxVolume, maxEstimated1RM: maxEst1RM, maxRepsAtMaxWeight, date: state.prs[exName]?.date ?? null };
+  }
+  for (const wk of state.weeks) {
+    for (const day of wk.days) {
+      for (const ex of day.exercises) {
+        if (ex.name === exName) {
+          ex.prWeight           = maxWeight > 0 ? maxWeight : null;
+          ex.prRepsAtMaxWeight  = maxRepsAtMaxWeight > 0 ? maxRepsAtMaxWeight : null;
+        }
+      }
+    }
+  }
+}
+
 function _applyPrTracking(state, ex, s, weight, reps) {
   if (weight > 0) {
     const volume  = weight * reps;
@@ -1720,7 +1815,7 @@ function _applyPrTracking(state, ex, s, weight, reps) {
       ? reps
       : (weight === prev.maxWeight ? Math.max(prev.maxRepsAtMaxWeight ?? 0, reps) : prev.maxRepsAtMaxWeight ?? 0);
     if (newMaxW > prev.maxWeight || newMaxV > prev.maxVolume || newMaxE > prev.maxEstimated1RM) {
-      state.prs[name] = { maxWeight: newMaxW, maxVolume: newMaxV, maxEstimated1RM: newMaxE, maxRepsAtMaxWeight: newMaxRMW, date: new Date().toISOString().split('T')[0] };
+      state.prs[name] = { maxWeight: newMaxW, maxVolume: newMaxV, maxEstimated1RM: newMaxE, maxRepsAtMaxWeight: newMaxRMW, date: _localISODateToday() };
     }
     if (est1RM > 0 && (ex.oneRM == null || est1RM > ex.oneRM)) {
       ex.oneRM = Math.round(est1RM * 10) / 10;
@@ -1738,7 +1833,7 @@ function _applyPrTracking(state, ex, s, weight, reps) {
   // Kalenderdatum statt day.id, weil day.id beim Wochen-Klonen unverändert
   // mitkopiert wird (siehe _resetClonedDays) und sich sonst über Wochen
   // hinweg fälschlich "gleich" anfühlen würde.
-  const today = new Date().toISOString().split('T')[0];
+  const today = _localISODateToday();
   const alreadyShownToday = ex._prBadgeShownOn === today;
   if (ex.prWeight === null || weight > ex.prWeight) {
     if (!alreadyShownToday) { s.prBadge = 'weight'; ex._prBadgeShownOn = today; }
@@ -1932,6 +2027,14 @@ function reduce(state, action) {
         day.exercises.forEach(ex => {
           if (ex.substituteFor) ex.name = ex.substituteFor;
           ex.substituteFor = null;
+          // Trainings-Tab-Audit (2026-08-17): dritte, unabhängige Kopie
+          // derselben skipReason/skipDate-Lücke wie _resetClonedDays()/
+          // DAY_ADD_CLONE -- beim Schreiben eines Tests für den dortigen Fix
+          // gefunden. Gleiche Ausnahme: nur 'substituted' bleibt.
+          if (ex.skipReason !== 'substituted') {
+            ex.skipReason = null;
+            ex.skipDate   = null;
+          }
           ex.sets.forEach(s => {
             s.status = 'pending';
             s.done = false;
@@ -2026,9 +2129,21 @@ function reduce(state, action) {
         exercises:  srcDay ? srcDay.exercises.map(ex => {
           const clonedEx = {
             ...JSON.parse(JSON.stringify(ex)),
-            sets: ex.sets.map(s => ({ ...s, status: 'pending', done: false, deloadSkip: false })),
+            // Trainings-Tab-Audit (2026-08-17): reps/rpe ergänzt -- diese
+            // unabhängige Klon-Kopie (nicht über _resetClonedDays()) ließ
+            // bisher die Wdh/RPE-Werte des Quell-Satzes an einem eigentlich
+            // 'pending' Satz stehen, anders als das etablierte Muster.
+            sets: ex.sets.map(s => ({ ...s, status: 'pending', done: false, reps: null, rpe: null, deloadSkip: false })),
           };
           _resetExerciseSubstitution(clonedEx);
+          // Trainings-Tab-Audit (2026-08-17): skipReason/skipDate ergänzt --
+          // identischer Fix wie _resetClonedDays() (siehe dortiger
+          // Kommentar): nur 'substituted' ist strukturell dauerhaft gemeint,
+          // alle anderen Gründe sollen jede Woche neu abgefragt werden.
+          if (clonedEx.skipReason !== 'substituted') {
+            clonedEx.skipReason = null;
+            clonedEx.skipDate   = null;
+          }
           return clonedEx;
         }) : [],
       };
@@ -2307,6 +2422,13 @@ function reduce(state, action) {
         newEx.progressionType  = history.progressionType;
         newEx.metric           = history.metric;
         newEx.tags             = history.tags;
+        // Trainings-Tab-Audit (2026-08-17): showPlates/metricStep ergänzt
+        // (siehe _findExerciseSettingsHistory()-Kommentar) -- nur
+        // übernehmen, wenn die History-Übung den Wert überhaupt trägt
+        // (undefined bei nie individuell gesetzt), sonst würde ein
+        // gültiger, gerade oben berechneter Default überschrieben.
+        if (history.showPlates !== undefined) newEx.showPlates = history.showPlates;
+        if (history.metricStep !== undefined) newEx.metricStep = history.metricStep;
       }
       day.exercises.push(newEx);
       break;
@@ -2331,6 +2453,18 @@ function reduce(state, action) {
     }
     case A.EX_UPDATE: {
       const ex = _currentWeek()?.days[p.di]?.exercises[p.ei]; if (!ex) break;
+      // Trainings-Tab-Audit (2026-08-17): field==='name' während einer
+      // aktiven Substitution (ex.substituteFor gesetzt) löscht substituteFor
+      // mit -- ohne diesen Guard konnte eine direkte Umbenennung über das
+      // Namensfeld (data-action="ex-name", immer editierbar, auch bei
+      // substituierten Übungen) den Anzeigenamen ändern, während
+      // substituteFor weiter auf den ALTEN Original-Namen zeigte. Ein
+      // späteres "Substitution zurücksetzen" hätte dann fälschlich den
+      // Original-Namen wiederhergestellt und die manuelle Umbenennung
+      // verworfen. Der "Heute anders"-Flow selbst dispatcht direkt danach
+      // EX_SET_SUBSTITUTE mit dem korrekten Original-Namen -- diese Zeile
+      // hier ist für ihn ein harmloser Zwischenschritt, keine Verhaltensänderung.
+      if (p.field === 'name' && ex.substituteFor) ex.substituteFor = null;
       ex[p.field] = p.value;
       break;
     }
@@ -2356,6 +2490,15 @@ function reduce(state, action) {
       if (p.ei < 0 || p.ei >= fromDay.exercises.length) break;
       const [moved] = fromDay.exercises.splice(p.ei, 1);
       moved.sets = moved.sets.map(() => mkSet());
+      // Trainings-Tab-Audit (2026-08-17): skipReason/skipDate ergänzt --
+      // bezog sich auf ein Skip-Ereignis am ALTEN Tag-Slot; die Übung startet
+      // am neuen Tag mit frischen 'pending'-Sätzen, wurde dort noch gar nicht
+      // übersprungen. Gleiche Ausnahme wie bei _resetClonedDays(): nur
+      // 'substituted' ist strukturell dauerhaft gemeint.
+      if (moved.skipReason !== 'substituted') {
+        moved.skipReason = null;
+        moved.skipDate   = null;
+      }
       toDay.exercises.push(moved);
       break;
     }
@@ -2542,6 +2685,11 @@ function reduce(state, action) {
       }
       else if (p.field === 'rpe')  v = (v === '' || v === null) ? null : Math.min(10, Math.max(1, +v));
       else if (p.field === 'note') v = String(v ?? '').slice(0, 120);
+      // Trainings-Tab-Audit (2026-08-17): Phantom-PR-Fix -- eine Korrektur
+      // an einem bereits ERFOLGREICHEN Satzes' Gewicht/Wdh kann den bisher
+      // gespeicherten PR ungültig machen (z.B. Gewicht nachträglich nach
+      // unten korrigiert). Snapshot VOR der Feldänderung, Recompute danach.
+      const _wasSuccessForPr = s.status === 'success' && (p.field === 'weight' || p.field === 'reps');
       s[p.field] = v;
       // Straight sets: auto-propagate weight from set 0 to all following pending sets
       if (p.si === 0 && p.field === 'weight' && (ex.setType ?? 'straight') === 'straight') {
@@ -2560,11 +2708,13 @@ function reduce(state, action) {
       if ((p.field === 'reps' || p.field === 'weight') && s.status !== 'pending') {
         _evaluateSetStatus(ex, s);
       }
+      if (_wasSuccessForPr) _recomputePrFromHistory(state, ex.name);
       break;
     }
     case A.SET_TOGGLE_DONE: {
       const exForToggle = _currentWeek()?.days[p.di]?.exercises[p.ei]; if (!exForToggle) break;
       const s = exForToggle.sets[p.si]; if (!s) break;
+      const _wasSuccessForPrToggle = s.status === 'success';
       const order = ['pending', 'success', 'fail'];
       let cur = s.status;
       if (cur !== 'pending' && cur !== 'success' && cur !== 'fail') {
@@ -2589,6 +2739,11 @@ function reduce(state, action) {
         if (ex && reps > 0) {
           _applyPrTracking(state, ex, s, weight, reps);
         }
+      } else if (_wasSuccessForPrToggle && next !== 'success') {
+        // Trainings-Tab-Audit (2026-08-17): Phantom-PR-Fix -- siehe
+        // Kommentar bei _recomputePrFromHistory(). Ein Satz, der einen PR
+        // getragen hat, wird hier zurück auf 'pending'/'fail' zyklisiert.
+        _recomputePrFromHistory(state, exForToggle.name);
       }
       break;
     }
@@ -2872,6 +3027,13 @@ function reduce(state, action) {
 
       state.weeks.forEach(wk => wk.days.forEach(day => day.exercises.forEach(ex => {
         if (variantSet.has(ex.name)) ex.name = finalName;
+        // Trainings-Tab-Audit (2026-08-17): substituteFor-Referenzen
+        // ebenfalls aktualisiert -- ohne diesen Fix konnte eine
+        // substituteFor-Referenz auf einen jetzt zusammengeführten,
+        // "verschwundenen" Namen zeigen. Ein Zurücksetzen der Substitution
+        // (EX_SET_SUBSTITUTE) hätte diesen Geister-Namen dann fälschlich
+        // als "Original" wiederhergestellt.
+        if (ex.substituteFor && variantSet.has(ex.substituteFor)) ex.substituteFor = finalName;
       })));
       state.customTemplate.forEach(day => day.exercises.forEach(ex => {
         if (variantSet.has(ex.name)) ex.name = finalName;

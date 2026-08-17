@@ -1,5 +1,29 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-08-17 — Runde 24 (train-v249→v250, B269-B282):
+*Letzte Aktualisierung: 2026-08-17 — Runde 25 (train-v250→v251, B284-B296,
+B283 übersprungen siehe BUGS.md-Hinweis): Vollständiger Trainings-Tab-Audit
+auf Nutzeranfrage ("mache einen total audit für trainingstab identifiziere
+fehler inkonsistenzen und bugs"), analog zum Coach-Tab-Audit direkt zuvor.
+5 parallele Diagnose-Agenten (Satz-Ebene, Übungs-Ebene/Reducer, Tag/Session/
+Timer, Wochen-Ebene, ui.js-Rendering-Schicht) fanden 5 bestätigte + 8
+Verdachtsfälle -- Ergebnis in
+`Diagnose & Sprints/diagnose-trainings-tab-audit-2026-08-17.txt`. Nutzer
+wählte "alle 13 fixen" -> B284-B296 umgesetzt (beim Testschreiben zusätzlich
+eine DRITTE unabhängige Kopie des skipReason-Klon-Bugs in WEEK_COPY_PREV
+gefunden und mitgefixt, in B288 zusammengefasst). Wichtigster Fund (B284):
+das manuelle ✓/✗-Icon (toggle-done, laut Code-Kommentar im Handler selbst
+vermutlich der meistgenutzte Bewertungspfad) startete den Pausentimer nie
+automatisch -- derselbe Bug-Typ wie B242/B249, hier aber im Hauptpfad nie
+gefixt. Zweithäufigstes Muster (B285-B286): wieder die isSeedWeek/archived-
+Filterlücken-Fehlerklasse aus Runde 24, hier in ui.js (4-fach duplizierter
+calcWeeks-Filter für Gewichtsempfehlungen) und state.js (`_dayEvalCounts()`,
+gemeinsame Basis für Trainings-Tab-Streak UND Coach-Tab-Konsistenz-Quote).
+B292 (Phantom-PR) führt eine neue `_recomputePrFromHistory()`-Funktion ein,
+die bei einer Korrektur an einem bereits bewerteten PR-Satz die komplette
+Historie neu scannt (bewusst nur bei dieser Korrektur ausgelöst, nicht bei
+jedem Satz-Update). 6 neue Tests (trainingstab_audit_fixes.spec.js). Volle
+Regressionssuite (102 Spec-Dateien, gebatcht) grün, 1 vorbestehendes Flake
+(share_image.spec.js, bereits aus Runde 23 bekannt) auf Retry grün.
+Davor: Runde 24 (train-v249→v250, B269-B282):
 Vollständiger Coach-Tab-Berechnungs-Audit auf Nutzeranfrage ("prüfe jede
 Berechnung des Coaching Tabs auf weitere Fehler"), ausgelöst durch den
 B267-Zufallsfund in Runde 23. 5 parallele read-only Diagnose-Agenten haben
