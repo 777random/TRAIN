@@ -31,11 +31,20 @@ import { isFullSuccess } from './setUtils.js';
  */
 const RPE_PLATEAU_DELOAD_STRATEGY_1WK_AVG = 8.5;
 
+// Utility-Schicht-Audit (Runde 29): jede der vier Helferfunktionen unten
+// schließt jetzt `ex.archived` (dritte unabhängige Fundstelle derselben
+// Fehlerklasse wie B272) UND `ex.substituteFor` (nur die eigentliche
+// Übung, nicht ihre Rolle als "Heute anders"-Ersatz einer ANDEREN Übung
+// zählt für ihre eigene Plateau-Historie) aus. Der bisherige `exNames`-
+// Filter (siehe detectPlateaus() unten) blacklistete einen Übungsnamen
+// dagegen KOMPLETT und DAUERHAFT, sobald er irgendwann als Substitutions-
+// Ziel auftrat -- auch für alle seine eigenen, nicht-substituierten
+// Wochen. Der per-Instanz-Ausschluss hier ist die korrekte Granularität.
 function _exMaxWeight(wk, exName) {
   let max = 0;
   for (const d of wk.days)
     for (const ex of d.exercises)
-      if (ex.name === exName)
+      if (ex.name === exName && !ex.archived && !ex.substituteFor)
         for (const s of ex.sets)
           if (isFullSuccess(s, ex) && (s.weight ?? 0) > max) max = s.weight;
   return max;
@@ -45,8 +54,12 @@ function _exSuccessRate(wk, exName) {
   let total = 0, success = 0;
   for (const d of wk.days)
     for (const ex of d.exercises)
-      if (ex.name === exName)
+      if (ex.name === exName && !ex.archived && !ex.substituteFor)
         for (const s of ex.sets) {
+          // Utility-Schicht-Audit (Runde 29): pending-Sätze nicht mehr im
+          // Nenner gezählt -- dritte unabhängige Fundstelle derselben
+          // Fehlerklasse wie B269 (weeklyFocus.js _completionRate()).
+          if (s.status !== 'success' && s.status !== 'fail') continue;
           total++;
           if (isFullSuccess(s, ex)) success++;
         }
@@ -62,26 +75,36 @@ function _exSuccessSetCount(wk, exName) {
   let count = 0;
   for (const d of wk.days)
     for (const ex of d.exercises)
-      if (ex.name === exName)
+      if (ex.name === exName && !ex.archived && !ex.substituteFor)
         for (const s of ex.sets)
           if (isFullSuccess(s, ex)) count++;
   return count;
 }
 
+// Utility-Schicht-Audit (Runde 29): isFullSuccess() statt rohem
+// status==='success' -- der Datei-Kopfkommentar dokumentiert isFullSuccess()
+// als einheitlichen Standard für "Erfolg" in dieser Datei, diese Funktion
+// wich bisher davon ab.
 function _exAvgRpe(wk, exName) {
   const rpes = [];
   for (const d of wk.days)
     for (const ex of d.exercises)
-      if (ex.name === exName)
+      if (ex.name === exName && !ex.archived && !ex.substituteFor)
         for (const s of ex.sets)
-          if (s.status === 'success' && s.rpe != null)
+          if (isFullSuccess(s, ex) && s.rpe != null)
             rpes.push(s.rpe);
   return rpes.length ? rpes.reduce((a, b) => a + b, 0) / rpes.length : null;
 }
 
 // Returns true if any day in the recent weeks has this exercise plus ≥2 others sharing a tag.
 function _hasSharedMuscleGroupDay(allWeeks, exName) {
+  // Utility-Schicht-Audit (Runde 29): isSeedWeek/deload/vacation ergänzt --
+  // betrifft nur die Deload-vs-Variation-vs-Volumen-Strategiewahl (nicht ob
+  // überhaupt ein Plateau erkannt wird), aber die Startwerte-Woche (oft
+  // mehrere Übungen an einem Tag mit überlappenden Tags) konnte die
+  // Strategie fälschlich auf 'variation' statt 'volume' kippen.
   const recent = [...allWeeks]
+    .filter(w => !w.isSeedWeek && w.mode !== 'deload' && w.mode !== 'vacation')
     .sort((a, b) => a.startDate.localeCompare(b.startDate))
     .slice(-4);
   for (const wk of recent) {
@@ -143,15 +166,17 @@ export function detectPlateaus(allWeeks, favoriteExercises = [], rpeEnabled = tr
 
   if (sortedNonDeload.length < 3) return [];
 
-  const substituteNames = new Set(
-    sortedNonDeload.flatMap(w =>
-      w.days.flatMap(d => d.exercises.filter(ex => ex.substituteFor).map(ex => ex.name))
-    )
-  );
-
+  // Utility-Schicht-Audit (Runde 29): die vorherige substituteNames-
+  // Blacklist entfernte einen Übungsnamen KOMPLETT aus der Plateau-Prüfung,
+  // sobald er irgendwann als Substitutions-ZIEL auftrat -- auch für seine
+  // eigenen, nie substituierten Wochen. Der korrekte Ausschluss geschieht
+  // jetzt granular pro Instanz in den _ex*()-Helferfunktionen oben
+  // (ex.substituteFor) UND im exWeeks-Filter direkt unten.
   const exNames = [...new Set(
-    sortedNonDeload.flatMap(w => w.days.flatMap(d => d.exercises.map(e => e.name)))
-  )].filter(name => !substituteNames.has(name));
+    sortedNonDeload.flatMap(w => w.days.flatMap(d => d.exercises
+      .filter(ex => !ex.archived && !ex.substituteFor)
+      .map(e => e.name)))
+  )];
 
   const plateaus = [];
 
@@ -159,7 +184,7 @@ export function detectPlateaus(allWeeks, favoriteExercises = [], rpeEnabled = tr
     // Only weeks where this exercise has at least one success set
     const exWeeks = sortedNonDeload.filter(wk =>
       wk.days.some(d => d.exercises.some(ex =>
-        ex.name === exName && ex.sets.some(s => s.status === 'success')
+        ex.name === exName && !ex.archived && !ex.substituteFor && ex.sets.some(s => s.status === 'success')
       ))
     );
 

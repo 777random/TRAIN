@@ -2215,7 +2215,11 @@ function renderExercise(wk, di, ei, state) {
   // manuellen Schrittweite-Buttons). Gilt für Gewicht UND Distanz/Zeit.
   let _stepSuggestionHtml = '';
   if (!locked) {
-    const _sortedWks    = getSortedWeeks(state);
+    // Utility-Schicht-Audit (Runde 29): isSeedWeek ausgeschlossen -- die
+    // Startwerte-Woche konnte sonst als vierter, künstlicher Datenpunkt in
+    // detectRecurringStep()s "genau 3 identische Deltas"-Schwelle einfließen
+    // und die Erkennung bei genau 3 echten Trainingswochen kippen.
+    const _sortedWks    = getSortedWeeks(state).filter(w => !w.isSeedWeek);
     const _stepHistory  = metric === 'reps' ? exWeightHistory(_sortedWks, ex.name) : exMetricHistory(_sortedWks, ex.name);
     const _stepPattern  = detectRecurringStep(_stepHistory);
     const _currentStep  = metric === 'reps' ? step : metricStepVal;

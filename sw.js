@@ -16,7 +16,7 @@
  *   asset conflicts.
  */
 
-const CACHE_VERSION  = 'train-v254';
+const CACHE_VERSION  = 'train-v255';
 
 // Runde 20 (Befund 4): kurze Änderungsliste für den aktuellen Build, im
 // Update-Banner beim Aufklappen ("mehr Details") angezeigt. 2-3 knappe
@@ -28,9 +28,9 @@ const CACHE_VERSION  = 'train-v254';
 // (Browser-Update-Algorithmus) -- die Werte sind dadurch garantiert die des
 // NEUEN, wartenden Workers, ganz ohne zusätzlichen Cache-Bypass.
 const CHANGELOG_ENTRIES = [
-  'Onboarding: Startwerte-Eingabe verwirft jetzt verwaiste Werte bei Vorlagenwechsel, Tippfehler-Schutz ergänzt',
-  'Onboarding: Wochenstartdatum wird jetzt korrekt lokal berechnet (kein Rollover nahe Mitternacht)',
-  'Kleinere interne Aufräumarbeiten im Onboarding-Ablauf',
+  'Erfolgs-Meldungen ("Beste Woche", "Bestes Jahr", Konsistenz-Meilensteine) durch die Startwerte-Woche nicht mehr verzerrt oder blockiert',
+  'Plateau-Erkennung: eine Übung wird nach einer einmaligen Substitution nicht mehr dauerhaft von der Stagnations-Prüfung ausgeschlossen',
+  'Kleinere interne Konsistenz-Korrekturen in den Coaching-Hinweisen',
 ];
 
 /**

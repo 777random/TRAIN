@@ -23,6 +23,17 @@ export function getSortedWeeks(state) {
   return [...state.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
 }
 
+// Utility-Schicht-Audit (Runde 29): getSortedWeeks() selbst bleibt bewusst
+// ungefiltert (dient andernorts als PR-/Gewichts-Kaltstart-Baseline,
+// Präzedenz Runde 24). Das komplette INSIGHTS-Toast-System unten braucht
+// die Startwerte-Woche aber praktisch nirgends als echten Datenpunkt --
+// ~22 unabhängige Fundstellen nutzten bisher getSortedWeeks(state) direkt
+// (teils nur mit Deload-Filter), ohne isSeedWeek auszuschließen. Neuer
+// gemeinsamer Helper statt 22 einzelner Inline-Filter.
+function _realWeeks(state) {
+  return getSortedWeeks(state).filter(w => !w.isSeedWeek);
+}
+
 export function getCompletionRate(wk) {
   let total = 0, done = 0;
   for (const d of wk.days)
@@ -46,13 +57,18 @@ function daysBetween(a, b) {
   return Math.round((new Date(b) - new Date(a)) / 86_400_000);
 }
 
-// Max success-set weight per week for a named exercise (0 if absent)
+// Max success-set weight per week for a named exercise (0 if absent).
+// Utility-Schicht-Audit (Runde 29): matcht jetzt auch ex.substituteFor ===
+// exName -- an einem Tag, an dem die Original-Übung per "Heute anders"
+// substituiert wurde, hieß ex.name bereits die Ersatz-Übung, wodurch die
+// Original-Historie eine Lücke zeigte, obwohl an dem Tag trainiert wurde.
+// Gleiche Doppelbuchungs-Logik wie _recalcExercisePRs() (state.js).
 export function exWeightHistory(sortedWeeks, exName) {
   return sortedWeeks.map(wk => {
     let max = 0;
     for (const d of wk.days)
       for (const ex of d.exercises)
-        if (ex.name === exName)
+        if (ex.name === exName || ex.substituteFor === exName)
           for (const s of ex.sets)
             if (s.status === 'success' && (s.weight ?? 0) > max) max = s.weight;
     return max;
@@ -68,7 +84,7 @@ export function exSetCountHistory(sortedWeeks, exName) {
     let count = 0;
     for (const d of wk.days)
       for (const ex of d.exercises)
-        if (ex.name === exName)
+        if (ex.name === exName || ex.substituteFor === exName)
           for (const s of ex.sets)
             if (s.status === 'success') count++;
     return count;
@@ -83,7 +99,7 @@ export function exMetricHistory(sortedWeeks, exName) {
     let max = 0;
     for (const d of wk.days)
       for (const ex of d.exercises)
-        if (ex.name === exName)
+        if (ex.name === exName || ex.substituteFor === exName)
           for (const s of ex.sets)
             if (s.status === 'success' && (parseFloat(s.reps) || 0) > max) max = parseFloat(s.reps);
     return max;
@@ -166,15 +182,25 @@ function countTagSets(wk, tag) {
 
 /**
  * Schlaf↔Abschlussquote-Korrelation. Exportiert und von E-02 UNTEN sowie von
- * progressInsights.js (dauerhafte "Deine Erkenntnisse"-Sektion) genutzt —
- * eine einzige Implementierung dieser Formel, keine Duplikate.
+ * progressInsights.js (dauerhafte "Deine Erkenntnisse"-Sektion) genutzt.
+ *
+ * Utility-Schicht-Audit (Runde 29): der bisherige Kommentar "eine einzige
+ * Implementierung, keine Duplikate" stimmte NICHT mehr -- sessionSummary.js
+ * hat mit `calcSleepCorrelation()` eine zweite, unabhängige Implementierung
+ * für den Tagesabschluss-Screen: andere Datenquelle (kategorisches
+ * `sessionCheckIn.sleep` pro Tag statt numerischem `sleepHours`-Wochen-
+ * mittel), anderer Schwellenwert, andere Signifikanzgrenze. Bewusst NICHT
+ * zusammengeführt (unterschiedliche Datenmodelle, unterschiedliche UI-
+ * Oberflächen) -- aber die hier fehlende Deload-/Urlaub-Ausschlussfilterung
+ * war eine echte Inkonsistenz gegenüber der Schwesterfunktion, jetzt
+ * angeglichen (gleiche Fehlerklasse wie B293/B317).
  * @returns {{ threshold: number, avgWith: number, avgWithout: number } | null}
  */
 export function computeSleepCorrelation(state, N = 0) {
   const threshold = 7;
   // Prefer per-day sleepHours (averaged over done days), fall back to weekly bodyData.sleep
   const sleepMap = new Map();
-  const allWeeks = getSortedWeeks(state);
+  const allWeeks = _realWeeks(state).filter(w => w.mode !== 'deload' && w.mode !== 'vacation');
   const all = N > 0 ? allWeeks.slice(-N) : allWeeks;
   all.forEach(wk => {
     const daySleeps = wk.days.filter(d => d.sleepHours != null).map(d => d.sleepHours);
@@ -212,7 +238,12 @@ export const INSIGHTS = [
       if (weight <= 0) return null;
       const pr = (state.prs ?? {})[ex.name];
       if (!pr) return null;
-      const today = new Date().toISOString().split('T')[0];
+      // Utility-Schicht-Audit (Runde 29): lokales Datum statt .toISOString()
+      // (UTC) -- dasselbe, im Projekt bereits mehrfach gefixte Antimuster
+      // (zuletzt B331). Nahe Mitternacht in Deutschland konnte der Toast
+      // fälschlich ausbleiben oder am falschen Tag erneut erscheinen.
+      const _td = new Date();
+      const today = `${_td.getFullYear()}-${String(_td.getMonth() + 1).padStart(2, '0')}-${String(_td.getDate()).padStart(2, '0')}`;
       if (pr.date !== today || Math.abs(pr.maxWeight - weight) > 0.01) return null;
       return {
         id: 'P-05', type: 'progression', priority: 1, immediate: true,
@@ -318,7 +349,7 @@ export const INSIGHTS = [
     id: 'K-02', priority: 2, type: 'consistency',
     trigger: ['NEUE_WOCHE_ERSTELLT', 'APP_GEÖFFNET'],
     evaluate(state) {
-      const sorted = getSortedWeeks(state);
+      const sorted = _realWeeks(state);
       if (sorted.length < 2) return null;
       const gap = daysBetween(sorted[sorted.length - 2].startDate, sorted[sorted.length - 1].startDate);
       if (gap <= 56) return null;
@@ -337,7 +368,7 @@ export const INSIGHTS = [
     id: 'P-01', priority: 5, type: 'progression',
     trigger: ['WOCHE_ABGESCHLOSSEN'],
     evaluate(state) {
-      const sorted = getSortedWeeks(state).filter(w => w.mode !== 'deload');
+      const sorted = _realWeeks(state).filter(w => w.mode !== 'deload');
       if (sorted.length < 3) return null;
       const exNames = [...new Set(sorted.flatMap(w => w.days.flatMap(d => d.exercises.map(e => e.name))))];
       let best = null, bestDelta = 0;
@@ -364,7 +395,7 @@ export const INSIGHTS = [
     id: 'P-02', priority: 7, type: 'progression',
     trigger: ['WOCHE_ABGESCHLOSSEN'],
     evaluate(state) {
-      const sorted = getSortedWeeks(state).filter(w => w.mode !== 'deload');
+      const sorted = _realWeeks(state).filter(w => w.mode !== 'deload');
       if (sorted.length < 3) return null;
       const exNames = [...new Set(sorted.flatMap(w => w.days.flatMap(d => d.exercises.map(e => e.name))))];
       let best = null, bestGain = 0;
@@ -399,7 +430,7 @@ export const INSIGHTS = [
     trigger: ['WOCHE_ABGESCHLOSSEN'],
     evaluate(state) {
       if (!(state.settings?.rpeEnabled ?? true)) return null;
-      const sorted = getSortedWeeks(state).filter(w => w.mode !== 'deload');
+      const sorted = _realWeeks(state).filter(w => w.mode !== 'deload');
       if (sorted.length < 3) return null;
       const exNames = [...new Set(sorted.flatMap(w => w.days.flatMap(d => d.exercises.map(e => e.name))))];
       let best = null, bestDrop = 0;
@@ -427,7 +458,7 @@ export const INSIGHTS = [
     id: 'P-04', priority: 9, type: 'progression',
     trigger: ['WOCHE_ABGESCHLOSSEN'],
     evaluate(state) {
-      const sorted = getSortedWeeks(state);
+      const sorted = _realWeeks(state);
       if (sorted.length < 2) return null;
       const curWk  = sorted[sorted.length - 1];
       const prevWks = sorted.slice(0, -1);
@@ -456,7 +487,7 @@ export const INSIGHTS = [
     id: 'P-06', priority: 15, type: 'progression',
     trigger: ['WOCHE_ABGESCHLOSSEN'],
     evaluate(state) {
-      const sorted = getSortedWeeks(state);
+      const sorted = _realWeeks(state);
       if (sorted.length < 4) return null;
       if (!sorted.slice(-4).every(wk => getCompletionRate(wk) >= 0.9)) return null;
       return {
@@ -473,7 +504,7 @@ export const INSIGHTS = [
     id: 'S-01', priority: 7, type: 'stagnation',
     trigger: ['WOCHE_ABGESCHLOSSEN'],
     evaluate(state) {
-      const sorted = getSortedWeeks(state).filter(w => w.mode !== 'deload');
+      const sorted = _realWeeks(state).filter(w => w.mode !== 'deload');
       if (sorted.length < 4) return null;
       const last4 = sorted.slice(-4);
       const exNames = [...new Set(last4.flatMap(w => w.days.flatMap(d => d.exercises.map(e => e.name))))];
@@ -511,7 +542,7 @@ export const INSIGHTS = [
     trigger: ['WOCHE_ABGESCHLOSSEN'],
     evaluate(state) {
       if (!(state.settings?.rpeEnabled ?? true)) return null;
-      const sorted = getSortedWeeks(state).filter(w => w.mode !== 'deload');
+      const sorted = _realWeeks(state).filter(w => w.mode !== 'deload');
       if (sorted.length < 3) return null;
       const last3 = sorted.slice(-3);
       const exNames = [...new Set(last3.flatMap(w => w.days.flatMap(d => d.exercises.map(e => e.name))))];
@@ -537,7 +568,7 @@ export const INSIGHTS = [
     id: 'S-03', priority: 13, type: 'stagnation',
     trigger: ['WOCHE_ABGESCHLOSSEN'],
     evaluate(state) {
-      const sorted = getSortedWeeks(state).filter(w => w.mode !== 'deload');
+      const sorted = _realWeeks(state).filter(w => w.mode !== 'deload');
       if (sorted.length < 3) return null;
       const last3 = sorted.slice(-3);
       const exNames = [...new Set(last3.flatMap(w => w.days.flatMap(d => d.exercises.map(e => e.name))))];
@@ -571,7 +602,7 @@ export const INSIGHTS = [
     id: 'S-04', priority: 10, type: 'stagnation',
     trigger: ['WOCHE_ABGESCHLOSSEN'],
     evaluate(state) {
-      const sorted = getSortedWeeks(state);
+      const sorted = _realWeeks(state);
       if (sorted.length < 5) return null;
       const last3 = sorted.slice(-3);
       const prev  = sorted.slice(-8, -3);
@@ -593,7 +624,7 @@ export const INSIGHTS = [
     id: 'S-05', priority: 11, type: 'stagnation',
     trigger: ['WOCHE_ABGESCHLOSSEN'],
     evaluate(state) {
-      const sorted = getSortedWeeks(state).filter(w => w.mode !== 'deload');
+      const sorted = _realWeeks(state).filter(w => w.mode !== 'deload');
       if (sorted.length < 5) return null;
       const last5 = sorted.slice(-5);
       const exNames = [...new Set(last5.flatMap(w => w.days.flatMap(d => d.exercises.map(e => e.name))))];
@@ -645,7 +676,7 @@ export const INSIGHTS = [
     trigger: ['WOCHE_ABGESCHLOSSEN'],
     evaluate(state) {
       if (!(state.settings?.rpeEnabled ?? true)) return null;
-      const sorted = getSortedWeeks(state);
+      const sorted = _realWeeks(state);
       if (sorted.length < 3) return null;
       const deloadIdx = [...sorted.keys()].reverse().find(i => sorted[i].mode === 'deload');
       if (deloadIdx == null || deloadIdx >= sorted.length - 1) return null;
@@ -680,7 +711,7 @@ export const INSIGHTS = [
     id: 'B-02', priority: 14, type: 'balance',
     trigger: ['WOCHE_ABGESCHLOSSEN'],
     evaluate(state) {
-      const sorted = getSortedWeeks(state);
+      const sorted = _realWeeks(state);
       if (sorted.length < 4) return null;
       const last4 = sorted.slice(-4);
       for (const pattern of ['Push', 'Pull', 'Hinge', 'Squat', 'Carry']) {
@@ -701,7 +732,7 @@ export const INSIGHTS = [
     id: 'B-03', priority: 17, type: 'balance',
     trigger: ['WOCHE_ABGESCHLOSSEN'],
     evaluate(state) {
-      const sorted = getSortedWeeks(state);
+      const sorted = _realWeeks(state);
       if (sorted.length < 4) return null;
       const last4  = sorted.slice(-4);
       const curWk  = sorted[sorted.length - 1];
@@ -723,7 +754,7 @@ export const INSIGHTS = [
     id: 'B-04', priority: 18, type: 'balance',
     trigger: ['NEUE_WOCHE_ERSTELLT'],
     evaluate(state) {
-      const sorted = getSortedWeeks(state);
+      const sorted = _realWeeks(state);
       if (sorted.length < 8) return null;
       const last8 = sorted.slice(-8);
       const sets = last8.map(wk =>
@@ -744,7 +775,7 @@ export const INSIGHTS = [
     id: 'Z-02', priority: 6, type: 'goal',
     trigger: ['WOCHE_ABGESCHLOSSEN'],
     evaluate(state) {
-      const sorted = getSortedWeeks(state);
+      const sorted = _realWeeks(state);
       if (sorted.length < 3) return null;
       const last3 = sorted.slice(-3);
       const exNames = [...new Set(last3.flatMap(w => w.days.flatMap(d => d.exercises.map(e => e.name))))];
@@ -780,7 +811,7 @@ export const INSIGHTS = [
     id: 'Z-03', priority: 12, type: 'goal',
     trigger: ['WOCHE_ABGESCHLOSSEN'],
     evaluate(state) {
-      const sorted = getSortedWeeks(state);
+      const sorted = _realWeeks(state);
       if (sorted.length < 4) return null;
       const last4 = sorted.slice(-4);
       const exNames = [...new Set(last4.flatMap(w => w.days.flatMap(d => d.exercises.map(e => e.name))))];
@@ -819,7 +850,7 @@ export const INSIGHTS = [
     id: 'K-01', priority: 4, type: 'consistency',
     trigger: ['WOCHE_ABGESCHLOSSEN'],
     evaluate(state) {
-      const sorted = getSortedWeeks(state);
+      const sorted = _realWeeks(state);
       let streak = 0;
       for (let i = sorted.length - 1; i >= 0; i--) {
         if (sorted[i].days.some(d => d.markedDone)) streak++; else break;
@@ -839,7 +870,7 @@ export const INSIGHTS = [
     id: 'K-03', priority: 14, type: 'consistency',
     trigger: ['WOCHE_ABGESCHLOSSEN'],
     evaluate(state) {
-      const sorted = getSortedWeeks(state);
+      const sorted = _realWeeks(state);
       if (sorted.length < 2) return null;
       const curWk  = sorted[sorted.length - 1];
       const curRate = getCompletionRate(curWk);
@@ -859,7 +890,7 @@ export const INSIGHTS = [
     id: 'K-04', priority: 18, type: 'consistency',
     trigger: ['WOCHE_ABGESCHLOSSEN'],
     evaluate(state) {
-      const sorted = getSortedWeeks(state);
+      const sorted = _realWeeks(state);
       if (sorted.length < 8) return null;
       const avg4 = sorted.slice(-4).reduce((s, w) => s + w.days.filter(d => d.markedDone).length, 0) / 4;
       const avg8 = sorted.slice(-8, -4).reduce((s, w) => s + w.days.filter(d => d.markedDone).length, 0) / 4;
@@ -878,7 +909,7 @@ export const INSIGHTS = [
     id: 'W-02', priority: 16, type: 'warning',
     trigger: ['WOCHE_ABGESCHLOSSEN'],
     evaluate(state) {
-      const sorted = getSortedWeeks(state);
+      const sorted = _realWeeks(state);
       if (sorted.length < 5) return null;
       if (!sorted.slice(-5).every(wk => getCompletionRate(wk) < 0.6)) return null;
       return {
@@ -895,7 +926,7 @@ export const INSIGHTS = [
     id: 'W-03', priority: 15, type: 'warning',
     trigger: ['WOCHE_ABGESCHLOSSEN'],
     evaluate(state) {
-      const sorted = getSortedWeeks(state);
+      const sorted = _realWeeks(state);
       if (sorted.length < 3) return null;
       const last3 = sorted.slice(-3);
       const muscle = ['Brust','Rücken','Beine','Schulter','Bizeps','Trizeps','Bauch'];
@@ -919,7 +950,7 @@ export const INSIGHTS = [
     trigger: ['WOCHE_ABGESCHLOSSEN'],
     evaluate(state) {
       const year   = new Date().getFullYear().toString();
-      const sorted = getSortedWeeks(state).filter(w => w.startDate.startsWith(year));
+      const sorted = _realWeeks(state).filter(w => w.startDate.startsWith(year));
       if (sorted.length < 2) return null;
       const curWk  = sorted[sorted.length - 1];
       const curVol = trueVol(curWk);
@@ -940,7 +971,7 @@ export const INSIGHTS = [
     id: 'M-02', priority: 20, type: 'motivation',
     trigger: ['NEUE_WOCHE_ERSTELLT'],
     evaluate(state) {
-      const sorted = getSortedWeeks(state);
+      const sorted = _realWeeks(state);
       if (sorted.length < 12 || sorted.length % 4 !== 0) return null;
       const exNames = [...new Set(sorted.flatMap(w => w.days.flatMap(d => d.exercises.map(e => e.name))))];
       let best = null, bestGain = 0;
@@ -966,7 +997,7 @@ export const INSIGHTS = [
     id: 'M-03', priority: 21, type: 'motivation',
     trigger: ['WOCHE_ABGESCHLOSSEN'],
     evaluate(state) {
-      const sorted = getSortedWeeks(state);
+      const sorted = _realWeeks(state);
       if (sorted.length < 2) return null;
       const curRate  = getCompletionRate(sorted[sorted.length - 1]);
       const prevRate = getCompletionRate(sorted[sorted.length - 2]);
@@ -987,8 +1018,10 @@ export const INSIGHTS = [
     evaluate(state) {
       const curWk = state.weeks[state.curIdx];
       if (!curWk) return null;
+      // Utility-Schicht-Audit (Runde 29): isSeedWeek ergänzt -- gleiche
+      // Fehlerklasse wie B285/B325.
       const calcWeeks = state.weeks
-        .filter(w => w.mode !== 'deload' && w !== curWk)
+        .filter(w => !w.isSeedWeek && w.mode !== 'deload' && w !== curWk)
         .filter(w => w.days.some(d => d.exercises.some(ex => ex.sets.some(s => s.status === 'success'))));
       if (calcWeeks.length < 2) return null;
       const allExNames = [...new Set(curWk.days.flatMap(d => d.exercises.map(ex => ex.name)))];
@@ -1021,8 +1054,10 @@ export const INSIGHTS = [
     evaluate(state) {
       const curWk = state.weeks[state.curIdx];
       if (!curWk) return null;
+      // Utility-Schicht-Audit (Runde 29): isSeedWeek ergänzt -- gleiche
+      // Fehlerklasse wie B285/B325.
       const calcWeeks = state.weeks
-        .filter(w => w.mode !== 'deload' && w !== curWk)
+        .filter(w => !w.isSeedWeek && w.mode !== 'deload' && w !== curWk)
         .filter(w => w.days.some(d => d.exercises.some(ex => ex.sets.some(s => s.status === 'success'))));
       if (calcWeeks.length < 2) return null;
       const allExNames2 = [...new Set(curWk.days.flatMap(d => d.exercises.map(ex => ex.name)))];
@@ -1055,8 +1090,10 @@ export const INSIGHTS = [
     evaluate(state) {
       const curWk = state.weeks[state.curIdx];
       if (!curWk) return null;
+      // Utility-Schicht-Audit (Runde 29): isSeedWeek ergänzt -- gleiche
+      // Fehlerklasse wie B285/B325.
       const calcWeeks = state.weeks
-        .filter(w => w.mode !== 'deload' && w !== curWk)
+        .filter(w => !w.isSeedWeek && w.mode !== 'deload' && w !== curWk)
         .filter(w => w.days.some(d => d.exercises.some(ex => ex.sets.some(s => s.status === 'success'))));
       if (calcWeeks.length < 2) return null;
       const allExNames3 = [...new Set(curWk.days.flatMap(d => d.exercises.map(ex => ex.name)))];

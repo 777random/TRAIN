@@ -1,5 +1,34 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-08-17 — Runde 28 (train-v253→v254, B327-B331):
+*Letzte Aktualisierung: 2026-08-17 — Runde 29 (train-v254→v255, B332-B343):
+Geteilte-Utility-Schicht-Audit, dritte von vier angekündigten Folgerunden
+nach Fortschritt-Tab (Runde 27) und Onboarding-Flow (Runde 28). 3 parallele
+Diagnose-Agenten (insightEngine.js Kernfunktionen, insightEngine.js
+INSIGHTS-Toast-Array, plateauDetector.js+consistencyUtils.js) fanden 8
+bestätigte + 4 Verdachtsfälle. weekReview.js/sessionSummary.js (bereits in
+Runde 27 vollständig geprüft) und weeklyFocus.js (Kernschwerpunkt Runde 24)
+wurden bewusst nicht erneut vollständig auditiert, um Doppelarbeit zu
+vermeiden. Ergebnis in
+`Diagnose & Sprints/diagnose-utility-schicht-audit-2026-08-17.txt`. Nutzer
+wählte "alle 12 fixen" -> B332-B343 umgesetzt. Wichtigster Fund (B343): das
+komplette INSIGHTS-Toast-System (~22 Insight-Definitionen, nie zuvor als
+eigenständiges Subsystem auditiert) hatte eine systemische isSeedWeek-
+Filterlücke -- K-01 zählte die Startwerte-Woche in der Streak mit, K-03
+("Beste Woche") und M-01 ("Bestes Jahr") konnten durch die künstlich
+perfekte Seed-Woche dauerhaft unterdrückt werden. Neuer gemeinsamer
+`_realWeeks()`-Helper statt 22 einzelner Inline-Filter. plateauDetector.js
+zeigte gleich drei aus früheren Runden bekannte Fehlerklassen (pending-
+Sätze im Nenner wie B269, archivierte Übungen wie B272, B337/B336) PLUS
+einen neuen Bug: `exNames`-Filter blacklistete einen Übungsnamen dauerhaft,
+sobald er jemals als Substitutions-Ziel auftrat -- auch für seine eigenen,
+nicht-substituierten Wochen (B338). B340 deckte zwei unabhängige,
+methodisch verschiedene Schlaf-Korrelations-Implementierungen auf (dritte
+Fundstelle der "widersprüchliche Parallel-Implementierungen"-Fehlerklasse
+nach B293/B317) -- bewusst nicht zusammengeführt, nur die inkonsistente
+Deload-/Urlaub-Filterung angeglichen. 6 neue Tests
+(utility_layer_audit_fixes.spec.js, davon 3 als reine Node-Unit-Tests ohne
+Browser für plateauDetector.js). Volle Regressionssuite (106 Spec-Dateien,
+gebatcht) komplett grün -- erstmals seit mehreren Runden ohne jedes Flake.
+Davor: Runde 28 (train-v253→v254, B327-B331):
 Onboarding-Flow-Audit, zweite von vier angekündigten Folgerunden nach
 Fortschritt-Tab (Runde 27). 2 parallele Diagnose-Agenten (Onboarding-
 Overlay-UI in ui.js, zugehörige Reducer in state.js) fanden 5 bestätigte
