@@ -1,6 +1,6 @@
 # TRAIN — Bug-Tracking
 *Wird nach jedem Sprint aktualisiert*
-*Stand: August 2026 / train-v253*
+*Stand: August 2026 / train-v254*
 
 ---
 
@@ -8,6 +8,11 @@
 
 | ID | Beschreibung | Version | Commit | Root Cause |
 |----|-------------|---------|--------|-----------|
+| B331 | Fünf unabhängige UTC-statt-lokal-Datum-Stellen im Onboarding-Bereich (`_applyTpl()`, `_applyBlank()`, `_finish()`s Seed-Startdatum, `_nextMonday()`, `_currentMonday()`) | v254 | — | Runde 28 (Onboarding-Flow-Audit). Dasselbe, im Projekt bereits mehrfach gefixte `.toISOString()`-Antimuster (B278/B287/B300/B305). Betrifft das Startdatum jeder neu onboardeten Woche UND den automatischen Wochenwechsel-Trigger. |
+| B330 | `_appendDefaultWeek()` ist eine FÜNFTE unabhängige Klon-Reset-Kopie mit denselben Lücken wie B288/B308 | v254 | — | Runde 28 (Onboarding-Flow-Audit). Rief nur `_resetExerciseSubstitution()` auf, jetzt `_resetClonedDays()` -- betrifft den ONBOARDING_DONE-Fallback UND den BACKUP_IMPORT-Fallback bei 0 importierten Wochen. |
+| B329 | Verwaiste Startwerte aus einer verworfenen Vorlagen-Auswahl landeten trotzdem in der Seed-Woche -- auch bei "Ohne Vorlage starten" | v254 | — | Runde 28 (Onboarding-Flow-Audit). `_finish()` iterierte `_startwerte` ungefiltert ohne Bezug zur final gewählten Vorlage; kein Reset beim Vorlagenwechsel oder beim "Ohne Vorlage"-Pfad. |
+| B328 | Keine Validierung/Obergrenze bei Startwerte-Eingaben (Gewicht/Wdh/RPE) im Onboarding | v254 | — | Runde 28 (Onboarding-Flow-Audit). Gleiche Fehlerklasse wie B304 (Körper-/Zielgewicht, Runde 26), hier unabhängig übersehen -- Obergrenze Gewicht ≤400, RPE auf [1,10] geklemmt. |
+| B327 | Vergessener Debug-`console.log` in `_showOnboarding()` entfernt | v254 | — | Runde 28 (Onboarding-Flow-Audit, Cleanup). Einziger console.log-Aufruf in ganz ui.js. |
 | B326 | Startwerte-Woche an DREI unabhängigen Stellen als "reviewbare" Woche wählbar (reviewableWeeks/_updateInlineReview, _runAutoWeekFlow, open-new-week) | v253 | — | Runde 27 (Fortschritt-Tab-Audit). ONBOARDING_SEED setzt den Seed-Tag mit markedDone:true, alle drei Stellen prüften nur markedDone, nie isSeedWeek. Führte zu einem fabrizierten Wochenrückblick mit erfundenen "Neuer PR"-Meldungen direkt nach dem Onboarding, inkl. funktionierendem Share-Button. |
 | B325 | `_updateExChart()`s calcWeeks (Hauptchart "Übungsfortschritt") schloss die Startwerte-Woche nicht aus | v253 | — | Runde 27 (Fortschritt-Tab-Audit). Fünfte unabhängige Fundstelle dieser Fehlerklasse (nach B267/B285/B310), diesmal im sichtbarsten Chart der App. |
 | B324 | `_renderMovementPattern()` (Bewegungsmuster-Karte + Push/Pull-Verhältnis) filterte weder isSeedWeek noch vacation | v253 | — | Runde 27 (Fortschritt-Tab-Audit). Beide Zeitfenster filterten nur mode!=='deload'; der Karten-Untertitel bestätigte die Lücke implizit selbst. |

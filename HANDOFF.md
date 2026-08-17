@@ -1,5 +1,25 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-08-17 — Runde 27 (train-v252→v253, B311-B326):
+*Letzte Aktualisierung: 2026-08-17 — Runde 28 (train-v253→v254, B327-B331):
+Onboarding-Flow-Audit, zweite von vier angekündigten Folgerunden nach
+Fortschritt-Tab (Runde 27). 2 parallele Diagnose-Agenten (Onboarding-
+Overlay-UI in ui.js, zugehörige Reducer in state.js) fanden 5 bestätigte
+Bugs -- deutlich kleinerer Fund-Umfang als bei den Tab-Audits, passend zur
+kleineren Codebasis. Ergebnis in
+`Diagnose & Sprints/diagnose-onboarding-flow-audit-2026-08-17.txt`. Nutzer
+wählte "alle 5 fixen" -> B327-B331 umgesetzt. Wichtigste Fixes: FÜNF
+unabhängige UTC-statt-lokal-Datum-Stellen (_applyTpl/_applyBlank/_finish in
+ui.js, _nextMonday/_currentMonday in state.js -- B331); _appendDefaultWeek()
+als FÜNFTE unabhängige Klon-Reset-Kopie mit denselben Lücken wie B288/B308,
+jetzt auf _resetClonedDays() vereinheitlicht (B330); verwaiste Startwerte
+aus einer verworfenen Vorlagen-Auswahl landeten trotzdem in der Seed-Woche
+(B329); fehlende Obergrenze bei Startwerte-Eingaben, gleiche Fehlerklasse
+wie B304 (B328). Nebenbei ein vergessener Debug-console.log entfernt
+(B327, einziger in ganz ui.js). 4 neue Tests
+(onboarding_flow_audit_fixes.spec.js). Volle Regressionssuite
+(105 Spec-Dateien, gebatcht) grün, 1 vorbestehendes Flake
+(trainingstab_audit_fixes.spec.js Phantom-PR-Test, bereits aus Runde 26/27
+bekannt) auf Retry grün.
+Davor: Runde 27 (train-v252→v253, B311-B326):
 Fortschritt-Tab-Audit auf Nutzeranfrage ("audit all things listed, beginn
 with fortschritt tab und dann weiter mit dem Rest"), erste von vier
 angekündigten Folgerunden (Onboarding-Flow, geteilte Utility-Schicht, PWA/

@@ -1418,7 +1418,15 @@ function _resortWeeksKeepingCurrent(state, refWeek) {
 
 function _appendDefaultWeek(startDate) {
   const days = clone(STATE.customTemplate ?? FACTORY_TEMPLATE);
-  days.forEach(day => (day.exercises ?? []).forEach(ex => _resetExerciseSubstitution(ex)));
+  // Onboarding-Flow-Audit (Runde 28): _resetClonedDays() statt der
+  // unvollständigen manuellen _resetExerciseSubstitution()-Nur-Kopie --
+  // fünfte unabhängige Klon-Reset-Fundstelle mit denselben Lücken wie
+  // B288/B308 (locked/markedDone/isVacation, alle Session-Felder,
+  // skipReason/skipDate, Satz-Bewertungen blieben bisher stehen).
+  // customTemplate kann aus einer echten, bereits bespielten Woche stammen
+  // ("Woche als Vorlage speichern") -- relevant für beide Aufrufer dieser
+  // Funktion: den ONBOARDING_DONE-Fallback und den BACKUP_IMPORT-Fallback.
+  _resetClonedDays(days);
   const newWk = {
     id:         Date.now(),
     startDate:  startDate ?? _nextMonday(),
@@ -1433,11 +1441,14 @@ function _appendDefaultWeek(startDate) {
   _resortWeeksKeepingCurrent(STATE, newWk);
 }
 
+// Onboarding-Flow-Audit (Runde 28): lokales Datum statt .toISOString()
+// (UTC) -- dasselbe, im Projekt bereits mehrfach gefixte Antimuster
+// (_localISODateToday() oben, weekReview.js _localISODate() u.a.).
 function _nextMonday() {
   const d   = new Date();
   const dow = d.getDay(); // 0 = Sunday
   d.setDate(d.getDate() + (dow === 0 ? 1 : 8 - dow));
-  return d.toISOString().split('T')[0];
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 /**
@@ -1450,7 +1461,9 @@ function _currentMonday() {
   const d   = new Date();
   const dow = d.getDay(); // 0 = Sunday
   d.setDate(d.getDate() + (dow === 0 ? -6 : 1 - dow));
-  return d.toISOString().slice(0, 10);
+  // Onboarding-Flow-Audit (Runde 28): lokales Datum statt .toISOString()
+  // (UTC), gleicher Grund wie bei _nextMonday() oben.
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 /**

@@ -10239,7 +10239,6 @@ function _showBackupReminderToast() {
 
 function _showOnboarding() {
   const st = getState();
-  console.log('[TRAIN] _showOnboarding called — weeks:', st.weeks.length, 'onboardingDone:', st.onboardingDone);
   if (st.weeks.length > 0 || st.onboardingDone === true) return;
   if (document.getElementById('onboarding')) return;
   _onboardingActive = true;
@@ -10441,7 +10440,20 @@ function _showOnboarding() {
     if (!name || !field) return;
     if (!_startwerte[name]) _startwerte[name] = {};
     const raw = inp.value.trim();
-    _startwerte[name][field] = raw === '' ? null : +raw;
+    let val = raw === '' ? null : +raw;
+    // Onboarding-Flow-Audit (Runde 28): Obergrenzen ergänzt -- die HTML-
+    // min/max-Attribute oben wurden bisher nie per JS durchgesetzt, ein
+    // Tippfehler landete unbegrenzt im Seed-Datensatz und verzerrte die
+    // erste echte Gewichtsempfehlung/den PR-Kaltstart. Gleiche Fehlerklasse
+    // wie B304 (Körper-/Zielgewicht, Runde 26).
+    if (val != null && Number.isFinite(val)) {
+      if (field === 'weight' && (val < 0 || val > 400)) val = null;
+      else if (field === 'reps' && val < 1) val = null;
+      else if (field === 'rpe' && (val < 1 || val > 10)) val = null;
+    } else if (val != null) {
+      val = null;
+    }
+    _startwerte[name][field] = val;
   });
 
   el.addEventListener('click', e => {
@@ -10449,6 +10461,14 @@ function _showOnboarding() {
     if (!btn) return;
     switch (btn.dataset.ob) {
       case 'select':
+        // Onboarding-Flow-Audit (Runde 28): _startwerte zurückgesetzt --
+        // die Startwerte-Eingabe zeigt/erlaubt nur Übungen der aktuell
+        // gewählten Vorlage (tplExercises, siehe oben), aber bereits
+        // eingetragene Werte für Übungen einer VORHERIGEN Vorlagenwahl
+        // blieben bisher im lokalen State und landeten trotzdem in der
+        // Seed-Woche (ONBOARDING_SEED) -- auch wenn die Übung in der final
+        // geladenen Vorlage gar nicht mehr vorkam.
+        _startwerte = {};
         _selTpl = +btn.dataset.tpl; _render(); break;
       case 'select-exp': {
         _expLevel = _expLevel === btn.dataset.exp ? null : btn.dataset.exp;
@@ -10468,6 +10488,12 @@ function _showOnboarding() {
         if (_selTpl !== null) _applyTpl(_selTpl);
         _afterSetup(); break;
       case 'skip':
+        // Onboarding-Flow-Audit (Runde 28): _startwerte zurückgesetzt --
+        // "Ohne Vorlage starten" kann auch nach einer vorherigen
+        // Vorlagenwahl+Startwerte-Eingabe geklickt werden (kein
+        // erzwungenes Deselektieren); ohne Reset landeten diese Werte
+        // trotzdem in der Seed-Woche, obwohl gar keine Vorlage geladen wird.
+        _startwerte = {};
         _applyBlank(); _afterSetup(); break;
       case 'install-native': {
         const dp = window.__trainInstallPrompt;
@@ -10545,7 +10571,11 @@ function _showOnboarding() {
     const d   = new Date();
     const dow = d.getDay();
     d.setDate(d.getDate() + (dow === 0 ? -6 : 1 - dow));
-    const startDate = d.toISOString().slice(0, 10);
+    // Onboarding-Flow-Audit (Runde 28): lokales Datum statt .toISOString()
+    // (UTC) -- dasselbe, im Projekt bereits mehrfach gefixte Antimuster.
+    // Nahe Mitternacht in Deutschland (positive UTC-Differenz) konnte der
+    // berechnete "aktuelle Montag" um einen Tag verschoben sein.
+    const startDate = _localISODate(d);
     const days = tpl.days.map((ds, di) => ({
       id: Date.now() + di,
       title: ds.title, subtitle: '',
@@ -10601,7 +10631,9 @@ function _showOnboarding() {
     const d = new Date();
     const dow = d.getDay();
     d.setDate(d.getDate() + (dow === 0 ? -6 : 1 - dow));
-    const startDate = d.toISOString().slice(0, 10);
+    // Onboarding-Flow-Audit (Runde 28): lokales Datum statt .toISOString()
+    // (UTC), gleicher Grund wie bei _applyTpl().
+    const startDate = _localISODate(d);
     const days = [{
       id: Date.now(), title: 'Tag A', subtitle: '', warmup: '', cooldown: '',
       locked: false, markedDone: false, isVacation: false,
