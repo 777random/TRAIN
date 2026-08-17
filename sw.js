@@ -16,7 +16,7 @@
  *   asset conflicts.
  */
 
-const CACHE_VERSION  = 'train-v252';
+const CACHE_VERSION  = 'train-v253';
 
 // Runde 20 (Befund 4): kurze Änderungsliste für den aktuellen Build, im
 // Update-Banner beim Aufklappen ("mehr Details") angezeigt. 2-3 knappe
@@ -28,9 +28,9 @@ const CACHE_VERSION  = 'train-v252';
 // (Browser-Update-Algorithmus) -- die Werte sind dadurch garantiert die des
 // NEUEN, wartenden Workers, ganz ohne zusätzlichen Cache-Bypass.
 const CHANGELOG_ENTRIES = [
-  'Körpergewicht-Eingabe: Tippfehler-Schutz (Obergrenze) und korrektes lokales Datum',
-  'Körper-Tab: Relative-Stärke-Chart zeigt keine verzerrten Werte mehr durch die Startwerte-Woche',
-  'Einstellungen: unfertiges BMI-Feld entfernt, Vorlagen-Übungen jetzt mit vollständigen Einstellungen',
+  'Fortschritt-Tab: Wochenrückblick direkt nach dem Onboarding zeigt keine erfundenen "Neuer PR"-Meldungen mehr',
+  'Übungsfortschritt-Chart, Bestleistungen und Bewegungsmuster zeigen keine verzerrten Werte mehr durch die Startwerte-Woche',
+  '"Ø Erfolg"- und "Wochen"-Anzeige im Fortschritt-Tab jetzt konsistent mit der Streak',
 ];
 
 /**

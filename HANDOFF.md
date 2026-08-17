@@ -1,5 +1,34 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-08-17 — Runde 26 (train-v251→v252, B297-B310):
+*Letzte Aktualisierung: 2026-08-17 — Runde 27 (train-v252→v253, B311-B326):
+Fortschritt-Tab-Audit auf Nutzeranfrage ("audit all things listed, beginn
+with fortschritt tab und dann weiter mit dem Rest"), erste von vier
+angekündigten Folgerunden (Onboarding-Flow, geteilte Utility-Schicht, PWA/
+Service-Worker+Backup/Restore folgen als eigene Runden). 4 parallele
+Diagnose-Agenten (ui.js-Aggregationsschicht/renderProgressTab,
+progressChart.js+Chart-Wrapper, weekReview.js/weekReviewModal.js,
+progressInsights.js/overallPerformance.js/sessionSummary.js) fanden 10
+bestätigte + 6 Verdachtsfälle -- Ergebnis in
+`Diagnose & Sprints/diagnose-fortschritt-tab-audit-2026-08-17.txt`. Nutzer
+wählte "alle 17 fixen" (16 tatsächliche Funde, davon 1 reiner Cleanup-Fund
+ohne Bug) -> B311-B326 umgesetzt. Wichtigster Fund (B326): die
+Startwerte-Woche war an DREI unabhängigen Stellen als "reviewbare" Woche
+wählbar (reviewableWeeks/_updateInlineReview im Fortschritt-Tab,
+_runAutoWeekFlow, open-new-week-Handler) -- ein brandneuer Nutzer konnte
+direkt nach dem Onboarding einen fabrizierten Wochenrückblick mit
+erfundenen "Neuer PR"-Meldungen sehen, inklusive funktionierendem
+Share-Button. Zweithäufigstes Muster: dieselbe isSeedWeek-Filterlücke wie
+in allen 3 vorherigen Audit-Runden, hier an 9 weiteren unabhängigen Stellen
+reproduziert -- darunter auch eine Korrektur zu Runde 25 selbst (B325,
+`_updateExChart()`s Hauptchart "Übungsfortschritt" war fälschlich als
+Fortschritt-Tab-fremd eingestuft und blieb ungefixt). B317 ist die zweite
+Fundstelle der "mehrere Absätze derselben Karte filtern uneinheitlich"-
+Fehlerklasse nach B293 (Runde 25). Nebenbei ~65 Zeilen toten Code entfernt
+(`_drawHeatmap()`/`drawLineChart()`, Überbleibsel vor der SVG-Chart-
+Umstellung). 7 neue Tests (fortschritt_tab_audit_fixes.spec.js). Volle
+Regressionssuite (104 Spec-Dateien, gebatcht) grün, 1 vorbestehendes Flake
+(trainingstab_audit_fixes.spec.js Phantom-PR-Test, bereits aus Runde 26
+bekannt) auf Retry grün.
+Davor: Runde 26 (train-v251→v252, B297-B310):
 Körper-Tab + Einstellungen-Audit auf Nutzeranfrage ("mach auch Körper-Tab und
 Einstellungen"), analog zu Coach-Tab (Runde 24) und Trainings-Tab (Runde 25).
 4 parallele Diagnose-Agenten (Körpergewicht/BMI, Relative-Stärke/Schlaf-

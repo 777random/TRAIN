@@ -188,7 +188,13 @@ export async function shareWeekReviewImage(reviewData, variant = 'best') {
         highlights: (highlights ?? []).map(h => ({ label: h.label, text: h.text })),
       });
     } else {
-      const sorted = reviewData.allWeeks ? getSortedWeeks({ weeks: reviewData.allWeeks }) : [week];
+      // Fortschritt-Tab-Audit (Runde 27): isSeedWeek ausgeschlossen -- der
+      // Fix gehört bewusst hier am Konsumenten, nicht zentral in
+      // getSortedWeeks() (diese dient andernorts als PR-/Gewichts-
+      // Kaltstart-Baseline, Präzedenz Runde 24). Ohne den Ausschluss konnte
+      // das selbst geschätzte Startgewicht als ältester Punkt in der Share-
+      // Bild-Sparkline ("Beste Übung") erscheinen.
+      const sorted = reviewData.allWeeks ? getSortedWeeks({ weeks: reviewData.allWeeks }).filter(w => !w.isSeedWeek) : [week];
       const favs   = reviewData.favoriteExercises ?? [];
       const best   = _pickBestExercise(reviewData, sorted, favs);
       const weights = best ? exWeightHistory(sorted, best.name).slice(-8).filter(w => w > 0) : [];

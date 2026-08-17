@@ -291,6 +291,14 @@ function _buildRecommendations(highlights, lowlights, completedDays, plannedDays
   } else if (h1?.type === 'streak') {
     const n = parseInt(h1.text, 10);
     recs.push({ text: `${n} Wochen konsistentes Training — weiter so und achte auf Überbelastungszeichen.` });
+  } else if (h1?.type === 'perfect') {
+    // Fortschritt-Tab-Audit (Runde 27): fehlender Zweig -- 'perfect'
+    // (Runde 23/B268) fiel bisher in den generischen else-Fallback statt
+    // wie 'pr'/'gain'/'streak' die konkrete Übung zu nennen. Die
+    // verschmolzene Highlight+Lowlight-Variante (_mergedHighlightLowlightText)
+    // behandelt 'perfect' bereits korrekt, hier war die Nachbarstelle
+    // übersehen worden.
+    recs.push({ text: `${h1.exName} lief diese Woche fehlerfrei — ein guter Kandidat für die nächste kleine Steigerung.` });
   } else {
     recs.push({ text: 'Konsistenz ist der Schlüssel — halte das Tempo bei und fokussiere dich auf saubere Technik.' });
   }
@@ -362,7 +370,12 @@ export function buildWeekReview(week, allWeeks, favoriteExercises = []) {
   // bereits etablierten Muster in insightEngine.js/ui.js/state.js (Gewicht
   // ist in einer Deload-Woche absichtlich reduziert, kein echter PR/Fortschritt).
   const highlights  = [];
-  const prevWeeks   = weekIdx > 0 ? sorted.slice(0, weekIdx).filter(w => w.mode !== 'deload') : [];
+  // Fortschritt-Tab-Audit (Runde 27): isSeedWeek + vacation ergänzt --
+  // vorher nur Deload ausgeschlossen. Die Startwerte-Woche (selbst
+  // geschätztes Gewicht, kein echtes Training) konnte so als PR-Baseline
+  // einfließen, gleiche Fehlerklasse wie bei den 3 Fundstellen, an denen die
+  // Seed-Woche selbst als reviewbar galt.
+  const prevWeeks   = weekIdx > 0 ? sorted.slice(0, weekIdx).filter(w => w.mode !== 'deload' && w.mode !== 'vacation' && !w.isSeedWeek) : [];
   let prH = null, gainH = null;
   if (!isDeload) {
     prH = _withFavoritesFirst(names => _findPR(week, prevWeeks, names), favoriteExercises);
@@ -372,7 +385,9 @@ export function buildWeekReview(week, allWeeks, favoriteExercises = []) {
   // Übung wie "Neuer PR" nochmal an (beides aus demselben Max-Gewicht
   // abgeleitet) -- reine Redundanz ohne neue Info. Übersprungen, wenn beide
   // Highlights dieselbe Übung meinen (Option A der Diagnose).
-  if (!isDeload && prevWeek && prevWeek.mode !== 'deload') {
+  // Fortschritt-Tab-Audit (Runde 27): isSeedWeek + vacation ergänzt, gleicher
+  // Grund wie beim prevWeeks-Filter oben.
+  if (!isDeload && prevWeek && prevWeek.mode !== 'deload' && prevWeek.mode !== 'vacation' && !prevWeek.isSeedWeek) {
     gainH = _withFavoritesFirst(names => _findBestGain(week, prevWeek, names), favoriteExercises);
     if (gainH && gainH.exName !== prH?.exName && highlights.length < 3) highlights.push(gainH);
     else gainH = null;

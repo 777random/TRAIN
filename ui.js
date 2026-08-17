@@ -1216,7 +1216,11 @@ function _realDayDate(day, week, dayIdx) {
  */
 function _computeBestleistungen(state) {
   const best = new Map(); // name -> { weight, reps, date, daySets }
-  state.weeks.forEach(wk => {
+  // Fortschritt-Tab-Audit (Runde 27): isSeedWeek ausgeschlossen -- die
+  // synthetische Startwerte-Woche (ein selbst geschätztes Gewicht, kein
+  // echtes Trainingsereignis) konnte sonst als "Bestleistung" erscheinen.
+  // Gleiche Fehlerklasse wie B267/B285/B310.
+  state.weeks.filter(wk => !wk.isSeedWeek).forEach(wk => {
     wk.days.forEach((day, di) => {
       const byName = new Map();
       day.exercises.forEach(ex => {
@@ -3618,8 +3622,11 @@ function _renderMovementPattern(state) {
   const customCatMap = buildCategoryMap(state.customExercises);
 
   // ── Balken: letzte 4 Wochen (ohne Deload) ────────────────────────────────
+  // Fortschritt-Tab-Audit (Runde 27): isSeedWeek + vacation ergänzt --
+  // vorher nur mode!=='deload' (der Untertitel unten bestätigte die Lücke
+  // implizit selbst). Gleiche Fehlerklasse wie B267/B285/B310.
   const last4 = [...state.weeks]
-    .filter(w => w.mode !== 'deload')
+    .filter(w => !w.isSeedWeek && w.mode !== 'deload' && w.mode !== 'vacation')
     .sort((a, b) => a.startDate.localeCompare(b.startDate))
     .slice(-4);
   if (!last4.length) return '';
@@ -3658,7 +3665,7 @@ function _renderMovementPattern(state) {
   // ── Push/Pull-Ratio: erkenntnisseHorizont Wochen ─────────────────────────
   const horizont = state.settings?.erkenntnisseHorizont ?? 8;
   const lastN = [...state.weeks]
-    .filter(w => w.mode !== 'deload')
+    .filter(w => !w.isSeedWeek && w.mode !== 'deload' && w.mode !== 'vacation')
     .sort((a, b) => a.startDate.localeCompare(b.startDate))
     .slice(-horizont);
   let pushSets = 0, pullSets = 0;
@@ -4476,7 +4483,13 @@ function _overallPerformanceParagraphs(state, N = 8) {
   // gar nicht mehr nach isSeedWeek filtern. Der Ausschluss muss daher hier
   // an der Quelle passieren, sonst hebt die künstlich perfekte Startwerte-
   // Woche die "Erfolgsquote"-Trendberechnung an.
-  const sortedWeeks = [...state.weeks].filter(w => !w.isSeedWeek).sort((a, b) => a.startDate.localeCompare(b.startDate));
+  // Fortschritt-Tab-Audit (Runde 27): Deload + Urlaub ergänzt -- vorher nur
+  // isSeedWeek, während die 3 anderen Absätze derselben Karte
+  // (Konsistenz/Volumen/Breite) bereits Deload (+teils Urlaub) ausschließen.
+  // Die "Qualität"-Zeile bezog dadurch als einzige noch reduzierte Deload-
+  // Intensität und Urlaubswochen mit ein -- widersprüchlich wirkende Trends
+  // innerhalb derselben Karte.
+  const sortedWeeks = [...state.weeks].filter(w => !w.isSeedWeek && w.mode !== 'deload' && w.mode !== 'vacation').sort((a, b) => a.startDate.localeCompare(b.startDate));
   const scoredWeeks = sortedWeeks.map(w => _weekSuccessScore(w));
 
   const quality     = computeQualityTrend(scoredWeeks, N);
@@ -4716,7 +4729,14 @@ function renderProgressTab(state) {
   const sorted = [...state.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
 
   // ── Wochenrückblick-Auswahl ───────────────────────────────────────────────
-  const reviewableWeeks = [...sorted].filter(w => w.days.some(d => d.markedDone)).reverse();
+  // Fortschritt-Tab-Audit (Runde 27): isSeedWeek ausgeschlossen -- der
+  // Seed-Tag (ONBOARDING_SEED, state.js) hat immer markedDone:true, die
+  // Startwerte-Woche konnte dadurch als "reviewbare" Woche erscheinen und
+  // buildWeekReview() lief mit prevWeeks=[], wodurch JEDE Startwerte-Übung
+  // als "Neuer PR" gemeldet wurde -- fabrizierter, teilbarer Rückblick
+  // direkt nach dem Onboarding. Gleiche Prüfung auch in _updateInlineReview()
+  // unten (unabhängige zweite Kopie desselben Filters).
+  const reviewableWeeks = [...sorted].filter(w => !w.isSeedWeek && w.days.some(d => d.markedDone)).reverse();
   const weekReviewHtml = reviewableWeeks.length ? (() => {
     const opts = reviewableWeeks.map((wk, i) => {
       const lbl = `${_weekLabel(wk, state.weeks)} · ${wkRange(wk.startDate)}${wk.note ? ' · ' + wk.note : ''}`;
@@ -4738,7 +4758,11 @@ function renderProgressTab(state) {
   const coachBilanzHtml  = _coachBilanzHtml(state);
 
   const streak     = _calcStreak(state);
-  const _scoreList = state.weeks.map(w => _weekSuccessScore(w)).filter(s => s.total > 0).map(s => s.pct);
+  // Fortschritt-Tab-Audit (Runde 27): isSeedWeek ausgeschlossen -- die
+  // Startwerte-Woche hat immer 100% Erfolgsquote (1 bewerteter 'success'-
+  // Satz pro Übung) und hob den "Ø Erfolg"-Badge bei wenigen echten Wochen
+  // künstlich an.
+  const _scoreList = state.weeks.filter(w => !w.isSeedWeek).map(w => _weekSuccessScore(w)).filter(s => s.total > 0).map(s => s.pct);
   const avgScore   = _scoreList.length > 0 ? Math.round(_scoreList.reduce((a, b) => a + b, 0) / _scoreList.length) : null;
   const archivedNames = new Set(
     state.weeks.flatMap(w => w.days.flatMap(d => d.exercises.filter(e => e.archived).map(e => e.name)))
@@ -4831,6 +4855,13 @@ function renderProgressTab(state) {
 
   <div class="chart-card">
     ${(() => {
+      // Fortschritt-Tab-Audit (Runde 27): trainedWeeksCount ohne Startwerte-
+      // Woche -- vorher zeigte diese Kachel state.weeks.length roh, während
+      // die Streak-Kacheln direkt daneben (_calcStreak(), via
+      // _weekTrainingStatus()) die Seed-Woche bereits korrekt ausschließen.
+      // Ein Nutzer mit 1 Trainingswoche + Startwerten sah "2 Wochen" neben
+      // einer Streak von "1".
+      const trainedWeeksCount = state.weeks.filter(w => !w.isSeedWeek).length;
       const allLogs  = state.weeks.flatMap(w => w.sessionLog ?? []);
       const totalMin = allLogs.length ? Math.round(allLogs.reduce((s, l) => s + l.duration, 0) / 60) : null;
       const avgMin   = allLogs.length ? Math.round(totalMin / allLogs.length) : null;
@@ -4839,7 +4870,7 @@ function renderProgressTab(state) {
     <div class="streak-row">
       <div class="streak-card"><div class="streak-num">${streak.cur}</div><div class="streak-lbl">Wochen</div></div>
       <div class="streak-card"><div class="streak-num">${streak.best}</div><div class="streak-lbl">Längste</div></div>
-      <div class="streak-card"><div class="streak-num">${state.weeks.length}</div><div class="streak-lbl">Wochen</div></div>
+      <div class="streak-card"><div class="streak-num">${trainedWeeksCount}</div><div class="streak-lbl">Wochen</div></div>
       ${avgScore !== null ? `
       <button type="button" class="streak-card" data-action="toggle-metric-tooltip" data-metric="avg-score" aria-expanded="${_metricTooltipKey === 'avg-score'}" aria-label="Ø Erfolg erklären">
         <div class="streak-num" style="color:${avgScore>=90?'var(--c-ok)':avgScore>=70?'var(--c-warn)':'var(--c-danger)'}">${avgScore}%</div>
@@ -4872,9 +4903,13 @@ function _updateInlineReview(state) {
   const sel  = document.getElementById('week-review-select');
   const wrap = document.getElementById('week-review-inline');
   if (!sel || !wrap) return;
+  // Fortschritt-Tab-Audit (Runde 27): isSeedWeek ausgeschlossen, muss mit
+  // dem reviewableWeeks-Filter in renderProgressTab() (dieselbe Fehlerklasse,
+  // unabhängige zweite Kopie) synchron bleiben, da die Indizes im
+  // week-review-select sonst nicht mehr übereinstimmen.
   const reviewable = [...state.weeks]
     .sort((a, b) => a.startDate.localeCompare(b.startDate))
-    .filter(w => w.days.some(d => d.markedDone))
+    .filter(w => !w.isSeedWeek && w.days.some(d => d.markedDone))
     .reverse();
   const wk = reviewable[+sel.value];
   if (!wk) { wrap.innerHTML = ''; return; }
@@ -4943,8 +4978,12 @@ function _attachChartTooltips(container) {
  * berechnet, kein gespeicherter Zustand.
  */
 function _corridorFor(state, exName) {
+  // Fortschritt-Tab-Audit (Runde 27): isSeedWeek ergänzt (Docstring oben
+  // nannte bisher nur Deload/Urlaub) -- sonst konnte die Korridor-
+  // Kalibrierung die Steigerungsrate ab dem künstlichen Seed-Startpunkt
+  // statt der ersten echten Trainingswoche berechnen.
   const sortedWeeks = [...state.weeks]
-    .filter(w => w.mode !== 'deload' && w.mode !== 'vacation')
+    .filter(w => !w.isSeedWeek && w.mode !== 'deload' && w.mode !== 'vacation')
     .sort((a, b) => a.startDate.localeCompare(b.startDate));
   return getProgressCorridorCalibration(sortedWeeks, exName);
 }
@@ -4966,8 +5005,12 @@ function _updateExChart(state) {
   const wrap = document.getElementById('chart-ex-wrap');
   if (!sel || !wrap) return;
   const name = sel.value;
+  // Fortschritt-Tab-Audit (Runde 27): isSeedWeek ergänzt -- das selbst
+  // geschätzte Startgewicht konnte sonst als erster Punkt im Hauptchart
+  // erscheinen. Fünfte unabhängige Fundstelle dieser Fehlerklasse
+  // (B267/B285/B310).
   const calcWeeks = [...state.weeks]
-    .filter(w => w.mode !== 'deload')
+    .filter(w => !w.isSeedWeek && w.mode !== 'deload')
     .sort((a, b) => a.startDate.localeCompare(b.startDate))
     .slice(-16);
   const corridor = _corridorFor(state, name);
@@ -5020,9 +5063,12 @@ function _renderStrengthGain(name, state) {
 function _renderLast4Units(name, state) {
   const rpeEnabled = state.settings?.rpeEnabled ?? true;
   const weeksWithEx = [];
+  // Fortschritt-Tab-Audit (Runde 27): isSeedWeek ergänzt -- die Startwerte-
+  // Woche konnte sonst mit KW-Label wie eine reguläre vergangene
+  // Trainingseinheit in "Letzte 4 Einheiten" auftauchen.
   const sorted = [...state.weeks].sort((a, b) => b.startDate.localeCompare(a.startDate));
   for (const wk of sorted) {
-    if (wk.mode === 'deload') continue;
+    if (wk.mode === 'deload' || wk.isSeedWeek) continue;
     const found = wk.days.flatMap(d => d.exercises ?? [])
       .find(ex => ex.name === name || ex.substituteFor === name);
     if (found?.sets?.length) weeksWithEx.push({ wk, ex: found });
@@ -5065,73 +5111,6 @@ function _renderLast4Units(name, state) {
     <summary class="l4-summary">📋 Letzte 4 Einheiten</summary>
     <div class="l4-body">${sections}</div>
   </details>`;
-}
-
-function _drawHeatmap(state) {
-  const hm = document.getElementById('heatmap');
-  if (!hm) return;
-  hm.innerHTML = '';
-  [...state.weeks]
-    .sort((a, b) => a.startDate.localeCompare(b.startDate))
-    .slice(-12)
-    .forEach(wk => {
-      const done     = wk.days.filter(d => !!d.markedDone).length;
-      const cell     = document.createElement('div');
-      cell.className = 'hm-cell' + (done === 0 ? '' : ` hm-cell--${Math.min(done, 3)}`);
-      const label = `${wkLabel(wk.startDate)}: ${done}/${wk.days.length} Tage`;
-      cell.setAttribute('role', 'gridcell');
-      cell.setAttribute('aria-label', label);
-      cell.title = label;
-      hm.appendChild(cell);
-    });
-}
-
-function drawLineChart(id, labels, data, color) {
-  const canvas = document.getElementById(id);
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  const W = canvas.offsetWidth || 300, H = 120;
-  canvas.width = W; canvas.height = H;
-  ctx.clearRect(0, 0, W, H);
-  if (!data.length || data.every(v => v === 0)) return;
-
-  const max = Math.max(...data, 1);
-  const pad = { l: 10, r: 10, t: 10, b: 20 };
-  const gw  = W - pad.l - pad.r;
-  const gh  = H - pad.t - pad.b;
-  const x   = i => pad.l + i * (gw / (data.length - 1 || 1));
-  const y   = v => pad.t + gh - (v / max) * gh;
-
-  ctx.strokeStyle = '#2E2E35'; ctx.lineWidth = 1;
-  [0, 0.5, 1].forEach(f => {
-    ctx.beginPath();
-    ctx.moveTo(pad.l, pad.t + gh * (1 - f));
-    ctx.lineTo(pad.l + gw, pad.t + gh * (1 - f));
-    ctx.stroke();
-  });
-
-  ctx.beginPath();
-  data.forEach((v, i) => i === 0 ? ctx.moveTo(x(i), y(v)) : ctx.lineTo(x(i), y(v)));
-  ctx.lineTo(x(data.length - 1), pad.t + gh);
-  ctx.lineTo(pad.l, pad.t + gh);
-  ctx.closePath();
-  ctx.fillStyle = color === '#C8FF00' ? 'rgba(200,255,0,.08)' : 'rgba(79,195,247,.08)';
-  ctx.fill();
-
-  ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = 2;
-  data.forEach((v, i) => i === 0 ? ctx.moveTo(x(i), y(v)) : ctx.lineTo(x(i), y(v)));
-  ctx.stroke();
-
-  data.forEach((v, i) => {
-    ctx.beginPath(); ctx.arc(x(i), y(v), 3, 0, Math.PI * 2);
-    ctx.fillStyle = color; ctx.fill();
-    ctx.fillStyle = '#666'; ctx.font = '9px DM Sans'; ctx.textAlign = 'center';
-    ctx.fillText(labels[i], x(i), H - 3);
-    if (v > 0) {
-      ctx.fillStyle = '#F0F0F0'; ctx.font = '10px DM Sans';
-      ctx.fillText(v >= 1000 ? (v/1000).toFixed(1)+'t' : v+'kg', x(i), y(v) - 5);
-    }
-  });
 }
 
 // ─── Settings tab ─────────────────────────────────────────────────────────────
@@ -6259,7 +6238,14 @@ function _handleClick(e) {
     case 'open-new-week': {
       const _st = getState();
       const _lastWk = getLatestWeek(_st.weeks);
-      const _hasCompleted = _lastWk?.days.some(d => d.markedDone);
+      // Fortschritt-Tab-Audit (Runde 27): isSeedWeek ausgeschlossen -- ein
+      // brandneuer Nutzer (nur Startwerte-Woche vorhanden, noch nie
+      // trainiert) bekam sonst hier den fabrizierten Wochenrückblick der
+      // Seed-Woche gezeigt (markedDone:true auf dem Seed-Tag), BEVOR die
+      // erste echte Woche überhaupt existiert. Dritte unabhängige
+      // Fundstelle derselben Fehlerklasse wie reviewableWeeks/
+      // _runAutoWeekFlow().
+      const _hasCompleted = _lastWk && !_lastWk.isSeedWeek && _lastWk.days.some(d => d.markedDone);
       _moreRecsOpen = false;
       _userDismissedAutoSelect = new Set();
       _userCustomStepChoice = new Map();
@@ -8877,7 +8863,13 @@ function _runAutoWeekFlow() {
   // markedDone immer auf false setzt. Fallback auf die alte Positions-Logik
   // nur im Extremfall, dass ÜBERHAUPT keine Woche je einen Tag abgeschlossen
   // hat (z.B. ganz neuer Account).
-  const prevWeek = [...sorted].reverse().find(w => w.days?.some(d => d.markedDone))
+  // Fortschritt-Tab-Audit (Runde 27): isSeedWeek ausgeschlossen -- ohne
+  // diesen Zusatz konnte bei einem brandneuen Nutzer (nur Startwerte-Woche
+  // vorhanden) die Seed-Woche als "vorherige Woche" gefunden werden
+  // (markedDone:true auf dem Seed-Tag) und einen fabrizierten Rückblick mit
+  // erfundenen PRs auslösen. Zweite unabhängige Fundstelle derselben
+  // Fehlerklasse wie das open-new-week-Handler-Pendant oben.
+  const prevWeek = [...sorted].reverse().find(w => !w.isSeedWeek && w.days?.some(d => d.markedDone))
     ?? sorted[sorted.length - 2] ?? null;
 
   const step2 = () => {
@@ -9591,7 +9583,14 @@ function _buildSessionSummaryData(di) {
   const day   = wk?.days[di];
   if (!day) return null;
 
-  const sortedWeeks = getSortedWeeks(state);
+  // Fortschritt-Tab-Audit (Runde 27): isSeedWeek ausgeschlossen -- ohne
+  // diesen Filter konnte die Startwerte-Woche als runningMax-Startpunkt in
+  // _weeksSincePreviousIncrease() (sessionSummary.js) einfließen und die
+  // angezeigte "dein bestes Training seit X Wochen"-Wochenanzahl verzerren,
+  // wenn ein späterer echter PR das geschätzte Startgewicht nur knapp
+  // übertrifft. Konsumenten-Fix (wie bei den anderen getSortedWeeks()-
+  // Fundstellen dieser Runde), nicht zentral in getSortedWeeks() selbst.
+  const sortedWeeks = getSortedWeeks(state).filter(w => !w.isSeedWeek);
   const curWeekIdx  = sortedWeeks.indexOf(wk);
 
   const highlights = buildSessionHighlights(day, sortedWeeks, curWeekIdx);

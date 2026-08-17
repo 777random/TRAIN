@@ -15,8 +15,15 @@ import { getSortedWeeks, getCompletionRate, exWeightHistory, computeSleepCorrela
 
 const WEEKDAY_NAMES = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
 
+// Fortschritt-Tab-Audit (Runde 27): isSeedWeek ergänzt -- getSortedWeeks()
+// selbst filtert bewusst nicht (dient andernorts als PR-/Gewichts-
+// Kaltstart-Baseline, Präzedenz Runde 24), aber alle Konsumenten dieser
+// Funktion (mostSuccessfulExercise/mostSuccessfulWeekday/
+// progressTrendOutlier/computeStrengthGain + darüber die Korridor-
+// Kalibrierung) sollen die Startwerte-Woche nicht als echten Datenpunkt
+// werten. Gleiche Fehlerklasse wie B267/B270/B285/B310.
 function _relevantWeeks(state) {
-  return getSortedWeeks(state).filter(w => w.mode !== 'deload' && w.mode !== 'vacation');
+  return getSortedWeeks(state).filter(w => !w.isSeedWeek && w.mode !== 'deload' && w.mode !== 'vacation');
 }
 
 function _weekdayName(wk, di) {
@@ -37,6 +44,9 @@ export function mostSuccessfulExercise(state, N = 8) {
   sorted.forEach((wk, idx) => {
     for (const day of wk.days) {
       for (const ex of day.exercises) {
+        // Fortschritt-Tab-Audit (Runde 27): archivierte Übungen ausgeschlossen,
+        // analog zu den strukturell verwandten Coach-Tab-Funktionen (B272).
+        if (ex.archived) continue;
         if (ex.sets.length === 0) continue;
         const e = stats.get(ex.name) ?? { success: 0, total: 0, weeks: new Set(), lastIdx: -1 };
         for (const s of ex.sets) { e.total++; if (s.status === 'success') e.success++; }
@@ -80,10 +90,12 @@ export function mostSuccessfulWeekday(state, N = 8) {
 
   for (const wk of sorted) {
     wk.days.forEach((day, di) => {
-      const attempted = day.exercises.some(ex => ex.sets.some(s => s.status === 'success' || s.status === 'fail'));
+      // Fortschritt-Tab-Audit (Runde 27): archivierte Übungen ausgeschlossen,
+      // analog zu den strukturell verwandten Coach-Tab-Funktionen (B272).
+      const attempted = day.exercises.some(ex => !ex.archived && ex.sets.some(s => s.status === 'success' || s.status === 'fail'));
       if (!attempted) return; // unbearbeiteter/leerer Tag ist kein Datenpunkt
       let success = 0, total = 0;
-      for (const ex of day.exercises) for (const s of ex.sets) { total++; if (s.status === 'success') success++; }
+      for (const ex of day.exercises) { if (ex.archived) continue; for (const s of ex.sets) { total++; if (s.status === 'success') success++; } }
       const name = _weekdayName(wk, di);
       const e = stats.get(name) ?? { success: 0, total: 0, count: 0 };
       e.success += success; e.total += total; e.count += 1;

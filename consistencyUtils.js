@@ -84,8 +84,14 @@ export function _consistencyEligibleWeeks(state) {
   // (_checkConsistencyGap()/computeConsistencyTrend()). Bewusst NUR hier
   // gefixt, nicht zentral in getSortedWeeks() (siehe B267-Kommentar dort),
   // um die legitime Baseline-Verwendung an anderen Stellen nicht zu brechen.
+  //
+  // Fortschritt-Tab-Audit (Runde 27): 'vacation' ergänzt -- vorher schloss
+  // dieser Filter nur Deload aus, während die geschwisterliche Volumen-/
+  // Breite-Filterung (_nonDeloadVacationWeeks(), overallPerformance.js)
+  // bereits Deload UND Urlaub ausschließt. Die 4 Absätze derselben
+  // "Gesamtperformance"-Karte filterten dadurch uneinheitlich.
   return getSortedWeeks(state)
-    .filter(w => w.mode !== 'deload' && !w.isSeedWeek)
+    .filter(w => w.mode !== 'deload' && w.mode !== 'vacation' && !w.isSeedWeek)
     .map(wk => ({ wk, ratio: _weekConsistencyRatio(wk) }))
     .filter(r => r.ratio !== null);
 }
