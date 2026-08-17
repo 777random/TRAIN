@@ -104,6 +104,19 @@ export async function registerServiceWorker() {
     // Laden) ein einmaliger Bestätigungs-Toast. Der explizite "Jetzt
     // aktualisieren"-Klick (ui.js) setzt vorher ein Consent-Flag, damit dieser
     // Pfad dort nicht zusätzlich (und irreführend, da ja bewusst ausgelöst) feuert.
+    // PWA-Audit (Runde 30, Verdachtsfall): geprüft, ob dieser Versions-
+    // Vergleich zusätzlich bei jedem `controllerchange`-Event laufen sollte
+    // (deckt den seltenen Fall ab, dass sich ein wartender Worker
+    // selbstständig aktiviert, während der Tab technisch offen bleibt --
+    // aktuell wird nur das dokumentierte Hauptszenario "App komplett
+    // geschlossen + neu geöffnet" abgedeckt). Ein `controllerchange`-
+    // Listener wurde testweise ergänzt, verursachte aber eine neue
+    // Flakiness in sw_silent_update_toast.spec.js (vermutlich doppelte
+    // GET_VERSION-Roundtrips/Message-Listener bei knapp aufeinander
+    // folgendem initialem Check + controllerchange) -- wieder verworfen,
+    // da die Auswirkung des ursprünglichen Verdachtsfalls gering ist und
+    // eine neue Instabilität in einem bestehenden, bisher zuverlässigen
+    // Test nicht rechtfertigt.
     if (navigator.serviceWorker.controller) {
       const onVersionMessage = event => {
         if (event.data?.type !== 'VERSION') return;

@@ -26,8 +26,12 @@ function today() {
 
 // Wochendurchschnitt aus weightLog, Fallback auf bodyData.weight (pre-v29)
 function _wkAvgWeight(bd) {
-  const log = bd.weightLog;
-  if (Array.isArray(log) && log.length > 0) {
+  // PWA-/Backup-Audit (Runde 30): null/undefined-Gewichte gefiltert, analog
+  // zu den strukturell identischen _wkAvgEnergy()/_wkAvgSleep() daneben --
+  // ein weightLog-Eintrag mit weight:null (sehr altes/korruptes State)
+  // kippte vorher die gesamte Wochendurchschnitts-Zelle auf NaN.
+  const log = (Array.isArray(bd.weightLog) ? bd.weightLog : []).filter(e => e?.weight != null);
+  if (log.length > 0) {
     return Math.round(log.reduce((s, e) => s + e.weight, 0) / log.length * 10) / 10;
   }
   return bd.weight ?? '';
@@ -134,6 +138,26 @@ function _sanitizeImportedState(parsed) {
     for (const day of wk.days ?? []) _sanitizeImportDay(day);
   }
   for (const day of parsed.customTemplate ?? []) _sanitizeImportDay(day);
+  // PWA-/Backup-Audit (Runde 30): weitere Text-Freifelder abgedeckt, die
+  // vorher keinen Längen-Deckel hatten -- Defense-in-Depth zusätzlich zum
+  // h()-Escaping in ui.js, nicht dessen Ersatz (siehe Datei-Kopfkommentar).
+  if (parsed.exerciseNotes && typeof parsed.exerciseNotes === 'object') {
+    for (const key of Object.keys(parsed.exerciseNotes)) {
+      parsed.exerciseNotes[key] = _sanitizeImportText(parsed.exerciseNotes[key], 200);
+    }
+  }
+  if (parsed.customAlternatives && typeof parsed.customAlternatives === 'object') {
+    for (const key of Object.keys(parsed.customAlternatives)) {
+      const alts = parsed.customAlternatives[key];
+      if (Array.isArray(alts)) parsed.customAlternatives[key] = alts.map(a => _sanitizeImportText(a, 80));
+    }
+  }
+  if (Array.isArray(parsed.favoriteExercises)) {
+    parsed.favoriteExercises = parsed.favoriteExercises.map(n => _sanitizeImportText(n, 80));
+  }
+  for (const ex of parsed.customExercises ?? []) {
+    if (ex && typeof ex === 'object' && 'name' in ex) ex.name = _sanitizeImportText(ex.name, 80);
+  }
   return parsed;
 }
 
@@ -189,7 +213,14 @@ export function importJSON(file) {
 // BOM at start ensures Excel opens UTF-8 without manual configuration.
 
 function cell(value) {
-  const str = value == null ? '' : String(value);
+  let str = value == null ? '' : String(value);
+  // PWA-/Backup-Audit (Runde 30): CSV-/Formula-Injection-Schutz (OWASP-
+  // anerkannte Kategorie) -- ein Übungsname/eine Notiz, die mit =, +, -
+  // oder @ beginnt, konnte beim Öffnen in Excel/Google Sheets als Formel
+  // interpretiert und ausgeführt werden. Führendes Apostroph erzwingt
+  // Text-Interpretation in allen gängigen Tabellenkalkulationen, ohne den
+  // sichtbaren Zellinhalt zu verändern.
+  if (/^[=+\-@]/.test(str)) str = "'" + str;
   if (str.includes(';') || str.includes('\n') || str.includes('"')) {
     return '"' + str.replace(/"/g, '""') + '"';
   }
@@ -313,8 +344,15 @@ export function exportCSV(scope = 'all') {
     'Veränderung (kg)', 'Veränderung (%)', 'Empfehlung',
   ));
 
+  // PWA-/Backup-Audit (Runde 30): isSeedWeek ergänzt -- die einzige
+  // CSV-Sektion mit interpretativer Vergleichslogik ("Gute Progression ✓"/
+  // "Rückgang"), die anderen Sektionen sind reine Datenauflistungen (dort
+  // ist die Seed-Woche als Zeile korrekt). Die Startwerte-Woche hat
+  // mode:'standard' und genau einen selbst geschätzten Gewichtswert pro
+  // Übung -- konnte als "Vorherige KW" in eine Progressions-Bewertung
+  // einfließen. Gleiche Fehlerklasse wie B339/B341 u.v.a.
   const exMap = new Map();
-  for (const wk of weeks.filter(w => (w.mode ?? 'standard') !== 'deload')) {
+  for (const wk of weeks.filter(w => !w.isSeedWeek && (w.mode ?? 'standard') !== 'deload' && w.mode !== 'vacation')) {
     for (const day of wk.days) {
       for (const ex of day.exercises) {
         if (!exMap.has(ex.name)) exMap.set(ex.name, []);

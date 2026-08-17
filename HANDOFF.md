@@ -1,5 +1,37 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-08-17 — Runde 29 (train-v254→v255, B332-B343):
+*Letzte Aktualisierung: 2026-08-17 — Runde 30 (train-v255→v256, B344-B352):
+PWA/Service-Worker + Backup/Restore-Audit, VIERTE und letzte der
+angekündigten Folgerunden nach Fortschritt-Tab (Runde 27), Onboarding-Flow
+(Runde 28) und Utility-Schicht (Runde 29) -- damit ist der Auftrag "audit
+all things listed" komplett abgearbeitet. 2 parallele Diagnose-Agenten
+(sw.js+registerSW.js, backup.js) fanden 4 bestätigte + 5 Verdachtsfälle.
+Ergebnis in `Diagnose & Sprints/diagnose-pwa-backup-audit-2026-08-17.txt`.
+Nutzer wählte "alle 9 fixen" -> B344-B352 umgesetzt. Anders als in den
+drei vorherigen Runden dominierte hier NICHT die isSeedWeek-Fehlerklasse
+(nur B349) -- PWA/Backup ist strukturell anderer Bereich (Browser-
+Lifecycle-APIs, Dateiformat-Export). Wichtigste Fixes: `install`-Handler
+(sw.js) behandelte ein fehlgeschlagenes `cache.addAll()` bisher SILENT als
+Erfolg -- ein einziger fehlgeschlagener Download hätte den neuen Worker mit
+komplett leerem Precache aktivieren können (B351); `cacheFirstWithRefresh()`s
+Hintergrund-Cache-Refresh war nicht durch `event.waitUntil()` geschützt und
+konnte dadurch praktisch nie zuverlässig fertig laufen (B350); eine echte
+CSV-Formula-Injection-Sicherheitslücke in `cell()` (B352, erste
+sicherheitsrelevante Fundstelle dieser gesamten Audit-Reihe). B346
+(Versionswechsel-Toast nur einmalig geprüft) wurde bewusst NICHT im Code
+gefixt -- ein testweise ergänzter `controllerchange`-Listener verursachte
+eine neue, empirisch bestätigte Flakiness in der bestehenden SW-Test-Suite
+(5/5 grün ohne den Listener, flaky mit ihm) und wurde wieder verworfen, da
+die Auswirkung des ursprünglichen Verdachtsfalls gering war -- ein Beispiel
+dafür, dass nicht jeder diagnostizierte Verdachtsfall eine risikofreie
+Korrektur hat. 4 neue Tests (pwa_backup_audit_fixes.spec.js, deckt die
+backup.js-Fixes ab; sw.js/registerSW.js-Fixes sind durch die bestehende
+sw_update_and_version.spec.js/sw_silent_update_toast.spec.js-Suite
+weiterhin abgedeckt, unverändert grün). Volle Regressionssuite (107
+Spec-Dateien, gebatcht) grün, 2 vorbestehende Flakes (plate_calculator.spec.js,
+trainingstab_audit_fixes.spec.js Phantom-PR) auf Retry/Isolation grün,
+beide unabhängig bestätigt (u.a. durch Vergleich mit einer temporär
+zurückgesetzten Version von registerSW.js).
+Davor: Runde 29 (train-v254→v255, B332-B343):
 Geteilte-Utility-Schicht-Audit, dritte von vier angekündigten Folgerunden
 nach Fortschritt-Tab (Runde 27) und Onboarding-Flow (Runde 28). 3 parallele
 Diagnose-Agenten (insightEngine.js Kernfunktionen, insightEngine.js

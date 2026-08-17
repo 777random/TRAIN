@@ -16,7 +16,7 @@
  *   asset conflicts.
  */
 
-const CACHE_VERSION  = 'train-v255';
+const CACHE_VERSION  = 'train-v256';
 
 // Runde 20 (Befund 4): kurze Änderungsliste für den aktuellen Build, im
 // Update-Banner beim Aufklappen ("mehr Details") angezeigt. 2-3 knappe
@@ -28,9 +28,9 @@ const CACHE_VERSION  = 'train-v255';
 // (Browser-Update-Algorithmus) -- die Werte sind dadurch garantiert die des
 // NEUEN, wartenden Workers, ganz ohne zusätzlichen Cache-Bypass.
 const CHANGELOG_ENTRIES = [
-  'Erfolgs-Meldungen ("Beste Woche", "Bestes Jahr", Konsistenz-Meilensteine) durch die Startwerte-Woche nicht mehr verzerrt oder blockiert',
-  'Plateau-Erkennung: eine Übung wird nach einer einmaligen Substitution nicht mehr dauerhaft von der Stagnations-Prüfung ausgeschlossen',
-  'Kleinere interne Konsistenz-Korrekturen in den Coaching-Hinweisen',
+  'Offline-Zuverlässigkeit verbessert: App-Update-Installation schlägt jetzt korrekt fehl statt mit leerem Cache zu starten',
+  'CSV-Export: Sicherheitslücke gegen manipulierte Formeln beim Öffnen in Excel/Sheets geschlossen',
+  'CSV-Export "Progression pro Übung" zeigt keine verzerrten Werte mehr durch die Startwerte-Woche',
 ];
 
 /**
@@ -95,7 +95,18 @@ self.addEventListener('install', event => {
       // KEIN automatisches self.skipWaiting() hier — der neue Worker soll in
       // 'installed' warten, bis die UI per postMessage({type:'SKIP_WAITING'})
       // eine bewusste Nutzer-Aktion bestätigt (siehe 'message'-Handler unten).
-      .catch(err => console.error('[SW] Precache failed:', err))
+      //
+      // PWA-Audit (Runde 30): der Fehler wird jetzt weitergeworfen statt nur
+      // geloggt -- cache.addAll() ist atomar (alle ~34 URLs oder keine).
+      // Vorher fing .catch() den Fehler ab, OHNE ihn erneut zu werfen:
+      // event.waitUntil() sah dadurch ein aufgelöstes statt abgelehntes
+      // Promise, die Installation galt als erfolgreich, obwohl der Precache
+      // komplett leer blieb -- Offline-Nutzung wäre für jede App-Shell-Datei
+      // gebrochen gewesen, ohne dass ein Nutzer je etwas davon gesehen hätte.
+      // Ein weitergeworfener Fehler lässt den Worker stattdessen korrekt im
+      // 'redundant'-Zustand landen; der alte, funktionierende Worker bleibt
+      // aktiv, und der nächste Update-Check versucht die Installation erneut.
+      .catch(err => { console.error('[SW] Precache failed:', err); throw err; })
   );
 });
 
@@ -130,7 +141,7 @@ self.addEventListener('fetch', event => {
 
   // ── App shell – Cache-First with background refresh ────────────────────────
   if (url.origin === self.location.origin) {
-    event.respondWith(cacheFirstWithRefresh(request, CACHE_VERSION));
+    event.respondWith(cacheFirstWithRefresh(event, request, CACHE_VERSION));
     return;
   }
 
@@ -145,21 +156,41 @@ self.addEventListener('fetch', event => {
  * 1. Return cached response immediately (if present).
  * 2. Fetch from network in the background; update cache on success.
  * 3. If not in cache, fetch from network (first visit).
+ *
+ * PWA-Audit (Runde 30): `networkFetch` läuft bei einem Cache-Hit im
+ * Hintergrund WEITER, nachdem diese Funktion (und damit event.respondWith())
+ * bereits mit `cached` aufgelöst hat -- ohne einen eigenen
+ * event.waitUntil()-Aufruf hat der Worker ab dann keine garantierte
+ * Laufzeit mehr und darf laut Spec beendet werden, sobald keine Events mehr
+ * offen sind (auf Mobilgeräten oft binnen Sekunden). Der Hintergrund-
+ * Refresh, den der Datei-Kopfkommentar oben verspricht ("stale assets are
+ * replaced silently... on the next visit"), konnte dadurch praktisch nie
+ * zuverlässig fertig laufen. `event` wird jetzt durchgereicht, damit
+ * cacheFirstWithRefresh() den Hintergrund-Fetch selbst absichern kann.
  */
-async function cacheFirstWithRefresh(request, cacheName) {
+async function cacheFirstWithRefresh(event, request, cacheName) {
   const cache  = await caches.open(cacheName);
   const cached = await cache.match(request);
 
   const networkFetch = fetch(request)
     .then(response => {
       if (response.ok) {
-        cache.put(request, response.clone());
+        // PWA-Audit (Runde 30): .catch() ergänzt -- ein QuotaExceededError
+        // beim Hintergrund-Cache-Update führte vorher zu einer unhandled
+        // promise rejection (nur Browser-Konsolenwarnung, kein Logging im
+        // Projekt-Stil). Funktional unschädlich (die Response wird trotzdem
+        // zurückgegeben), aber jetzt sichtbar für Diagnosezwecke.
+        cache.put(request, response.clone()).catch(err => console.error('[SW] Cache-Refresh fehlgeschlagen:', err));
       }
       return response;
     })
     .catch(() => null); // offline – background refresh fails silently
 
-  return cached ?? await networkFetch ?? new Response('Offline', { status: 503 });
+  if (cached) {
+    event.waitUntil(networkFetch);
+    return cached;
+  }
+  return await networkFetch ?? new Response('Offline', { status: 503 });
 }
 
 // ─── Message handling ─────────────────────────────────────────────────────────
