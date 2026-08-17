@@ -9282,6 +9282,12 @@ export function mountApp(root) {
     // selbst (siehe 'install' dort). localStorage bleibt über den Reload
     // hinweg erhalten (unabhängig vom Service-Worker-Cache).
     e.target.disabled = true;
+    // Nutzer-Feedback (2026-08-17): flag setzen, damit registerSW.js' neuer
+    // Silent-Update-Check (siehe dort) nach diesem bewussten, explizit
+    // ausgelösten Reload NICHT fälschlich "im Hintergrund aktualisiert"
+    // meldet -- diese Meldung ist nur für den Fall gedacht, dass der Worker
+    // OHNE Nutzer-Klick aktiv wurde (App komplett geschlossen+neu geöffnet).
+    try { localStorage.setItem('train_explicit_update_consent', 'true'); } catch (_) { /* best effort */ }
     // Selbstheilungs-Netz (B166): _pendingSwRegistration wird ausschließlich
     // über 'train:show-update-banner' gesetzt, das wiederum von registerSW.js'
     // Event-Kette abhängt. Falls diese Kette aus irgendeinem anderen Grund nie

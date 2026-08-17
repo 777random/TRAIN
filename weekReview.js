@@ -95,7 +95,22 @@ function _maxWeightPerExercise(week) {
   return map;
 }
 
-function _findPR(week, prevWeeks) {
+// Nutzer-Feedback (2026-08-17): Prioritäten-System für Highlights/Lowlights
+// -- Favoriten-Übungen sollen bevorzugt gemeldet werden; nur wenn UNTER den
+// Favoriten nichts Passendes zu finden ist, wird auf alle Übungen
+// ausgewichen. `restrictNames` (Set|null) grenzt die Suche in den einzelnen
+// _find*()-Funktionen ein; `_withFavoritesFirst()` orchestriert den
+// zweistufigen Versuch (erst Favoriten, dann alle) einheitlich für alle
+// Finder-Funktionen unten.
+function _withFavoritesFirst(finder, favoriteExercises) {
+  if (favoriteExercises?.length) {
+    const favResult = finder(new Set(favoriteExercises));
+    if (favResult) return favResult;
+  }
+  return finder(null);
+}
+
+function _findPR(week, prevWeeks, restrictNames = null) {
   const thisMax = _maxWeightPerExercise(week);
   const histMax = new Map();
   for (const wk of prevWeeks)
@@ -105,6 +120,7 @@ function _findPR(week, prevWeeks) {
 
   let best = null, bestDelta = 0;
   thisMax.forEach((w, name) => {
+    if (restrictNames && !restrictNames.has(name)) return;
     const prev  = histMax.get(name) ?? 0;
     const delta = w - prev;
     if (delta > bestDelta) { bestDelta = delta; best = { name, weight: w, prev }; }
@@ -116,17 +132,37 @@ function _findPR(week, prevWeeks) {
   return { type: 'pr', label: 'Neuer PR', text, exName: best.name };
 }
 
-function _findBestGain(week, prevWeek) {
+function _findBestGain(week, prevWeek, restrictNames = null) {
   const thisMax = _maxWeightPerExercise(week);
   const prevMax = _maxWeightPerExercise(prevWeek);
   let best = null, bestDelta = 0;
   thisMax.forEach((w, name) => {
+    if (restrictNames && !restrictNames.has(name)) return;
     const prev  = prevMax.get(name) ?? 0;
     const delta = w - prev;
     if (prev > 0 && delta > bestDelta) { bestDelta = delta; best = { name, delta }; }
   });
   if (!best) return null;
   return { type: 'gain', label: 'Stärkste Steigerung', text: `${best.name} +${best.delta} kg ggü. Vorwoche`, exName: best.name };
+}
+
+// Drittes Highlight neben PR/Steigerung: eine Übung, die diese Woche
+// vollständig (100 %, mind. 3 bewertete Sätze) erfolgreich war -- ein
+// eigenständiges "gutes Zeichen" (saubere Ausführung), unabhängig von
+// Gewichtszahlen, damit auch ohne neuen PR/Steigerung ein drittes,
+// aussagekräftiges Highlight möglich ist.
+function _findPerfectExercise(week, restrictNames = null) {
+  let best = null;
+  for (const d of week.days)
+    for (const ex of d.exercises) {
+      if (restrictNames && !restrictNames.has(ex.name)) continue;
+      const evaluated = ex.sets.filter(s => s.status === 'success' || s.status === 'fail');
+      if (evaluated.length < 3) continue;
+      const allSuccess = evaluated.every(s => s.status === 'success');
+      if (allSuccess && (!best || evaluated.length > best.sets)) best = { name: ex.name, sets: evaluated.length };
+    }
+  if (!best) return null;
+  return { type: 'perfect', label: 'Saubere Ausführung', text: `${best.name}: alle ${best.sets} Sätze erfolgreich`, exName: best.name };
 }
 
 // Delegiert an setUtils.js (Konsolidierung 2026-07-14 — war vorher hier
@@ -168,11 +204,12 @@ function _calcStreak(sortedWeeks, week) {
 // Erfolgsquoten-Kernmetrik bleibt unverändert (ein Ausfall bleibt für die
 // Statistik ein Ausfall), nur die konkrete Handlungsempfehlung/Lowlight-
 // Anzeige entfällt für explizit verletzungsbedingte Fälle.
-function _findFailHighlight(week) {
+function _findFailHighlight(week, restrictNames = null) {
   let worstName = null, worstCount = 0;
   for (const d of week.days)
     for (const ex of d.exercises) {
       if (ex.skipReason === 'injury') continue;
+      if (restrictNames && !restrictNames.has(ex.name)) continue;
       const n = ex.sets.filter(s => s.status === 'fail').length;
       if (n > worstCount) { worstCount = n; worstName = ex.name; }
     }
@@ -184,10 +221,11 @@ function _findFailHighlight(week) {
   };
 }
 
-function _findFatigueHighlight(week) {
+function _findFatigueHighlight(week, restrictNames = null) {
   let worst = null, worstRpe = 0;
   for (const d of week.days)
     for (const ex of d.exercises) {
+      if (restrictNames && !restrictNames.has(ex.name)) continue;
       const rpeSets = ex.sets.filter(s => s.rpe != null && s.status === 'success');
       if (!rpeSets.length) continue;
       const avg = rpeSets.reduce((sum, s) => sum + s.rpe, 0) / rpeSets.length;
@@ -311,15 +349,23 @@ export function buildWeekReview(week, allWeeks, favoriteExercises = []) {
   const summary = { streak, totalSets, completedDays, plannedDays, avgSessionDuration, goalFulfillment };
 
   // ── Highlights ────────────────────────────────────────────────────────────────
+  // Nutzer-Feedback (2026-08-17): jetzt bis zu 3 Highlights UND 3 Lowlights
+  // (vorher 2/2), jeweils mit Favoriten-Priorität -- jede _find*()-Funktion
+  // wird zuerst NUR auf favoriteExercises eingeschränkt versucht
+  // (_withFavoritesFirst()); findet sich dort nichts, weicht sie auf alle
+  // Übungen aus. Kein erzwungenes Auffüllen auf exakt 3 -- fehlt ein
+  // drittes echtes Signal, bleibt die Liste kürzer, statt Inhalte zu
+  // erfinden.
+  //
   // Runde 9/Cluster 2: Deload-Wochen fließen weder als aktuelle Woche noch
   // als Vergleichs-Baseline in PR-/Steigerungs-Erkennung ein — analog zum
   // bereits etablierten Muster in insightEngine.js/ui.js/state.js (Gewicht
   // ist in einer Deload-Woche absichtlich reduziert, kein echter PR/Fortschritt).
   const highlights  = [];
   const prevWeeks   = weekIdx > 0 ? sorted.slice(0, weekIdx).filter(w => w.mode !== 'deload') : [];
-  let prH = null;
+  let prH = null, gainH = null;
   if (!isDeload) {
-    prH = _findPR(week, prevWeeks);
+    prH = _withFavoritesFirst(names => _findPR(week, prevWeeks, names), favoriteExercises);
     if (prH) highlights.push(prH);
   }
   // Solotest-Feedback (2026-08-16): "Stärkste Steigerung" zeigte oft dieselbe
@@ -327,33 +373,31 @@ export function buildWeekReview(week, allWeeks, favoriteExercises = []) {
   // abgeleitet) -- reine Redundanz ohne neue Info. Übersprungen, wenn beide
   // Highlights dieselbe Übung meinen (Option A der Diagnose).
   if (!isDeload && prevWeek && prevWeek.mode !== 'deload') {
-    const gainH = _findBestGain(week, prevWeek);
+    gainH = _withFavoritesFirst(names => _findBestGain(week, prevWeek, names), favoriteExercises);
     if (gainH && gainH.exName !== prH?.exName && highlights.length < 3) highlights.push(gainH);
+    else gainH = null;
   }
-  // Solotest-Feedback (2026-08-16): "Konsistenz" (Streak) entfernt — der
-  // Streak ist bereits dauerhaft sichtbar (Fortschritt-Tab), Wiederholung
-  // hier bot laut Nutzer-Feedback keinen Mehrwert ("hat für den Athleten
-  // keinen Mehrwert").
+  if (!isDeload && highlights.length < 3) {
+    const perfectH = _withFavoritesFirst(names => _findPerfectExercise(week, names), favoriteExercises);
+    if (perfectH && perfectH.exName !== prH?.exName && perfectH.exName !== gainH?.exName) highlights.push(perfectH);
+  }
+  // "Konsistenz" (Streak) bewusst NICHT als Highlight-Kandidat -- der Streak
+  // ist bereits dauerhaft sichtbar (Fortschritt-Tab), Wiederholung hier bot
+  // laut Nutzer-Feedback keinen Mehrwert ("hat für den Athleten keinen
+  // Mehrwert", Solotest-Feedback 2026-08-16).
 
   // ── Lowlights ─────────────────────────────────────────────────────────────────
   const lowlights = [];
-  const failH = _findFailHighlight(week);
+  const failH = _withFavoritesFirst(names => _findFailHighlight(week, names), favoriteExercises);
   if (failH) lowlights.push(failH);
-  if (completedDays < plannedDays && lowlights.length < 2)
+  if (completedDays < plannedDays && lowlights.length < 3)
     lowlights.push({
       type: 'missed', label: 'Verpasste Tage',
       text: `${plannedDays - completedDays} von ${plannedDays} ${plannedDays === 1 ? 'Tag' : 'Tagen'} nicht abgeschlossen`,
     });
-  if (lowlights.length < 2) {
-    const fatigueH = _findFatigueHighlight(week);
-    if (fatigueH) lowlights.push(fatigueH);
-  }
-
-  // ── Favoriten zuerst in highlights + lowlights ───────────────────────────────
-  if (favoriteExercises.length > 0) {
-    const _fav = name => favoriteExercises.includes(name) ? 0 : 1;
-    highlights.sort((a, b) => _fav(a.exName) - _fav(b.exName));
-    lowlights.sort((a, b)  => _fav(a.exName) - _fav(b.exName));
+  if (lowlights.length < 3) {
+    const fatigueH = _withFavoritesFirst(names => _findFatigueHighlight(week, names), favoriteExercises);
+    if (fatigueH && fatigueH.exName !== failH?.exName) lowlights.push(fatigueH);
   }
 
   // ── Recommendations ───────────────────────────────────────────────────────────

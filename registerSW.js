@@ -91,6 +91,41 @@ export async function registerServiceWorker() {
     document.addEventListener('visibilitychange', _recheckForUpdate);
     window.addEventListener('pageshow', _recheckForUpdate);
 
+    // Nutzer-Feedback (2026-08-17): "Später" gedrückt -> Update-Banner kommt
+    // beim nächsten App-Öffnen nicht mehr. Ursache: ein wartender Worker
+    // aktiviert sich automatisch (Browser-Standardverhalten, KEIN eigener
+    // Code-Pfad), sobald der alte Worker keine Clients mehr hat -- typisch
+    // wenn die (installierte) App komplett geschlossen und neu geöffnet wird.
+    // registration.waiting ist dann beim nächsten Start bereits leer, die
+    // Update-Prüfung oben findet nichts mehr -- das Update WURDE angewendet,
+    // nur ohne jede Rückmeldung, was sich wie ein spurlos verschwundener
+    // Hinweis anfühlt. Vergleicht die aktuell aktive Version gegen die beim
+    // letzten Aufruf gespeicherte; bei Abweichung (und nicht beim allerersten
+    // Laden) ein einmaliger Bestätigungs-Toast. Der explizite "Jetzt
+    // aktualisieren"-Klick (ui.js) setzt vorher ein Consent-Flag, damit dieser
+    // Pfad dort nicht zusätzlich (und irreführend, da ja bewusst ausgelöst) feuert.
+    if (navigator.serviceWorker.controller) {
+      const onVersionMessage = event => {
+        if (event.data?.type !== 'VERSION') return;
+        navigator.serviceWorker.removeEventListener('message', onVersionMessage);
+        const newVersion = event.data.version;
+        let lastVersion = null, explicitConsent = false;
+        try {
+          lastVersion = localStorage.getItem('train_last_sw_version');
+          explicitConsent = localStorage.getItem('train_explicit_update_consent') === 'true';
+          localStorage.removeItem('train_explicit_update_consent');
+        } catch (_) { /* best effort, kein Blockieren */ }
+        if (lastVersion && lastVersion !== newVersion && !explicitConsent) {
+          window.dispatchEvent(new CustomEvent('train:show-toast', {
+            detail: { message: '✓ TRAIN wurde im Hintergrund aktualisiert' },
+          }));
+        }
+        try { localStorage.setItem('train_last_sw_version', newVersion); } catch (_) { /* best effort */ }
+      };
+      navigator.serviceWorker.addEventListener('message', onVersionMessage);
+      navigator.serviceWorker.controller.postMessage({ type: 'GET_VERSION' });
+    }
+
     console.info('[SW] Registered, scope:', registration.scope);
   } catch (err) {
     console.error('[SW] Registration failed:', err);

@@ -58,8 +58,18 @@ import { detectSessionFatigue } from './sessionSummary.js';
 
 const DAY_MS = 86_400_000;
 
+// Nutzer-Feedback (2026-08-17): Die synthetische Startwerte-Woche
+// (ONBOARDING_SEED, isSeedWeek) ist ein PR-Kaltstart-Datenpunkt, keine
+// echte Trainingswoche -- ihre Sätze sind aber IMMER status:'success'
+// (per Konstruktion), was jeden Trend-/Durchschnittsvergleich verzerrt, der
+// sie mit einbezieht (z.B. "Erfolgsquote gesunken", das eine künstlich
+// perfekte Startwerte-Woche als Vergleichs-Baseline nutzte). Analog zur
+// bereits gefixten state.js-Kopie (_weekTrainingStatus()/WEEK_NAVIGATE,
+// B246) -- weeklyFocus.js hat aber eine EIGENE, unabhängige Wochenliste,
+// die diesen Ausschluss bisher nicht kannte. Zentral hier, da praktisch
+// jedes Signal in dieser Datei über _sortedWeeks()/_nonDeloadWeeks() geht.
 function _sortedWeeks(state) {
-  return [...state.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
+  return [...state.weeks].filter(w => !w.isSeedWeek).sort((a, b) => a.startDate.localeCompare(b.startDate));
 }
 
 function _nonDeloadWeeks(state) {

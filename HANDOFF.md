@@ -1,5 +1,27 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-08-16 — Runde 22 (train-v247→v248, B246-B265):
+*Letzte Aktualisierung: 2026-08-17 — Runde 23 (train-v248→v249, B266-B268):
+3 punktuelle Nutzer-Rückmeldungen direkt im Chat (kein Solotest-Dokument
+diesmal). (1) Update-Banner "Später" -> Hinweis kam beim nächsten App-Öffnen
+nicht wieder: kein echter Bug, sondern fehlende Rückmeldung -- ein wartender
+Service Worker aktiviert sich automatisch (Browser-Standard), sobald die
+App komplett geschlossen+neu geöffnet wird; jetzt ein einmaliger "im
+Hintergrund aktualisiert"-Toast bei Versionsabweichung (registerSW.js,
+B266). (2) Coach-Tab behauptete teils fälschlich "Erfolgsquote gesunken":
+weeklyFocus.js hatte eine EIGENE, von der state.js-Kopie unabhängige
+_sortedWeeks()-Funktion, die die Startwerte-Woche (isSeedWeek) nicht
+ausschloss -- derselbe Bug-Typ wie B246 (Runde 22), aber unabhängig
+übersehen, mit weitem Blast-Radius (praktisch jedes Coach-Signal in dieser
+Datei). Zentral in _sortedWeeks() gefixt (B267). (3) Wochenrückblick auf
+Wunsch von 2/2 auf bis zu 3/3 Highlights/Lowlights erweitert, mit
+Favoriten-Priorität bei der Auswahl (_withFavoritesFirst()-Muster: erst nur
+Favoriten versuchen, bei leerem Ergebnis auf alle Übungen ausweichen);
+neues drittes Highlight "saubere Ausführung" (100% Erfolgsquote einer
+Übung, min. 3 Sätze), da vorher nur PR+Steigerung als Highlight-Quellen
+existierten (B268). 8 neue Tests (sw_silent_update_toast.spec.js,
+weeklyfocus_seedweek_exclusion.spec.js, weekreview_favorites_and_3plus3.spec.js).
+Gezielte Regressionssuiten (Coach-Tab/weeklyFocus, Wochenrückblick, Share-
+Image, SW-Update — nicht die volle 97-Datei-Suite) grün.
+Davor: Runde 22 (train-v247→v248, B246-B265):
 Solotest-Feedback-Sammelrunde. Nutzer testete die App eigenständig anhand der
 `TRAIN-Solotest-Checkliste.md` und trug ~40 Rohpunkte (Bugs, UX-Fragen,
 Produktfragen) direkt in die Checkliste ein; 7 parallele Diagnose-Agenten
