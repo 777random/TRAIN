@@ -16,7 +16,7 @@
  *   asset conflicts.
  */
 
-const CACHE_VERSION  = 'train-v256';
+const CACHE_VERSION  = 'train-v257';
 
 // Runde 20 (Befund 4): kurze Änderungsliste für den aktuellen Build, im
 // Update-Banner beim Aufklappen ("mehr Details") angezeigt. 2-3 knappe
@@ -28,9 +28,9 @@ const CACHE_VERSION  = 'train-v256';
 // (Browser-Update-Algorithmus) -- die Werte sind dadurch garantiert die des
 // NEUEN, wartenden Workers, ganz ohne zusätzlichen Cache-Bypass.
 const CHANGELOG_ENTRIES = [
-  'Offline-Zuverlässigkeit verbessert: App-Update-Installation schlägt jetzt korrekt fehl statt mit leerem Cache zu starten',
-  'CSV-Export: Sicherheitslücke gegen manipulierte Formeln beim Öffnen in Excel/Sheets geschlossen',
-  'CSV-Export "Progression pro Übung" zeigt keine verzerrten Werte mehr durch die Startwerte-Woche',
+  'Gewichtsempfehlungen berücksichtigen jetzt auch die Historie substituierter Übungen ("Heute anders")',
+  'Isolationsübungen bekommen in Erinnerungs-Hinweisen jetzt dieselbe korrekte Bewertung wie im Coach-Tab',
+  'Kleinere interne Konsistenz-Korrekturen im Empfehlungs-Algorithmus',
 ];
 
 /**

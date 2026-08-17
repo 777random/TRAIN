@@ -9,7 +9,13 @@ import { isFullSuccess } from './setUtils.js';
 /** Rounds weight to the nearest plate step (e.g. 2.5 kg or 1.25 kg). */
 export function roundToPlate(weight, step = 2.5) {
   step = step || 2.5;
-  return Math.round(weight / step) * step;
+  // weightRecommendation.js-Audit (Runde 31): zusätzliche Nachkomma-
+  // Rundung gegen Floating-Point-Artefakte bei untypischen Schrittweiten
+  // (z.B. 0.1) -- Math.round(weight/step)*step kann sonst Werte wie
+  // 82.49999999999999 statt 82.5 liefern. Kein bekannter Fall bei den
+  // gängigen Schrittweiten (1.25/2.5/5/10), aber eine risikofreie
+  // Absicherung.
+  return Math.round(Math.round(weight / step) * step * 1000) / 1000;
 }
 
 /**
@@ -80,6 +86,15 @@ function _recommendationCore(lastValue, weekSets, progressionMode, targetRepsMax
   // stillschweigend verdünnten (weniger echte Datenpunkte als die letzten
   // 4 gemeint waren). Jetzt wie im double_progression-Zweig unten zuerst
   // auf Wochen MIT Daten gefiltert, erst dann die letzten 4 genommen.
+  //
+  // weightRecommendation.js-Audit (Runde 31, Verdachtsfall): das
+  // double_progression-Gate weiter unten nutzt bewusst ein engeres
+  // 3-Wochen-Fenster statt dieser 4 -- geprüft und NICHT vereinheitlicht,
+  // da beide Fenstergrößen für unterschiedliche Fragen stehen (hier: wie
+  // war die jüngste Erfolgsquote insgesamt; dort: ist die Wdh-Obergrenze
+  // stabil erreicht, ein strengerer/engerer Maßstab für ein Gate ohne
+  // Rückfrage) und eine Vereinheitlichung ohne klare Evidenz für einen
+  // echten Bug ein unnötiges Verhaltensrisiko wäre.
   let successes = 0, fails = 0;
   for (const w of weekSets.filter(w => w.success.length + w.fail.length > 0).slice(-4)) {
     successes += w.success.length;
@@ -103,7 +118,10 @@ function _recommendationCore(lastValue, weekSets, progressionMode, targetRepsMax
   // Wdh-Obergrenze bei guter Erfolgsquote ─────────────────────────────────
   if (progressionMode === 'double_progression') {
     const recentWithData = weekSets.filter(w => w.success.length + w.fail.length > 0).slice(-3);
-    const recentReps     = recentWithData.flatMap(w => [...w.success, ...w.fail].map(s => s.reps ?? 0));
+    // weightRecommendation.js-Audit (Runde 31): parseFloat(...)||0 statt
+    // ??0 -- konsistent zu den übrigen reps-Auswertungen in dieser Datei
+    // (fängt NaN ab, nicht nur null/undefined).
+    const recentReps     = recentWithData.flatMap(w => [...w.success, ...w.fail].map(s => parseFloat(s.reps) || 0));
     const avgReps        = recentReps.length > 0 ? recentReps.reduce((a, b) => a + b, 0) / recentReps.length : 0;
     const recentSucc     = recentWithData.reduce((s, w) => s + w.success.length, 0);
     const recentFail     = recentWithData.reduce((s, w) => s + w.fail.length, 0);
@@ -203,7 +221,14 @@ export function getWeightRecommendation(exerciseName, weeks, plateStep = 2.5, pr
     const success = [], fail = [];
     for (const d of wk.days)
       for (const ex of d.exercises)
-        if (ex.name === exerciseName)
+        // weightRecommendation.js-Audit (Runde 31): auch ex.substituteFor
+        // matchen -- vierte unabhängige Fundstelle derselben Fehlerklasse
+        // wie B335 (Runde 29, exWeightHistory() in insightEngine.js). Bei
+        // einer heute aktiven "Heute anders"-Substitution heißt ex.name
+        // bereits die Ersatz-Übung; ohne diesen Zusatz riss die Historie
+        // der Original-Übung an dem Tag ab, die Empfehlung fiel mangels
+        // Datenpunkten meist komplett weg.
+        if (ex.name === exerciseName || ex.substituteFor === exerciseName)
           for (const s of ex.sets) {
             if (isFullSuccess(s, ex)) success.push(s);
             else if (s.status === 'fail') fail.push(s);
@@ -285,7 +310,14 @@ export function getMetricRecommendation(exerciseName, weeks, metricStep = 10, pr
     const success = [], fail = [];
     for (const d of wk.days)
       for (const ex of d.exercises)
-        if (ex.name === exerciseName)
+        // weightRecommendation.js-Audit (Runde 31): auch ex.substituteFor
+        // matchen -- vierte unabhängige Fundstelle derselben Fehlerklasse
+        // wie B335 (Runde 29, exWeightHistory() in insightEngine.js). Bei
+        // einer heute aktiven "Heute anders"-Substitution heißt ex.name
+        // bereits die Ersatz-Übung; ohne diesen Zusatz riss die Historie
+        // der Original-Übung an dem Tag ab, die Empfehlung fiel mangels
+        // Datenpunkten meist komplett weg.
+        if (ex.name === exerciseName || ex.substituteFor === exerciseName)
           for (const s of ex.sets) {
             if (isFullSuccess(s, ex)) success.push(s);
             else if (s.status === 'fail') fail.push(s);
@@ -341,18 +373,21 @@ export function isReadyForAutoSelect(exerciseName, weeks, progressionMode = 'wei
     const success = [], fail = [];
     for (const d of wk.days)
       for (const ex of d.exercises)
-        if (ex.name === exerciseName) {
-          const targetReps = parseFloat(ex.targetReps) || 0;
+        // weightRecommendation.js-Audit (Runde 31): auch ex.substituteFor
+        // matchen -- vierte unabhängige Fundstelle derselben Fehlerklasse
+        // wie B335 (Runde 29, exWeightHistory() in insightEngine.js). Bei
+        // einer heute aktiven "Heute anders"-Substitution heißt ex.name
+        // bereits die Ersatz-Übung; ohne diesen Zusatz riss die Historie
+        // der Original-Übung an dem Tag ab, die Empfehlung fiel mangels
+        // Datenpunkten meist komplett weg.
+        if (ex.name === exerciseName || ex.substituteFor === exerciseName) {
+          // weightRecommendation.js-Audit (Runde 31): isFullSuccess()
+          // (setUtils.js) statt einer per Hand duplizierten Kopie derselben
+          // Logik -- verifiziert 100% äquivalent, aber die Duplikation war
+          // ein Wartungsrisiko (eine künftige Änderung an isFullSuccess()
+          // hätte diese Kopie unbemerkt zurückgelassen).
           for (const s of ex.sets) {
-            if (s.status === 'success') {
-              // Defensiv: ein als 'success' markierter Satz zählt hier nur
-              // als echter Erfolg, wenn die Wdh das targetReps der Übung
-              // erreichen — fängt bereits fehlerhaft markierte Altdaten ab,
-              // ohne dass eine Migration nötig ist (siehe SET_TOGGLE_DONE-Fix).
-              const reps = parseFloat(s.reps) || 0;
-              if (targetReps > 0 && reps < targetReps) fail.push(s);
-              else success.push(s);
-            }
+            if (isFullSuccess(s, ex)) success.push(s);
             else if (s.status === 'fail') fail.push(s);
           }
         }
@@ -368,7 +403,9 @@ export function isReadyForAutoSelect(exerciseName, weeks, progressionMode = 'wei
   // ohne Rückfrage greift.
   if (progressionMode === 'double_progression') {
     if (!targetRepsMax) return false;
-    const recentReps = lastWeeks.flatMap(w => [...w.success, ...w.fail].map(s => s.reps ?? 0));
+    // weightRecommendation.js-Audit (Runde 31): parseFloat(...)||0 statt
+    // ??0, konsistent zu den übrigen reps-Auswertungen in dieser Datei.
+    const recentReps = lastWeeks.flatMap(w => [...w.success, ...w.fail].map(s => parseFloat(s.reps) || 0));
     const avgReps     = recentReps.length > 0 ? recentReps.reduce((a, b) => a + b, 0) / recentReps.length : 0;
     if (avgReps < targetRepsMax) return false;
   }

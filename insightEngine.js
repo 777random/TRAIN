@@ -14,6 +14,7 @@
 import { getWeightRecommendation } from './weightRecommendation.js';
 import { detectPlateaus } from './plateauDetector.js';
 import { getEffectiveWeightStep } from './state.js';
+import { buildCategoryMap, isCompoundExercise } from './movementMap.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -1019,20 +1020,32 @@ export const INSIGHTS = [
       const curWk = state.weeks[state.curIdx];
       if (!curWk) return null;
       // Utility-Schicht-Audit (Runde 29): isSeedWeek ergänzt -- gleiche
-      // Fehlerklasse wie B285/B325.
+      // Fehlerklasse wie B285/B325. weightRecommendation.js-Audit
+      // (Runde 31): vacation ergänzt -- alle ui.js-Aufrufstellen und
+      // weeklyFocus.js' _nonDeloadWeeks() schlossen Urlaubswochen bereits
+      // korrekt aus, hier fehlte es.
       const calcWeeks = state.weeks
-        .filter(w => !w.isSeedWeek && w.mode !== 'deload' && w !== curWk)
+        .filter(w => !w.isSeedWeek && w.mode !== 'deload' && w.mode !== 'vacation' && w !== curWk)
         .filter(w => w.days.some(d => d.exercises.some(ex => ex.sets.some(s => s.status === 'success'))));
       if (calcWeeks.length < 2) return null;
       const allExNames = [...new Set(curWk.days.flatMap(d => d.exercises.map(ex => ex.name)))];
       const favs = state.favoriteExercises ?? [];
       const exNames = favs.length > 0 ? allExNames.filter(n => favs.includes(n)) : allExNames;
       if (!exNames.length) return null;
+      // weightRecommendation.js-Audit (Runde 31): isCompound berechnet
+      // statt hart auf true gesetzt -- Isolationsübungen bekamen dadurch
+      // die Compound-RPE-Schwelle (halfCeiling 8.5 statt 7.5) und konnten
+      // hier "noch Luft nach oben" melden, während dieselbe Situation im
+      // Coach-Tab (_checkProgression(), weeklyFocus.js) korrekt als
+      // "Gewicht halten" bewertet wurde -- sichtbarer Widerspruch zwischen
+      // zwei UI-Oberflächen für dieselbe Übung/Woche.
+      const catMap = buildCategoryMap(state.customExercises);
       const candidates = [];
       for (const name of exNames) {
         const exInst = curWk.days.flatMap(d => d.exercises).find(e => e.name === name);
         const exStep = getEffectiveWeightStep(exInst, state.settings, state.customExercises);
-        const rec = getWeightRecommendation(name, calcWeeks, exStep, exInst?.progressionMode ?? 'weight_first', exInst?.targetRepsMax ?? null, true, state.settings?.nutritionPhase ?? 'maintenance');
+        const isCompound = isCompoundExercise(name, catMap);
+        const rec = getWeightRecommendation(name, calcWeeks, exStep, exInst?.progressionMode ?? 'weight_first', exInst?.targetRepsMax ?? null, isCompound, state.settings?.nutritionPhase ?? 'maintenance');
         if (rec && rec.delta > 0) candidates.push({ name, rec });
       }
       candidates.sort((a, b) => b.rec.delta - a.rec.delta);
@@ -1055,20 +1068,27 @@ export const INSIGHTS = [
       const curWk = state.weeks[state.curIdx];
       if (!curWk) return null;
       // Utility-Schicht-Audit (Runde 29): isSeedWeek ergänzt -- gleiche
-      // Fehlerklasse wie B285/B325.
+      // Fehlerklasse wie B285/B325. weightRecommendation.js-Audit
+      // (Runde 31): vacation ergänzt -- alle ui.js-Aufrufstellen und
+      // weeklyFocus.js' _nonDeloadWeeks() schlossen Urlaubswochen bereits
+      // korrekt aus, hier fehlte es.
       const calcWeeks = state.weeks
-        .filter(w => !w.isSeedWeek && w.mode !== 'deload' && w !== curWk)
+        .filter(w => !w.isSeedWeek && w.mode !== 'deload' && w.mode !== 'vacation' && w !== curWk)
         .filter(w => w.days.some(d => d.exercises.some(ex => ex.sets.some(s => s.status === 'success'))));
       if (calcWeeks.length < 2) return null;
       const allExNames2 = [...new Set(curWk.days.flatMap(d => d.exercises.map(ex => ex.name)))];
       const favs2 = state.favoriteExercises ?? [];
       const exNames2 = favs2.length > 0 ? allExNames2.filter(n => favs2.includes(n)) : allExNames2;
       if (!exNames2.length) return null;
+      // weightRecommendation.js-Audit (Runde 31): isCompound berechnet
+      // statt hart auf true gesetzt, siehe Kommentar bei A-01.
+      const catMap = buildCategoryMap(state.customExercises);
       const candidates = [];
       for (const name of exNames2) {
         const exInst = curWk.days.flatMap(d => d.exercises).find(e => e.name === name);
         const exStep = getEffectiveWeightStep(exInst, state.settings, state.customExercises);
-        const rec = getWeightRecommendation(name, calcWeeks, exStep, exInst?.progressionMode ?? 'weight_first', exInst?.targetRepsMax ?? null, true, state.settings?.nutritionPhase ?? 'maintenance');
+        const isCompound = isCompoundExercise(name, catMap);
+        const rec = getWeightRecommendation(name, calcWeeks, exStep, exInst?.progressionMode ?? 'weight_first', exInst?.targetRepsMax ?? null, isCompound, state.settings?.nutritionPhase ?? 'maintenance');
         if (rec && rec.delta > 0) candidates.push({ name, rec });
       }
       candidates.sort((a, b) => b.rec.delta - a.rec.delta);
@@ -1091,18 +1111,25 @@ export const INSIGHTS = [
       const curWk = state.weeks[state.curIdx];
       if (!curWk) return null;
       // Utility-Schicht-Audit (Runde 29): isSeedWeek ergänzt -- gleiche
-      // Fehlerklasse wie B285/B325.
+      // Fehlerklasse wie B285/B325. weightRecommendation.js-Audit
+      // (Runde 31): vacation ergänzt -- alle ui.js-Aufrufstellen und
+      // weeklyFocus.js' _nonDeloadWeeks() schlossen Urlaubswochen bereits
+      // korrekt aus, hier fehlte es.
       const calcWeeks = state.weeks
-        .filter(w => !w.isSeedWeek && w.mode !== 'deload' && w !== curWk)
+        .filter(w => !w.isSeedWeek && w.mode !== 'deload' && w.mode !== 'vacation' && w !== curWk)
         .filter(w => w.days.some(d => d.exercises.some(ex => ex.sets.some(s => s.status === 'success'))));
       if (calcWeeks.length < 2) return null;
       const allExNames3 = [...new Set(curWk.days.flatMap(d => d.exercises.map(ex => ex.name)))];
       const favs3 = state.favoriteExercises ?? [];
       const exNames = favs3.length > 0 ? allExNames3.filter(n => favs3.includes(n)) : allExNames3;
+      // weightRecommendation.js-Audit (Runde 31): isCompound berechnet
+      // statt hart auf true gesetzt, siehe Kommentar bei A-01.
+      const catMap = buildCategoryMap(state.customExercises);
       for (const name of exNames) {
         const exInst = curWk.days.flatMap(d => d.exercises).find(e => e.name === name);
         const exStep = getEffectiveWeightStep(exInst, state.settings, state.customExercises);
-        const rec = getWeightRecommendation(name, calcWeeks, exStep, exInst?.progressionMode ?? 'weight_first', exInst?.targetRepsMax ?? null, true, state.settings?.nutritionPhase ?? 'maintenance');
+        const isCompound = isCompoundExercise(name, catMap);
+        const rec = getWeightRecommendation(name, calcWeeks, exStep, exInst?.progressionMode ?? 'weight_first', exInst?.targetRepsMax ?? null, isCompound, state.settings?.nutritionPhase ?? 'maintenance');
         if (rec && rec.delta === 0) {
           return {
             id: 'A-02', type: 'recovery', priority: 8,

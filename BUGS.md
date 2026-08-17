@@ -1,6 +1,6 @@
 # TRAIN — Bug-Tracking
 *Wird nach jedem Sprint aktualisiert*
-*Stand: August 2026 / train-v256*
+*Stand: August 2026 / train-v257*
 
 ---
 
@@ -8,6 +8,13 @@
 
 | ID | Beschreibung | Version | Commit | Root Cause |
 |----|-------------|---------|--------|-----------|
+| B359 | `substituteFor` wurde in keiner der drei weekSets-Konstruktionen in weightRecommendation.js berücksichtigt | v257 | — | Runde 31 (weightRecommendation.js-Audit). `getWeightRecommendation()`/`getMetricRecommendation()`/`isReadyForAutoSelect()` matchten nur `ex.name`, nicht zusätzlich `ex.substituteFor` -- bei aktiver "Heute anders"-Substitution riss die Historie der Original-Übung ab, die Empfehlung fiel meist ganz weg. Vierte unabhängige Fundstelle derselben Fehlerklasse wie B335. |
+| B358 | insightEngine.js Toast-Insights A-01/A-01b/A-02: `isCompound` fest auf `true` gesetzt statt berechnet | v257 | — | Runde 31 (weightRecommendation.js-Audit). Isolationsübungen bekamen dadurch die Compound-RPE-Schwelle -- ein Toast konnte bei RPE 8 fälschlich "noch Luft nach oben" melden, während dieselbe Situation im Coach-Tab (`_checkProgression()`, weeklyFocus.js) korrekt als "Gewicht halten" bewertet wurde. Direkter Widerspruch zwischen zwei UI-Oberflächen für dieselbe Übung/Woche. |
+| B357 | insightEngine.js Toast-Insights A-01/A-01b/A-02: `calcWeeks`-Filter schloss Urlaubswochen nicht aus | v257 | — | Runde 31 (weightRecommendation.js-Audit). Alle ui.js-Aufrufstellen und weeklyFocus.js' `_nonDeloadWeeks()` schlossen Urlaubswochen bereits korrekt aus. |
+| B356 | `isReadyForAutoSelect()` duplizierte `isFullSuccess()`-Logik per Hand statt sie zu importieren | v257 | — | Runde 31 (weightRecommendation.js-Audit, Verdachtsfall). Verifiziert 100% äquivalent, aber Wartungsrisiko bei künftiger Änderung von `isFullSuccess()` -- jetzt zentrale Funktion genutzt. |
+| B355 | Fenstergröße-Inkonsistenz in `_recommendationCore()` (4 vs. 3 Wochen) — dokumentiert, keine Code-Änderung | v257 | — | Runde 31 (weightRecommendation.js-Audit, Verdachtsfall). Geprüft und NICHT vereinheitlicht: beide Fenstergrößen stehen für unterschiedliche Fragen (allgemeine Erfolgsquote vs. strengeres Auto-Vorauswahl-Gate), eine Vereinheitlichung ohne klare Bug-Evidenz wäre ein unnötiges Verhaltensrisiko. |
+| B354 | `?? 0` vs. `parseFloat(...) \|\| 0` gemischt für `s.reps` in weightRecommendation.js | v257 | — | Runde 31 (weightRecommendation.js-Audit, Verdachtsfall, kosmetisch). Vereinheitlicht auf `parseFloat(...) \|\| 0`. |
+| B353 | `roundToPlate()`: theoretisches Floating-Point-Präzisionsrisiko bei untypischen Schrittweiten | v257 | — | Runde 31 (weightRecommendation.js-Audit, Verdachtsfall). Zusätzliche Nachkomma-Rundung als risikofreie Absicherung ergänzt. |
 | B352 | CSV-Injection: `cell()` neutralisierte keine Formel-Präfixe (`=`,`+`,`-`,`@`) — SICHERHEITSRELEVANT | v256 | — | Runde 30 (PWA/Backup-Audit). Ein Übungsname/eine Notiz mit Formel-Präfix wurde unverändert in die CSV geschrieben und konnte beim Öffnen in Excel/Google Sheets als Formel ausgeführt werden (CSV-/Formula-Injection, OWASP-Kategorie). Führendes Apostroph erzwingt jetzt Text-Interpretation. |
 | B351 | `install`-Handler (sw.js): ein fehlgeschlagenes `cache.addAll()` wurde durch `.catch()` silent als Erfolg behandelt | v256 | — | Runde 30 (PWA/Backup-Audit). `event.waitUntil()` sah dadurch ein aufgelöstes statt abgelehntes Promise -- ein einziger fehlgeschlagener Download hätte den neuen Worker mit komplett leerem Precache aktivieren können, Offline-Nutzung für jede App-Shell-Datei gebrochen. Fehler wird jetzt weitergeworfen. |
 | B350 | `cacheFirstWithRefresh()`s Hintergrund-Refresh war nicht durch `event.waitUntil()` geschützt (sw.js) | v256 | — | Runde 30 (PWA/Backup-Audit). Der im Hintergrund laufende `networkFetch`/`cache.put()` hatte nach dem sofortigen Zurückgeben von `cached` keine garantierte Laufzeit mehr -- der dokumentierte "Hintergrund-Refresh"-Mechanismus konnte praktisch nie zuverlässig fertig laufen. `event` wird jetzt durchgereicht und der Hintergrund-Fetch per `event.waitUntil()` abgesichert. |

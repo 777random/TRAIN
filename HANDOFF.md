@@ -1,5 +1,35 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-08-17 — Runde 30 (train-v255→v256, B344-B352):
+*Letzte Aktualisierung: 2026-08-17 — Runde 31 (train-v256→v257, B353-B359):
+weightRecommendation.js-Audit, FÜNFTE Runde nach Abschluss der ursprünglich
+angekündigten Vier-Runden-Serie -- auf Nutzerfrage "is there something
+else to audit" empfohlen und auf Zustimmung hin gestartet: der zentrale
+RPE-/Erfolgsquoten-Algorithmus hinter praktisch jeder "nächste Woche:
+Xkg"-Anzeige im Projekt war bisher nie als eigenständiges Subsystem
+auditiert worden, nur als Konsument/Nebenfund an anderer Stelle erwähnt.
+2 parallele Diagnose-Agenten (Kernalgorithmus in weightRecommendation.js
+selbst, Aufrufstellen-Konsistenz projektweit) fanden 3 bestätigte + 4
+Verdachtsfälle. Ergebnis in
+`Diagnose & Sprints/diagnose-weightrecommendation-audit-2026-08-17.txt`.
+Nutzer wählte "alle 7 fixen" -> B353-B359 umgesetzt (6 per Code-Änderung,
+1 bewusst nur dokumentiert). Wichtigste Fixes: `substituteFor` wurde in
+keiner der drei weekSets-Konstruktionen berücksichtigt -- vierte
+unabhängige Fundstelle derselben Fehlerklasse wie B335 (Runde 29), hier
+unmittelbar sichtbar als fehlende statt nur verzerrte Empfehlung nach
+einer "Heute anders"-Substitution (B359); insightEngine.js Toast-Insights
+A-01/A-01b/A-02 hatten `isCompound` fest auf `true` gesetzt statt berechnet
+-- ein direkt sichtbarer Widerspruch zwischen Coach-Tab und Toast für
+dieselbe Isolationsübung bei RPE 8 (B358). Eine vermutete Bulk+Isolation-
+Kollaps-Lücke (aus der ersten Recon-Hypothese) stellte sich als
+beabsichtigtes Design heraus und wurde NICHT gefixt. B355
+(Fenstergröße-Inkonsistenz 4 vs. 3 Wochen) wurde bewusst nur dokumentiert,
+nicht verändert -- beide Fenstergrößen beantworten unterschiedliche
+Fragen, eine Vereinheitlichung ohne klare Bug-Evidenz wäre ein unnötiges
+Verhaltensrisiko gewesen (analog zur B346-Entscheidung aus Runde 30). 5
+neue Tests (weightrecommendation_audit_fixes.spec.js, davon 4 als reine
+Node-Unit-Tests ohne Browser). Volle Regressionssuite (108 Spec-Dateien,
+gebatcht) grün, 1 vorbestehendes Flake (trainingstab_audit_fixes.spec.js
+Phantom-PR, bereits aus mehreren vorherigen Runden bekannt) auf Retry grün.
+Davor: Runde 30 (train-v255→v256, B344-B352):
 PWA/Service-Worker + Backup/Restore-Audit, VIERTE und letzte der
 angekündigten Folgerunden nach Fortschritt-Tab (Runde 27), Onboarding-Flow
 (Runde 28) und Utility-Schicht (Runde 29) -- damit ist der Auftrag "audit
