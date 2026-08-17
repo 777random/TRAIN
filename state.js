@@ -218,9 +218,7 @@ function buildDefaultState() {
     settings: {
       swipe:              true,
       drag:               true,
-      heightCm:           null,
       targetWeight:       null,
-      showBmi:            false,
       deloadFactor:       0.75,
       deloadFactorCustom: null,
       barbellWeight:      20,
@@ -666,7 +664,6 @@ function migrate(raw) {
     // (where swipe was false by default). drag keeps its persisted value.
     if (raw.settings.swipe        === undefined) raw.settings.swipe        = true;
     if (raw.settings.drag         === undefined) raw.settings.drag         = true;
-    if (raw.settings.heightCm     === undefined) raw.settings.heightCm     = null;
     if (raw.settings.targetWeight === undefined) raw.settings.targetWeight = null;
     raw.meta = {
       schemaVersion: 6,
@@ -701,7 +698,6 @@ function migrate(raw) {
   //           per-day sessionNote/sessionRating, per-exercise tags/supersetId
   if ((raw.meta?.schemaVersion ?? 0) < 9) {
     const s = raw.settings ?? {};
-    if (s.showBmi            === undefined) s.showBmi            = false;
     if (s.deloadFactor       === undefined) s.deloadFactor       = 0.75;
     if (s.deloadFactorCustom === undefined) s.deloadFactorCustom = null;
     if (s.barbellWeight      === undefined) s.barbellWeight      = 20;
@@ -2873,17 +2869,31 @@ function reduce(state, action) {
         ex.nextWeekPlan = 0;
         ex.nextWeekPlanConfirmed = false;
         ex._showCfg = false;
-        (ex.sets ?? []).forEach(s => {
-          s.status = 'pending';
-          s.done = false;
-        });
       }));
-      days.forEach(d => { d.locked = false; d.markedDone = false; });
+      // Körper-Tab/Einstellungen-Audit (2026-08-17): nutzt jetzt dieselbe
+      // zentrale _resetClonedDays()-Funktion wie WEEK_CREATE/AUTO_WEEK_CREATE
+      // statt einer eigenen, unvollständigen Kopie -- die vorherige Inline-
+      // Logik setzte nur sets.status/done + day.locked/markedDone zurück,
+      // ließ aber skipReason/skipDate, substituteFor, sets.reps/rpe UND alle
+      // Tag-Session-Felder (sessionCheckIn/sessionModifier/sleepHours/
+      // energyLevel/sessionStartTs/sessionEndTs) unangetastet stehen. Das
+      // war bereits die VIERTE unabhängige Klon-Reset-Kopie mit denselben
+      // Lücken wie die drei in Runde 25 (B288) gefixten Stellen.
+      _resetClonedDays(days);
       wk.days = days;
       break;
     }
 
     // ── Settings ──────────────────────────────────────────────────────────────
+    // Körper-Tab/Einstellungen-Audit (2026-08-17): Warnhinweis -- der
+    // `key in state.settings`-Guard bedeutet, dass ein Toggle-Key, der
+    // (noch) NICHT in buildDefaultState()'s settings-Objekt existiert, hier
+    // stillschweigend zum No-op wird, OHNE Fehlermeldung. Historisches
+    // Beispiel: soundEnabled (B210/Runde 19) war genau deshalb für
+    // Bestandsnutzer dauerhaft wirkungslos. Beim Hinzufügen eines neuen
+    // Settings-Tab-Toggles (`tog()` in renderSettingsTab, ui.js) IMMER
+    // zuerst den Key in buildDefaultState() UND der "Always-apply
+    // defaults"-Sektion in migrate() ergänzen.
     case A.SETTING_TOGGLE: {
       if (p.key in state.settings) state.settings[p.key] = !state.settings[p.key];
       break;
@@ -2936,9 +2946,21 @@ function reduce(state, action) {
     // ── Named templates (v9) ─────────────────────────────────────────────────
     case A.TEMPLATE_ADD: {
       if (!Array.isArray(state.templates)) state.templates = [];
+      // Körper-Tab/Einstellungen-Audit (2026-08-17): Namens-Duplikate
+      // automatisch disambiguiert (" (2)", " (3)", ...) -- vorher waren
+      // zwei benannte Vorlagen mit identischem Namen möglich (keine
+      // Datenkorruption, aber eine verwirrende Auswahl-Liste beim Laden,
+      // da nicht unterscheidbar).
+      let baseName = String(p.name ?? 'Neues Template').trim() || 'Neues Template';
+      let finalName = baseName;
+      let n = 2;
+      while (state.templates.some(t => t.name === finalName)) {
+        finalName = `${baseName} (${n})`;
+        n++;
+      }
       state.templates.push({
         id:   Date.now() + Math.random(),
-        name: p.name ?? 'Neues Template',
+        name: finalName,
         days: p.days ? clone(p.days) : clone(state.customTemplate ?? FACTORY_TEMPLATE),
       });
       break;
@@ -2993,12 +3015,39 @@ function reduce(state, action) {
       if (p.oldName !== p.name) {
         state.weeks.forEach(wk => wk.days.forEach(day => day.exercises.forEach(ex => {
           if (ex.name === p.oldName) ex.name = p.name;
+          // Körper-Tab/Einstellungen-Audit (2026-08-17): substituteFor
+          // ergänzt -- dieselbe Fehlerklasse wie B291 (EX_MERGE_NAMES),
+          // hier eine unabhängige zweite Fundstelle.
+          if (ex.substituteFor === p.oldName) ex.substituteFor = p.name;
         })));
         state.customTemplate.forEach(day => day.exercises.forEach(ex => {
           if (ex.name === p.oldName) ex.name = p.name;
         }));
         const fi = (state.favoriteExercises ?? []).indexOf(p.oldName);
         if (fi >= 0) state.favoriteExercises[fi] = p.name;
+        // Körper-Tab/Einstellungen-Audit (2026-08-17): vier namensbasierte
+        // State-Maps ergänzt, die bisher NICHT migriert wurden -- wurden
+        // beim Umbenennen zu Waisen-Einträgen unter dem alten Namen (PR
+        // erschien für die umbenannte Übung fälschlich als "nie erreicht",
+        // ein bereits bearbeitetes Plateau wurde erneut gemeldet, die
+        // dauerhafte Notiz (B127) und gespeicherte Alternativ-Vorschläge
+        // (B138) gingen verloren).
+        if (state.prs && Object.prototype.hasOwnProperty.call(state.prs, p.oldName)) {
+          state.prs[p.name] = state.prs[p.oldName];
+          delete state.prs[p.oldName];
+        }
+        if (state.plateauActions && Object.prototype.hasOwnProperty.call(state.plateauActions, p.oldName)) {
+          state.plateauActions[p.name] = state.plateauActions[p.oldName];
+          delete state.plateauActions[p.oldName];
+        }
+        if (state.exerciseNotes && Object.prototype.hasOwnProperty.call(state.exerciseNotes, p.oldName)) {
+          state.exerciseNotes[p.name] = state.exerciseNotes[p.oldName];
+          delete state.exerciseNotes[p.oldName];
+        }
+        if (state.customAlternatives && Object.prototype.hasOwnProperty.call(state.customAlternatives, p.oldName)) {
+          state.customAlternatives[p.name] = state.customAlternatives[p.oldName];
+          delete state.customAlternatives[p.oldName];
+        }
       }
       break;
     }

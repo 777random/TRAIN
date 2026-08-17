@@ -3196,8 +3196,13 @@ function _nearestBodyWeight(history, dateStr, maxDays = 30) {
  * @returns {Array<{date: string, ratio: number, bodyWeight: number}>}
  */
 function _weeklyP4PSeries(state, exName, bwHistory) {
+  // Körper-Tab-Audit (2026-08-17): isSeedWeek ausgeschlossen -- die
+  // synthetische Startwerte-Woche (ein selbst geschätztes Gewicht, kein
+  // echtes Trainingsereignis) konnte sonst als erster Datenpunkt im
+  // "Relative Stärke"-Chart erscheinen und den angezeigten Kraftzuwachs-
+  // Vergleich verzerren. Gleiche Fehlerklasse wie B267/B285.
   const weeks = [...state.weeks]
-    .filter(w => w.mode !== 'deload' && w.mode !== 'vacation')
+    .filter(w => !w.isSeedWeek && w.mode !== 'deload' && w.mode !== 'vacation')
     .sort((a, b) => a.startDate.localeCompare(b.startDate));
   const series = [];
   for (const wk of weeks) {
@@ -3227,8 +3232,10 @@ function _weeklyP4PSeries(state, exName, bwHistory) {
  * @returns {Array<{date: string, ratio: number, bodyWeight: number}>}
  */
 function _allTimePRSeries(state, exName, bwHistory) {
+  // Körper-Tab-Audit (2026-08-17): isSeedWeek ausgeschlossen -- siehe
+  // identischer Kommentar in _weeklyP4PSeries() direkt oberhalb.
   const weeks = [...state.weeks]
-    .filter(w => w.mode !== 'deload' && w.mode !== 'vacation')
+    .filter(w => !w.isSeedWeek && w.mode !== 'deload' && w.mode !== 'vacation')
     .sort((a, b) => a.startDate.localeCompare(b.startDate));
   const series = [];
   let runningMax = 0;
@@ -3292,7 +3299,9 @@ function renderBodyTab(state) {
   const targetWeight = state.settings?.targetWeight;
 
   // ── Tägliche Gewichtsdaten ────────────────────────────────────────────────
-  const todayStr   = new Date().toISOString().slice(0, 10);
+  // Körper-Tab-Audit (2026-08-17): _localISODate() statt .toISOString()
+  // (UTC) -- dasselbe, im Projekt bereits mehrfach gefixte Antimuster.
+  const todayStr   = _localISODate(new Date());
   const weightLog  = Array.isArray(bd.weightLog) ? bd.weightLog : [];
   const todayEntry = weightLog.find(e => e.date === todayStr);
 
@@ -3373,7 +3382,11 @@ function renderBodyTab(state) {
       />
       ${weightDiff !== null ? `
       <div class="body-badge" style="color:${Math.abs(weightDiff) < 0.1 ? 'var(--c-ok)' : 'var(--c-text-3)'}">
-        ${Math.abs(weightDiff) < 0.1 ? '✓ Ziel erreicht!' : weightDiff > 0 ? `noch ${weightDiff.toFixed(1)} kg` : `${Math.abs(weightDiff).toFixed(1)} kg drüber`}
+        ${/* Körper-Tab-Audit (2026-08-17): Richtung explizit benannt --
+           "noch Xkg" sagte bisher nicht ob Zu- oder Abnahme gemeint ist,
+           potenziell missverständlich bei bereits unterschrittenem
+           Abnehm-Ziel. weightDiff = targetWeight - currWeight. */ ''}
+        ${Math.abs(weightDiff) < 0.1 ? '✓ Ziel erreicht!' : weightDiff > 0 ? `noch ${weightDiff.toFixed(1)} kg zunehmen` : `noch ${Math.abs(weightDiff).toFixed(1)} kg abnehmen`}
       </div>` : ''}
     </div>
     <div class="body-field" style="margin-top:var(--sp-2)">
@@ -7527,8 +7540,12 @@ function _handleClick(e) {
     case 'log-bodyweight': {
       const input = document.getElementById('body-weight-today');
       const w     = parseFloat(input?.value);
-      if (!Number.isFinite(w) || w <= 0) break;
-      const todayDate = new Date().toISOString().slice(0, 10);
+      // Körper-Tab-Audit (2026-08-17): Obergrenze ergänzt (analog zu
+      // set-barbell-weight, bw<=50) -- ein Tippfehler (825 statt 82.5)
+      // wurde bisher unbegrenzt übernommen und verzerrte Chart/Trend
+      // sichtbar, ohne dass der Nutzer eine Rückmeldung bekam.
+      if (!Number.isFinite(w) || w <= 0 || w > 400) break;
+      const todayDate = _localISODate(new Date());
       dispatch(A.BODY_LOG_WEIGHT, { date: todayDate, weight: w });
       showToast('Körpergewicht eingetragen ✓', 'ok');
       break;
@@ -7708,7 +7725,13 @@ function _handleClick(e) {
 
     case 'delete-custom-ex': {
       const name = el.dataset.name;
-      if (confirm(`"${name}" löschen? Bereits hinzugefügte Übungen in Wochen bleiben erhalten.`)) {
+      // Körper-Tab/Einstellungen-Audit (2026-08-17): Hinweis auf die
+      // Kategorie-Nebenwirkung ergänzt -- nach dem Löschen fällt die
+      // Kategorie-Auflösung für diese Übung auf die eingebaute
+      // MOVEMENT_MAP zurück (meist "Sonstige"), was Push/Pull-/Compound-
+      // Isolation-Signale im Coach-Tab für bereits geloggte Sätze
+      // rückwirkend leicht verschieben kann.
+      if (confirm(`"${name}" löschen? Bereits hinzugefügte Übungen in Wochen bleiben erhalten, ihre Bewegungskategorie kann sich danach aber ändern.`)) {
         dispatch(A.CUSTOM_EX_DELETE, { name });
         showToast('Übung gelöscht', 'info');
         if (_activeTab === 'settings') renderSettingsTab(getState());
@@ -8129,7 +8152,9 @@ function _handleChange(e) {
     }
     case 'set-target-weight': {
       const tw = parseFloat(el.value);
-      dispatch(A.SETTING_SET, { key: 'targetWeight', value: Number.isFinite(tw) && tw > 0 ? tw : null });
+      // Körper-Tab-Audit (2026-08-17): Obergrenze ergänzt, siehe
+      // identischer Kommentar bei 'log-bodyweight'.
+      dispatch(A.SETTING_SET, { key: 'targetWeight', value: Number.isFinite(tw) && tw > 0 && tw <= 400 ? tw : null });
       break;
     }
     case 'set-barbell-weight': {
@@ -8884,7 +8909,12 @@ function _saveTemplate() {
     const ex    = tpl[di]?.exercises[ei];
     if (!ex) return;
 
-    if      (field === 'name')      ex.name = inp.value;
+    // Körper-Tab/Einstellungen-Audit (2026-08-17): leerer Name fällt jetzt
+    // auf einen Platzhalter zurück -- inkonsistent zum direkt daneben
+    // liegenden, bereits abgesicherten Namensfeld für benannte Vorlagen
+    // (confirm-save-named-template, das leere/nur-Leerzeichen-Namen
+    // ablehnt), hier wäre sonst ex.name==='' ins Template gewandert.
+    if      (field === 'name')      ex.name = inp.value.trim() || 'Übung';
     else if (field === 'note')      ex.note = inp.value;
     else if (field === 'setsCount') {
       const n = Math.max(1, Math.min(8, +inp.value || 1));
@@ -8912,9 +8942,22 @@ function _handleTplAction(el) {
     dispatch(A.TPL_SAVE, { template: tpl });
     renderTemplateEditor(getState());
   } else if (action === 'add-ex') {
+    // Körper-Tab/Einstellungen-Audit (2026-08-17): vollständiges Feld-Set
+    // ergänzt, analog zu EX_ADD (state.js) -- vorher fehlten weightStep/
+    // showPlates/metricStep/progressionType/progressionMode/targetReps/
+    // targetRepsMax/tags/skipReason/skipDate/nextWeekPlan(Confirmed)/
+    // prWeight/prRepsAtMaxWeight/prRepsHistory komplett. TPL_SAVEs
+    // Normalisierung backfillt nur metric/status/done -- eine so
+    // gespeicherte Vorlage vererbte das unvollständige Feld-Set an jede
+    // daraus erstellte reale Woche (gleiche Fehlerklasse wie B289).
     tpl[di].exercises.push({
       name: 'Neue Übung', note: '', pauseSec: 90, metric: 'reps',
-      sets: [{ weight: 0, reps: 10, rpe: null, status: 'pending', done: false }],
+      progressionType: 'weight', progressionMode: 'weight_first', targetRepsMax: null, prRepsHistory: {},
+      prWeight: null, prRepsAtMaxWeight: null,
+      nextWeekPlan: 0, nextWeekPlanConfirmed: false, nextWeekPlanAutoReviewed: true,
+      skipReason: null, skipDate: null, substituteFor: null,
+      tags: [], targetReps: 10, showPlates: true, metricStep: undefined,
+      sets: [{ weight: 0, reps: 10, rpe: null, status: 'pending', done: false, note: '' }],
     });
     dispatch(A.TPL_SAVE, { template: tpl });
     renderTemplateEditor(getState());

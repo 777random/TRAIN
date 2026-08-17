@@ -1,5 +1,30 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-08-17 — Runde 25 (train-v250→v251, B284-B296,
+*Letzte Aktualisierung: 2026-08-17 — Runde 26 (train-v251→v252, B297-B310):
+Körper-Tab + Einstellungen-Audit auf Nutzeranfrage ("mach auch Körper-Tab und
+Einstellungen"), analog zu Coach-Tab (Runde 24) und Trainings-Tab (Runde 25).
+4 parallele Diagnose-Agenten (Körpergewicht/BMI, Relative-Stärke/Schlaf-
+Korrelation, Settings-Reducer/Custom-Exercises/Backup, Template-Editor)
+fanden 5 bestätigte + 9 Verdachtsfälle -- Ergebnis in
+`Diagnose & Sprints/diagnose-koerper-einstellungen-audit-2026-08-17.txt`.
+Nutzer wählte "alle 14 fixen" und, für den BMI-Fund, explizit "Datenfelder
+entfernen" statt der empfohlenen Fertigstellung. Wichtigster Fund (B310):
+Korrektur zu Runde 25 -- `_weeklyP4PSeries()`/`_allTimePRSeries()` wurden
+dort fälschlich als Fortschritt-Tab-Code eingestuft, sind aber tatsächlich
+Körper-Tab-Code ("Relative Stärke"-Karte); die Startwerte-Woche konnte dort
+als synthetischer erster Datenpunkt erscheinen. Zweithäufigstes Muster:
+`WEEK_RESET_TO_TPL` (B308) ist die VIERTE unabhängige Wochen-Klon-Reset-Kopie
+mit denselben Lücken wie B288, jetzt auf `_resetClonedDays()` vereinheitlicht;
+`CUSTOM_EX_UPDATE` (B309) ist eine zweite unabhängige "Übung umbenennen"-
+Implementierung mit denselben Lücken wie B291 (`EX_MERGE_NAMES`), fehlte u.a.
+die Migration von `state.prs`/`plateauActions`/`exerciseNotes`/
+`customAlternatives`. Produktentscheidung: BMI-Datenfelder (`heightCm`/
+`showBmi`) waren nie angebunden (keine Berechnung/Anzeige irgendwo in ui.js)
+-- komplett aus Schema/Migration entfernt statt fertiggestellt (B306). 5 neue
+Tests (koerper_einstellungen_audit_fixes.spec.js). Volle Regressionssuite
+(103 Spec-Dateien, gebatcht) grün, 2 vorbestehende Flakes (plate_calculator.spec.js,
+trainingstab_audit_fixes.spec.js Phantom-PR-Test) auf Retry/Isolation grün,
+beide unabhängig von diesen Änderungen.
+Davor: Runde 25 (train-v250→v251, B284-B296,
 B283 übersprungen siehe BUGS.md-Hinweis): Vollständiger Trainings-Tab-Audit
 auf Nutzeranfrage ("mache einen total audit für trainingstab identifiziere
 fehler inkonsistenzen und bugs"), analog zum Coach-Tab-Audit direkt zuvor.

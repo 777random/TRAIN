@@ -15,8 +15,13 @@ function triggerDownload(blob, filename) {
   setTimeout(() => { URL.revokeObjectURL(url); document.body.removeChild(a); }, 150);
 }
 
+// Körper-Tab/Einstellungen-Audit (2026-08-17): 'YYYY-MM-DD' aus LOKALEN
+// Datumskomponenten statt .toISOString() (UTC) -- dasselbe, im Projekt
+// bereits mehrfach gefixte Antimuster. Betrifft hier nur den Export-
+// Dateinamen (kosmetisch), kein Datenfehler.
 function today() {
-  return new Date().toISOString().split('T')[0];
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 // Wochendurchschnitt aus weightLog, Fallback auf bodyData.weight (pre-v29)
@@ -241,7 +246,9 @@ export function exportCSV(scope = 'all') {
   for (const wk of weeks) {
     const kw         = wkLabel(wk.startDate);
     const [von, bis] = wkDates(wk.startDate);
-    const modus      = wk.mode === 'deload' ? 'Deload' : 'Standard';
+    // Körper-Tab/Einstellungen-Audit (2026-08-17): 'vacation' ergänzt --
+    // Urlaubswochen erschienen bisher fälschlich als "Standard" in der CSV.
+    const modus      = wk.mode === 'deload' ? 'Deload' : wk.mode === 'vacation' ? 'Urlaub' : 'Standard';
     const bd         = wk.bodyData ?? {};
 
     for (const day of wk.days) {
@@ -277,7 +284,9 @@ export function exportCSV(scope = 'all') {
   for (const wk of weeks) {
     const kw         = wkLabel(wk.startDate);
     const [von, bis] = wkDates(wk.startDate);
-    const modus      = wk.mode === 'deload' ? 'Deload' : 'Standard';
+    // Körper-Tab/Einstellungen-Audit (2026-08-17): 'vacation' ergänzt --
+    // Urlaubswochen erschienen bisher fälschlich als "Standard" in der CSV.
+    const modus      = wk.mode === 'deload' ? 'Deload' : wk.mode === 'vacation' ? 'Urlaub' : 'Standard';
     const bd         = wk.bodyData ?? {};
     const tot  = wk.days.reduce((s, d) => s + d.exercises.reduce((ss, ex) => ss + ex.sets.length, 0), 0);
     const done = wk.days.reduce((s, d) => s + d.exercises.reduce((ss, ex) => ss + ex.sets.filter(st => st.done).length, 0), 0);

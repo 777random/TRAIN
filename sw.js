@@ -16,7 +16,7 @@
  *   asset conflicts.
  */
 
-const CACHE_VERSION  = 'train-v251';
+const CACHE_VERSION  = 'train-v252';
 
 // Runde 20 (Befund 4): kurze Änderungsliste für den aktuellen Build, im
 // Update-Banner beim Aufklappen ("mehr Details") angezeigt. 2-3 knappe
@@ -28,9 +28,9 @@ const CACHE_VERSION  = 'train-v251';
 // (Browser-Update-Algorithmus) -- die Werte sind dadurch garantiert die des
 // NEUEN, wartenden Workers, ganz ohne zusätzlichen Cache-Bypass.
 const CHANGELOG_ENTRIES = [
-  'Pausentimer startet jetzt zuverlässig auch über das ✓/✗-Icon (nicht nur "Satz bestätigen")',
-  'Trainings-Tab: mehrere Berechnungsfehler behoben (Gewichtsempfehlungen, Streak, PR-Erkennung)',
-  'Coach-Tab: mehrere Berechnungsfehler behoben (u.a. falsches "Erfolgsquote gesunken"-Signal)',
+  'Körpergewicht-Eingabe: Tippfehler-Schutz (Obergrenze) und korrektes lokales Datum',
+  'Körper-Tab: Relative-Stärke-Chart zeigt keine verzerrten Werte mehr durch die Startwerte-Woche',
+  'Einstellungen: unfertiges BMI-Feld entfernt, Vorlagen-Übungen jetzt mit vollständigen Einstellungen',
 ];
 
 /**
