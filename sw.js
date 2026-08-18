@@ -16,7 +16,7 @@
  *   asset conflicts.
  */
 
-const CACHE_VERSION  = 'train-v257';
+const CACHE_VERSION  = 'train-v258';
 
 // Runde 20 (Befund 4): kurze Änderungsliste für den aktuellen Build, im
 // Update-Banner beim Aufklappen ("mehr Details") angezeigt. 2-3 knappe
@@ -28,9 +28,9 @@ const CACHE_VERSION  = 'train-v257';
 // (Browser-Update-Algorithmus) -- die Werte sind dadurch garantiert die des
 // NEUEN, wartenden Workers, ganz ohne zusätzlichen Cache-Bypass.
 const CHANGELOG_ENTRIES = [
-  'Gewichtsempfehlungen berücksichtigen jetzt auch die Historie substituierter Übungen ("Heute anders")',
-  'Isolationsübungen bekommen in Erinnerungs-Hinweisen jetzt dieselbe korrekte Bewertung wie im Coach-Tab',
-  'Kleinere interne Konsistenz-Korrekturen im Empfehlungs-Algorithmus',
+  'Abschluss-Nachricht nach dem letzten Satz zeigt bei Isolationsübungen jetzt eine konsistente Bewertung',
+  'Pausenzeit-Vorschläge nach einem schnellen RPE-Anstieg bleiben jetzt in einem realistischen Rahmen',
+  'Kleinere interne Konsistenz-Korrekturen im Intra-Session-Coach',
 ];
 
 /**

@@ -2950,7 +2950,12 @@ function renderSetRow(s, si, ex, di, ei, prevEx, locked, rpeEnabled = true, show
     const isLastSet = si === ex.sets.length - 1;
     if (isLastSet) {
       const _lsmState = getState();
-      const msg = buildLastSetMessage(s, ex, nextWeekWeight, getEffectiveWeightStep(ex, _lsmState.settings, _lsmState.customExercises), nextWeekReason);
+      // sessionCoach.js-Audit (Runde 32): isCompound ergänzt -- ohne diesen
+      // Parameter zeigte buildLastSetMessage() bei einer Isolationsübung mit
+      // RPE 8 "Perfekt abgeschlossen ✓" direkt neben einem nextWeekText, der
+      // (korrekt, seit B358/Runde 31) bereits "gleiches Gewicht" zeigte.
+      const _lsmIsCompound = isCompoundExercise(ex.name, buildCategoryMap(_lsmState.customExercises));
+      const msg = buildLastSetMessage(s, ex, nextWeekWeight, getEffectiveWeightStep(ex, _lsmState.settings, _lsmState.customExercises), nextWeekReason, _lsmIsCompound);
       _noteSuggestedWeight = msg.suggestedWeight ?? null;
       const dismissed = msg.canAddSet && _optionalSetDismissed.has(feedbackKey);
       if (!dismissed) {

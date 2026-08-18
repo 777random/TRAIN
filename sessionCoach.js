@@ -51,6 +51,15 @@ function _applyModifier(nextWeight, currentWeight, sessionModifier, step, modifi
     return Math.max(nextWeight * 0.9, currentWeight - step);
   }
   if (sessionModifier === 'reduced_mild') {
+    // sessionCoach.js-Audit (Runde 32): bewusst OHNE modifierScope/isCompound-
+    // Prüfung, anders als 'reduced' oben -- verlässt sich auf die Invariante,
+    // dass _buildSessionBriefing() (ui.js) 'reduced_mild' strukturell IMMER
+    // mit modifierScope:'all' setzt, nie mit 'compound' (im Gegensatz zu
+    // 'reduced', das immer mit modifierScope:'compound' einhergeht). Verifiziert
+    // beim Audit, aktuell unerreichbarer Code-Pfad. Falls sich diese
+    // Aufrufstellen-Kopplung künftig ändert, muss diese Funktion um dieselbe
+    // Scope-Prüfung wie 'reduced' ergänzt werden, sonst würden Isolations-
+    // übungen bei einmalig schlechtem Schlaf fälschlich gedämpft.
     return Math.max(nextWeight * 0.95, currentWeight - step);
   }
   return nextWeight;
@@ -71,6 +80,12 @@ function _applyModifier(nextWeight, currentWeight, sessionModifier, step, modifi
 // Tabelle (wie lang PAUSIEREN, nicht ob der Satz als "hart" zählt) — bewusst
 // NICHT mit RPE_SET_HARD_ZONE zusammengelegt, siehe Kommentar dort.
 const RPE_PAUSE_TIER_HIGH = 8.5;
+
+// sessionCoach.js-Audit (Runde 32): höchster Wert, der in der Pausentabelle
+// unten überhaupt vorkommt (Kraft+Compound, RPE 9-10) -- als Obergrenze für
+// den Trend-Multiplikator weiter unten wiederverwendet, statt eine neue,
+// willkürliche Zahl einzuführen.
+const MAX_PAUSE_SEC = 300;
 
 export function _pauseSecForRpe(rpe, goal, isCompound) {
   if (rpe == null) return null;
@@ -94,7 +109,8 @@ export function _pauseSecForRpe(rpe, goal, isCompound) {
   if (rpe <= 9.5) return isStrength
     ? (isCompound ? 300 : 210)
     : (isCompound ? 240 : 150);
-  // rpe === 10
+  // rpe > 9.5 (sessionCoach.js-Audit, Runde 32: Kommentar korrigiert --
+  // fängt jeden Wert über 9.5 ab, nicht nur exakt 10)
   return isStrength
     ? (isCompound ? 300 : 240)
     : (isCompound ? 300 : 180);
@@ -164,6 +180,17 @@ export function buildSetFeedback(s, ex, sessionModifier, si, goal = null, isComp
 
   const repDiff = targetReps - reps; // positiv = Wdh verfehlt, 0 = erreicht, negativ = übertroffen
 
+  // sessionCoach.js-Audit (Runde 32, geprüft und bewusst NICHT verändert):
+  // Gruppe C (repDiff===0) unten hat eine 6-stufige RPE-Leiter, Gruppen
+  // A/B/D nur 2-3 Stufen -- DECISIONS.md (B92) spezifiziert nur Gruppe C's
+  // Bänder explizit. Konkret: RPE 9 + repDiff>=2 (A) löst sofort -2×step
+  // aus, RPE 9 + repDiff===0 (C, Ziel erreicht) nur -1×step (C springt
+  // erst bei RPE 10 auf -2×step). Könnte beabsichtigt sein (verfehlt+hart
+  // = stärkeres Signal als erreicht+hart) oder eine unvollständige
+  // Übertragung der Matrix -- ohne eindeutige Spezifikation für A/B/D ist
+  // das eine Produktentscheidung, keine reine Code-Korrektur; bewusst
+  // nicht angetastet, um kein Verhaltensrisiko ohne klare Bug-Evidenz
+  // einzugehen (siehe auch B346/B355-Präzedenz).
   let nextWeight, pauseSec, hint;
   if (repDiff >= 2) { // Gruppe A: Wdh deutlich verfehlt
     if (rpe >= 9) {
@@ -212,7 +239,10 @@ export function buildSetFeedback(s, ex, sessionModifier, si, goal = null, isComp
   // derselben Übung um >=1.5 -> längere Pause, zusätzlicher Hinweis.
   const prevRpe = si > 0 ? ex.sets[si - 1]?.rpe : null;
   if (prevRpe != null && rpe - prevRpe >= 1.5) {
-    pauseSec = Math.round(pauseSec * 1.5);
+    // sessionCoach.js-Audit (Runde 32): auf MAX_PAUSE_SEC gedeckelt -- ohne
+    // Obergrenze konnte der Multiplikator einen bereits hohen Basiswert
+    // (300s) auf 450s hochtreiben, eine unrealistisch lange Pausenzeit.
+    pauseSec = Math.min(Math.round(pauseSec * 1.5), MAX_PAUSE_SEC);
     hint += ' · RPE steigt schnell';
   }
 
@@ -259,13 +289,30 @@ export function buildSetFeedback(s, ex, sessionModifier, si, goal = null, isComp
  *   Klammerzusatz angehängt statt den Nachrichtentext zu ersetzen. Bei
  *   fehlendem Wert (nicht genug Historie) bleibt der Text unverändert wie
  *   zuvor — kein erzwungener/leerer Zusatz.
+ * @param {boolean} [isCompound] sessionCoach.js-Audit (Runde 32): B121-Pendant
+ *   (siehe buildSetFeedback()/RPE_SET_HARD_ZONE oben und der isCompound-
+ *   Kollaps in weightRecommendation.js' _recommendationCore()) — bei
+ *   Isolationsübungen kollabiert dort die "kleine Steigerung"-Zone auf
+ *   denselben Wert wie die Vollsteigerungs-Schwelle (7.5), d.h. bereits ab
+ *   RPE >7.5 empfiehlt getWeightRecommendation() "Halten", nicht erst ab 9
+ *   wie bei Compound-Übungen. Ohne diesen Parameter zeigte diese Funktion
+ *   bei einer Isolationsübung mit RPE 8 "Perfekt abgeschlossen ✓" direkt
+ *   neben einem `nextWeekText`, der bereits "gleiches Gewicht" (Halten)
+ *   zeigte — widersprüchliche Botschaft im selben UI-Element. Default true,
+ *   um bestehende Aufrufer nicht zu brechen, die den Parameter (noch) nicht
+ *   übergeben.
  * @returns {{ text: string, canAddSet: boolean, suggestedWeight: number|null }}
  */
-export function buildLastSetMessage(s, ex, nextWeekWeight, effectiveStep = null, nextWeekReason = null) {
+export function buildLastSetMessage(s, ex, nextWeekWeight, effectiveStep = null, nextWeekReason = null, isCompound = true) {
   const step = effectiveStep ?? (ex.weightStep || 2.5);
   const rpe = s.rpe;
   const nextWeekText = nextWeekWeight != null ? `${nextWeekWeight}kg` : 'gleiches Gewicht';
   const reasonSuffix = nextWeekReason ? ` (${nextWeekReason})` : '';
+  // Compound: 7.5-8.5 ist die halbe Steigerungszone (RPE_SET_HARD_ZONE) und
+  // verdient noch das "Perfekt"-Lob. Isolation: dieselbe Zone kollabiert in
+  // getWeightRecommendation() bereits auf "Halten" -- die Perfekt-Zone endet
+  // hier entsprechend früher, bei derselben Schwelle (7.5).
+  const perfectCeiling = isCompound ? 9 : 7.5;
 
   if (s.status !== 'success') {
     return { text: `Ziel nicht erreicht — Nächste Woche: gleiches Gewicht, Technik prüfen${reasonSuffix}`, canAddSet: false, suggestedWeight: null };
@@ -277,7 +324,7 @@ export function buildLastSetMessage(s, ex, nextWeekWeight, effectiveStep = null,
   if (rpe == null || rpe <= 7) {
     return { text: `Übung abgeschlossen ✓ Nächste Woche: ${nextWeekText}${reasonSuffix}`, canAddSet: false, suggestedWeight: null };
   }
-  if (rpe < 9) { // 8, 8.5
+  if (rpe < perfectCeiling) {
     return { text: `Perfekt abgeschlossen ✓ Nächste Woche: ${nextWeekText}${reasonSuffix}`, canAddSet: false, suggestedWeight: null };
   }
   return { text: `Hart aber fertig ✓ Nächste Woche: gleiches Gewicht${reasonSuffix}`, canAddSet: false, suggestedWeight: null };

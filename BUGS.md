@@ -1,6 +1,6 @@
 # TRAIN — Bug-Tracking
 *Wird nach jedem Sprint aktualisiert*
-*Stand: August 2026 / train-v257*
+*Stand: August 2026 / train-v258*
 
 ---
 
@@ -8,6 +8,11 @@
 
 | ID | Beschreibung | Version | Commit | Root Cause |
 |----|-------------|---------|--------|-----------|
+| B364 | `buildLastSetMessage()` (sessionCoach.js) hatte kein Compound/Isolation-Bewusstsein | v258 | — | Runde 32 (sessionCoach.js-Audit). Eine Isolationsübung bei RPE 8 konnte "Perfekt abgeschlossen ✓" zeigen, obwohl der `nextWeekText` daneben (via `getWeightRecommendation()`, seit B358) bereits "gleiches Gewicht" (Halten) anzeigte -- widersprüchliche Botschaft im selben UI-Element. Neuer `isCompound`-Parameter, analog zu B121/`buildSetFeedback()`. |
+| B363 | Pausenzeit-Trend-Multiplikator in `buildSetFeedback()` ohne Obergrenze | v258 | — | Runde 32 (sessionCoach.js-Audit, Verdachtsfall). `pauseSec * 1.5` konnte bei bereits hohem Basiswert (300s) auf 450s eskalieren. Neue `MAX_PAUSE_SEC`-Deckelung auf den ohnehin höchsten Tabellenwert (300s). |
+| B362 | Ungenauer Kommentar bei `_pauseSecForRpe()`s letztem Zweig korrigiert | v258 | — | Runde 32 (sessionCoach.js-Audit, Verdachtsfall, kosmetisch). `// rpe === 10` beschrieb tatsächlich jeden Wert `>9.5`. |
+| B361 | `_applyModifier()`: `reduced_mild` prüft `modifierScope`/`isCompound` nicht, `reduced` schon -- Invariante dokumentiert, keine Code-Änderung | v258 | — | Runde 32 (sessionCoach.js-Audit, Verdachtsfall). Verifiziert als aktuell unerreichbarer Code-Pfad (`_buildSessionBriefing()` in ui.js setzt `reduced_mild` strukturell immer mit `modifierScope:'all'`) -- nur ein erklärender Kommentar ergänzt, der diese Kopplung dokumentiert, falls sie sich künftig ändert. |
+| B360 | Granularitäts-Asymmetrie zwischen den 4 Entscheidungsmatrix-Gruppen (A/B/C/D) in `buildSetFeedback()` -- dokumentiert, keine Code-Änderung | v258 | — | Runde 32 (sessionCoach.js-Audit, Verdachtsfall). Gruppe C hat eine 6-stufige RPE-Leiter, A/B/D nur 2-3 Stufen; DECISIONS.md spezifiziert nur Gruppe C explizit. Ohne eindeutige Spezifikation für A/B/D ist das eine Produktentscheidung, keine reine Code-Korrektur -- nur dokumentiert (analog B346/B355). |
 | B359 | `substituteFor` wurde in keiner der drei weekSets-Konstruktionen in weightRecommendation.js berücksichtigt | v257 | — | Runde 31 (weightRecommendation.js-Audit). `getWeightRecommendation()`/`getMetricRecommendation()`/`isReadyForAutoSelect()` matchten nur `ex.name`, nicht zusätzlich `ex.substituteFor` -- bei aktiver "Heute anders"-Substitution riss die Historie der Original-Übung ab, die Empfehlung fiel meist ganz weg. Vierte unabhängige Fundstelle derselben Fehlerklasse wie B335. |
 | B358 | insightEngine.js Toast-Insights A-01/A-01b/A-02: `isCompound` fest auf `true` gesetzt statt berechnet | v257 | — | Runde 31 (weightRecommendation.js-Audit). Isolationsübungen bekamen dadurch die Compound-RPE-Schwelle -- ein Toast konnte bei RPE 8 fälschlich "noch Luft nach oben" melden, während dieselbe Situation im Coach-Tab (`_checkProgression()`, weeklyFocus.js) korrekt als "Gewicht halten" bewertet wurde. Direkter Widerspruch zwischen zwei UI-Oberflächen für dieselbe Übung/Woche. |
 | B357 | insightEngine.js Toast-Insights A-01/A-01b/A-02: `calcWeeks`-Filter schloss Urlaubswochen nicht aus | v257 | — | Runde 31 (weightRecommendation.js-Audit). Alle ui.js-Aufrufstellen und weeklyFocus.js' `_nonDeloadWeeks()` schlossen Urlaubswochen bereits korrekt aus. |

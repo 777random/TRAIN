@@ -1,5 +1,35 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-08-17 — Runde 31 (train-v256→v257, B353-B359):
+*Letzte Aktualisierung: 2026-08-18 — Runde 32 (train-v257→v258, B360-B364):
+sessionCoach.js-Audit, SECHSTE Runde -- auf Nutzerauftrag "start
+sessionCoach.js audit" gestartet (Nutzer hatte diese Datei als eine von
+mehreren offenen Kandidaten genannt bekommen, nachdem die ursprüngliche
+Vier-Runden-Serie plus weightRecommendation.js/Runde 31 abgeschlossen
+waren). sessionCoach.js (Intra-Session-Coach: RPE-/Wdh-Differenz-
+Entscheidungsmatrix für Satz-zu-Satz-Feedback, Pausenzeiten, Abschluss-
+Nachricht) war bisher nie als eigenständiges Subsystem auditiert. 2
+parallele Diagnose-Agenten (Kernlogik in sessionCoach.js, Aufrufstellen-
+Konsistenz in ui.js/state.js) fanden 1 bestätigten Bug + 4 Verdachtsfälle.
+Ergebnis in `Diagnose & Sprints/diagnose-sessioncoach-audit-2026-08-18.txt`.
+Nutzer wählte "Bug + sinnvolle Verdachtsfälle fixen" -> B360-B364
+umgesetzt (3 per Code-Änderung, 2 bewusst nur dokumentiert). Wichtigster
+Fund (B364): `buildLastSetMessage()` hatte kein Compound/Isolation-
+Bewusstsein -- eine Isolationsübung bei RPE 8 konnte "Perfekt
+abgeschlossen ✓" zeigen, direkt neben einem `nextWeekText`, der (seit
+B358/Runde 31 korrekt) bereits "gleiches Gewicht" zeigte, dieselbe
+Compound/Isolation-Bewusstseins-Lücke wie B121/B358. Bemerkenswert sauberer
+Befund im Aufrufstellen-Cluster: alle 7 `buildSetFeedback()`-Aufrufstellen
+waren bereits korrekt, und die ursprünglich vermutete `reduced_mild`-Scope-
+Lücke (B361) erwies sich als durch eine externe Invariante bereits
+abgesichert (nur dokumentiert). B360 (Granularitäts-Asymmetrie zwischen den
+4 Matrix-Gruppen) wurde ebenfalls bewusst nur dokumentiert -- eine reine
+Produktentscheidung ohne eindeutige DECISIONS.md-Spezifikation für die
+betroffenen Gruppen, analog zu B346/B355. 4 neue Tests
+(sessioncoach_audit_fixes.spec.js, reine Node-Unit-Tests ohne Browser).
+Volle Regressionssuite (109 Spec-Dateien, gebatcht) grün, 2 vorbestehende
+Flakes (delete_all_data.spec.js -- neu beobachtet, aber bei 6/6
+Wiederholungen sauber, sowie das altbekannte trainingstab_audit_fixes.spec.js
+Phantom-PR) jeweils unabhängig als umgebungsbedingt bestätigt.
+Davor: Runde 31 (train-v256→v257, B353-B359):
 weightRecommendation.js-Audit, FÜNFTE Runde nach Abschluss der ursprünglich
 angekündigten Vier-Runden-Serie -- auf Nutzerfrage "is there something
 else to audit" empfohlen und auf Zustimmung hin gestartet: der zentrale
