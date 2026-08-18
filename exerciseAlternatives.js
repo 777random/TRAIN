@@ -14,12 +14,25 @@ export const EXERCISE_ALTERNATIVES = {
   'Schulterdrücken': ['Kurzhantel-Schulterdrücken', 'Arnold Press', 'Landmine Press', 'Z-Press'],
   'Rudern': ['Kurzhantel-Rudern', 'Sitzrudern', 'T-Bar Rudern', 'Pendlay Row'],
   'Dips': ['Trizeps-Pushdown', 'Close Grip Bench Press', 'Skull Crusher'],
-  'Bizepscurl': ['Hammer Curl', 'Preacher Curl', 'Cable Curl'],
+  // exerciseAlternatives.js-Audit (Runde 37, Fund 1): Schlüssel war
+  // 'Bizepscurl' (Singular) -- die restliche App (movementMap.js,
+  // state.js FACTORY_TEMPLATE, ui.js _STANDARD_EXERCISES, alle Tests)
+  // nutzt durchgängig 'Bizepscurls' (Plural), der Eintrag war für echte
+  // Übungen praktisch nie erreichbar.
+  'Bizepscurls': ['Hammer Curl', 'Preacher Curl', 'Cable Curl'],
   'Beinpresse': ['Kniebeuge', 'Hack Squat', 'Bulgarian Split Squat'],
   'Romanian Deadlift': ['Good Morning', 'Stiff Leg Deadlift', 'Nordic Curl'],
   'Hip Thrust': ['Glute Bridge', 'Donkey Kick'],
   'Face Pull': ['Band Pull Apart', 'Reverse Fly'],
   'Trizeps-Pushdown': ['Skull Crusher', 'Overhead Extension', 'Dips'],
+  // exerciseAlternatives.js-Audit (Runde 37, Fund 2): 'Trizeps-Pushdown'
+  // (Bindestrich-Schreibweise) kommt nirgends sonst im Projekt vor --
+  // movementMap.js kennt für dieselbe Übung nur die englischen Formen
+  // 'Tricep Pushdown'/'Triceps Pushdown'. Als zusätzliche Schlüssel
+  // ergänzt (statt umbenannt), falls ein Nutzer die deutsche Form bereits
+  // verwendet.
+  'Tricep Pushdown': ['Skull Crusher', 'Overhead Extension', 'Dips'],
+  'Triceps Pushdown': ['Skull Crusher', 'Overhead Extension', 'Dips'],
   'Ausfallschritte': ['Bulgarian Split Squat', 'Step-Up', 'Reverse Lunge'],
   'Wadenheben': ['Sitzende Wadenübung', 'Einbeiniges Wadenheben'],
   'Lat Pulldown': ['Klimmzüge', 'Assisted Pull-Up'],

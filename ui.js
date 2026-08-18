@@ -26,7 +26,7 @@ import {
   exportJSON, exportJSONAuto, importJSON, exportCSV,
 } from './backup.js';
 import * as ic from './icons.js';
-import { fireTrigger } from './triggerEngine.js';
+import { fireTrigger, TRIGGERS } from './triggerEngine.js';
 import { getWeightRecommendation, getMetricRecommendation, roundToPlate, isReadyForAutoSelect } from './weightRecommendation.js';
 import { renderProgressChart, renderBodyWeightChart, renderRelativeStrengthChart } from './progressChart.js';
 import { buildWeekReview }        from './weekReview.js';
@@ -7334,7 +7334,7 @@ function _handleClick(e) {
         const afterSt  = getState();
         const afterSet = afterSt.weeks[afterSt.curIdx]?.days[+di]?.exercises[+ei]?.sets[+si];
         if (afterSet?.status === 'success') {
-          const triggered = fireTrigger('SATZ_ABGEHAKT', { di: +di, ei: +ei, si: +si });
+          const triggered = fireTrigger(TRIGGERS.SATZ_ABGEHAKT, { di: +di, ei: +ei, si: +si });
           for (const ins of triggered) {
             if (ins.immediate) showToast(ins.message, ins.type === 'warning' ? 'warn' : 'ok', ins.id === 'P-05' ? 4000 : 3000);
           }
@@ -7440,7 +7440,7 @@ function _handleClick(e) {
       const _aft = getState();
       const _aftSet = _aft.weeks[_aft.curIdx]?.days[+di]?.exercises[+ei]?.sets[_csi];
       if (_aftSet?.status === 'success') {
-        const triggered = fireTrigger('SATZ_ABGEHAKT', { di: +di, ei: +ei, si: _csi });
+        const triggered = fireTrigger(TRIGGERS.SATZ_ABGEHAKT, { di: +di, ei: +ei, si: _csi });
         for (const ins of triggered) {
           if (ins.immediate) showToast(ins.message, ins.type === 'warning' ? 'warn' : 'ok', ins.id === 'P-05' ? 4000 : 3000);
         }
@@ -8875,7 +8875,7 @@ function _createWeek() {
   closeModal('modal-new-week');
   showToast(source === 'template' ? 'Neue Woche aus Vorlage erstellt ✓' : 'Neue Woche aus Vorwoche erstellt ✓', 'ok');
   _gcEvent('Woche erstellt');
-  const triggered = fireTrigger('NEUE_WOCHE_ERSTELLT', {});
+  const triggered = fireTrigger(TRIGGERS.NEUE_WOCHE_ERSTELLT, {});
   for (const ins of triggered) {
     if (ins.immediate) showToast(ins.message, ins.type === 'warning' ? 'warn' : 'ok', 5000);
   }
@@ -9520,7 +9520,7 @@ export function mountApp(root) {
 
   // Fire APP_GEÖFFNET and show 4-week backup reminder if due
   setTimeout(() => {
-    const triggered = fireTrigger('APP_GEÖFFNET', {});
+    const triggered = fireTrigger(TRIGGERS.APP_GEÖFFNET, {});
     for (const ins of triggered) {
       if (ins.immediate) showToast(ins.message, ins.type === 'warning' ? 'warn' : 'ok', 5000);
     }
@@ -9835,7 +9835,7 @@ function _finishCompletion(di, rating, sleepHours, energyLevel) {
   for (const _k of [..._setFeedbackDismissed]) if (_k.startsWith(_expandedPrefix)) _setFeedbackDismissed.delete(_k);
   if (lockedDay?.markedDone) {
     const allDone   = afterSt.weeks[afterSt.curIdx]?.days.every(d => d.markedDone);
-    const trigger   = allDone ? 'WOCHE_ABGESCHLOSSEN' : 'TAG_ABGESCHLOSSEN';
+    const trigger   = allDone ? TRIGGERS.WOCHE_ABGESCHLOSSEN : TRIGGERS.TAG_ABGESCHLOSSEN;
     const triggered = fireTrigger(trigger, { di });
     for (const ins of triggered) {
       if (ins.immediate) showToast(ins.message, ins.type === 'warning' ? 'warn' : 'ok', 5000);

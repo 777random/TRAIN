@@ -1,6 +1,6 @@
 # TRAIN — Bug-Tracking
 *Wird nach jedem Sprint aktualisiert*
-*Stand: August 2026 / train-v262*
+*Stand: August 2026 / train-v263*
 
 ---
 
@@ -8,6 +8,9 @@
 
 | ID | Beschreibung | Version | Commit | Root Cause |
 |----|-------------|---------|--------|-----------|
+| B392 | exerciseAlternatives.js: `EXERCISE_ALTERNATIVES['Trizeps-Pushdown']` kommt sonst nirgends im Projekt vor | v263 | — | Runde 37 (triggerEngine.js/exerciseAlternatives.js-Audit, geringere Konfidenz). movementMap.js kennt für dieselbe Übung nur 'Tricep Pushdown'/'Triceps Pushdown' -- als zusätzliche Schlüssel ergänzt statt umbenannt. |
+| B391 | exerciseAlternatives.js: `EXERCISE_ALTERNATIVES['Bizepscurl']` (Singular) war ein toter Schlüssel | v263 | — | Runde 37 (triggerEngine.js/exerciseAlternatives.js-Audit). Restliche App (movementMap.js, state.js, ui.js, alle Tests) nutzt durchgängig 'Bizepscurls' (Plural) -- der Eintrag war für echte Übungen praktisch nie erreichbar. |
+| B390 | triggerEngine.js: exportierte `TRIGGERS`-Konstante nirgends importiert/genutzt | v263 | — | Runde 37 (triggerEngine.js/exerciseAlternatives.js-Audit, kosmetisch). Alle 5 Aufrufstellen in ui.js nutzten rohe String-Literale statt der Konstante -- funktional unschädlich, aber ohne Tippfehler-Schutz. |
 | B389 | `overallPerformance.js`: `computeQualityTrend()` hat keinen eigenen isSeedWeek-Filter (V1) | v262 | — | Runde 36 (weeklyFocus.js/overallPerformance.js-Audit, Verdachtsfall, nur dokumentiert). Aktuell korrekt, da der einzige Aufrufer (ui.js) bereits vorfiltert -- nur ein erklärender Kommentar ergänzt, keine Code-Änderung. |
 | B388 | `_checkProgression()`s Konfidenz-/Beleg-Berechnung ignorierte substituteFor | v262 | — | Runde 36 (weeklyFocus.js-Audit). Widersprüchliche Zahlen innerhalb derselben UI-Karte: die Gewichtsempfehlung daneben war bereits substituteFor-bewusst (B359, Runde 31), die separate Konfidenz-Neuberechnung nicht. |
 | B387 | `_checkMultiExerciseFailure()` ignorierte substituteFor | v262 | — | Runde 36 (weeklyFocus.js-Audit). Eine substituierte Übung landete unter einem eigenen, getrennten Map-Eintrag statt mit der Original-Übung zusammengeführt zu werden. |

@@ -16,7 +16,7 @@
  *   asset conflicts.
  */
 
-const CACHE_VERSION  = 'train-v262';
+const CACHE_VERSION  = 'train-v263';
 
 // Runde 20 (Befund 4): kurze Änderungsliste für den aktuellen Build, im
 // Update-Banner beim Aufklappen ("mehr Details") angezeigt. 2-3 knappe
@@ -28,8 +28,7 @@ const CACHE_VERSION  = 'train-v262';
 // (Browser-Update-Algorithmus) -- die Werte sind dadurch garantiert die des
 // NEUEN, wartenden Workers, ganz ohne zusätzlichen Cache-Bypass.
 const CHANGELOG_ENTRIES = [
-  'Coach-Tab: mehrere Warnsignale (RPE-Anstieg, Plateau-Anzeichen, Dauer-Fehlschläge) erkennen jetzt auch substituierte Übungen korrekt',
-  'Compound/Isolation-Verhältnis im Coach-Tab genauer berechnet',
+  '"Heute anders": kuratierte Alternativ-Vorschläge für Bizepscurls und Trizeps-Pushdown-Varianten korrigiert/ergänzt',
 ];
 
 /**

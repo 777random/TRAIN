@@ -115,3 +115,21 @@ test('AC5: unbekannte Uebung -> nur Eingabefeld, kein Fehler', async ({ page }) 
   await expect(page.locator('.sub-name-input')).toBeVisible();
   expect(pageErrors, pageErrors.join('; ')).toHaveLength(0);
 });
+
+// Runde 37 (exerciseAlternatives.js-Audit): 2 Namens-Schlüssel-Funde.
+// exerciseAlternatives.js ist "importfrei" (siehe Datei-Kopfkommentar) --
+// reine Node-Unit-Tests ohne Browser, analog zu
+// weightrecommendation_audit_fixes.spec.js.
+
+test('Fund 1: EXERCISE_ALTERNATIVES["Bizepscurls"] (Plural, wie überall sonst im Projekt) liefert Vorschläge', async () => {
+  const mod = await import('../exerciseAlternatives.js');
+  const result = mod.getAlternatives('Bizepscurls', {});
+  expect(result).toEqual(['Hammer Curl', 'Preacher Curl', 'Cable Curl']);
+});
+
+test('Fund 2: EXERCISE_ALTERNATIVES kennt "Tricep Pushdown"/"Triceps Pushdown" (movementMap.js-Schreibweisen), zusätzlich zu "Trizeps-Pushdown"', async () => {
+  const mod = await import('../exerciseAlternatives.js');
+  expect(mod.getAlternatives('Tricep Pushdown', {}).length).toBeGreaterThan(0);
+  expect(mod.getAlternatives('Triceps Pushdown', {}).length).toBeGreaterThan(0);
+  expect(mod.getAlternatives('Trizeps-Pushdown', {}).length).toBeGreaterThan(0);
+});

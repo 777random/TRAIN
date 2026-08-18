@@ -1,5 +1,35 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-08-18 — Runde 36 (train-v261→v262, B384-B389):
+*Letzte Aktualisierung: 2026-08-18 — Runde 37 (train-v262→v263, B390-B392):
+triggerEngine.js + exerciseAlternatives.js-Audit, ELFTE Runde -- dritte
+einer angekündigten Multi-Runden-Serie nach state.js (Runde 35) und
+weeklyFocus.js/overallPerformance.js (Runde 36). Beide Dateien
+ungewöhnlich klein (35 bzw. 59 Zeilen) -- kein Fall für die übliche
+2-Fork-Diagnose. Auf Nachfrage bestätigte der Nutzer: eigener Recon statt
+Fork-Dispatch, direkt weiter mit exerciseAlternatives.js in derselben
+Runde. Ergebnis in `Diagnose & Sprints/diagnose-triggerengine-
+exercisealternatives-audit-2026-08-18.txt`. triggerEngine.js ist reiner
+Pass-Through (fireTrigger() -> evaluateInsights(), insightEngine.js
+bereits Runde 29 auditiert) -- einziger Fund (B390, kosmetisch): die
+exportierte TRIGGERS-Konstante wurde nirgends importiert, alle 5
+Aufrufstellen in ui.js nutzten rohe String-Literale statt Tippfehler-
+geschützter Konstanten-Referenz. exerciseAlternatives.js (26 kuratierte
+Alternativ-Einträge für "Heute anders") hatte 2 Namens-Schlüssel-Funde:
+B391 (HIGH) 'Bizepscurl' (Singular) war ein toter Schlüssel, die
+restliche App nutzt durchgängig 'Bizepscurls' (Plural); B392 (MEDIUM)
+'Trizeps-Pushdown' kommt sonst nirgends im Projekt vor, movementMap.js
+kennt nur die englischen Formen. Ein dritter, auf den ersten Blick
+plausibler Verdacht (getAlternatives(ex.name, state) statt
+substituteFor-Auflösung, dieselbe Fehlerklasse wie ~9 andere Funde
+dieser Session) wurde NICHT gefixt -- der Code direkt darüber trägt
+einen expliziten, bereits bestehenden Kommentar, der genau dieses
+Verhalten für die Schwesterfunktion (D2 sub-suggestions) als bewusste
+Design-Entscheidung dokumentiert; getAlternatives() folgt laut eigenem
+Kommentar demselben Muster. 2 neue Tests (exercise_alternatives.spec.js
+erweitert, reine Node-Unit-Tests, da exerciseAlternatives.js
+"importfrei" ist). Volle Regressionssuite (113 Spec-Dateien, gebatcht)
+grün, 1 vorbestehendes Flake (trainingstab_audit_fixes.spec.js
+Phantom-PR) unverändert, state.js in dieser Runde nicht angefasst.
+Davor: Runde 36 (train-v261→v262, B384-B389):
 weeklyFocus.js + overallPerformance.js-Audit, ZEHNTE Runde -- zweite einer
 angekündigten Multi-Runden-Serie nach state.js (Runde 35, B375-B383).
 weeklyFocus.js (1600 Zeilen, Coach-Tab-Signal-Engine, ~20 unabhängige
