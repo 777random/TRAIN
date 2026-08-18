@@ -37,14 +37,16 @@ test('Leg Curl/Beinbeuger: Bewegungsmuster Hinge, aber Isolation ueber ISOLATION
   expect(isCompoundExercise('Beinbeuger', {})).toBe(false);
 });
 
-test('Keine Duplikate in MOVEMENT_MAP (Key-Anzahl entspricht 139 vor B111 + 79 neue Eintraege)', async () => {
+test('Keine Duplikate in MOVEMENT_MAP (Key-Anzahl entspricht 139 vor B111 + 79 neue Eintraege + 8 aus Runde 34)', async () => {
   const mod = await import('../movementMap.js');
   // Ein doppelt vergebener Objekt-Key würde von JS beim Parsen still
   // überschrieben statt zu einem sichtbaren Fehler zu führen -- eine reine
   // Object.keys()-Prüfung auf dem bereits geparsten Objekt kann das daher
   // NICHT erkennen. Stattdessen: die erwartete Gesamtzahl bestätigt indirekt,
-  // dass keine der 79 neuen Zeilen versehentlich einen bereits vorhandenen
-  // Namen (oder einen der anderen neuen Namen) erneut vergeben hat -- sonst
-  // wäre die Gesamtzahl kleiner als 218.
-  expect(Object.keys(mod.MOVEMENT_MAP).length).toBe(218);
+  // dass keine der Zeilen versehentlich einen bereits vorhandenen Namen (oder
+  // einen der anderen neuen Namen) erneut vergeben hat -- sonst wäre die
+  // Gesamtzahl kleiner. 218 (Stand vor Runde 34) + 8 neue Schreibvarianten
+  // aus dem movementMap.js-Audit (B2/B3/B5: Push Up/Pull Up/Chin Up-
+  // Leerzeichenformen, Planks, Sit Up) = 226.
+  expect(Object.keys(mod.MOVEMENT_MAP).length).toBe(226);
 });

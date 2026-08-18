@@ -21,6 +21,10 @@ export const MOVEMENT_MAP = {
   'Bench Press': 'Push', 'Incline Bench Press': 'Push', 'Overhead Press': 'Push',
   'Military Press': 'Push', 'Dumbbell Press': 'Push',
   'Push-Up': 'Push', 'Push-Ups': 'Push',
+  // movementMap.js-Audit (Runde 34, B2): Leerzeichen-Schreibweise fehlte
+  // hier komplett, obwohl NO_BARBELL_EXERCISE_NAMES sie bereits kannte —
+  // fiel bisher auf 'Sonstige' zurück statt 'Push'.
+  'Push Up': 'Push', 'Push Ups': 'Push',
   'Tricep Pushdown': 'Push', 'Triceps Pushdown': 'Push', 'Bench Dips': 'Push',
   'Klimmzüge': 'Pull', 'Latziehen': 'Pull', 'Lat Maschine': 'Pull',
   'Kabelrudern': 'Pull', 'Rudern': 'Pull', 'Rudern Maschine': 'Pull',
@@ -31,6 +35,9 @@ export const MOVEMENT_MAP = {
   'KH Shrugs': 'Pull',
   // Englische Synonyme für bereits vorhandene Pull-Übungen oben.
   'Pull-Up': 'Pull', 'Pull-Ups': 'Pull', 'Chin-Up': 'Pull', 'Chin-Ups': 'Pull',
+  // movementMap.js-Audit (Runde 34, B2): Leerzeichen-Schreibweise fehlte
+  // hier komplett (siehe Push Up/Push Ups oben, gleicher Fund).
+  'Pull Up': 'Pull', 'Pull Ups': 'Pull', 'Chin Up': 'Pull', 'Chin Ups': 'Pull',
   'Lat Pulldown': 'Pull',
   'Barbell Row': 'Pull', 'BB Row': 'Pull', 'Bent Over Row': 'Pull', 'Bent-Over Row': 'Pull',
   'Cable Row': 'Pull', 'Seated Row': 'Pull',
@@ -60,12 +67,16 @@ export const MOVEMENT_MAP = {
   'KB Carry': 'Carry',
   // Englische Synonyme für bereits vorhandene Carry-Übungen oben.
   'Farmer Carry': 'Carry', 'Farmers Carry': 'Carry', 'Kettlebell Carry': 'Carry',
-  'Plank': 'Core', 'Crunch': 'Core', 'Situps': 'Core', 'Beinheben': 'Core',
+  'Plank': 'Core', 'Planks': 'Core', 'Crunch': 'Core', 'Situps': 'Core', 'Beinheben': 'Core',
   'Ab-Wheel': 'Core', 'Cable Crunches': 'Core', 'Russian Twists': 'Core',
   'Hollow Hold': 'Core', 'Pallof Press': 'Core', 'Battle Ropes': 'Core',
   'Burpees': 'Core', 'Broad Jumps': 'Core',
   // Englische Synonyme/Schreibvarianten für bereits vorhandene Core-Übungen oben.
-  'Sit-Up': 'Core', 'Sit-Ups': 'Core', 'Sit Ups': 'Core', 'Crunches': 'Core',
+  // movementMap.js-Audit (Runde 34, B3/B5): 'Planks' (Plural, oben ergänzt)
+  // und 'Sit Up' (Singular) fehlten, obwohl NO_BARBELL_EXERCISE_NAMES bzw.
+  // die übrigen Sit-Up-Schreibvarianten sie bereits kannten/nahelegten —
+  // fielen bisher auf 'Sonstige' zurück statt 'Core'.
+  'Sit-Up': 'Core', 'Sit-Ups': 'Core', 'Sit Up': 'Core', 'Sit Ups': 'Core', 'Crunches': 'Core',
   'Leg Raise': 'Core', 'Leg Raises': 'Core', 'Hanging Leg Raise': 'Core',
 
   // Sprint "movementMap.js erweitern" (2026-07, B111) — häufig verwendete
@@ -142,7 +153,11 @@ export function buildCategoryMap(customExercises) {
 
 /** Löst die Bewegungskategorie einer Übung auf: Override zuerst, dann MOVEMENT_MAP, sonst 'Sonstige'. */
 export function resolveCategory(name, categoryMap) {
-  return categoryMap[name] ?? MOVEMENT_MAP[name] ?? 'Sonstige';
+  // movementMap.js-Audit (Runde 34, B4): categoryMap selbst konnte bisher
+  // null/undefined sein und eine TypeError werfen (nur `name` war gegen
+  // Nullish abgesichert) -- inkonsistent zu buildCategoryMap()s eigenem
+  // `customExercises ?? []`-Fallback direkt oberhalb.
+  return (categoryMap ?? {})[name] ?? MOVEMENT_MAP[name] ?? 'Sonstige';
 }
 
 /**
@@ -194,8 +209,19 @@ const ISOLATION_EXERCISE_NAMES = new Set([
  */
 const NO_BARBELL_EXERCISE_NAMES = new Set([
   'Klimmzüge', 'Pull Up', 'Pull Ups', 'Pull-Up', 'Pull-Ups', 'Chin Up', 'Chin Ups',
+  // movementMap.js-Audit (Runde 34, B1): hyphenierte Push-Up/Chin-Up-Formen
+  // fehlten, obwohl MOVEMENT_MAP genau diese Schreibweise als primäre Form
+  // führt (Zeile oben) -- der Hantelscheiben-Rechner wurde dadurch
+  // fälschlich für "Push-Up"/"Chin-Up" (mit Bindestrich) als Default gezeigt.
   'Dips', 'Bench Dips', 'Trizepsdips', 'Liegestütz', 'Push Up', 'Push Ups',
+  'Push-Up', 'Push-Ups', 'Chin-Up', 'Chin-Ups',
   'Planks', 'Plank',
+  // movementMap.js-Audit (Runde 34, V1 — teilweise, Nutzer-Entscheidung):
+  // nur die eindeutigen "nie mit Hantelscheiben"-Fälle ergänzt. Crunch,
+  // Situps, Ab-Wheel, Russian Twists, Hollow Hold bewusst NICHT ergänzt --
+  // reine Boden-Core-Übungen, für die die UI den Hantelscheiben-Toggle
+  // vermutlich ohnehin nie anzeigt; ohne Beleg keine Vermutung erzwingen.
+  'Burpees', 'Box Jumps', 'Broad Jumps', 'Battle Ropes',
 ]);
 
 /** Ob für diese Übung standardmäßig der Hantelscheiben-Rechner sinnvoll ist (Solotest-Feedback 2026-08-16). */

@@ -1,5 +1,40 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-08-18 — Runde 33 (train-v258→v259, B365-B368):
+*Letzte Aktualisierung: 2026-08-18 — Runde 34 (train-v259→v260, B369-B374):
+movementMap.js-Audit, ACHTE Runde -- auf Nutzerauftrag "start
+movementMap.js audit" gestartet. movementMap.js (Übungsname→Bewegungs-
+muster-Kategorie: MOVEMENT_MAP 218→226 Einträge, ISOLATION_EXERCISE_NAMES,
+NO_BARBELL_EXERCISE_NAMES, MUSCLE_GROUP_MAP) war bisher nie als
+eigenständiges Subsystem auditiert. Eigener Recon vor Fork-Dispatch fand
+bereits selbst einen Bug (Push-Up/Chin-Up-Hyphen-Lücke in
+NO_BARBELL_EXERCISE_NAMES) und bestätigte per Skript, dass beide
+Objektliterale keine doppelt vergebenen Keys enthalten (218 bzw. 72 unique
+zum Rundenstart). 2 parallele Diagnose-Agenten (interne Namens-Varianten-
+Konsistenz zwischen den 3 Listen + MUSCLE_GROUP_MAP-Plausibilität,
+projektweite Aufrufstellen-Konsistenz + exerciseAlternatives.js) fanden
+5 bestätigte Bugs + 1 Verdachtsfall. Ergebnis in
+`Diagnose & Sprints/diagnose-movementmap-audit-2026-08-18.txt`. Nutzer
+wählte "Alle 5 fixen + V1 teilweise" -> B369-B374 umgesetzt. Root Cause
+aller 5 Bugs (B369-B373) identisch: die drei Namens-Listen sind unabhängig,
+inkrementell über viele Sprints gewachsen -- Synonyme (Bindestrich vs.
+Leerzeichen, Singular vs. Plural) wurden dabei jeweils nur in EINE Liste
+eingetragen statt konsistent in alle betroffenen (z.B. "Push-Up" nur in
+MOVEMENT_MAP, "Push Up" nur in NO_BARBELL_EXERCISE_NAMES -- beide Listen
+kannten jeweils nur die halbe Wahrheit). B374 (Verdachtsfall) nur
+teilweise umgesetzt: die eindeutigen Fälle (Burpees, Box/Broad Jumps,
+Battle Ropes) ergänzt, der Rest (Crunch, Situps, Ab-Wheel, Russian
+Twists, Hollow Hold) bewusst dokumentiert statt geraten, analog zum
+etablierten Konsolidierungs-Muster (B346/B355/B360/B361). Der zweite
+Diagnose-Fork bestätigte call-site-seitig eine saubere Architektur: keine
+direkten MOVEMENT_MAP-Bypässe im Projekt, exerciseAlternatives.js ist
+bewusst unabhängig (keine Divergenz), alle ~24 isCompoundExercise()-
+Aufrufstellen bauen categoryMap frisch, defaultShowPlates() wird nie beim
+Rendern erneut aufgerufen. 6 neue Tests (movementmap_audit_fixes.spec.js,
+reine Node-Unit-Tests ohne Browser) + 1 bestehender Test
+(movement_map_expansion.spec.js) auf die neue Key-Anzahl (226) angepasst.
+Volle Regressionssuite (111 Spec-Dateien, gebatcht) grün, 1 vorbestehendes
+Flake (trainingstab_audit_fixes.spec.js Phantom-PR, seit Runde 26 in
+jeder Runde beobachtet und bestätigt unabhängig) auf Retry grün.
+Davor: Runde 33 (train-v258→v259, B365-B368):
 ui.js-Dispatch-Handler-Audit, SIEBTE Runde -- auf Nutzerauftrag "start
 ui.js dispatch audit" gestartet. Der zentrale Event-Dispatch-Mechanismus
 `_handleClick()` (ui.js, ~2130 Zeilen, 162 `case`-Zweige auf `data-action`)

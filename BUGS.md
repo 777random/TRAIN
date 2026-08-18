@@ -1,6 +1,6 @@
 # TRAIN — Bug-Tracking
 *Wird nach jedem Sprint aktualisiert*
-*Stand: August 2026 / train-v259*
+*Stand: August 2026 / train-v260*
 
 ---
 
@@ -8,6 +8,12 @@
 
 | ID | Beschreibung | Version | Commit | Root Cause |
 |----|-------------|---------|--------|-----------|
+| B374 | `NO_BARBELL_EXERCISE_NAMES` erweitert um Burpees/Box Jumps/Broad Jumps/Battle Ropes | v260 | — | Runde 34 (movementMap.js-Audit, Verdachtsfall, teilweise). Nur die eindeutigen Fälle ergänzt, restliche Kandidaten (Crunch, Situps, Ab-Wheel, Russian Twists, Hollow Hold) bewusst dokumentiert statt geraten. |
+| B373 | `resolveCategory()`/`isCompoundExercise()` nicht null-sicher für `categoryMap` | v260 | — | Runde 34 (movementMap.js-Audit). `categoryMap[name] ?? ...` warf eine TypeError bei null/undefined `categoryMap` -- inkonsistent zu `buildCategoryMap()`s eigenem `customExercises ?? []`-Fallback in derselben Datei. Jetzt `(categoryMap ?? {})[name] ?? ...`. |
+| B372 | MOVEMENT_MAP fehlte 'Sit Up' (Singular, Leerzeichen) | v260 | — | Runde 34 (movementMap.js-Audit). Fiel auf 'Sonstige' statt 'Core' zurück. |
+| B371 | MOVEMENT_MAP fehlte 'Planks' (Plural) — dadurch fälschlich als Compound statt Isolation eingestuft | v260 | — | Runde 34 (movementMap.js-Audit). NO_BARBELL_EXERCISE_NAMES kannte 'Planks' bereits, MOVEMENT_MAP nur 'Plank' (Singular) -- "Planks" fiel auf 'Sonstige' zurück, wodurch die Core/Carry-Ausschlussregel in `isCompoundExercise()` nicht griff und eine zu lange Pausenzeiten-Empfehlung entstand. |
+| B370 | MOVEMENT_MAP fehlten die Leerzeichen-Formen "Push Up"/"Pull Up"/"Chin Up" | v260 | — | Runde 34 (movementMap.js-Audit). NO_BARBELL_EXERCISE_NAMES kannte diese Schreibweisen bereits, MOVEMENT_MAP nur die hyphenierten Formen -- die Leerzeichen-Varianten fielen auf 'Sonstige' zurück, wodurch das Bewegungsmuster-Radar (ui.js) und die "Breite"-Dimension (overallPerformance.js) für diese Schreibweise nicht funktionierten. |
+| B369 | `NO_BARBELL_EXERCISE_NAMES` fehlten die hyphenierten Formen "Push-Up"/"Chin-Up" | v260 | — | Runde 34 (movementMap.js-Audit). MOVEMENT_MAP definiert 'Push-Up'/'Push-Ups'/'Chin-Up'/'Chin-Ups' (Bindestrich) als primäre Schreibweise, NO_BARBELL_EXERCISE_NAMES kannte nur die Leerzeichen-Varianten -- `defaultShowPlates()` zeigte den Hantelscheiben-Rechner fälschlich für diese Körpergewichtsübungen an. Eigenes Recon vor Fork-Dispatch fand diesen Bug als Ausgangspunkt für die Runde. |
 | B368 | SIEBEN destruktive/hochriskante Bestätigungs-Panels hatten keinen Outside-Click-Handler | v259 | — | Runde 33 (ui.js-Dispatch-Handler-Audit). Betroffen: Übung archivieren/entfernen, Tag entfernen, Alle Daten löschen, Woche/Template zurücksetzen, Vorlage speichern. Alle anderen Popover im selben Dispatch-Mechanismus (RPE-Popover, Ex-/Wochen-Menü usw.) schlossen bereits bei Klick daneben -- am gravierendsten bei "Alle Daten löschen": das Panel mit dem scharfen Löschen-Button blieb beliebig lange sichtbar. Neue `.js-confirm-panel`-Markierung + zentraler Outside-Click-Guard. |
 | B367 | Sechs UTC-statt-lokal-Datum-Stellen in ui.js, davon 2 im Dispatch-Switch selbst | v259 | — | Runde 33 (ui.js-Dispatch-Handler-Audit). `decision-log-stay/change`+`coach-signal-dismiss` (Dispatch-Switch), `nextMonday()`, `measuredWeekStart`, sowie ein in Runde 28 (B331) diagnostizierter, aber nie tatsächlich umgesetzter Fund (`_finish()`s ONBOARDING_SEED-Startdatum) -- beim Umsetzen dieser Runde nachgeholt. Dieselbe, im Projekt bereits x-fach gefixte Antimuster-Klasse. |
 | B366 | `remove-set` hatte keine Bestätigung, anders als alle Geschwister-Lösch-Aktionen | v259 | — | Runde 33 (ui.js-Dispatch-Handler-Audit, Verdachtsfall). `confirm()` ergänzt, analog zum bereits bestehenden Muster bei `delete-named-template`. |
