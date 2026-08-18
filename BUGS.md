@@ -1,6 +1,6 @@
 # TRAIN — Bug-Tracking
 *Wird nach jedem Sprint aktualisiert*
-*Stand: August 2026 / train-v263*
+*Stand: August 2026 / train-v264*
 
 ---
 
@@ -8,6 +8,9 @@
 
 | ID | Beschreibung | Version | Commit | Root Cause |
 |----|-------------|---------|--------|-----------|
+| B395 | timer.js: "Nochmal tippen ✓"-Dismiss-Bestätigungshinweis nicht als aria-live-Region | v264 | — | Runde 38 (timer.js-Audit, F3, kosmetisch). `.pause-overlay__label span` bekam beim ersten Dismiss-Tap neuen Text ohne `aria-live` -- Screenreader-Nutzer bekamen die "nochmal tippen"-Anforderung nicht automatisch angesagt. Jetzt `aria-live="polite"` im Basis-Markup. |
+| B394 | timer.js: `maxSessionMs`-Default (3h) doppelt hardcodiert | v264 | — | Runde 38 (timer.js-Audit, F2, kosmetisch). `10800000` identisch an zwei Stellen (`_updateClockDisplay()`, `_stopSession()`) statt einer gemeinsamen Modul-Konstante -- aktuell konsistent, reines Wartbarkeitsrisiko. Jetzt `DEFAULT_MAX_SESSION_MS`. |
+| B393 | timer.js: `_dismissPause()`/`_stopSession()` räumten das "WEITER!"-Popup bei Wochenwechsel/manuellem Stopp nicht mit auf | v264 | — | Runde 38 (timer.js-Audit, F1, MEDIUM). Ein Pausen-Countdown, der natürlich endet, zeigt für 3s ein "WEITER!"-Popup (`_goTimer` blendet es automatisch wieder aus). Navigierte der Nutzer innerhalb dieses Fensters zu einer anderen Woche (oder stoppte die Session manuell), räumte `_onStateChange()`/`_manualToggle()` zwar `_pauseEnd`/Overlay/Wake-Lock auf, aber nicht `_goTimer`/`_goPopup` -- das Popup blieb bis zu 3s sichtbar auf der neuen Woche bzw. nach dem Stopp. Selbstheilend, aber sichtbare UX-Inkonsistenz. Beide Funktionen räumen den Popup-Zustand jetzt synchron mit ab. |
 | B392 | exerciseAlternatives.js: `EXERCISE_ALTERNATIVES['Trizeps-Pushdown']` kommt sonst nirgends im Projekt vor | v263 | — | Runde 37 (triggerEngine.js/exerciseAlternatives.js-Audit, geringere Konfidenz). movementMap.js kennt für dieselbe Übung nur 'Tricep Pushdown'/'Triceps Pushdown' -- als zusätzliche Schlüssel ergänzt statt umbenannt. |
 | B391 | exerciseAlternatives.js: `EXERCISE_ALTERNATIVES['Bizepscurl']` (Singular) war ein toter Schlüssel | v263 | — | Runde 37 (triggerEngine.js/exerciseAlternatives.js-Audit). Restliche App (movementMap.js, state.js, ui.js, alle Tests) nutzt durchgängig 'Bizepscurls' (Plural) -- der Eintrag war für echte Übungen praktisch nie erreichbar. |
 | B390 | triggerEngine.js: exportierte `TRIGGERS`-Konstante nirgends importiert/genutzt | v263 | — | Runde 37 (triggerEngine.js/exerciseAlternatives.js-Audit, kosmetisch). Alle 5 Aufrufstellen in ui.js nutzten rohe String-Literale statt der Konstante -- funktional unschädlich, aber ohne Tippfehler-Schutz. |

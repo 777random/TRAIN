@@ -78,6 +78,11 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
+// Fallback when settings.maxSessionMs is unset — 3h, mirrors the settings
+// default. Kept as a shared constant so _updateClockDisplay() and
+// _stopSession() can't drift apart (Runde 38, F2).
+const DEFAULT_MAX_SESSION_MS = 10800000;
+
 // ─── Module state ─────────────────────────────────────────────────────────────
 
 let _sessInterval = null;   // setInterval handle for clock display (display-only)
@@ -139,7 +144,7 @@ function _getActiveDay() {
 function _updateClockDisplay() {
   if (!_clockEl) return;
   const day = _getActiveDay();
-  const maxMs = (getState().settings?.maxSessionMs ?? 10800000);
+  const maxMs = (getState().settings?.maxSessionMs ?? DEFAULT_MAX_SESSION_MS);
   if (!day?.sessionStartTs || day.sessionEndTs) {
     if (_sessInterval) { clearInterval(_sessInterval); _sessInterval = null; }
     if (day?.sessionStartTs && day.sessionEndTs) {
@@ -190,7 +195,7 @@ function _stopSession() {
   // Live-Anzeige (_updateClockDisplay() unten) -- vorher wurde hier die
   // ungedeckelte Wanduhr-Differenz persistiert, eine nie sauber beendete
   // Session konnte den Ø-Session-Wert im Fortschritt-Tab massiv verzerren.
-  const maxMs    = getState().settings?.maxSessionMs ?? 10800000;
+  const maxMs    = getState().settings?.maxSessionMs ?? DEFAULT_MAX_SESSION_MS;
   const duration = Math.min(Math.round((Date.now() - day.sessionStartTs) / 1000), Math.round(maxMs / 1000));
   const time     = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
   dispatch(A.SESSION_STOP, { duration, time });
@@ -199,6 +204,10 @@ function _stopSession() {
     _clockEl.textContent = '00:00';
     _clockEl.classList.remove('toolbar-timer--running');
   }
+  // F1 (Runde 38): siehe _dismissPause() -- gleiche Lücke, falls die Uhr
+  // manuell exakt im 3s-"WEITER!"-Fenster gestoppt wird.
+  clearTimeout(_goTimer);
+  _goPopup?.classList?.remove('go-popup--visible');
 }
 
 /** Called when user taps the clock element in the toolbar. */
@@ -324,6 +333,11 @@ function _dismissPause() {
   _pauseSetKey = null;
   _hidePauseOverlay();
   _releaseWakeLock();
+  // F1 (Runde 38): auch ein bereits laufendes "WEITER!"-Popup mit aufräumen --
+  // sonst blinkt es (bezogen auf die verlassene Pause) noch bis zu 3s auf der
+  // neu angezeigten Woche weiter (selbstheilend, aber sichtbar inkonsistent).
+  clearTimeout(_goTimer);
+  _goPopup?.classList?.remove('go-popup--visible');
 }
 
 function _showPauseOverlay() {
@@ -544,7 +558,7 @@ function _buildOverlayDOM() {
       </button>
       <div class="pause-overlay__label">
         <strong>Pause</strong>
-        <span>Tippen zum Beenden</span>
+        <span aria-live="polite">Tippen zum Beenden</span>
       </div>
     </div>
     <div class="pause-overlay__tip" id="pause-tip" hidden></div>

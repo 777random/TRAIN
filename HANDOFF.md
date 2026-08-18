@@ -1,8 +1,6 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-08-18 — Runde 38 (train-v263, NOCH NICHT
-UMGESETZT -- Diagnose abgeschlossen, Fixes vom Nutzer freigegeben, aber
-NOCH NICHT implementiert. Hier fortsetzen, bevor eine neue Runde
-begonnen wird):*
+*Letzte Aktualisierung: 2026-08-18 — Runde 38 (train-v263→v264,
+B393-B395, ABGESCHLOSSEN):*
 timer.js + dragdrop.js + setUtils.js-Audit, ZWÖLFTE Runde -- vierte einer
 angekündigten Multi-Runden-Serie nach state.js (Runde 35), weeklyFocus.js/
 overallPerformance.js (Runde 36), triggerEngine.js/exerciseAlternatives.js
@@ -20,17 +18,20 @@ bisher nie eigenständig auditiert. 2 parallele Diagnose-Agenten (Zeile
 Audio/_onStateChange(); Zeile 414-986: Custom-Events-Binding/Overlay-DOM/
 Styles/App-Interaktions-Binding/mountTimer()) fanden insgesamt ein
 ungewöhnlich sauberes Modul -- KEIN HIGH-Bug, nur 1 mittlerer + 2
-kosmetische Funde. Ergebnis in `Diagnose & Sprints/diagnose-timerjs-
-audit-2026-08-18.txt`. Nutzer wählte "Alle 3 fixen":
-  F1 (MEDIUM): _dismissPause()/_stopSession() räumen bei einem
-      Wochenwechsel während des 3-Sekunden-"WEITER!"-Popup-Fensters
-      _goTimer/_goPopup nicht mit auf -- selbstheilend nach 3s, aber
-      sichtbare UX-Inkonsistenz (timer.js:321-327, 186-202).
-  F2 (LOW, kosmetisch): maxSessionMs-Default (3h/10800000) doppelt
-      hardcodiert statt gemeinsamer Modul-Konstante (timer.js:142, 193).
-  F3 (LOW, kosmetisch): Dismiss-Bestätigungs-Hinweis ("Nochmal tippen ✓")
-      nicht als aria-live-Region -- Screenreader-Nutzer bekommen die
-      Anforderung nicht angesagt (timer.js:754-764, _bindOverlayEvents).
+kosmetische Funde. Diagnose in `Diagnose & Sprints/diagnose-timerjs-
+audit-2026-08-18.txt`, Sprint-Ergebnis in `Diagnose & Sprints/sprint-
+ergebnis-runde38-2026-08-18.txt`. Nutzer wählte "Alle 3 fixen" -> B393-
+B395 umgesetzt:
+  B393 (MEDIUM): _dismissPause()/_stopSession() räumten bei einem
+      Wochenwechsel bzw. manuellem Stopp während des 3-Sekunden-
+      "WEITER!"-Popup-Fensters _goTimer/_goPopup nicht mit auf -- jetzt
+      brechen beide zusätzlich clearTimeout(_goTimer) aus und entfernen
+      go-popup--visible synchron (timer.js:321-333, 191-209).
+  B394 (LOW, kosmetisch): maxSessionMs-Default (3h/10800000) doppelt
+      hardcodiert -- neue DEFAULT_MAX_SESSION_MS-Modulkonstante, kein
+      beobachtbares Verhalten geändert.
+  B395 (LOW, kosmetisch): Dismiss-Bestätigungs-Hinweis ("Nochmal tippen ✓")
+      trägt jetzt aria-live="polite" im Basis-Markup.
 Bemerkenswert sauberer Befund: eine auf den ersten Blick vertraute
 substituteFor-Blindheit in _renderPauseTip() wurde geprüft und als
 KEIN Bug verworfen (Punkt-in-Zeit-Abfrage "wovon erhole ich mich
@@ -40,12 +41,24 @@ und als aktuell nicht erreichbar bestätigt (wird laut projektweitem
 Grep exakt einmal aufgerufen, kein Re-Mount-Pfad im Code) -- nur als
 defensive-Härtung-Hinweis notiert, kein Fix.
 
-NÄCHSTER SCHRITT (noch offen): F1-F3 in timer.js umsetzen, Tests
-schreiben, volle Regressionssuite laufen lassen, BUGS.md (fortlaufend ab
-B393)/CACHE_VERSION (train-v263→v264) aktualisieren, sprint-ergebnis-
-runde38-*.txt schreiben, committen + pushen. BUGS.md/sw.js sind in
-diesem Zwischenstand NOCH NICHT aktualisiert (Stand weiterhin v263,
-B392) -- das folgt erst nach der Implementierung.
+3 neue Tests (tests/timerjs_audit_fixes.spec.js, Playwright-Browser-
+Kontext analog zu pause_tips.spec.js -- timer.js ist DOM-gebunden). Alle
+3 per git-stash-Differenztest gegen den Vorher-Stand verifiziert (schlagen
+mit unverändertem timer.js zuverlässig fehl). B394 bewusst ohne eigenen
+Test (reine Konstanten-Konsolidierung ohne beobachtbares Verhalten). Volle
+Playwright-Suite (114 Spec-Dateien, diesmal in einem einzigen Lauf statt
+gebatcht -- das in Runde 37 dokumentierte Windows-EMFILE-Risiko trat
+diesmal nicht auf) grün: 170 passed, 0 failed, ~14.5 Min. Das
+vorbestehende Flake (trainingstab_audit_fixes.spec.js "Phantom-PR", seit
+Runde 26 beobachtet) ist in diesem Lauf nicht aufgetreten -- weiterhin als
+bekannt unzuverlässig einzustufen, kein Beleg für Behebung. state.js in
+dieser Runde nicht angefasst.
+
+Damit ist die angekündigte Multi-Runden-Serie (state.js Runde 35 ->
+weeklyFocus.js/overallPerformance.js Runde 36 -> triggerEngine.js/
+exerciseAlternatives.js Runde 37 -> timer.js/dragdrop.js/setUtils.js
+Runde 38) vollständig durch. KEIN offener nächster Datei-Kandidat --
+nächste Runde braucht einen neuen Nutzerauftrag.
 Davor: Runde 37 (train-v262→v263, B390-B392):
 triggerEngine.js + exerciseAlternatives.js-Audit, ELFTE Runde -- dritte
 einer angekündigten Multi-Runden-Serie nach state.js (Runde 35) und
