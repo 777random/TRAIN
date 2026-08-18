@@ -16,7 +16,7 @@
  *   asset conflicts.
  */
 
-const CACHE_VERSION  = 'train-v260';
+const CACHE_VERSION  = 'train-v261';
 
 // Runde 20 (Befund 4): kurze Änderungsliste für den aktuellen Build, im
 // Update-Banner beim Aufklappen ("mehr Details") angezeigt. 2-3 knappe
@@ -28,8 +28,9 @@ const CACHE_VERSION  = 'train-v260';
 // (Browser-Update-Algorithmus) -- die Werte sind dadurch garantiert die des
 // NEUEN, wartenden Workers, ganz ohne zusätzlichen Cache-Bypass.
 const CHANGELOG_ENTRIES = [
-  'Bewegungsmuster-Erkennung: mehrere Übungsnamens-Schreibweisen (z.B. "Push-Up", "Pull Up", "Planks") wurden bisher nicht erkannt',
-  'Hantelscheiben-Rechner wird jetzt nicht mehr fälschlich für einige Körpergewichtsübungen vorgeschlagen',
+  'PR-Erkennung bei "Heute anders"-Substitution und bei Urlaubsplan-Übungen korrigiert',
+  'Übungen zusammenführen: Notizen, Plateau-Status und Alternativ-Vorschläge gehen jetzt nicht mehr verloren',
+  'Kleinere interne Datums-Korrekturen',
 ];
 
 /**

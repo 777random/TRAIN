@@ -1255,8 +1255,14 @@ function _findExerciseSettingsHistory(state, name, di) {
     if (hit) return pick(hit);
   }
   // 3. letzte Woche, 4. ältere Wochen (neueste zuerst)
+  // state.js-Audit (Runde 35, B5): isSeedWeek ausgeschlossen -- die
+  // synthetische ONBOARDING_SEED-"Startwerte"-Woche setzt tags: [] für
+  // JEDE Seed-Übung hart, was den korrekt über resolveMuscleGroups()
+  // berechneten Default sonst überschrieben hätte (weightStep/targetReps/
+  // etc. aus der Seed-Woche bleiben unproblematisch und werden weiterhin
+  // übernommen).
   for (let wi = state.curIdx - 1; wi >= 0; wi--) {
-    const w = state.weeks[wi]; if (!w) continue;
+    const w = state.weeks[wi]; if (!w || w.isSeedWeek) continue;
     for (const day of w.days) {
       const hit = day.exercises.find(ex => _exNameKey(ex.name) === key);
       if (hit) return pick(hit);
@@ -1282,7 +1288,9 @@ function _recordSubstitution(state, originalName, substituteName) {
   if (!state.substituteHistory || typeof state.substituteHistory !== 'object') state.substituteHistory = {};
   const hist = state.substituteHistory;
   const list = hist[originalName] ?? (hist[originalName] = []);
-  const today = new Date().toISOString().slice(0, 10);
+  // state.js-Audit (Runde 35, B1): UTC-Datum statt lokaler Datumskomponenten
+  // -- dasselbe, im Projekt bereits mehrfach gefixte Antimuster.
+  const today = _localISODateToday();
   const existing = list.find(e => e.name === substituteName);
   if (existing) {
     existing.count += 1;
@@ -1780,7 +1788,12 @@ function _recomputePrFromHistory(state, exName) {
     if (wk.mode === 'deload') continue;
     for (const day of wk.days) {
       for (const ex of day.exercises) {
-        if (ex.name !== exName) continue;
+        // state.js-Audit (Runde 35, B3): auch ex.substituteFor berücksichtigen
+        // -- ohne diesen Fix durchsuchte eine Korrektur an einer aktuell
+        // substituierten Übung (aufgerufen mit dem ORIGINAL-Namen, siehe
+        // Aufrufstellen unten) die falschen Sätze, dieselbe Fehlerklasse wie
+        // in weightRecommendation.js (Runde 31, B359).
+        if (ex.name !== exName && ex.substituteFor !== exName) continue;
         for (const s of ex.sets) {
           if (s.status !== 'success') continue;
           const w = parseFloat(s.weight) || 0;
@@ -1801,7 +1814,7 @@ function _recomputePrFromHistory(state, exName) {
   for (const wk of state.weeks) {
     for (const day of wk.days) {
       for (const ex of day.exercises) {
-        if (ex.name === exName) {
+        if (ex.name === exName || ex.substituteFor === exName) {
           ex.prWeight           = maxWeight > 0 ? maxWeight : null;
           ex.prRepsAtMaxWeight  = maxRepsAtMaxWeight > 0 ? maxRepsAtMaxWeight : null;
         }
@@ -1814,7 +1827,12 @@ function _applyPrTracking(state, ex, s, weight, reps) {
   if (weight > 0) {
     const volume  = weight * reps;
     const est1RM  = reps <= 10 ? weight * (1 + reps / 30) : 0;
-    const name    = ex.name;
+    // state.js-Audit (Runde 35, B4): ex.substituteFor berücksichtigen, sonst
+    // landet ein PR während aktiver Substitution unter dem temporären
+    // Substitut-Namen statt der eigentlichen Übung -- ex.prWeight/
+    // ex.prRepsAtMaxWeight (objektgebunden, siehe Kommentar oben) sind davon
+    // nicht betroffen, nur die globale state.prs[]-Map.
+    const name    = ex.substituteFor || ex.name;
     if (!state.prs) state.prs = {};
     const prev    = state.prs[name] ?? { maxWeight: 0, maxVolume: 0, maxEstimated1RM: 0, maxRepsAtMaxWeight: 0, date: null };
     const newMaxW   = Math.max(prev.maxWeight,       weight);
@@ -1883,6 +1901,51 @@ function _evaluateSetStatus(ex, s) {
   s.status = canSuccess ? 'success' : 'fail';
   s.done   = canSuccess;
   return canSuccess;
+}
+
+/**
+ * state.js-Audit (Runde 35, B7/V1/V2): gemeinsame Helper-Funktion für
+ * DAY_LOAD_VACATION_PLAN/WEEK_LOAD_VACATION_PLAN, die zuvor unabhängig je
+ * ein eigenes ~20-zeiliges Übungs-Objekt-Literal bauten (dieselbe
+ * Fragilitäts-Klasse, die das Projekt für Tag-/Wochen-Reset-Logik bereits
+ * einmal konsolidiert hat, siehe WEEK_RESET_TO_TPL) UND dabei prWeight/
+ * prRepsAtMaxWeight (B7 -- ohne die beiden Felder blieb _applyPrTracking()s
+ * strikte `=== null`-Prüfung wirkungslos, ein echter PR auf einer
+ * Urlaubsplan-Übung wurde während der laufenden Sitzung nicht erkannt) sowie
+ * showPlates (V2) vergaßen. WEEK_LOAD_VACATION_PLAN fehlten zusätzlich
+ * progressionMode/targetRepsMax/prRepsHistory, die DAY_LOAD_VACATION_PLAN
+ * bereits hatte -- Feldsatz jetzt für beide identisch und analog zur
+ * EX_ADD-Referenz-Implementierung.
+ */
+function _buildVacationExercise(t) {
+  const m = t.metric ?? 'reps';
+  return {
+    name:                     t.name,
+    note:                     '',
+    pauseSec:                 90,
+    metric:                   m,
+    progressionType:          m === 'reps' ? 'weight' : 'reps',
+    metricStep:               m === 'm' ? 50 : m === 'sec' ? 10 : undefined,
+    progressionMode:          'weight_first',
+    targetRepsMax:            null,
+    prRepsHistory:            {},
+    prWeight:                 null,
+    prRepsAtMaxWeight:        null,
+    setType:                  'straight',
+    targetReps:               t.reps,
+    nextWeekPlan:             0,
+    nextWeekPlanConfirmed:    false,
+    nextWeekPlanAutoReviewed: true,
+    skipReason:               null,
+    skipDate:                 null,
+    tags:                     [],
+    showPlates:               m === 'reps' && defaultShowPlates(t.name),
+    supersetId:               null,
+    sets: Array.from({ length: t.sets }, () => ({
+      weight: null, reps: null, rpe: null,
+      status: 'pending', done: false, note: '',
+    })),
+  };
 }
 
 function reduce(state, action) {
@@ -2256,30 +2319,7 @@ function reduce(state, action) {
       } else {
         const tpl = VACATION_PLANS[p.plan];
         if (!tpl) break;
-        day.exercises = tpl.map(t => ({
-          name:                  t.name,
-          note:                  '',
-          pauseSec:              90,
-          metric:                t.metric,
-          progressionType:       (t.metric ?? 'reps') === 'reps' ? 'weight' : 'reps',
-          metricStep:            t.metric === 'm' ? 50 : t.metric === 'sec' ? 10 : undefined,
-          progressionMode:       'weight_first',
-          targetRepsMax:         null,
-          prRepsHistory:         {},
-          setType:               'straight',
-          targetReps:            t.reps,
-          nextWeekPlan:          0,
-          nextWeekPlanConfirmed: false,
-          nextWeekPlanAutoReviewed: true,
-          skipReason:            null,
-          skipDate:              null,
-          tags:                  [],
-          supersetId:            null,
-          sets: Array.from({ length: t.sets }, () => ({
-            weight: null, reps: null, rpe: null,
-            status: 'pending', done: false, note: '',
-          })),
-        }));
+        day.exercises = tpl.map(_buildVacationExercise);
       }
       const allVac = wk.days.every(d => d.isVacation);
       if (allVac) wk.mode = 'vacation';
@@ -2297,27 +2337,7 @@ function reduce(state, action) {
         } else {
           const tpl = VACATION_PLANS[p.plan];
           if (tpl) {
-            day.exercises = tpl.map(t => ({
-              name:                  t.name,
-              note:                  '',
-              pauseSec:              90,
-              metric:                t.metric,
-              progressionType:       (t.metric ?? 'reps') === 'reps' ? 'weight' : 'reps',
-              metricStep:            t.metric === 'm' ? 50 : t.metric === 'sec' ? 10 : undefined,
-              setType:               'straight',
-              targetReps:            t.reps,
-              nextWeekPlan:          0,
-              nextWeekPlanConfirmed: false,
-              nextWeekPlanAutoReviewed: true,
-              skipReason:            null,
-              skipDate:              null,
-              tags:                  [],
-              supersetId:            null,
-              sets: Array.from({ length: t.sets }, () => ({
-                weight: null, reps: null, rpe: null,
-                status: 'pending', done: false, note: '',
-              })),
-            }));
+            day.exercises = tpl.map(_buildVacationExercise);
           }
         }
       });
@@ -2581,7 +2601,10 @@ function reduce(state, action) {
       // nur zur Erfassung gespeichert, ohne skipDate.
       const ex = _currentWeek()?.days[p.di]?.exercises[p.ei]; if (!ex) break;
       ex.skipReason = p.reason ?? null;
-      ex.skipDate = p.reason === 'injury' ? new Date().toISOString().split('T')[0] : null;
+      // state.js-Audit (Runde 35, B2): UTC-Datum statt der bereits im File
+      // vorhandenen _localISODateToday()-Helper-Funktion -- dasselbe,
+      // bereits mehrfach gefixte Antimuster.
+      ex.skipDate = p.reason === 'injury' ? _localISODateToday() : null;
       break;
     }
     case A.EX_SET_TARGETS: {
@@ -2717,7 +2740,7 @@ function reduce(state, action) {
       if ((p.field === 'reps' || p.field === 'weight') && s.status !== 'pending') {
         _evaluateSetStatus(ex, s);
       }
-      if (_wasSuccessForPr) _recomputePrFromHistory(state, ex.name);
+      if (_wasSuccessForPr) _recomputePrFromHistory(state, ex.substituteFor || ex.name);
       break;
     }
     case A.SET_TOGGLE_DONE: {
@@ -2752,7 +2775,7 @@ function reduce(state, action) {
         // Trainings-Tab-Audit (2026-08-17): Phantom-PR-Fix -- siehe
         // Kommentar bei _recomputePrFromHistory(). Ein Satz, der einen PR
         // getragen hat, wird hier zurück auf 'pending'/'fail' zyklisiert.
-        _recomputePrFromHistory(state, exForToggle.name);
+        _recomputePrFromHistory(state, exForToggle.substituteFor || exForToggle.name);
       }
       break;
     }
@@ -3111,6 +3134,34 @@ function reduce(state, action) {
           const keep = matches.find(c => c.name === finalName) ?? matches[0];
           keep.name = finalName;
           state.customExercises = state.customExercises.filter(c => !variantSet.has(c.name) || c === keep);
+        }
+      }
+      // state.js-Audit (Runde 35, B6): vier namensbasierte State-Maps
+      // ergänzt, die bisher NICHT beim Zusammenführen migriert wurden --
+      // dieselbe Fehlerklasse und derselbe Fix wie bei CUSTOM_EX_UPDATE
+      // oben (PR erschien fälschlich als "nie erreicht", ein bereits
+      // bearbeitetes Plateau wurde erneut gemeldet, dauerhafte Notiz
+      // (B127) und gespeicherte Alternativ-Vorschläge (B138) gingen
+      // verloren) -- EX_MERGE_NAMES hatte diese Behandlung nie erhalten,
+      // obwohl es dieselbe Art von Umbenennung ist (mehrere alte Namen ->
+      // ein neuer Name statt nur einem).
+      for (const oldName of variantNames) {
+        if (oldName === finalName) continue;
+        if (state.prs && Object.prototype.hasOwnProperty.call(state.prs, oldName)) {
+          if (!Object.prototype.hasOwnProperty.call(state.prs, finalName)) state.prs[finalName] = state.prs[oldName];
+          delete state.prs[oldName];
+        }
+        if (state.plateauActions && Object.prototype.hasOwnProperty.call(state.plateauActions, oldName)) {
+          if (!Object.prototype.hasOwnProperty.call(state.plateauActions, finalName)) state.plateauActions[finalName] = state.plateauActions[oldName];
+          delete state.plateauActions[oldName];
+        }
+        if (state.exerciseNotes && Object.prototype.hasOwnProperty.call(state.exerciseNotes, oldName)) {
+          if (!Object.prototype.hasOwnProperty.call(state.exerciseNotes, finalName)) state.exerciseNotes[finalName] = state.exerciseNotes[oldName];
+          delete state.exerciseNotes[oldName];
+        }
+        if (state.customAlternatives && Object.prototype.hasOwnProperty.call(state.customAlternatives, oldName)) {
+          if (!Object.prototype.hasOwnProperty.call(state.customAlternatives, finalName)) state.customAlternatives[finalName] = state.customAlternatives[oldName];
+          delete state.customAlternatives[oldName];
         }
       }
       break;

@@ -1,5 +1,44 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-08-18 — Runde 34 (train-v259→v260, B369-B374):
+*Letzte Aktualisierung: 2026-08-18 — Runde 35 (train-v260→v261, B375-B383):
+state.js-Audit, NEUNTE Runde -- erste einer angekündigten Multi-Runden-
+Serie (state.js, danach weeklyFocus.js, overallPerformance.js,
+triggerEngine.js, exerciseAlternatives.js, timer.js, dragdrop.js,
+setUtils.js), auf Nutzerauftrag "start with state.js and continue with
+the other files" gestartet. state.js (3347 Zeilen, zentraler Reducer)
+war bisher nie als eigenständiges Subsystem auditiert. Eigener Recon vor
+Fork-Dispatch fand bereits selbst einen Bug (`EX_MERGE_NAMES` fehlten 4
+namensbasierte State-Map-Updates, dieselbe Fehlerklasse wie bei
+`CUSTOM_EX_UPDATE` bereits im Körper-Tab-Audit gefixt). 2 parallele
+Diagnose-Agenten (Helper-Funktionen vor dem Reducer inkl. migrate(),
+Reducer-Switch selbst mit ~120 Cases) fanden 7 bestätigte Bugs + 2
+gekoppelte Verdachtsfälle. Ergebnis in
+`Diagnose & Sprints/diagnose-statejs-audit-2026-08-18.txt`. Nutzer wählte
+"Alle 7 fixen + V1/V2 mit" -> B375-B383 umgesetzt. Bemerkenswertester
+Fund (B381, gekoppelt mit V1/V2 = B382/B383): `DAY_LOAD_VACATION_PLAN`/
+`WEEK_LOAD_VACATION_PLAN` legten Übungs-Objekte ohne `prWeight`/
+`prRepsAtMaxWeight` an (anders als die EX_ADD-Referenz-Implementierung,
+die beide explizit auf `null` setzt) -- dadurch griff
+`_applyPrTracking()`s strikte `=== null`-Prüfung nie, ein echter PR auf
+einer Urlaubsplan-Übung wurde während der laufenden Sitzung gar nicht
+erkannt (kein Badge, kein Update), sondern erst beim nächsten
+vollständigen Neuladen über den vollen PR-Recompute. Im selben Zug eine
+neue `_buildVacationExercise()`-Helper-Funktion eingeführt (ersetzt zwei
+unabhängig duplizierte ~20-zeilige Objekt-Literale, analog zur bereits
+einmal konsolidierten Tag-/Wochen-Reset-Logik). Zwei weitere Funde (B377/
+B378) sind die inzwischen fünfte bzw. dritte unabhängige Fundstelle
+bereits etablierter Fehlerklassen im Projekt (substituteFor-Blindheit bei
+PR-Verarbeitung bzw. unvollständige namensbasierte State-Map-Pflege bei
+Umbenennungs-Operationen). 8 neue Tests (statejs_audit_fixes.spec.js,
+Browser-Kontext via direktem `dispatch()`-Aufruf, analog zu
+koerper_einstellungen_audit_fixes.spec.js, da state.js NICHT import-frei
+ist). Volle Regressionssuite (112 Spec-Dateien, gebatcht) grün. Ein
+vermeintlicher Regressions-Verdacht (Phantom-PR-Test aus
+trainingstab_audit_fixes.spec.js schlug 4/5 Wiederholungen fehl, direkt
+im selben Bereich wie B377/B378) wurde per git-stash-Differenztest
+zweifelsfrei als vorbestehende, umgebungsbedingte Flakiness bestätigt --
+schlägt mit UNVERÄNDERTEM state.js (vor dieser Runde) identisch 4/5-mal
+fehl.
+Davor: Runde 34 (train-v259→v260, B369-B374):
 movementMap.js-Audit, ACHTE Runde -- auf Nutzerauftrag "start
 movementMap.js audit" gestartet. movementMap.js (Übungsname→Bewegungs-
 muster-Kategorie: MOVEMENT_MAP 218→226 Einträge, ISOLATION_EXERCISE_NAMES,

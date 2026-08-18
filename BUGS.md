@@ -1,6 +1,6 @@
 # TRAIN — Bug-Tracking
 *Wird nach jedem Sprint aktualisiert*
-*Stand: August 2026 / train-v260*
+*Stand: August 2026 / train-v261*
 
 ---
 
@@ -8,6 +8,15 @@
 
 | ID | Beschreibung | Version | Commit | Root Cause |
 |----|-------------|---------|--------|-----------|
+| B383 | `DAY_LOAD_VACATION_PLAN`/`WEEK_LOAD_VACATION_PLAN`: fehlendes `showPlates`+`progressionMode`/`targetRepsMax`/`prRepsHistory` (V2) | v261 | — | Runde 35 (state.js-Audit, Verdachtsfall, mit B382 zusammen konsolidiert). Nicht aktuell symptomatisch (alle VACATION_PLANS-Einträge sind Körpergewicht/Kurzhantel/Maschine), aber nicht durch Design garantiert -- bricht still, falls je eine Langhantel-Übung in einen Urlaubsplan aufgenommen wird. |
+| B382 | `DAY_LOAD_VACATION_PLAN`/`WEEK_LOAD_VACATION_PLAN`: duplizierte ~20-zeilige Übungs-Objekt-Literale statt gemeinsamer Helper-Funktion (V1) | v261 | — | Runde 35 (state.js-Audit, Verdachtsfall). Neue `_buildVacationExercise()`-Helper-Funktion, analog zur bereits einmal konsolidierten Tag-/Wochen-Reset-Logik (`WEEK_RESET_TO_TPL`). |
+| B381 | `DAY_LOAD_VACATION_PLAN`/`WEEK_LOAD_VACATION_PLAN`: PR-Tracking während der Sitzung stillschweigend inaktiv | v261 | — | Runde 35 (state.js-Audit). Beide Cases legten Übungs-Objekte ohne `prWeight`/`prRepsAtMaxWeight` an (anders als die Referenz-Implementierung `EX_ADD`, die beide explizit auf `null` setzt) -- `_applyPrTracking()`s strikte `ex.prWeight === null`-Prüfung griff dadurch nie, ein echter PR auf einer Urlaubsplan-Übung wurde erst beim nächsten vollständigen Neuladen erkannt. |
+| B380 | `EX_MERGE_NAMES` fehlten 4 namensbasierte State-Map-Updates | v261 | — | Runde 35 (state.js-Audit). Beim Zusammenführen von Übungsnamens-Varianten wurden `state.prs`/`state.plateauActions`/`state.exerciseNotes`/`state.customAlternatives` nicht aktualisiert -- die Schwesterfunktion `CUSTOM_EX_UPDATE` bekam genau diese 4 Maps bereits im "Körper-Tab/Einstellungen-Audit" nachgerüstet, EX_MERGE_NAMES hat diese Behandlung nie erhalten, obwohl es dieselbe Art von Umbenennung ist. Eigener Recon-Fund, Ausgangspunkt der Runde. |
+| B379 | `_findExerciseSettingsHistory()` konnte `tags: []` einer Startwerte-Woche fälschlich übernehmen | v261 | — | Runde 35 (state.js-Audit). Kein isSeedWeek-Ausschluss in der Rückwärtssuche -- ONBOARDING_SEED setzt `tags` bei jeder Seed-Übung hart auf `[]`, was den korrekt über `resolveMuscleGroups()` berechneten Default sonst überschrieben hätte. |
+| B378 | `_applyPrTracking()` buchte `state.prs[]` unter dem Substitut-Namen statt dem Original bei aktiver Substitution | v261 | — | Runde 35 (state.js-Audit). `ex.prWeight`/`ex.prRepsAtMaxWeight` (objektgebunden) waren davon nicht betroffen, nur die globale `state.prs[]`-Map -- z.B. `_renderAnalysis1RM()` (ui.js) hätte die 1RM-Historie bei erstmaliger Substitution fälschlich leer gezeigt. |
+| B377 | `_recomputePrFromHistory()` ignorierte `substituteFor` | v261 | — | Runde 35 (state.js-Audit). Eine Phantom-PR-Korrektur an einer aktuell substituierten Übung durchsuchte die falschen Sätze. Mindestens fünfte unabhängige Fundstelle derselben Fehlerklasse im Projekt (vgl. B335, B359). |
+| B376 | UTC-Datum-Antimuster in `EX_SET_SKIP_REASON` (`skipDate`) | v261 | — | Runde 35 (state.js-Audit). Statt der bereits im selben File definierten `_localISODateToday()`-Helper-Funktion. Feeds `_checkInjuryReminder()` (weeklyFocus.js). |
+| B375 | UTC-Datum-Antimuster in `_recordSubstitution()` (`substituteHistory[].lastUsed`) | v261 | — | Runde 35 (state.js-Audit). Steuert die "älteste zuerst entfernen"-Sortierung beim Überschreiten der Max-Grenzen (5 pro Übung/50 global). Dasselbe, im Projekt bereits ~25x gefundene Antimuster. |
 | B374 | `NO_BARBELL_EXERCISE_NAMES` erweitert um Burpees/Box Jumps/Broad Jumps/Battle Ropes | v260 | — | Runde 34 (movementMap.js-Audit, Verdachtsfall, teilweise). Nur die eindeutigen Fälle ergänzt, restliche Kandidaten (Crunch, Situps, Ab-Wheel, Russian Twists, Hollow Hold) bewusst dokumentiert statt geraten. |
 | B373 | `resolveCategory()`/`isCompoundExercise()` nicht null-sicher für `categoryMap` | v260 | — | Runde 34 (movementMap.js-Audit). `categoryMap[name] ?? ...` warf eine TypeError bei null/undefined `categoryMap` -- inkonsistent zu `buildCategoryMap()`s eigenem `customExercises ?? []`-Fallback in derselben Datei. Jetzt `(categoryMap ?? {})[name] ?? ...`. |
 | B372 | MOVEMENT_MAP fehlte 'Sit Up' (Singular, Leerzeichen) | v260 | — | Runde 34 (movementMap.js-Audit). Fiel auf 'Sonstige' statt 'Core' zurück. |
