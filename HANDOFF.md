@@ -1,5 +1,52 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-08-18 — Runde 37 (train-v262→v263, B390-B392):
+*Letzte Aktualisierung: 2026-08-18 — Runde 38 (train-v263, NOCH NICHT
+UMGESETZT -- Diagnose abgeschlossen, Fixes vom Nutzer freigegeben, aber
+NOCH NICHT implementiert. Hier fortsetzen, bevor eine neue Runde
+begonnen wird):*
+timer.js + dragdrop.js + setUtils.js-Audit, ZWÖLFTE Runde -- vierte einer
+angekündigten Multi-Runden-Serie nach state.js (Runde 35), weeklyFocus.js/
+overallPerformance.js (Runde 36), triggerEngine.js/exerciseAlternatives.js
+(Runde 37). dragdrop.js ist eine vendorte Drittanbieter-Bibliothek
+(mobile-drag-drop 2.3.0-rc.1, MIT) -- bewusst aus dem Scope genommen,
+keine weitere Aktion nötig. setUtils.js (53 Zeilen) per eigenem Recon
+geprüft und für sauber befunden (weekSuccessCounts()/isFullSuccess() sind
+bereits die konsolidierte Quelle, mit eigenem Drift-Absicherungs-Test,
+siehe tests/weeklyfocus_scoreweek_parity.spec.js) -- keine weitere Aktion
+nötig.
+
+timer.js (986 Zeilen, Pausenzeit-/Rest-Timer + Session-Tracking-UI) war
+bisher nie eigenständig auditiert. 2 parallele Diagnose-Agenten (Zeile
+1-414: Wake-Lock/Zeit-Formatierung/Session-Tracking/Pausenzeit-Timer-Kern/
+Audio/_onStateChange(); Zeile 414-986: Custom-Events-Binding/Overlay-DOM/
+Styles/App-Interaktions-Binding/mountTimer()) fanden insgesamt ein
+ungewöhnlich sauberes Modul -- KEIN HIGH-Bug, nur 1 mittlerer + 2
+kosmetische Funde. Ergebnis in `Diagnose & Sprints/diagnose-timerjs-
+audit-2026-08-18.txt`. Nutzer wählte "Alle 3 fixen":
+  F1 (MEDIUM): _dismissPause()/_stopSession() räumen bei einem
+      Wochenwechsel während des 3-Sekunden-"WEITER!"-Popup-Fensters
+      _goTimer/_goPopup nicht mit auf -- selbstheilend nach 3s, aber
+      sichtbare UX-Inkonsistenz (timer.js:321-327, 186-202).
+  F2 (LOW, kosmetisch): maxSessionMs-Default (3h/10800000) doppelt
+      hardcodiert statt gemeinsamer Modul-Konstante (timer.js:142, 193).
+  F3 (LOW, kosmetisch): Dismiss-Bestätigungs-Hinweis ("Nochmal tippen ✓")
+      nicht als aria-live-Region -- Screenreader-Nutzer bekommen die
+      Anforderung nicht angesagt (timer.js:754-764, _bindOverlayEvents).
+Bemerkenswert sauberer Befund: eine auf den ersten Blick vertraute
+substituteFor-Blindheit in _renderPauseTip() wurde geprüft und als
+KEIN Bug verworfen (Punkt-in-Zeit-Abfrage "wovon erhole ich mich
+gerade" soll bewusst die aktuell aktive, ggf. substituierte Übung
+zeigen). mountTimer()-Reentrancy-Risiko (kein Idempotenz-Schutz) geprüft
+und als aktuell nicht erreichbar bestätigt (wird laut projektweitem
+Grep exakt einmal aufgerufen, kein Re-Mount-Pfad im Code) -- nur als
+defensive-Härtung-Hinweis notiert, kein Fix.
+
+NÄCHSTER SCHRITT (noch offen): F1-F3 in timer.js umsetzen, Tests
+schreiben, volle Regressionssuite laufen lassen, BUGS.md (fortlaufend ab
+B393)/CACHE_VERSION (train-v263→v264) aktualisieren, sprint-ergebnis-
+runde38-*.txt schreiben, committen + pushen. BUGS.md/sw.js sind in
+diesem Zwischenstand NOCH NICHT aktualisiert (Stand weiterhin v263,
+B392) -- das folgt erst nach der Implementierung.
+Davor: Runde 37 (train-v262→v263, B390-B392):
 triggerEngine.js + exerciseAlternatives.js-Audit, ELFTE Runde -- dritte
 einer angekündigten Multi-Runden-Serie nach state.js (Runde 35) und
 weeklyFocus.js/overallPerformance.js (Runde 36). Beide Dateien
