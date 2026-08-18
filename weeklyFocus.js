@@ -240,18 +240,22 @@ function _checkRisingRpe(state) {
   if (weeks.length < 3) return null;
   const last3 = weeks.slice(-3);
   if (!_hasRealisticWeeklySpacing(last3)) return null;
-  const exNames = [...new Set(last3.flatMap(w => w.days.flatMap(d => d.exercises.map(e => e.name))))];
+  // weeklyFocus.js-Audit (Runde 36, B1): auch ex.substituteFor
+  // berücksichtigen -- sonst durchsuchte eine an einem Tag substituierte
+  // Übung die falschen Sätze, dieselbe Fehlerklasse wie in
+  // weightRecommendation.js (Runde 31, B359).
+  const exNames = [...new Set(last3.flatMap(w => w.days.flatMap(d => d.exercises.map(e => e.substituteFor ?? e.name))))];
   for (const name of exNames) {
     const weights = last3.map(wk => {
       let max = 0;
-      for (const d of wk.days) for (const ex of d.exercises) if (ex.name === name)
+      for (const d of wk.days) for (const ex of d.exercises) if (ex.name === name || ex.substituteFor === name)
         for (const s of ex.sets) if (s.status === 'success' && (s.weight ?? 0) > max) max = s.weight;
       return max;
     });
     if (weights.some(w => w === 0) || !weights.every(w => Math.abs(w - weights[0]) < 0.1)) continue;
     const rpes = last3.map(wk => {
       const vals = [];
-      for (const d of wk.days) for (const ex of d.exercises) if (ex.name === name)
+      for (const d of wk.days) for (const ex of d.exercises) if (ex.name === name || ex.substituteFor === name)
         for (const s of ex.sets) if (s.status === 'success' && s.rpe != null) vals.push(s.rpe);
       return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
     });
@@ -602,7 +606,9 @@ function _checkPrePlateau(state) {
   if (weeks.length < 3) return null;
   const last3 = weeks.slice(-3);
   if (!_hasRealisticWeeklySpacing(last3)) return null;
-  const exNames = [...new Set(last3.flatMap(w => w.days.flatMap(d => d.exercises.map(e => e.name))))];
+  // weeklyFocus.js-Audit (Runde 36, B2): auch ex.substituteFor
+  // berücksichtigen -- dieselbe Fehlerklasse wie B1 (_checkRisingRpe oben).
+  const exNames = [...new Set(last3.flatMap(w => w.days.flatMap(d => d.exercises.map(e => e.substituteFor ?? e.name))))];
 
   for (const name of exNames) {
     // Max-Gewicht (success sets) pro Woche
@@ -610,7 +616,7 @@ function _checkPrePlateau(state) {
       let max = 0;
       for (const d of wk.days)
         for (const ex of d.exercises)
-          if (ex.name === name)
+          if (ex.name === name || ex.substituteFor === name)
             for (const s of ex.sets)
               if (s.status === 'success' && (s.weight ?? 0) > max) max = s.weight;
       return max;
@@ -625,7 +631,7 @@ function _checkPrePlateau(state) {
       const vals = [];
       for (const d of wk.days)
         for (const ex of d.exercises)
-          if (ex.name === name)
+          if (ex.name === name || ex.substituteFor === name)
             for (const s of ex.sets)
               if (s.status === 'success' && s.rpe != null) vals.push(s.rpe);
       if (!vals.length) return null;
@@ -644,7 +650,7 @@ function _checkPrePlateau(state) {
     for (const wk of last3)
       for (const d of wk.days)
         for (const ex of d.exercises)
-          if (ex.name === name)
+          if (ex.name === name || ex.substituteFor === name)
             for (const s of ex.sets) { tot++; if (s.status === 'success') succ++; }
     if (tot === 0 || succ / tot < 0.7) continue;
 
@@ -960,10 +966,15 @@ function _checkProgression(state) {
   // derselben Empfehlung optisch nach oben ziehen, die getWeightRecommendation()
   // selbst bereits strenger (nicht als vollen Erfolg) bewertet.
   let succ = 0, fail = 0, rpeSum = 0, rpeCount = 0;
+  // weeklyFocus.js-Audit (Runde 36, B6): auch ex.substituteFor
+  // berücksichtigen -- sonst fällt eine Woche, in der best.name selbst
+  // substituiert wurde, aus den Konfidenz-/Beleg-Zahlen heraus, obwohl sie
+  // in der bereits substituteFor-bewussten getWeightRecommendation()-
+  // Empfehlung (oben, B359/Runde 31) daneben bereits berücksichtigt ist.
   for (const wk of calcWeeks.slice(-4))
     for (const d of wk.days)
       for (const ex of d.exercises)
-        if (ex.name === best.name)
+        if (ex.name === best.name || ex.substituteFor === best.name)
           for (const s of ex.sets) {
             if (isFullSuccess(s, ex)) { succ++; if (s.rpe != null) { rpeSum += s.rpe; rpeCount++; } }
             else if (s.status === 'fail') fail++;
@@ -1108,10 +1119,14 @@ function _checkCompoundIsolationBalance(state) {
       for (const ex of day.exercises) {
         if (ex.archived) continue;
         const baseName = ex.substituteFor ?? ex.name;
-        const cat = resolveCategory(baseName, customCatMap);
         const n = ex.sets.filter(s => s.status === 'success' || s.status === 'fail').length;
         totalSets += n;
-        if (cat === 'Squat' || cat === 'Hinge' || cat === 'Push' || cat === 'Pull') compoundSets += n;
+        // weeklyFocus.js-Audit (Runde 36, B3): isCompoundExercise() statt der
+        // hier zuvor hardcodierten Kategorie-Liste (Squat/Hinge/Push/Pull) --
+        // die ignorierte ISOLATION_EXERCISE_NAMES-Overrides (z.B. wurden
+        // Bizepscurls, Kategorie 'Pull' aber explizit Isolation, fälschlich
+        // als Compound gezählt). Dieselbe Fehlerklasse wie B358 (Runde 31).
+        if (isCompoundExercise(baseName, customCatMap)) compoundSets += n;
       }
     }
   }
@@ -1123,7 +1138,7 @@ function _checkCompoundIsolationBalance(state) {
   return {
     status: 'compoundIsolationImbalance',
     headline: 'Mehr Grundübungen',
-    reasoning: `Verhältnis der letzten ${lastN.length} Wochen: ${compoundPct}% Compound-Sätze (Squat/Hinge/Push/Pull) von ${totalSets} bewerteten Sätzen insgesamt.`,
+    reasoning: `Verhältnis der letzten ${lastN.length} Wochen: ${compoundPct}% Compound-Sätze von ${totalSets} bewerteten Sätzen insgesamt.`,
     recommendation: `Du trainierst ${compoundPct}% Compound — für Kraftaufbau empfiehlt sich >70%.`,
     compoundPct,
     // E1 (Transparenz Coach-Tab)
@@ -1257,7 +1272,9 @@ function _checkPersistentFailure(state) {
   const weeks = _nonDeloadWeeks(state);
   if (weeks.length < 3) return null;
   const last3 = weeks.slice(-3);
-  const exNames = [...new Set(last3.flatMap(w => w.days.flatMap(d => d.exercises.map(e => e.name))))];
+  // weeklyFocus.js-Audit (Runde 36, B4): auch ex.substituteFor
+  // berücksichtigen -- dieselbe Fehlerklasse wie B1/B2 oben.
+  const exNames = [...new Set(last3.flatMap(w => w.days.flatMap(d => d.exercises.map(e => e.substituteFor ?? e.name))))];
 
   for (const name of exNames) {
     let succ = 0, fail = 0, weeksAttempted = 0, lastFailWeight = null, lastFailEx = null;
@@ -1270,7 +1287,7 @@ function _checkPersistentFailure(state) {
       // (z.B. wegen wiederholtem Scheitern) konnte so noch Wochen später
       // fälschlich "Gewicht reduzieren" vorschlagen, obwohl sie gar nicht
       // mehr trainiert wird.
-      for (const d of wk.days) for (const ex of d.exercises) if (ex.name === name && !ex.archived) {
+      for (const d of wk.days) for (const ex of d.exercises) if ((ex.name === name || ex.substituteFor === name) && !ex.archived) {
         for (const s of ex.sets) {
           if (s.status === 'success') { succ++; wkEvaluated++; }
           else if (s.status === 'fail') {
@@ -1361,8 +1378,13 @@ function _checkMultiExerciseFailure(state) {
     // _checkPersistentFailure() oben -- archivierte Übungen ausgeschlossen.
     for (const d of wk.days) for (const ex of d.exercises) {
       if (ex.archived) continue;
-      let entry = perExercise.get(ex.name);
-      if (!entry) { entry = { succ: 0, fail: 0, lastFailWeight: null, lastFailEx: null }; perExercise.set(ex.name, entry); }
+      // weeklyFocus.js-Audit (Runde 36, B5): auch ex.substituteFor
+      // berücksichtigen -- dieselbe Fehlerklasse wie B1/B2/B4 oben, sonst
+      // landet eine an einem Tag substituierte Übung unter einem eigenen,
+      // von der Original-Übung getrennten Map-Eintrag.
+      const baseName = ex.substituteFor ?? ex.name;
+      let entry = perExercise.get(baseName);
+      if (!entry) { entry = { succ: 0, fail: 0, lastFailWeight: null, lastFailEx: null }; perExercise.set(baseName, entry); }
       for (const s of ex.sets) {
         if (s.status === 'success') { succ++; entry.succ++; }
         else if (s.status === 'fail') {

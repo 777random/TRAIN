@@ -1,6 +1,6 @@
 # TRAIN — Bug-Tracking
 *Wird nach jedem Sprint aktualisiert*
-*Stand: August 2026 / train-v261*
+*Stand: August 2026 / train-v262*
 
 ---
 
@@ -8,6 +8,12 @@
 
 | ID | Beschreibung | Version | Commit | Root Cause |
 |----|-------------|---------|--------|-----------|
+| B389 | `overallPerformance.js`: `computeQualityTrend()` hat keinen eigenen isSeedWeek-Filter (V1) | v262 | — | Runde 36 (weeklyFocus.js/overallPerformance.js-Audit, Verdachtsfall, nur dokumentiert). Aktuell korrekt, da der einzige Aufrufer (ui.js) bereits vorfiltert -- nur ein erklärender Kommentar ergänzt, keine Code-Änderung. |
+| B388 | `_checkProgression()`s Konfidenz-/Beleg-Berechnung ignorierte substituteFor | v262 | — | Runde 36 (weeklyFocus.js-Audit). Widersprüchliche Zahlen innerhalb derselben UI-Karte: die Gewichtsempfehlung daneben war bereits substituteFor-bewusst (B359, Runde 31), die separate Konfidenz-Neuberechnung nicht. |
+| B387 | `_checkMultiExerciseFailure()` ignorierte substituteFor | v262 | — | Runde 36 (weeklyFocus.js-Audit). Eine substituierte Übung landete unter einem eigenen, getrennten Map-Eintrag statt mit der Original-Übung zusammengeführt zu werden. |
+| B386 | `_checkPersistentFailure()` ignorierte substituteFor | v262 | — | Runde 36 (weeklyFocus.js-Audit). |
+| B385 | `_checkCompoundIsolationBalance()` reimplementierte die Compound/Isolation-Klassifikation statt `isCompoundExercise()` zu nutzen | v262 | — | Runde 36 (weeklyFocus.js-Audit). Hardcodierte Kategorie-Liste ignorierte ISOLATION_EXERCISE_NAMES-Overrides (z.B. Bizepscurls fälschlich als Compound gezählt). Dieselbe Fehlerklasse wie B358 (Runde 31). Ein bestehender Test (session_summary.spec.js) nutzte bewusst eine unbekannte Übung, um "Isolation" zu simulieren -- durch den Fix zählt "unbekannt/Sonstige" jetzt korrekt konsistent als Compound (Pausenzeiten-Sicherheitslogik), Test auf eine echte Isolationsübung (Bizepscurls) umgestellt. |
+| B384 | `_checkRisingRpe()`/`_checkPrePlateau()` ignorierten substituteFor | v262 | — | Runde 36 (weeklyFocus.js-Audit). Mindestens siebte/achte unabhängige Fundstelle dieser Fehlerklasse in der Session (vgl. B335, B359, B377/B378/B386/B387). |
 | B383 | `DAY_LOAD_VACATION_PLAN`/`WEEK_LOAD_VACATION_PLAN`: fehlendes `showPlates`+`progressionMode`/`targetRepsMax`/`prRepsHistory` (V2) | v261 | — | Runde 35 (state.js-Audit, Verdachtsfall, mit B382 zusammen konsolidiert). Nicht aktuell symptomatisch (alle VACATION_PLANS-Einträge sind Körpergewicht/Kurzhantel/Maschine), aber nicht durch Design garantiert -- bricht still, falls je eine Langhantel-Übung in einen Urlaubsplan aufgenommen wird. |
 | B382 | `DAY_LOAD_VACATION_PLAN`/`WEEK_LOAD_VACATION_PLAN`: duplizierte ~20-zeilige Übungs-Objekt-Literale statt gemeinsamer Helper-Funktion (V1) | v261 | — | Runde 35 (state.js-Audit, Verdachtsfall). Neue `_buildVacationExercise()`-Helper-Funktion, analog zur bereits einmal konsolidierten Tag-/Wochen-Reset-Logik (`WEEK_RESET_TO_TPL`). |
 | B381 | `DAY_LOAD_VACATION_PLAN`/`WEEK_LOAD_VACATION_PLAN`: PR-Tracking während der Sitzung stillschweigend inaktiv | v261 | — | Runde 35 (state.js-Audit). Beide Cases legten Übungs-Objekte ohne `prWeight`/`prRepsAtMaxWeight` an (anders als die Referenz-Implementierung `EX_ADD`, die beide explizit auf `null` setzt) -- `_applyPrTracking()`s strikte `ex.prWeight === null`-Prüfung griff dadurch nie, ein echter PR auf einer Urlaubsplan-Übung wurde erst beim nächsten vollständigen Neuladen erkannt. |

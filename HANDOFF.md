@@ -1,5 +1,38 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-08-18 — Runde 35 (train-v260→v261, B375-B383):
+*Letzte Aktualisierung: 2026-08-18 — Runde 36 (train-v261→v262, B384-B389):
+weeklyFocus.js + overallPerformance.js-Audit, ZEHNTE Runde -- zweite einer
+angekündigten Multi-Runden-Serie nach state.js (Runde 35, B375-B383).
+weeklyFocus.js (1600 Zeilen, Coach-Tab-Signal-Engine, ~20 unabhängige
+`_check*`-Funktionen) und overallPerformance.js (185 Zeilen,
+"Gesamtperformance"-Sektion Fortschritt-Tab) waren beide im
+movementMap.js-Audit (Runde 34) bereits auf Aufrufstellen-Ebene sauber
+verifiziert worden, ihre interne Logik aber nicht. 2 parallele Diagnose-
+Agenten (weeklyFocus.js Zeile 1-900 bzw. 899-1600 + overallPerformance.js)
+fanden 6 bestätigte Bugs + 1 Verdachtsfall (geringe Auswirkung). Ergebnis
+in `Diagnose & Sprints/diagnose-weeklyfocus-overallperformance-audit-
+2026-08-18.txt`. Nutzer wählte "Alle 6 fixen + V1 dokumentieren" ->
+B384-B389 umgesetzt. 5 der 6 Bugs (B384/B386/B387/B388, B384 deckt sowohl
+`_checkRisingRpe()` als auch `_checkPrePlateau()` ab) sind dieselbe, in
+dieser Session bereits ~7-8x unabhängig gefundene substituteFor-
+Blindheits-Fehlerklasse (vgl. B335, B359, B377/B378 aus Runde 35) -- eine
+an einem Tag substituierte Übung wurde beim mehrwöchigen Verfolgen über
+rohen `ex.name` statt `ex.name === name || ex.substituteFor === name`
+unsichtbar für ihre eigene Historie. B385 ist die zweite etablierte
+Fehlerklasse (hardcodierte statt über `isCompoundExercise()` berechnete
+Compound/Isolation-Einstufung, vgl. B358 aus Runde 31) -- deckte dabei
+auch einen bestehenden Test auf, der sich unbeabsichtigt auf das alte
+Fallback-Verhalten für unbekannte Übungen verlassen hatte (auf eine echte
+Isolationsübung umgestellt statt den Fix aufzuweichen). 6 neue Tests
+(weeklyfocus_overallperformance_audit_fixes.spec.js, Browser-Kontext via
+direktem Aufruf von computeWeeklyFocus()/computeStructuralSignals(), da
+weeklyFocus.js state.js importiert und damit nicht import-frei ist) --
+alle 6 einzeln per git-stash-Differenztest gegen den Vorher-Stand
+verifiziert (5/6 schlugen ohne die Fixes sofort fehl, der 6. wurde nach
+einer zu schwachen ersten Assertion verschärft, bis er ebenfalls
+trennscharf war). Volle Regressionssuite (113 Spec-Dateien, gebatcht)
+grün, 1 vorbestehendes Flake (trainingstab_audit_fixes.spec.js
+Phantom-PR, seit Runde 26 in jeder Runde beobachtet) unverändert.
+Davor: Runde 35 (train-v260→v261, B375-B383):
 state.js-Audit, NEUNTE Runde -- erste einer angekündigten Multi-Runden-
 Serie (state.js, danach weeklyFocus.js, overallPerformance.js,
 triggerEngine.js, exerciseAlternatives.js, timer.js, dragdrop.js,

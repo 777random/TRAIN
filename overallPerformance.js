@@ -50,6 +50,15 @@ function _nonDeloadVacationWeeks(state) {
 // Kopfkommentar zum zirkulären Import). Reihenfolge chronologisch.
 const QUALITY_STABLE_BAND = 2; // Prozentpunkte — Sprint-Text nennt keinen exakten Wert, eigene Wahl
 
+// weeklyFocus.js/overallPerformance.js-Audit (Runde 36, V1): kein eigener
+// isSeedWeek-Filter hier -- verlässt sich darauf, dass der Aufrufer bereits
+// vorfilterte scoredWeeks übergibt. Aktuell korrekt (einziger Aufrufer,
+// ui.js' _overallPerformanceParagraphs(), filtert isSeedWeek/deload/vacation
+// bereits vor dem Aufruf), aber ein künftiger zweiter Aufrufer ohne
+// Vorfilterung würde stillschweigend falsche Trends zeigen -- bewusst nur
+// dokumentiert statt hier zusätzlich gefiltert, da scoredWeeks bereits
+// vorverdichtete {succ,fail,total,pct}-Objekte sind, kein isSeedWeek-Feld
+// mehr tragen und daher hier gar nicht mehr geprüft werden könnten.
 export function computeQualityTrend(scoredWeeks, N = 8) {
   const half = Math.max(2, Math.round(N / 2));
   const scored = scoredWeeks.filter(s => s.total > 0);

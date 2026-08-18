@@ -336,9 +336,18 @@ test('Compound/Isolation-Signal erscheint im Coach-Tab bei <60% Compound', async
   await page.goto('/');
   await page.waitForSelector('#app.is-ready', { timeout: 10000 });
 
-  // "Nackenrollen" ist in movementMap.js nicht gelistet -> resolveCategory
-  // liefert 'Sonstige' -> zählt als Isolation (0% Compound).
-  const weeks = buildCategoryWeeks('Nackenrollen');
+  // weeklyFocus.js-Audit (Runde 36, B3): _checkCompoundIsolationBalance()
+  // nutzt jetzt isCompoundExercise() statt einer eigenen, hardcodierten
+  // Kategorie-Liste -- deren "unbekannt/Sonstige zählt als Compound"-
+  // Fallback (movementMap.js, Pausenzeiten-Sicherheitslogik) gilt jetzt
+  // konsistent auch hier. Ein bisher unlistetes "Nackenrollen" (vorher:
+  // 'Sonstige' -> Isolation) zählt daher jetzt korrekt als Compound und
+  // löst dieses Signal NICHT mehr aus. "Bizepscurls" ist stattdessen ein
+  // explizit über ISOLATION_EXERCISE_NAMES als Isolation eingestuftes
+  // Beispiel (Kategorie 'Pull', aber kein Compound) -- genau der Fall, den
+  // B3 zusätzlich korrekt erfasst (vorher hier fälschlich als Compound
+  // gezählt).
+  const weeks = buildCategoryWeeks('Bizepscurls');
   await seed(page, weeks, weeks.length - 1);
 
   await page.click('[data-tab="coach"]');
