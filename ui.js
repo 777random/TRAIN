@@ -183,9 +183,6 @@ let _exNoteOpenKey = null;
 /** B127: aktiver Tab im offenen Notiz-Panel — 'heute' | 'immer'. */
 let _exNoteActiveTab = 'heute';
 
-/** B125: Key der Übung, für die der "Zu anderem Tag verschieben"-Dialog vorbereitet wird: `${di}-${ei}` oder null. */
-let _moveExDayKey = null;
-
 /** Whether the week-level ⋮ menu is open. */
 let _weekMenuOpen = false;
 
@@ -479,7 +476,9 @@ function nextMonday() {
   const d   = new Date();
   const dow = d.getDay(); // 0 = Sun
   d.setDate(d.getDate() + (dow === 0 ? 1 : 8 - dow));
-  return d.toISOString().split('T')[0];
+  // ui.js-Dispatch-Audit (Runde 33): lokales Datum statt .toISOString()
+  // (UTC) -- dasselbe, im Projekt bereits x-fach gefixte Antimuster.
+  return _localISODate(d);
 }
 
 /**
@@ -1063,7 +1062,7 @@ function renderDayList(state) {
       aria-label="Neue Trainingswoche erstellen">${ic.plus()}</button>
   </div>
   ${!_overviewMode && _activeDayIdx !== null && _removeDayConfirmKey === String(_activeDayIdx) && wk.days[+_removeDayConfirmKey] ? `
-  <div class="sub-form" style="text-align:center;padding:var(--sp-3) var(--sp-4)">
+  <div class="sub-form js-confirm-panel" style="text-align:center;padding:var(--sp-3) var(--sp-4)">
     <p style="font-size:13px;color:var(--c-text-2);margin-bottom:var(--sp-2)">"${h(wk.days[+_removeDayConfirmKey].title)}" löschen? Alle Einträge dieses Tags werden entfernt.</p>
     <div style="display:flex;gap:var(--sp-2);justify-content:center">
       <button class="btn btn--danger btn--sm" data-action="confirm-remove-day" data-di="${_removeDayConfirmKey}">Löschen</button>
@@ -2646,7 +2645,7 @@ function renderExercise(wk, di, ei, state) {
   ${exNotePanelHtml}
 
   ${_archiveConfirmKey === `${di}-${ei}` ? `
-  <div class="sub-form" style="text-align:center;padding:var(--sp-4)">
+  <div class="sub-form js-confirm-panel" style="text-align:center;padding:var(--sp-4)">
     <p style="font-size:13px;color:var(--c-text-2);margin-bottom:var(--sp-3)">${h(ex.name)} wird aus dem Training ausgeblendet. Die bisherige Historie bleibt erhalten.</p>
     <div style="display:flex;gap:var(--sp-2);justify-content:center">
       <button class="btn btn--danger btn--sm" data-action="confirm-archive-ex" data-di="${di}" data-ei="${ei}">Archivieren</button>
@@ -2655,7 +2654,7 @@ function renderExercise(wk, di, ei, state) {
   </div>` : ''}
 
   ${_removeExConfirmKey === `${di}-${ei}` ? `
-  <div class="sub-form" style="text-align:center;padding:var(--sp-4)">
+  <div class="sub-form js-confirm-panel" style="text-align:center;padding:var(--sp-4)">
     <p style="font-size:13px;color:var(--c-text-2);margin-bottom:var(--sp-3)">"${h(ex.name)}" entfernen?</p>
     <div style="display:flex;gap:var(--sp-2);justify-content:center">
       <button class="btn btn--danger btn--sm" data-action="confirm-remove-ex" data-di="${di}" data-ei="${ei}">Entfernen</button>
@@ -3963,7 +3962,9 @@ function _checkDecisionOutcomes(state) {
   const _d = new Date();
   const _dow = _d.getDay();
   _d.setDate(_d.getDate() + (_dow === 0 ? -6 : 1 - _dow));
-  const measuredWeekStart = _d.toISOString().slice(0, 10);
+  // ui.js-Dispatch-Audit (Runde 33): lokales Datum statt .toISOString()
+  // (UTC) -- dasselbe, im Projekt bereits x-fach gefixte Antimuster.
+  const measuredWeekStart = _localISODate(_d);
 
   const _avg = (weeks) => {
     const scored = weeks.map(w => _weekSuccessScore(w)).filter(s => s.total > 0);
@@ -5652,7 +5653,7 @@ function renderSettingsTab(state) {
       <div class="settings-row__action">${ic.chevronRight()}</div>
     </div>
     ${_deleteAllDataConfirmOpen ? `
-    <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:var(--sp-3)">
+    <div class="settings-row js-confirm-panel" style="flex-direction:column;align-items:stretch;gap:var(--sp-3)">
       <p style="font-size:13px;color:var(--c-text-2);margin:0">
         Alle Trainingsdaten auf diesem Gerät werden unwiderruflich gelöscht.<br>
         Erstelle vorher ein Backup, falls du die Daten behalten willst.<br><br>
@@ -5684,7 +5685,7 @@ function renderSettingsTab(state) {
         >${ic.minus()}</button>
       </div>
       ${_removeDayConfirmKey === String(di) ? `
-      <div class="sub-form" style="width:100%;text-align:center;padding:var(--sp-3)">
+      <div class="sub-form js-confirm-panel" style="width:100%;text-align:center;padding:var(--sp-3)">
         <p style="font-size:13px;color:var(--c-text-2);margin-bottom:var(--sp-2)">"${h(day.title)}" löschen? Alle Einträge dieses Tags werden entfernt.</p>
         <div style="display:flex;gap:var(--sp-2);justify-content:center">
           <button class="btn btn--danger btn--sm" data-action="confirm-remove-day" data-di="${di}">Löschen</button>
@@ -5712,7 +5713,7 @@ function renderSettingsTab(state) {
       <div class="settings-row__action">${ic.chevronRight()}</div>
     </div>
     ${_resetToTplConfirmOpen ? `
-    <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:var(--sp-3)">
+    <div class="settings-row js-confirm-panel" style="flex-direction:column;align-items:stretch;gap:var(--sp-3)">
       <p style="font-size:13px;color:var(--c-text-2);margin:0">Aktuelle Woche mit Custom-Template überschreiben?</p>
       <div style="display:flex;gap:var(--sp-2);justify-content:center">
         <button class="btn btn--danger btn--sm" data-action="confirm-reset-to-tpl">Überschreiben</button>
@@ -5727,7 +5728,7 @@ function renderSettingsTab(state) {
       <div class="settings-row__action">${ic.chevronRight()}</div>
     </div>
     ${_savingTemplateOpen ? `
-    <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:var(--sp-3)">
+    <div class="settings-row js-confirm-panel" style="flex-direction:column;align-items:stretch;gap:var(--sp-3)">
       <div style="display:flex;align-items:center;gap:var(--sp-2)">
         <input class="body-input" type="text" maxlength="60" placeholder="Name der Vorlage"
           data-action="save-named-template-name" style="flex:1"
@@ -5756,7 +5757,7 @@ function renderSettingsTab(state) {
       <div class="settings-row__action">${ic.chevronRight()}</div>
     </div>
     ${_resetFactoryConfirmOpen ? `
-    <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:var(--sp-3)">
+    <div class="settings-row js-confirm-panel" style="flex-direction:column;align-items:stretch;gap:var(--sp-3)">
       <p style="font-size:13px;color:var(--c-text-2);margin:0">Custom-Template auf Werkseinstellung zurücksetzen?</p>
       <div style="display:flex;gap:var(--sp-2);justify-content:center">
         <button class="btn btn--danger btn--sm" data-action="confirm-reset-factory">Zurücksetzen</button>
@@ -6066,6 +6067,27 @@ function _handleClick(e) {
   document.querySelectorAll('.confirm-set-no-target').forEach(el => {
     if (!el.contains(e.target)) { clearTimeout(el._timer); el.remove(); }
   });
+
+  // ui.js-Dispatch-Audit (Runde 33): Outside-Click schließt jetzt auch die
+  // destruktiven/hochriskanten Bestätigungs-Panels -- vorher als einzige
+  // Overlay-Kategorie im Dispatch-Mechanismus OHNE Outside-Click-Handler,
+  // obwohl das etablierte Muster oben (RPE-Popover, Ex-Menü, Wochen-Menü
+  // usw.) für praktisch jedes andere Popover bereits galt. Am gravierendsten
+  // bei "Alle Daten löschen": das Panel mit dem scharfen Löschen-Button
+  // blieb vorher beliebig lange sichtbar, bis explizit "Abbrechen" gedrückt
+  // wurde. Erneutes Antippen des jeweiligen Auslöse-Buttons bleibt
+  // funktional unverändert (setzt den Zustand im switch unten einfach
+  // wieder), da die Trigger-Buttons selbst nie innerhalb eines
+  // .js-confirm-panel liegen.
+  if (!e.target.closest('.js-confirm-panel')) {
+    if (_archiveConfirmKey !== null)   { _archiveConfirmKey = null; scheduleRender(); }
+    if (_removeExConfirmKey !== null)  { _removeExConfirmKey = null; scheduleRender(); }
+    if (_removeDayConfirmKey !== null) { _removeDayConfirmKey = null; scheduleRender(); }
+    if (_deleteAllDataConfirmOpen)     { _deleteAllDataConfirmOpen = false; scheduleRender(); }
+    if (_resetToTplConfirmOpen)        { _resetToTplConfirmOpen = false; scheduleRender(); }
+    if (_savingTemplateOpen)           { _savingTemplateOpen = false; scheduleRender(); }
+    if (_resetFactoryConfirmOpen)      { _resetFactoryConfirmOpen = false; scheduleRender(); }
+  }
 
   // ── 1. Day tab button ────────────────────────────────────────────────────
   const hdr = e.target.closest('.day-tab');
@@ -6557,7 +6579,9 @@ function _handleClick(e) {
       const _d = new Date();
       const _dow = _d.getDay();
       _d.setDate(_d.getDate() + (_dow === 0 ? -6 : 1 - _dow));
-      const decidedWeekStart = _d.toISOString().slice(0, 10);
+      // ui.js-Dispatch-Audit (Runde 33): lokales Datum statt .toISOString()
+      // (UTC) -- dasselbe, im Projekt bereits x-fach gefixte Antimuster.
+      const decidedWeekStart = _localISODate(_d);
       dispatch(A.DECISION_LOG_ADD, {
         type: el.dataset.type,
         signal: el.dataset.signal,
@@ -6618,7 +6642,9 @@ function _handleClick(e) {
       const _d = new Date();
       const _dow = _d.getDay();
       _d.setDate(_d.getDate() + (_dow === 0 ? -6 : 1 - _dow));
-      const decidedWeekStart = _d.toISOString().slice(0, 10);
+      // ui.js-Dispatch-Audit (Runde 33): lokales Datum statt .toISOString()
+      // (UTC) -- dasselbe, im Projekt bereits x-fach gefixte Antimuster.
+      const decidedWeekStart = _localISODate(_d);
       dispatch(A.DECISION_LOG_ADD, {
         type: signalType,
         signal: el.dataset.signal ?? '',
@@ -7486,7 +7512,13 @@ function _handleClick(e) {
     }
 
     case 'remove-set':
-      dispatch(A.SET_REMOVE, { di: +di, ei: +ei, si: +si }); break;
+      // ui.js-Dispatch-Audit (Runde 33): confirm() ergänzt -- alle
+      // Geschwister-Aktionen (remove-ex, remove-day, day-reset-sets,
+      // delete-all-data, reset-to-tpl, reset-factory, delete-named-template,
+      // delete-custom-ex) sind bereits abgesichert, remove-set war die
+      // einzige Lücke in einem ansonsten durchgängig bestätigten Muster.
+      if (confirm('Diesen Satz entfernen?')) dispatch(A.SET_REMOVE, { di: +di, ei: +ei, si: +si });
+      break;
 
     case 'add-set':
       dispatch(A.SET_ADD, { di: +di, ei: +ei }); break;
@@ -10660,7 +10692,11 @@ function _showOnboarding() {
       const _d = new Date();
       const _dow = _d.getDay();
       _d.setDate(_d.getDate() + (_dow === 0 ? -6 : 1 - _dow) - 7); // last Monday
-      dispatch(A.ONBOARDING_SEED, { startDate: _d.toISOString().slice(0, 10), exercises: seedExs });
+      // ui.js-Dispatch-Audit (Runde 33): lokales Datum statt .toISOString()
+      // (UTC) -- war bereits in Runde 28 (B331) als Fund dokumentiert,
+      // dabei aber versehentlich nicht tatsächlich gefixt (nur _applyTpl()/
+      // _applyBlank() wurden damals geändert) -- hier nachgeholt.
+      dispatch(A.ONBOARDING_SEED, { startDate: _localISODate(_d), exercises: seedExs });
     }
     // Sprint C1: das im Onboarding gewählte Hauptziel wird jetzt persistiert
     // (vorher nur lokale Variable, siehe DECISIONS.md) — für die

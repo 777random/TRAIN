@@ -16,7 +16,7 @@
  *   asset conflicts.
  */
 
-const CACHE_VERSION  = 'train-v258';
+const CACHE_VERSION  = 'train-v259';
 
 // Runde 20 (Befund 4): kurze Änderungsliste für den aktuellen Build, im
 // Update-Banner beim Aufklappen ("mehr Details") angezeigt. 2-3 knappe
@@ -28,9 +28,9 @@ const CACHE_VERSION  = 'train-v258';
 // (Browser-Update-Algorithmus) -- die Werte sind dadurch garantiert die des
 // NEUEN, wartenden Workers, ganz ohne zusätzlichen Cache-Bypass.
 const CHANGELOG_ENTRIES = [
-  'Abschluss-Nachricht nach dem letzten Satz zeigt bei Isolationsübungen jetzt eine konsistente Bewertung',
-  'Pausenzeit-Vorschläge nach einem schnellen RPE-Anstieg bleiben jetzt in einem realistischen Rahmen',
-  'Kleinere interne Konsistenz-Korrekturen im Intra-Session-Coach',
+  'Bestätigungs-Dialoge (u.a. "Alle Daten löschen") schließen jetzt zuverlässig bei Klick daneben',
+  '"Satz entfernen" fragt jetzt vor dem Löschen nach, wie andere Lösch-Aktionen auch',
+  'Kleinere interne Datums-Korrekturen im Coach-Entscheidungsverlauf',
 ];
 
 /**

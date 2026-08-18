@@ -1,6 +1,6 @@
 # TRAIN — Bug-Tracking
 *Wird nach jedem Sprint aktualisiert*
-*Stand: August 2026 / train-v258*
+*Stand: August 2026 / train-v259*
 
 ---
 
@@ -8,6 +8,10 @@
 
 | ID | Beschreibung | Version | Commit | Root Cause |
 |----|-------------|---------|--------|-----------|
+| B368 | SIEBEN destruktive/hochriskante Bestätigungs-Panels hatten keinen Outside-Click-Handler | v259 | — | Runde 33 (ui.js-Dispatch-Handler-Audit). Betroffen: Übung archivieren/entfernen, Tag entfernen, Alle Daten löschen, Woche/Template zurücksetzen, Vorlage speichern. Alle anderen Popover im selben Dispatch-Mechanismus (RPE-Popover, Ex-/Wochen-Menü usw.) schlossen bereits bei Klick daneben -- am gravierendsten bei "Alle Daten löschen": das Panel mit dem scharfen Löschen-Button blieb beliebig lange sichtbar. Neue `.js-confirm-panel`-Markierung + zentraler Outside-Click-Guard. |
+| B367 | Sechs UTC-statt-lokal-Datum-Stellen in ui.js, davon 2 im Dispatch-Switch selbst | v259 | — | Runde 33 (ui.js-Dispatch-Handler-Audit). `decision-log-stay/change`+`coach-signal-dismiss` (Dispatch-Switch), `nextMonday()`, `measuredWeekStart`, sowie ein in Runde 28 (B331) diagnostizierter, aber nie tatsächlich umgesetzter Fund (`_finish()`s ONBOARDING_SEED-Startdatum) -- beim Umsetzen dieser Runde nachgeholt. Dieselbe, im Projekt bereits x-fach gefixte Antimuster-Klasse. |
+| B366 | `remove-set` hatte keine Bestätigung, anders als alle Geschwister-Lösch-Aktionen | v259 | — | Runde 33 (ui.js-Dispatch-Handler-Audit, Verdachtsfall). `confirm()` ergänzt, analog zum bereits bestehenden Muster bei `delete-named-template`. |
+| B365 | `_moveExDayKey` (ui.js) war deklariert, aber nirgends gelesen/geschrieben -- toter Code entfernt | v259 | — | Runde 33 (ui.js-Dispatch-Handler-Audit, Verdachtsfall/Cleanup). |
 | B364 | `buildLastSetMessage()` (sessionCoach.js) hatte kein Compound/Isolation-Bewusstsein | v258 | — | Runde 32 (sessionCoach.js-Audit). Eine Isolationsübung bei RPE 8 konnte "Perfekt abgeschlossen ✓" zeigen, obwohl der `nextWeekText` daneben (via `getWeightRecommendation()`, seit B358) bereits "gleiches Gewicht" (Halten) anzeigte -- widersprüchliche Botschaft im selben UI-Element. Neuer `isCompound`-Parameter, analog zu B121/`buildSetFeedback()`. |
 | B363 | Pausenzeit-Trend-Multiplikator in `buildSetFeedback()` ohne Obergrenze | v258 | — | Runde 32 (sessionCoach.js-Audit, Verdachtsfall). `pauseSec * 1.5` konnte bei bereits hohem Basiswert (300s) auf 450s eskalieren. Neue `MAX_PAUSE_SEC`-Deckelung auf den ohnehin höchsten Tabellenwert (300s). |
 | B362 | Ungenauer Kommentar bei `_pauseSecForRpe()`s letztem Zweig korrigiert | v258 | — | Runde 32 (sessionCoach.js-Audit, Verdachtsfall, kosmetisch). `// rpe === 10` beschrieb tatsächlich jeden Wert `>9.5`. |

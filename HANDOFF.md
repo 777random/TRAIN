@@ -1,5 +1,32 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-08-18 — Runde 32 (train-v257→v258, B360-B364):
+*Letzte Aktualisierung: 2026-08-18 — Runde 33 (train-v258→v259, B365-B368):
+ui.js-Dispatch-Handler-Audit, SIEBTE Runde -- auf Nutzerauftrag "start
+ui.js dispatch audit" gestartet. Der zentrale Event-Dispatch-Mechanismus
+`_handleClick()` (ui.js, ~2130 Zeilen, 162 `case`-Zweige auf `data-action`)
+war bisher nie als eigenständiges Subsystem auditiert, nur indirekt über
+Tab-Audits berührt. 2 parallele Diagnose-Agenten (Outside-Click-Preamble +
+strukturelle switch-Health, inhaltliche Case-Body-Korrektheit) fanden 2
+bestätigte + 2 Verdachtsfälle. Ergebnis in
+`Diagnose & Sprints/diagnose-uijs-dispatch-audit-2026-08-18.txt`. Nutzer
+wählte "alle 4 fixen" -> B365-B368 umgesetzt. Größter struktureller Fund
+der gesamten bisherigen Audit-Reihe (B368): SIEBEN destruktive/
+hochriskante Bestätigungs-Panels (Übung archivieren/entfernen, Tag
+entfernen, Alle Daten löschen, Woche/Template zurücksetzen, Vorlage
+speichern) hatten -- anders als ALLE anderen Popover im selben Dispatch-
+Mechanismus -- keinen Outside-Click-Handler; am gravierendsten beim
+irreversibelsten Button der App ("Alle Daten löschen"), dessen scharfer
+Button beliebig lange sichtbar blieb, bis explizit "Abbrechen" gedrückt
+wurde. Beim Umsetzen von B367 (2 weitere UTC-Datumsstellen im Dispatch-
+Switch) zusätzlich entdeckt: ein in Runde 28 (B331) bereits diagnostizierter,
+aber NIE tatsächlich umgesetzter Fund (`_finish()`s ONBOARDING_SEED-
+Startdatum) sowie 2 weitere unabhängige Instanzen desselben Musters
+(`nextMonday()`, `measuredWeekStart`) -- alle in dieser Runde nachgeholt,
+Gesamtsumme dieser Runde damit 6 Datums-Fixes statt der ursprünglich 2
+diagnostizierten. 3 neue Tests (uijs_dispatch_audit_fixes.spec.js). Volle
+Regressionssuite (110 Spec-Dateien, gebatcht) grün, 1 vorbestehendes
+Flake (trainingstab_audit_fixes.spec.js Phantom-PR, seit Runde 26 in
+jeder Runde beobachtet und bestätigt unabhängig) auf Retry grün.
+Davor: Runde 32 (train-v257→v258, B360-B364):
 sessionCoach.js-Audit, SECHSTE Runde -- auf Nutzerauftrag "start
 sessionCoach.js audit" gestartet (Nutzer hatte diese Datei als eine von
 mehreren offenen Kandidaten genannt bekommen, nachdem die ursprüngliche
