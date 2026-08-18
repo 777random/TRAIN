@@ -258,7 +258,14 @@ let _checkInDraft = new Map();
 // Tag-Slot in einer späteren (auch geklonten) Woche.
 /** Tage (`${wk.id}_${day.id}`), für die der Check-in in dieser Sitzung übersprungen wurde. */
 let _skippedCheckIn = new Set();
-/** Manuelles Auf-/Zuklappen des Briefings pro Tag (di → boolean), überschreibt den Default. */
+/**
+ * Manuelles Auf-/Zuklappen des Briefings (`${wk.id}_${day.id}` → boolean),
+ * überschreibt den Default. Runde 39 (ui.js-Render-Audit, F5): auf dieselbe
+ * `${wk.id}_${day.id}`-Konvention wie _checkInDraft/_skippedCheckIn/
+ * _editingCheckIn (siehe B83-Kommentar oben) umgestellt -- vorher nach
+ * bloßem Tag-Index `di` geschlüsselt, kollidierte dadurch zwischen Wochen
+ * (Tag-Index 0 ist fast immer der Standard-Landing-Tag jeder Woche).
+ */
 let _briefingExpandedOverride = new Map();
 // B87 Fix 2: Tage (`${wk.id}_${day.id}`, gleiche Konvention wie _skippedCheckIn),
 // für die der Check-in aktuell zur Korrektur wieder geöffnet ist — zeigt die
@@ -274,7 +281,12 @@ let _optionalSetDismissed = new Set();
 // für diesen Satz nicht erneut, bis zum nächsten vollen Reload. Sätze mit
 // bereits gespeichertem s.note sind davon unabhängig immer sichtbar.
 let _noteAnomalyDismissed = new Set();
-/** Auf-/Zuklappen der Aufwärm-Empfehlung pro Tag (di), Default zu. */
+/**
+ * Auf-/Zuklappen der Aufwärm-Empfehlung (`${wk.id}_${day.id}`), Default zu.
+ * Runde 39 (F5): gleiche Rekeying-Umstellung wie _briefingExpandedOverride
+ * (siehe dort) -- vorher nach bloßem `di` geschlüsselt, kollidierte
+ * zwischen Wochen.
+ */
 let _warmupExpanded = new Set();
 /** B128: Auf-/Zuklappen des Auto-Steigerung-Banners ("Anpassen"), pro Woche (wk.id). */
 let _autoPlanBannerExpanded = new Set();
@@ -1281,7 +1293,12 @@ function _pinScrollTop(el, target, framesLeft = 15) {
  * in _renderRitualAnchor() ersetzt, nicht mehr hier berechnet.
  */
 function _trainingContextAnchor(state, wk, di) {
-  const sortedWeeks = [...state.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
+  // Runde 39 (ui.js-Render-Audit, F1): isSeedWeek ausgeschlossen -- die
+  // synthetische Startwerte-Woche liegt (per Onboarding-Konstruktion, 7 Tage
+  // vor der ersten echten Woche) immer chronologisch zuerst und wurde sonst
+  // als fabrizierte "letzte Einheit" angezeigt. Gleiche Fehlerklasse wie
+  // _computeBestleistungen() (Zeile 1222) in derselben Datei.
+  const sortedWeeks = [...state.weeks].filter(w => !w.isSeedWeek).sort((a, b) => a.startDate.localeCompare(b.startDate));
   const curWeekIdx = sortedWeeks.indexOf(wk);
   if (curWeekIdx === -1) return null;
 
@@ -1322,7 +1339,10 @@ function _renderRitualAnchor(state, wk, di) {
   const ctx   = _trainingContextAnchor(state, wk, di);
   const line1 = ctx ? `Letzte Einheit: ${ctx.timeText}` : null;
 
-  const sortedWeeks = [...state.weeks].sort((a, b) => a.startDate.localeCompare(b.startDate));
+  // Runde 39 (F1): isSeedWeek ausgeschlossen -- sonst verwässert die
+  // synthetische 100%-Erfolgsquote der Startwerte-Woche den Ø-Wert der
+  // ersten vier echten Wochen.
+  const sortedWeeks = [...state.weeks].filter(w => !w.isSeedWeek).sort((a, b) => a.startDate.localeCompare(b.startDate));
   const last4  = sortedWeeks.slice(-4).map(w => _weekSuccessScore(w)).filter(s => s.total > 0);
   const avgPct = last4.length > 0 ? Math.round(last4.reduce((a, s) => a + s.pct, 0) / last4.length) : null;
   const line2  = avgPct !== null ? `Ø Erfolg (4W): ${avgPct}%` : null;
@@ -1364,7 +1384,12 @@ function _renderStreakBadge(state) {
  */
 function _prevWeekBanner(state, wk, di) {
   if (!(state.curIdx > 0)) return '';
-  const prevDay = state.weeks[state.curIdx - 1]?.days?.[di];
+  const prevWk = state.weeks[state.curIdx - 1];
+  // Runde 39 (F1): isSeedWeek ausgeschlossen -- sonst zeigt die erste echte
+  // Trainingswoche fälschlich "Selber Tag letzte Woche: 100%" gegen die
+  // synthetische Startwerte-Woche.
+  if (!prevWk || prevWk.isSeedWeek) return '';
+  const prevDay = prevWk.days?.[di];
   if (!prevDay) return '';
   let _pbSucc = 0, _pbFail = 0;
   prevDay.exercises.forEach(ex => ex.sets.forEach(s => {
@@ -1423,7 +1448,13 @@ function _isTodayDay(wk, di) {
  * dasselbe Signal "schlecht geschlafen an diesem Tag".
  */
 function _isCumulativeSleepDeficit(state) {
-  const recentDays = state.weeks.flatMap(w => w.days)
+  // Runde 39 (F8): isSeedWeek ausgeschlossen -- der Seed-Tag setzt
+  // sleepHours nie (bleibt undefined statt null), bestand den Filter unten
+  // dadurch zufällig (undefined !== null). Aktuell ohne reale Auswirkung
+  // (Seed-Woche ist immer die chronologisch älteste), aber nicht durch eine
+  // hier abgesicherte Invariante garantiert -- explizit gefiltert, analog zu
+  // _computeBestleistungen() (Zeile 1222).
+  const recentDays = state.weeks.filter(w => !w.isSeedWeek).flatMap(w => w.days)
     .filter(d => d.markedDone && (d.sleepHours !== null || d.sessionCheckIn?.sleep))
     .slice(-3);
   const poorCount = recentDays.filter(d =>
@@ -1580,7 +1611,11 @@ function _lastWeekAvgRpe(exName, wk, state) {
   const rpes = [];
   for (const d of sorted[idx - 1].days ?? [])
     for (const ex of d.exercises ?? [])
-      if (ex.name === exName)
+      // Runde 39 (F3): substituteFor mit einbezogen -- sonst verschwindet
+      // der RPE-/Pausen-Vorschau-Hint, wenn die heutige Fokus-Übung per
+      // "Heute anders" ersetzt wurde und in der Vorwoche noch unter dem
+      // Originalnamen lief. Etablierte Konvention aus state.js.
+      if (ex.name === exName || ex.substituteFor === exName)
         for (const s of ex.sets ?? [])
           if (s.status === 'success' && s.rpe != null) rpes.push(s.rpe);
   return rpes.length ? rpes.reduce((a, b) => a + b, 0) / rpes.length : null;
@@ -1759,7 +1794,10 @@ function _renderSessionBriefing(di, day, wk, state) {
   const focusEx = _findFocusExercise(day, state.customExercises, state.favoriteExercises);
   let focusHtml = '';
   if (focusEx) {
-    const lastRpe = _lastWeekAvgRpe(focusEx.name, wk, state);
+    // Runde 39 (F3): kanonischen Namen auflösen -- wurde die Fokus-Übung
+    // HEUTE per "Heute anders" ersetzt (focusEx.name = Substitut-Name), lag
+    // die Vorwochen-Historie unter dem Originalnamen (focusEx.substituteFor).
+    const lastRpe = _lastWeekAvgRpe(focusEx.substituteFor || focusEx.name, wk, state);
     let rpeText = '';
     let pauseText = '';
     if (lastRpe != null) {
@@ -1782,7 +1820,9 @@ function _renderSessionBriefing(di, day, wk, state) {
     focusHtml = `<div class="session-briefing-card__focus">Fokus heute: ${h(focusEx.name)}<br>Ziel: ${weightText}${setsReps}${rpeText}${pauseText}</div>`;
   }
   const defaultExpanded = !day.sessionStartTs;
-  const isExpanded = _briefingExpandedOverride.has(di) ? _briefingExpandedOverride.get(di) : defaultExpanded;
+  // Runde 39 (F5): ${wk.id}_${day.id} statt bloßem di -- siehe Deklaration.
+  const _briefingKey = `${wk.id}_${day.id}`;
+  const isExpanded = _briefingExpandedOverride.has(_briefingKey) ? _briefingExpandedOverride.get(_briefingKey) : defaultExpanded;
 
   // Runde 20 (Befund 1): dieser Button ist seit state.js SESSION_CHECKIN_SET
   // keine automatische Reduktion mehr auslöst der EINZIGE Weg, wie Gewichte
@@ -1976,7 +2016,8 @@ function renderDayBody(wk, di, state) {
     if (compoundEx && workingWeight > 0) {
       const warmupSets = buildWarmupSets(workingWeight, getEffectiveWeightStep(compoundEx, state.settings, state.customExercises));
       if (warmupSets.length > 0) {
-        const isOpen = _warmupExpanded.has(di);
+        // Runde 39 (F5): ${wk.id}_${day.id} statt bloßem di -- siehe Deklaration.
+        const isOpen = _warmupExpanded.has(`${wk.id}_${day.id}`);
         const setsText = warmupSets.map(ws => `${ws.weight}kg × ${ws.reps}`).join(' · ');
         warmupRecHtml = `
     <div class="warmup-rec-block">
@@ -2031,21 +2072,6 @@ function renderDayBody(wk, di, state) {
       ${day.energyLevel != null ? `<span class="session-rating__meta">⚡ ${day.energyLevel}/5</span>` : ''}
     </div>` : ''}
   `;
-}
-
-function renderInfoBlock(type, label, value, di, disabled) {
-  return `
-<div class="info-block info-block--${type}">
-  <span class="info-block__label">${label}</span>
-  <textarea
-    rows="2"
-    ${disabled ? 'disabled' : ''}
-    data-action="day-field"
-    data-di="${di}"
-    data-field="${type === 'warmup' ? 'warmup' : 'cooldown'}"
-    aria-label="${label}"
-  >${h(value ?? '')}</textarea>
-</div>`;
 }
 
 /**
@@ -2111,7 +2137,13 @@ function renderExercise(wk, di, ei, state) {
   let prevEx = null;
   for (let _wi = state.curIdx - 1; _wi >= 0; _wi--) {
     const _w = state.weeks[_wi];
-    if (_w.mode === 'deload') continue;
+    // Runde 39 (F4): 'vacation' mit ausgeschlossen, analog zum calcWeeks-
+    // Filter weiter unten in dieser Funktion -- Urlaubswochen enthalten für
+    // jede Übung ein namensgleiches, aber leeres Platzhalter-Objekt
+    // (_buildVacationExercise(), state.js), das sonst die Suche vorzeitig
+    // mit leeren Sätzen beendet statt zur letzten echten Trainingswoche
+    // weiterzugehen.
+    if (_w.mode === 'deload' || _w.mode === 'vacation') continue;
     for (const _d of (_w.days ?? [])) {
       const _pe = (_d.exercises ?? []).find(_e => _e.name === _lookupName);
       if (_pe) { prevEx = _pe; break; }
@@ -2150,7 +2182,12 @@ function renderExercise(wk, di, ei, state) {
         // dupliziert in ui.js (siehe identische Stellen weiter unten).
         const calcWeeks = state.weeks
           .filter(w => !w.isSeedWeek && w.mode !== 'deload' && w.mode !== 'vacation')
-          .filter(w => w.days.some(d => d.exercises.some(e => e.name === ex.name && e.sets.some(s2 => s2.status === 'success'))));
+          // Runde 39 (F6): substituteFor mit einbezogen -- eine Woche, in der
+          // diese Übung per "Heute anders" ersetzt wurde, zählte sonst nicht
+          // zum Trend-Gate (>= 2 Wochen), obwohl getWeightRecommendation()
+          // selbst diese Woche korrekt verarbeiten würde. Etablierte
+          // Konvention aus weightRecommendation.js (Runde 31).
+          .filter(w => w.days.some(d => d.exercises.some(e => (e.name === ex.name || e.substituteFor === ex.name) && e.sets.some(s2 => s2.status === 'success'))));
         if (calcWeeks.length >= 2) {
           const recStep = getEffectiveWeightStep(ex, state.settings, state.customExercises);
           const _nwIsCompound = isCompoundExercise(ex.name, buildCategoryMap(state.customExercises));
@@ -2674,7 +2711,10 @@ function renderExercise(wk, di, ei, state) {
     if (ex.oneRM != null && ex.oneRM > 0) {
       return `<div class="orm-hint" aria-label="Geschätztes 1RM">~${ex.oneRM.toFixed(1)} kg 1RM</div>`;
     }
-    const best1RM = ex.sets
+    // Runde 39 (F2): 1RM-Schätzung ergibt nur für metric:'reps' Sinn --
+    // bei 'sec'/'m' trägt s.reps Sekunden/Meter, nicht Wiederholungen.
+    // Gleicher Guard wie die Schwesterfunktion _renderAnalysis1RM() (B31).
+    const best1RM = metric !== 'reps' ? 0 : ex.sets
       .filter(s => s.status === 'success' && (s.reps ?? 0) > 0 && (s.reps ?? 0) <= 10 && (s.weight ?? 0) > 0)
       .map(s => s.weight * (1 + s.reps / 30))
       .reduce((max, v) => Math.max(max, v), 0);
@@ -2720,7 +2760,12 @@ function renderExercise(wk, di, ei, state) {
   <!-- Soll-Ist + Fulfillment combined row (2.4): always visible, no toggle -->
   ${(() => {
     if (!ex.targetReps) return '';
-    if (ex.substituteFor && (!prevEx || prevEx.metric !== ex.metric)) return '';
+    // Runde 39 (F9): nur bei echtem Metrik-Konflikt unterdrücken -- die
+    // Existenzprüfung (!prevEx) versteckte den Meter bisher auch, wenn
+    // schlicht keine Vorwoche existiert (z.B. Programmwoche 1 + sofortige
+    // Substitution), obwohl die Ist/Soll-Rechnung unten prevEx gar nicht
+    // referenziert.
+    if (ex.substituteFor && prevEx && prevEx.metric !== ex.metric) return '';
     const nSets     = ex.sets.length;
     const target    = nSets * ex.targetReps;
     // success UND fail zählen (Sprint "Kategorie-1-Bugfixes", Fix 5c/8) —
@@ -3615,7 +3660,9 @@ function _avgRepsLast4(exName, allWeeks) {
   const repsSum = [];
   for (const wk of sorted.slice(-4)) {
     for (const day of wk.days) {
-      const ex = day.exercises.find(e => e.name === exName);
+      // Runde 39 (F6): substituteFor mit einbezogen -- dieselbe Fehlerklasse
+      // wie beim calcWeeks-Filter in renderExercise() (siehe dort).
+      const ex = day.exercises.find(e => e.name === exName || e.substituteFor === exName);
       if (!ex) continue;
       const ok = ex.sets.filter(s => s.status === 'success' && (s.reps ?? 0) > 0).map(s => parseFloat(s.reps) || 0);
       if (ok.length) repsSum.push(Math.round(ok.reduce((a, b) => a + b, 0) / ok.length));
@@ -7958,9 +8005,12 @@ function _handleClick(e) {
       const _bDi = +di;
       const _bWk = getState().weeks[getState().curIdx];
       const _bDay = _bWk?.days[_bDi];
+      if (!_bWk || !_bDay) break;
       const _bDefault = !_bDay?.sessionStartTs;
-      const _bCurrent = _briefingExpandedOverride.has(_bDi) ? _briefingExpandedOverride.get(_bDi) : _bDefault;
-      _briefingExpandedOverride.set(_bDi, !_bCurrent);
+      // Runde 39 (F5): ${wk.id}_${day.id} statt bloßem di -- siehe Deklaration.
+      const _bKey = `${_bWk.id}_${_bDay.id}`;
+      const _bCurrent = _briefingExpandedOverride.has(_bKey) ? _briefingExpandedOverride.get(_bKey) : _bDefault;
+      _briefingExpandedOverride.set(_bKey, !_bCurrent);
       scheduleRender();
       break;
     }
@@ -8023,7 +8073,12 @@ function _handleClick(e) {
     // B77: Intra-Session Coach
     case 'toggle-warmup-rec': {
       const _wDi = +di;
-      if (_warmupExpanded.has(_wDi)) _warmupExpanded.delete(_wDi); else _warmupExpanded.add(_wDi);
+      const _wWk = getState().weeks[getState().curIdx];
+      const _wDay = _wWk?.days[_wDi];
+      if (!_wWk || !_wDay) break;
+      // Runde 39 (F5): ${wk.id}_${day.id} statt bloßem di -- siehe Deklaration.
+      const _wKey = `${_wWk.id}_${_wDay.id}`;
+      if (_warmupExpanded.has(_wKey)) _warmupExpanded.delete(_wKey); else _warmupExpanded.add(_wKey);
       scheduleRender();
       break;
     }

@@ -3266,6 +3266,12 @@ function reduce(state, action) {
           id: Date.now() - 999, title: 'Startwerte', subtitle: '',
           warmup: '', cooldown: '', locked: true, markedDone: true,
           isVacation: false, exercises: _seedExercises,
+          // Runde 39 (ui.js-Render-Audit, F8): explizit null statt undefined,
+          // wie jede andere Tag-Erzeugungsstelle in dieser Datei (analog zur
+          // v12->v13-Migration, die genau diese Invarianz nachträglich
+          // garantiert hat) -- undefined bestand ui.js' `!== null`-Filter in
+          // _isCumulativeSleepDeficit() sonst zufällig.
+          sleepHours: null, energyLevel: null,
         }],
         sessionLog: [], bodyData: {}, restDays: [],
       };

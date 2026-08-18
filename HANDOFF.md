@@ -1,6 +1,81 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-08-18 — Runde 38 (train-v263→v264,
-B393-B395, ABGESCHLOSSEN):*
+*Letzte Aktualisierung: 2026-08-18 — Runde 39 (train-v264→v265,
+B396-B404, ABGESCHLOSSEN):*
+ui.js-Render-Logik-Audit, Teil 1: Training-Tab (Zeile 917-3132), DREIZEHNTE
+Runde -- erste einer neuen Multi-Runden-Serie für ui.js' bisher nie
+eigenständig auditierte Render-Logik (10724 Zeilen, mit Abstand größte
+Datei im Projekt; bisher nur der Dispatch-Handler-Mechanismus,
+_handleClick/_handleChange/_handleInput/_handleBlur/_handleKeydown,
+Runde 33, eigenständig auditiert). Auf Nutzerauftrag "start with the
+ui.js render logic audit" bewusst auf den höchstfrequentierten Teil
+beschränkt: Wochenkopf/Tagesliste/Session-Briefing (renderWeekHeader,
+renderDayList, renderDayBody + Helfer) und Übungs-/Satz-Rendering
+(renderExercise, renderSetRow). 2 parallele Diagnose-Agenten (Fork A:
+Zeile 917-2103, Fork B: Zeile 2104-3132) fanden 9 bestätigte Funde (2
+HIGH, 4 MEDIUM, 3 LOW/kosmetisch). Diagnose in `Diagnose & Sprints/
+diagnose-uijs-rendertab-audit-2026-08-18.txt`, Sprint-Ergebnis in
+`Diagnose & Sprints/sprint-ergebnis-runde39-2026-08-18.txt`. Nutzer
+bestätigte den konsolidierten Plan (Plan-Mode) -> "alle 9 fixen" ->
+B396-B404 umgesetzt:
+  B396 (HIGH): Ritual-Anchor-Karte zeigte am ersten echten Trainingstag
+      fabrizierte Daten aus der Onboarding-Seed-Woche (erfundene "Letzte
+      Einheit", verwässerte Ø-Erfolgsquote, falscher "Selber Tag letzte
+      Woche"-Banner) -- isSeedWeek fehlte an 3 Stellen, obwohl 2 andere
+      Stellen derselben Datei es bereits korrekt filterten.
+  B397 (HIGH): 1RM-Epley-Schätzung auf der Übungskarte fehlte der
+      Metrik-Guard, den die Schwesterfunktion im Analysis-Tab (B31)
+      bereits hatte -- sinnlose Zahl bei gewichteten metric:'sec'/'m'-
+      Übungen.
+  B398 (MEDIUM): _lastWeekAvgRpe() suchte bei einer heute substituierten
+      Fokus-Übung unter dem neuen statt dem Originalnamen -- RPE-/
+      Pausen-Vorschau verschwand komplett aus dem Session-Briefing.
+  B399 (MEDIUM): prevEx-Lookup in renderExercise() schloss Deload-, aber
+      nicht Urlaubswochen aus -- Vorwoche-Hints verschwanden bzw. der
+      Gewichts-Pfeil konnte in der ersten Woche nach einem Urlaub
+      fälschlich "↑" zeigen.
+  B400 (MEDIUM): _briefingExpandedOverride/_warmupExpanded kollidierten
+      zwischen Wochen (bare Tag-Index statt ${wk.id}_${day.id}, trotz
+      B83-Präzedenzfall direkt darüber in derselben Datei).
+  B401 (MEDIUM): calcWeeks-Filter + _avgRepsLast4() substituteFor-blind
+      -- 9./10. Fundstelle derselben, im Projekt bereits mehrfach
+      gefixten Fehlerklasse, hier erstmals in ui.js' Render-Schicht.
+  B402 (LOW, kosmetisch): renderInfoBlock() toter Code, gelöscht.
+  B403 (LOW, kosmetisch): _isCumulativeSleepDeficit() ohne isSeedWeek-
+      Filter (aktuell ohne reale Auswirkung) -- beide Seiten gefixt
+      (ui.js-Filter + state.js ONBOARDING_SEED setzt sleepHours/
+      energyLevel jetzt explizit null).
+  B404 (LOW, kosmetisch): Fulfillment-Meter bei Substitution auch ohne
+      echten Metrik-Konflikt unterdrückt (nur wegen fehlendem prevEx,
+      z.B. Programmwoche 1) -- Existenzcheck entfernt.
+Bemerkenswert: die erste Testversion für B398/B401 schlug trotz
+korrektem Code-Fix zunächst fehl -- B398s Fix setzte anfangs am falschen
+Ende an (Suchfunktion erweitert statt kanonischen Namen am Aufrufer
+aufzulösen), B401s Testfixture hatte das Ziele-Panel (ex._showCfg) nicht
+geöffnet, hinter dem der Wiederholungsvorschlag lebt. Beide korrigiert,
+danach grün, per git-stash-Differenztest gegen den Vorher-Stand
+verifiziert (alle 7 neuen Tests schlagen mit unverändertem ui.js/state.js
+zuverlässig fehl). 7 neue Tests (tests/uijs_rendertab_audit_fixes.
+spec.js) -- F7 (toter Code) und F8 (ohne aktuelle Verhaltensänderung)
+bewusst ohne eigenen Test.
+
+Volle Playwright-Suite (115 Spec-Dateien) lief diese Runde NICHT in einem
+Durchgang: der `npx serve`-Dev-Server stürzte bei sustained load nach
+ca. 5-6 Minuten wiederholt ab (bei 4 UND bei 1 Worker, an unterschiedlichen
+Stellen -- bestätigt umgebungsbedingt, dasselbe "Windows-EMFILE-Limit"-
+Muster wie in Runde 37 dokumentiert). In 6 kleineren Batches gefahren
+(je frischer Server), alle 115 Spec-Dateien lückenlos abgedeckt (per
+Datei-Listen-Abgleich verifiziert) -- grün bis auf das seit Runde 26
+bekannte, umgebungsbedingte "Phantom-PR"-Flake (trainingstab_audit_
+fixes.spec.js, identisches Fehlerbild wie in jeder vorherigen Runde);
+state.js' PR-Tracking-Pfad wurde diese Runde nicht angefasst.
+
+NÄCHSTER SCHRITT (offen, kein Auftrag): Body-Tab (renderBodyTab + Body-
+Weight-/P4P-Chart-Helfer, ~3132-3609) und/oder Coach-/Fortschritt-Tab-
+Rendering (~3609-5126) sind die nächsten Kandidaten der neuen ui.js-
+Render-Serie, danach Settings-Tab/Template-Editor (~5126-8385, exkl.
+Dispatch-Handler) und App-Scaffold/Modals/Completion-Flow (~8385-10724).
+Braucht neuen Nutzerauftrag, bevor gestartet wird.
+Davor: Runde 38 (train-v263→v264, B393-B395):
 timer.js + dragdrop.js + setUtils.js-Audit, ZWÖLFTE Runde -- vierte einer
 angekündigten Multi-Runden-Serie nach state.js (Runde 35), weeklyFocus.js/
 overallPerformance.js (Runde 36), triggerEngine.js/exerciseAlternatives.js

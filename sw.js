@@ -16,7 +16,7 @@
  *   asset conflicts.
  */
 
-const CACHE_VERSION  = 'train-v264';
+const CACHE_VERSION  = 'train-v265';
 
 // Runde 20 (Befund 4): kurze Änderungsliste für den aktuellen Build, im
 // Update-Banner beim Aufklappen ("mehr Details") angezeigt. 2-3 knappe
@@ -28,8 +28,9 @@ const CACHE_VERSION  = 'train-v264';
 // (Browser-Update-Algorithmus) -- die Werte sind dadurch garantiert die des
 // NEUEN, wartenden Workers, ganz ohne zusätzlichen Cache-Bypass.
 const CHANGELOG_ENTRIES = [
-  'Pausenzeit-Timer: "WEITER!"-Popup verschwindet jetzt sofort bei Wochenwechsel/manuellem Stopp statt bis zu 3s nachzuhängen',
-  'Barrierefreiheit: Dismiss-Bestätigungshinweis im Pausen-Overlay wird jetzt für Screenreader angesagt',
+  'Erster Trainingstag: keine erfundene "Letzte Einheit"/Erfolgsquote mehr aus den Startwerten',
+  '1RM-Schätzung auf der Übungskarte erscheint nicht mehr fälschlich bei Zeit-/Distanz-Übungen',
+  'Session-Briefing, Vorwochen-Hinweise und Wiederholungsvorschlag berücksichtigen jetzt "Heute anders"-Substitutionen konsistent',
 ];
 
 /**
