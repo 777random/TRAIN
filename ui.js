@@ -6789,9 +6789,13 @@ function _handleClick(e) {
         // erhalten (_resetClonedDays() in state.js lässt skipReason bewusst
         // unangetastet). Andere Gründe (injury/time/fatigue/kein Grund) sind
         // tagesspezifisch und sollen weiterhin jede Woche neu gefragt werden.
+        // Runde 40 (F10): archivierte Übungen ausgeschlossen -- eine mitten
+        // in der Session archivierte, nie berührte Übung landete sonst in
+        // der Skip-Grund-Abfrage, obwohl der Nutzer sie bereits bewusst
+        // ausgeblendet hat.
         const skipped = (dayBefore?.exercises ?? [])
           .map((ex, ei) => ({ ex, ei }))
-          .filter(({ ex }) => (ex.sets ?? []).every(s => s.status === 'pending') && ex.skipReason !== 'substituted')
+          .filter(({ ex }) => !ex.archived && (ex.sets ?? []).every(s => s.status === 'pending') && ex.skipReason !== 'substituted')
           .map(({ ex, ei }) => ({ name: ex.name, di: +di, ei }));
         _showSkipReasonQueue(+di, skipped, () => _showDayCompletionModal(+di));
       }
@@ -8495,7 +8499,15 @@ function _renderExSearchResults() {
   const existingNames = new Set();
   const wk = getState().weeks[getState().curIdx];
   if (wk && _exSearchDi !== null) {
-    (wk.days[_exSearchDi]?.exercises ?? []).forEach(ex => existingNames.add(ex.name));
+    (wk.days[_exSearchDi]?.exercises ?? []).forEach(ex => {
+      existingNames.add(ex.name);
+      // Runde 40 (F4): auch den Original-Namen einer heute substituierten
+      // Übung als "bereits im Tag" registrieren -- sonst lässt sich dieselbe
+      // Übung über die Suche ein zweites Mal hinzufügen, was nach dem
+      // Wochenwechsel (Substitution wird zurückgesetzt) zu zwei Einträgen
+      // derselben Übung am selben Tag führt.
+      if (ex.substituteFor) existingNames.add(ex.substituteFor);
+    });
   }
 
   const std = _STANDARD_EXERCISES
@@ -8755,9 +8767,17 @@ function _prepNewWeekModal() {
       const _nameToInstances = new Map();
       curWk.days.forEach((day, di) => {
         (day.exercises ?? []).forEach((ex, ei) => {
-          if (ex.substituteFor) return;
-          if (!_nameToInstances.has(ex.name)) _nameToInstances.set(ex.name, []);
-          _nameToInstances.get(ex.name).push({ di, ei, dayTitle: day.title, ex });
+          // Runde 40 (F3): eine heute per "Heute anders" substituierte
+          // Instanz wird unter ihrem ORIGINAL-Namen (ex.substituteFor)
+          // registriert statt übersprungen -- sie revertiert beim
+          // Wochenwechsel zurück auf den Original-Namen und muss dieselbe
+          // nextWeekPlanConfirmed-Schreibung bekommen wie eine an einem
+          // anderen Tag NICHT substituierte Instanz derselben Übung (sonst
+          // starten beide Tage nominell dieselbe Übung mit
+          // unterschiedlichem Gewicht in der neuen Woche).
+          const key = ex.substituteFor ?? ex.name;
+          if (!_nameToInstances.has(key)) _nameToInstances.set(key, []);
+          _nameToInstances.get(key).push({ di, ei, dayTitle: day.title, ex });
         });
       });
       curWk.days.forEach((day, di) => {
@@ -8916,13 +8936,20 @@ function _createWeek() {
   const copyPrev = document.getElementById('nw-copy-prev')?.checked ?? true;
   if (!date) { showToast('Bitte Datum wählen', 'warn'); return; }
   const source = copyPrev ? 'prev' : 'template';
+  // Runde 40 (F1): den gewählten Vorlagen-Wert tatsächlich auslesen und
+  // durchreichen -- vorher wurde die Dropdown-Auswahl nirgends gelesen,
+  // WEEK_CREATE lud immer nur state.customTemplate.
+  const tplSelectVal = document.getElementById('nw-template-select')?.value;
+  const templateId = tplSelectVal?.startsWith('tpl-')
+    ? getState().templates?.[+tplSelectVal.slice(4)]?.id ?? null
+    : null;
   // WEEK_CREATE dedupet still (state.js: bricht ab wenn startDate schon
   // existiert) — der Reducer gibt aber keinen Erfolgs-Indikator zurück.
   // weeks.length davor/danach vergleichen statt blind Erfolg zu melden
   // (Sprint "Kategorie-1-Bugfixes", Fix 2 — Ursache der gemeldeten
   // Unzuverlässigkeit: Datumskollision quittierte bisher trotzdem "✓").
   const beforeCount = getState().weeks.length;
-  dispatch(A.WEEK_CREATE, { startDate: date, note, source });
+  dispatch(A.WEEK_CREATE, { startDate: date, note, source, templateId });
   if (getState().weeks.length === beforeCount) {
     showToast('Für dieses Datum existiert bereits eine Woche', 'warn');
     return;
@@ -8987,9 +9014,14 @@ function _runAutoWeekFlow() {
 }
 
 // ─── Template save ────────────────────────────────────────────────────────────
-function _saveTemplate() {
-  const tpl = JSON.parse(JSON.stringify(getState().customTemplate));
-
+// Runde 40 (F2): aus _saveTemplate() ausgelagert, damit _handleTplAction()
+// (Übung hinzufügen/entfernen) dieselben Live-DOM-Werte übernehmen kann,
+// bevor es mutiert+dispatcht+neu rendert -- vorher klonte _handleTplAction()
+// direkt aus dem letzten COMMITTETEN Stand (getState()), wodurch jede noch
+// nicht per "Speichern" bestätigte Eingabe (Name/Notiz/Sätze/Wdh/Gewicht,
+// für JEDE Übung im Vorlagen-Tag) beim darauffolgenden vollen Re-Render
+// kommentarlos verworfen wurde.
+function _applyTplDomEdits(tpl) {
   document.querySelectorAll('[data-tpl-di][data-tpl-field]').forEach(inp => {
     const di    = +inp.dataset.tplDi;
     const ei    = +inp.dataset.tplEi;
@@ -9013,7 +9045,11 @@ function _saveTemplate() {
     else if (field === 'reps')   ex.sets.forEach(s => s.reps   = +inp.value || 10);
     else if (field === 'weight') ex.sets.forEach(s => s.weight = +inp.value || 0);
   });
+  return tpl;
+}
 
+function _saveTemplate() {
+  const tpl = _applyTplDomEdits(JSON.parse(JSON.stringify(getState().customTemplate)));
   dispatch(A.TPL_SAVE, { template: tpl });
   closeModal('modal-template');
   showToast('Template gespeichert ✓', 'ok');
@@ -9023,7 +9059,7 @@ function _handleTplAction(el) {
   const action = el.dataset.tplAction;
   const di     = +el.dataset.tplDi;
   const ei     = el.dataset.tplEi !== undefined ? +el.dataset.tplEi : null;
-  const tpl    = JSON.parse(JSON.stringify(getState().customTemplate));
+  const tpl    = _applyTplDomEdits(JSON.parse(JSON.stringify(getState().customTemplate)));
 
   if (action === 'rm-ex' && ei !== null) {
     tpl[di].exercises.splice(ei, 1);
@@ -9706,13 +9742,21 @@ function _buildSessionSummaryData(di) {
   if (focusEx && (focusEx.progressionType ?? 'weight') !== 'reps') {
     // Trainings-Tab-Audit (2026-08-17): isSeedWeek ausgeschlossen -- siehe
     // identischer Kommentar bei der ersten calcWeeks-Fundstelle weiter oben.
+    // Runde 40 (F8): kanonischen Namen auflösen -- focusEx selbst kann eine
+    // heute substituierte Übung sein (focusEx.name = Substitut-Name), die
+    // Historie liegt aber unter dem Original-Namen (focusEx.substituteFor).
+    // Sowohl der calcWeeks-Filter als auch getWeightRecommendation() müssen
+    // gegen diesen kanonischen Namen suchen, sonst findet keiner von beiden
+    // die Historie (dieselbe Zwei-Schritte-Falle wie bei _lastWeekAvgRpe()
+    // in Runde 39/F3).
+    const canonicalName = focusEx.substituteFor || focusEx.name;
     const calcWeeks = state.weeks
       .filter(w => !w.isSeedWeek && w.mode !== 'deload' && w.mode !== 'vacation')
-      .filter(w => w.days.some(d => d.exercises.some(e => e.name === focusEx.name && e.sets.some(s => s.status === 'success'))));
+      .filter(w => w.days.some(d => d.exercises.some(e => (e.name === canonicalName || e.substituteFor === canonicalName) && e.sets.some(s => s.status === 'success'))));
     if (calcWeeks.length >= 2) {
       const step = getEffectiveWeightStep(focusEx, state.settings, state.customExercises);
-      const _fpIsCompound = isCompoundExercise(focusEx.name, buildCategoryMap(state.customExercises));
-      const rec = getWeightRecommendation(focusEx.name, calcWeeks, step, focusEx.progressionMode ?? 'weight_first', focusEx.targetRepsMax ?? null, _fpIsCompound, state.settings?.nutritionPhase ?? 'maintenance');
+      const _fpIsCompound = isCompoundExercise(canonicalName, buildCategoryMap(state.customExercises));
+      const rec = getWeightRecommendation(canonicalName, calcWeeks, step, focusEx.progressionMode ?? 'weight_first', focusEx.targetRepsMax ?? null, _fpIsCompound, state.settings?.nutritionPhase ?? 'maintenance');
       nextWeekWeight = rec?.recommendedWeight ?? null;
     }
   }
@@ -9816,6 +9860,15 @@ function _autoSetNextWeekPlanForDay(di, skippedNames) {
 
   const selections = [];
   (day.exercises ?? []).forEach((ex, ei) => {
+    // Runde 40 (F7): archivierte Übungen ausgeschlossen -- ohne diesen
+    // Filter (den die Nachbarfunktion _getDayCompletionStats() bereits hat,
+    // ~11 weitere Stellen im Projekt siehe BUGS.md B181) schrieb diese
+    // Funktion eine unreviewte nextWeekPlanConfirmed-Gewichtsänderung auf
+    // eine ausgeblendete Übung -- die beim nächsten Wochenwechsel
+    // (_applyPlannedProgression() schließt archivierte Übungen ebenfalls
+    // nicht aus) tatsächlich angewendet wird, unbemerkt bis die Übung
+    // wieder reaktiviert wird.
+    if (ex.archived) return;
     if (skippedNames.has(ex.name)) return;
     if (ex.substituteFor) return;
     if (ex.nextWeekPlanConfirmed) return; // manuell gesetzt oder bereits aktiver Plan — nicht überschreiben
@@ -9848,8 +9901,6 @@ function _finishCompletion(di, rating, sleepHours, energyLevel) {
   document.getElementById('day-completion-modal')?.remove();
   _completionModalDi = null;
 
-  const stats = _getDayCompletionStats(di);
-
   // B128: Snapshot VOR dem Dispatch — DAY_TOGGLE_COMPLETE setzt jeden noch
   // 'pending' Satz synchron auf 'fail' (state.js), danach wäre "komplett
   // übersprungen" nicht mehr erkennbar (identisches Prinzip wie bei
@@ -9862,6 +9913,15 @@ function _finishCompletion(di, rating, sleepHours, energyLevel) {
   );
 
   dispatch(A.DAY_TOGGLE_COMPLETE, { di });
+  // Runde 40 (F6): _getDayCompletionStats() NACH dem Dispatch aufrufen --
+  // DAY_TOGGLE_COMPLETE setzt jeden noch offenen Satz synchron auf 'fail',
+  // ein davor erfasster Snapshot zeigte auf dem Completion-Screen eine
+  // garantiert zu hohe Erfolgsquote (nur die bereits bewerteten Sätze
+  // zählten, die frisch auf 'fail' gesetzten nicht). _buildSessionSummaryData()
+  // (dieselbe setTimeout-Kette unten) liest bereits korrekt nach dem
+  // Dispatch -- das war schon die beabsichtigte Semantik, nur diese
+  // Aufrufstelle war zu früh.
+  const stats = _getDayCompletionStats(di);
   _autoSetNextWeekPlanForDay(di, skippedNames);
   if (rating      != null) dispatch(A.DAY_SET_FIELD, { di, field: 'sessionRating', value: rating });
   if (sleepHours  != null) dispatch(A.DAY_SET_FIELD, { di, field: 'sleepHours',    value: sleepHours });
@@ -9946,13 +10006,18 @@ function _showVacationWeekPopup() {
       overlay.remove();
     } else if (vac === 'equipment') {
       overlay.innerHTML = screen2();
-    } else if (vac === 'custom') {
-      dispatch(A.WEEK_LOAD_VACATION_PLAN, { plan: 'custom' });
-      overlay.remove();
-    } else if (vac === 'rest') {
-      dispatch(A.WEEK_LOAD_VACATION_PLAN, { plan: 'rest' });
-      overlay.remove();
-    } else if (VACATION_PLANS[vac]) {
+    } else if (vac === 'custom' || vac === 'rest' || VACATION_PLANS[vac]) {
+      // Runde 40 (F2): dieselbe Datenverlust-Bestätigung wie die Tages-Ebene-
+      // Schwesterfunktion _showVacationPlanModal() (siehe dort, "Trainings-
+      // Tab-Audit 2026-08-17") -- WEEK_LOAD_VACATION_PLAN überschreibt im
+      // Reducer bedingungslos JEDEN Tag der Woche, diese Woche-Ebene-Variante
+      // hatte den Schutz nie bekommen.
+      const _wk = getState().weeks[getState().curIdx];
+      const _hasData = (_wk?.days ?? []).some(d => (d.exercises ?? []).some(ex => ex.sets.some(s => s.status !== 'pending')));
+      if (_hasData && !confirm('Diese Woche hat bereits eingetragene Sätze — die gehen beim Wechsel zum Urlaubsplan verloren. Fortfahren?')) {
+        overlay.remove();
+        return;
+      }
       dispatch(A.WEEK_LOAD_VACATION_PLAN, { plan: vac });
       overlay.remove();
     }
@@ -10220,8 +10285,12 @@ function _maybeShowPrMomentToast(di, ei, si, prevWeight) {
   const st = getState();
   const ex = st.weeks[st.curIdx]?.days[di]?.exercises[ei];
   const s  = ex?.sets[si];
-  if (s?.status === 'success' && s?.prBadge === 'weight' && ex) {
-    _showPrMomentToast(ex.name, s.weight ?? 0, s.reps ?? 0, prevWeight);
+  // Runde 40 (F9): auch Wdh-PRs (prBadge:'reps') lösen jetzt den Echtzeit-
+  // Toast aus, nicht mehr nur Gewichts-PRs -- sessionSummary.js behandelt
+  // beide bereits gleichwertig als feier-würdig (B141), der Echtzeit-Toast
+  // war nie mitgezogen worden.
+  if (s?.status === 'success' && (s?.prBadge === 'weight' || s?.prBadge === 'reps') && ex) {
+    _showPrMomentToast(ex.name, s.weight ?? 0, s.reps ?? 0, prevWeight, s.prBadge);
   }
 }
 
@@ -10257,7 +10326,7 @@ function _maybeRestartPauseForRpe(di, ei, si) {
   window.dispatchEvent(new CustomEvent('train:pause-restart', { detail: { pauseSec: fb.pauseSec, key: `${di}-${ei}-${si}` } }));
 }
 
-function _showPrMomentToast(exName, weight, reps, prevWeight) {
+function _showPrMomentToast(exName, weight, reps, prevWeight, prType = 'weight') {
   document.getElementById('pr-moment-toast')?.remove();
   const el = document.createElement('div');
   el.id        = 'pr-moment-toast';
@@ -10269,7 +10338,10 @@ function _showPrMomentToast(exName, weight, reps, prevWeight) {
   el.querySelector('#pr-moment-toast-btn')?.addEventListener('click', async () => {
     dismiss();
     try {
-      const canvas = await buildPrShareCanvas([{ name: exName, weight, reps, type: 'weight', prevWeight }]);
+      // Runde 40 (F9): prType statt hartcodiertem 'weight' -- buildPrShareCanvas()
+      // unterstützt 'reps' bereits (zeigt "X WDH" statt Gewicht×Wdh, siehe
+      // shareImage.js), nur dieser Aufrufer reichte den Typ nie durch.
+      const canvas = await buildPrShareCanvas([{ name: exName, weight, reps, type: prType, prevWeight }]);
       await shareCanvas(canvas, 'train-pr.png', 'Neuer Rekord — TRAIN');
     } catch (_) { /* Canvas/Share fehlgeschlagen -> stiller Abbruch, kein Crash */ }
   });

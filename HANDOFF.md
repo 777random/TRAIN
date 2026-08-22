@@ -1,6 +1,69 @@
 # TRAIN — Session Handoff
-*Letzte Aktualisierung: 2026-08-18 — Runde 39 (train-v264→v265,
-B396-B404, ABGESCHLOSSEN):*
+*Letzte Aktualisierung: 2026-08-22 — Runde 40 (train-v265→v266,
+B405-B415, ABGESCHLOSSEN):*
+ui.js-Render-Logik-Audit, Teil 2: App-Scaffold/Modals/Completion-Flow
+(Zeile 8441-10335, ~1895 Zeilen), VIERZEHNTE Runde -- zweite der neuen
+ui.js-Render-Serie nach Runde 39 (Training-Tab). Ausgehend von einer
+Audit-Coverage-Übersicht (alle Runden gegen den aktuellen Codestand
+gemappt) als größter noch nie auditierter Block identifiziert, auf
+"execute" gestartet. 2 parallele Diagnose-Agenten (Fork A: 8441-9596
+Setup/Navigation/Modals -- Übungssuche/-Anlegen-Modal, Neue-Woche-Modal,
+Vorlage-Speichern, Tab-Switching, _buildScaffold; Fork B: 9597-10335
+Session-Completion-Flow -- Tagesabschluss-Statistik, _finishCompletion,
+Urlaubswoche/-tag, Skip-Grund-Abfrage, PR-Moment-Toast) fanden 9
+bestätigte Kernfunde (4 HIGH, 4 MEDIUM, 1 LOW/MEDIUM) plus 2 direkt
+anliegende Nebenfunde (F10 ui.js, F11 state.js). Diagnose in
+`Diagnose & Sprints/diagnose-uijs-scaffold-modals-completion-audit-
+2026-08-22.txt`, Sprint-Ergebnis in `Diagnose & Sprints/sprint-ergebnis-
+runde40-2026-08-22.txt`. Nutzer bestätigte den konsolidierten Plan
+(Plan-Mode) -> "F1-F11 fixen" -> B405-B415 umgesetzt:
+  B405 (HIGH): Named-Template-Auswahl im "Neue Woche"-Modal komplett
+      wirkungslos -- Dropdown zeigte gespeicherte Vorlagen korrekt an,
+      _createWeek() las den Wert nie aus, WEEK_CREATE-Reducer kannte nur
+      state.customTemplate. Neuer templateId-Reducer-Zweig.
+  B406 (HIGH): Vorlagen-Editor verwarf ungespeicherte Eingaben bei Übung
+      hinzufügen/entfernen -- ein voller Re-Render aus dem letzten
+      COMMITTETEN Stand löschte jede noch nicht gespeicherte Eingabe.
+  B407 (MEDIUM): Neue-Woche-Auto-Vorauswahl inkonsistent bei einer an nur
+      einem von zwei Tagen substituierten Übung.
+  B408 (LOW): Übungssuche-Duplikat-Check ignorierte ex.substituteFor.
+  B409 (HIGH): _showVacationWeekPopup() fehlte die Datenverlust-
+      Bestätigung, die die Tages-Ebene-Schwesterfunktion bereits hatte --
+      jede Urlaubswochen-Option außer "Normal" überschrieb bedingungslos
+      JEDEN Tag der Woche.
+  B410 (HIGH): _finishCompletion() zeigte eine überhöhte Erfolgsquote --
+      Stats-Snapshot lief vor statt nach dem DAY_TOGGLE_COMPLETE-Dispatch.
+  B411 (HIGH): _autoSetNextWeekPlanForDay() schloss archivierte Übungen
+      nicht aus -- eine so gesetzte Gewichtsänderung wird beim nächsten
+      Wochenwechsel tatsächlich auf die ausgeblendete Übung angewendet.
+  B412 (MEDIUM): Session-Summary "Nächstes Training"-Vorschau
+      substituteFor-blind (kanonische Namensauflösung wie Runde 39/F3).
+  B413 (LOW/MEDIUM): Echtzeit-PR-Toast feuerte nur für Gewichts-PRs,
+      nicht für Wdh-PRs (inkonsistent zu B141).
+  B414 (LOW/MEDIUM): Skip-Grund-Abfrage-Aufrufer schloss archivierte
+      Übungen nicht aus (Nebenfund).
+  B415 (state.js, Begleitfix): _recomputePrFromHistory() schloss die
+      Seed-Woche nicht von der PR-Baseline aus.
+Bemerkenswert: die erste Testversion für B412 (F8) schlug trotz Code-Fix
+fehl -- derselbe Fehler wie im Fix selbst (Suche unter dem Substitut-
+statt dem Original-Namen), beim Debuggen entdeckt und korrigiert
+(kanonischer Name wird jetzt einmal aufgelöst, für Filter UND
+getWeightRecommendation() verwendet). Alle 11 Tests
+(tests/uijs_scaffold_modals_audit_fixes.spec.js) per git-stash-
+Differenztest verifiziert (schlagen mit unverändertem ui.js/state.js
+zuverlässig fehl). Volle Playwright-Suite (116 Spec-Dateien, 6 Batches,
+wie in Runde 39 wegen des Dev-Server-Instabilität-Musters): 580 passed,
+1 failed -- das seit Runde 26 bekannte Phantom-PR-Flake, bereits identisch
+in Runde 39 aufgetreten, bevor diese Runde _recomputePrFromHistory()
+überhaupt anfasste.
+
+NÄCHSTER SCHRITT (offen, kein Auftrag): laut Audit-Coverage-Übersicht
+sind Body-/Coach-/Fortschritt-/Settings-Tab-Rendering die nächsten
+Kandidaten der ui.js-Render-Serie (bisher nur die ältere, leichtere
+Runde-24-27-Sweep-Generation, nicht die jetzige tiefe Diagnose-Fork-
+Methode), daneben zwei Nicht-Code-Lücken (dedizierter Security-Pass,
+Real-Device-/Cross-Browser-Testing).
+Davor: Runde 39 (train-v264→v265, B396-B404):
 ui.js-Render-Logik-Audit, Teil 1: Training-Tab (Zeile 917-3132), DREIZEHNTE
 Runde -- erste einer neuen Multi-Runden-Serie für ui.js' bisher nie
 eigenständig auditierte Render-Logik (10724 Zeilen, mit Abstand größte

@@ -1494,7 +1494,7 @@ export const A = Object.freeze({
   // Navigation
   WEEK_NAVIGATE:       'WEEK_NAVIGATE',       // { delta: ±1 }
   // Week CRUD
-  WEEK_CREATE:         'WEEK_CREATE',         // { startDate, note, source?: 'prev'|'template' }
+  WEEK_CREATE:         'WEEK_CREATE',         // { startDate, note, source?: 'prev'|'template', templateId?: number } -- templateId wählt eine benannte Vorlage aus state.templates[], sonst state.customTemplate
   AUTO_WEEK_CREATE:    'AUTO_WEEK_CREATE',    // { startDate } – automatische Wochenerstellung beim App-Öffnen, Steigerungen NIE still angewendet
   WEEK_DELETE:         'WEEK_DELETE',         // { weekIdx?: number }  — omit to delete curIdx
   WEEK_COPY_PREV:      'WEEK_COPY_PREV',      // {}
@@ -1785,7 +1785,11 @@ function _localISODateToday() {
 function _recomputePrFromHistory(state, exName) {
   let maxWeight = 0, maxVolume = 0, maxEst1RM = 0, maxRepsAtMaxWeight = 0;
   for (const wk of state.weeks) {
-    if (wk.mode === 'deload') continue;
+    // Runde 40 (ui.js-Render-Audit, F11): isSeedWeek ausgeschlossen -- die
+    // synthetische Startwerte-Woche (ggf. grob geschätzte Werte, kein echtes
+    // Trainingsereignis) zählte sonst zur PR-Baseline mit, analog zu den
+    // zahlreichen anderen isSeedWeek-Ausschlüssen im Projekt.
+    if (wk.mode === 'deload' || wk.isSeedWeek) continue;
     for (const day of wk.days) {
       for (const ex of day.exercises) {
         // state.js-Audit (Runde 35, B3): auch ex.substituteFor berücksichtigen
@@ -1999,8 +2003,17 @@ function reduce(state, action) {
         days = clone(resolved.cloneSourceWeek.days);
         _applyPlannedProgression(days, state);
       } else {
-        // Explicit restart: load global template as-is (no auto-progression mapping)
-        days = clone(state.customTemplate ?? FACTORY_TEMPLATE);
+        // Runde 40 (ui.js-Render-Audit, F1): p.templateId löst eine benannte
+        // Vorlage aus state.templates[] auf, wenn im "Neue Woche"-Modal eine
+        // gewählt wurde -- vorher wurde source:'template' immer nur
+        // state.customTemplate (die EINE globale Standard-Vorlage) geladen,
+        // die Dropdown-Auswahl war komplett wirkungslos. Fällt auf
+        // customTemplate zurück, wenn keine/keine gültige templateId
+        // übergeben wurde (Option "Standard-Vorlage").
+        const namedTemplate = p.templateId != null
+          ? state.templates?.find(t => t.id === p.templateId)
+          : null;
+        days = clone(namedTemplate?.days ?? state.customTemplate ?? FACTORY_TEMPLATE);
         // Make sure templates never carry "planned" UI state forward
         days.forEach(d => (d.exercises ?? []).forEach(ex => { ex.nextWeekPlan = 0; ex.nextWeekPlanConfirmed = false; ex._showCfg = false; }));
       }

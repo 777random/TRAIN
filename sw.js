@@ -16,7 +16,7 @@
  *   asset conflicts.
  */
 
-const CACHE_VERSION  = 'train-v265';
+const CACHE_VERSION  = 'train-v266';
 
 // Runde 20 (Befund 4): kurze Änderungsliste für den aktuellen Build, im
 // Update-Banner beim Aufklappen ("mehr Details") angezeigt. 2-3 knappe
@@ -28,9 +28,9 @@ const CACHE_VERSION  = 'train-v265';
 // (Browser-Update-Algorithmus) -- die Werte sind dadurch garantiert die des
 // NEUEN, wartenden Workers, ganz ohne zusätzlichen Cache-Bypass.
 const CHANGELOG_ENTRIES = [
-  'Erster Trainingstag: keine erfundene "Letzte Einheit"/Erfolgsquote mehr aus den Startwerten',
-  '1RM-Schätzung auf der Übungskarte erscheint nicht mehr fälschlich bei Zeit-/Distanz-Übungen',
-  'Session-Briefing, Vorwochen-Hinweise und Wiederholungsvorschlag berücksichtigen jetzt "Heute anders"-Substitutionen konsistent',
+  'Benannte Vorlagen im "Neue Woche"-Dialog funktionieren jetzt tatsächlich',
+  '"Urlaubswoche" fragt jetzt nach, bevor bereits eingetragene Sätze überschrieben werden',
+  'Erfolgsquote nach Tagesabschluss + Gewichtsvorschläge für archivierte/substituierte Übungen korrigiert',
 ];
 
 /**
